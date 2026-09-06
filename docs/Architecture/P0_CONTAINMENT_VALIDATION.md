@@ -35,17 +35,18 @@ Will, so every mobile-surface finding below is real shipped exposure rather than
 
 ## Validation summary
 
-| ID       | Package                                    | Audit status | **Validated status**                                  | Migration needed         |
-| -------- | ------------------------------------------ | ------------ | ----------------------------------------------------- | ------------------------ |
-| PSEC-01  | Token & telemetry containment (APO-01)     | P0 Shipped   | **Confirmed — worse than recorded**                   | No                       |
-| PSEC-02a | Telemetry payloads (APO-02)                | P0 Shipped   | **Confirmed**                                         | No                       |
-| PSEC-02b | Tenant-seal read/write paths               | P0 Shipped   | **Mostly confirmed; 1 item already fixed, 2 broader** | No                       |
-| PSEC-03  | Global cache flush (APO-04)                | P0 Shipped   | **Confirmed**                                         | No                       |
-| PSEC-04  | Logout / account-switch purge (TA-01)      | P0 Partial   | **Confirmed — worse than recorded**                   | No                       |
-| PSEC-05  | Raw presentation (TA-02)                   | P0 Shipped   | **Confirmed, different mechanism**                    | No                       |
-| PSEC-06  | Share capture (CC-05)                      | P0 Shipped   | **Confirmed; audit wrong on the cause**               | No                       |
-| PSEC-07  | Native notification contract (NOTIF-01/02) | P0 Shipped   | **Confirmed — contract is unsatisfiable**             | No                       |
-| PSEC-08  | Connector credential encryption (INT-01)   | P0 Planned   | **Confirmed; partly fixable, partly blocked**         | Phase 1 no / phase 2 yes |
+| ID       | Package                                    | Audit status | **Validated status**                                  | Migration needed |
+| -------- | ------------------------------------------ | ------------ | ----------------------------------------------------- | ---------------- |
+| PSEC-01  | Token & telemetry containment (APO-01)     | P0 Shipped   | **Confirmed — worse than recorded**                   | No               |
+| PSEC-02a | Telemetry payloads (APO-02)                | P0 Shipped   | **Confirmed**                                         | No               |
+| PSEC-02b | Tenant-seal read/write paths               | P0 Shipped   | **Mostly confirmed; 1 item already fixed, 2 broader** | No               |
+| PSEC-03  | Global cache flush (APO-04)                | P0 Shipped   | **Confirmed**                                         | No               |
+| PSEC-04  | Logout / account-switch purge (TA-01)      | P0 Partial   | **Confirmed — worse than recorded**                   | No               |
+| PSEC-05  | Raw presentation (TA-02)                   | P0 Shipped   | **Confirmed, different mechanism**                    | No               |
+| PSEC-06  | Share capture (CC-05)                      | P0 Shipped   | **Confirmed; audit wrong on the cause**               | No               |
+| PSEC-07  | Native notification contract (NOTIF-01/02) | P0 Shipped   | **Confirmed — contract is unsatisfiable**             | No               |
+| PSEC-08  | Connector credential encryption (INT-01)   | P0 Planned   | **Confirmed; both phases now shipped**                | No               |
+| NOTIF-03 | Notification preference taxonomy           | Not recorded | **New finding — 4 of 5 toggles were decorative**      | No               |
 
 ### Corrections to the audit record
 
@@ -72,6 +73,14 @@ Will, so every mobile-surface finding below is real shipped exposure rather than
 6. **The audit's `webhook_secret` "constant-time lookup" risk does not apply.** `webhook_secret`, `access_token` and
    `refresh_token` appear in **zero** `where()` clauses repo-wide — they are only read as model attributes. This is
    what makes PSEC-08 phase 1 safe and migration-free.
+7. **PSEC-08 phase 2 needed no migration after all, and the "~67 call sites" figure was wrong.** A cast is
+   transparent, so no call site changed. What mattered was whether any SQL JSON path touches a secret leaf; all
+   eleven were checked and none does. See PSEC-08 below.
+8. **The notification preference taxonomy is a finding the audit did not record** — four of the five mobile
+   categories gated notifications that do not exist, while three real types had no toggle. Filed here as NOTIF-03.
+9. **`Integration::configuration` was leaking into the activity log too.** The phase 1 write-up spotted this for
+   `IntegrationGroup` but not for `Integration`, which logs `configuration` via `logFillable()` with no `logExcept`
+   — so Hevy and Goodreads API keys kept landing in the changelog.
 
 ---
 
@@ -114,8 +123,16 @@ iOS session can mint for itself.** There is no ability allowlist anywhere in the
 5. **Tests**: rewrite `store_defaults_to_wildcard_when_no_abilities_given` to assert 422; add cases for `[]`, `['*']`,
    `['ios:*']`, an unknown ability, and non-subset delegation.
 
-No migration. **Operational follow-up, not code:** inventory `personal_access_tokens` for `["*"]` by provenance and
-decide revocation — that is the incident half of PSEC-01 and needs the user's call.
+No migration.
+
+**The incident half — shipped: revoke all now.** The code change stops new wildcard tokens being minted; every token
+issued before it still carries `["*"]` and still satisfies every `tokenCan()` in the application, including the
+non-delegable `ios:read`, `ios:write` and `mcp:read` the allowlist deliberately withholds. The Product Owner's decision
+was to **revoke all of them**, so `tokens:revoke-wildcard` ships alongside: `--dry-run` prints the inventory by
+provenance (id, name, owner, created, last used) so the blast radius can be read before anything is destroyed, and the
+live run deletes each token together with its paired `oauth_refresh_tokens` row in one transaction — otherwise the
+refresh token would simply mint a replacement. Same resumable, idempotent shape as
+`integrations:encrypt-credentials`.
 
 ---
 
@@ -150,6 +167,19 @@ retention/deletion response — again the user's call, not code.
 
 ---
 
+### Historical Sentry events — **accepted risk, no action**
+
+The rewrite stops new leakage; it does nothing about events already in Sentry, which include query maps, request
+bodies and response bodies captured before it. The Product Owner's decision is to **accept the exposure and move on**:
+the events are being left in place, un-deleted, with no user notification.
+
+Recorded here in the same voice ADRs 0003 and 0004 use for the deferred DB-level tenancy hardening. Naming an accepted
+risk beats leaving it undocumented, and the deliberate decision is what distinguishes it from an oversight. Anyone
+revisiting it should know the exposure window is bounded by the deploy of `SentryMobileApiLogging`'s allowlist rewrite,
+and that the leaked material is mobile API request/response content for whoever used the app in that window.
+
+---
+
 ## PSEC-02b — Tenant-seal shipped read/write paths
 
 **Validated per component.** No policy layer and no global scopes exist on `Event`/`Block`/`EventObject`, so every fix
@@ -167,12 +197,37 @@ both `bulkRestore` and `bulkDelete`, and cascades to an unscoped **hard** delete
 `task-pipeline-overview.blade.php` is unscoped in six read properties _and_ at `:358`/`:363` (`TaskExecution::find`) and
 `:377` (`Event::find`), the last feeding a `ProcessTaskPipelineJob` write against another user's event. Not in the
 audit: `pending-links.blade.php` (4 unscoped `Relationship` mutations) and `search.blade.php:88` (every user's raw
-search strings). `sense-check.blade.php` contains no ownership reference at all and needs its own pass.
+search strings). `sense-check.blade.php` contains no ownership reference at all and needs its own pass — see below, it was the last
+gap closed.
 
 **MVC:** re-resolve selected IDs through the component's own already-scoped listing query inside the mutation — add the
 `user_id` predicate (or the `integration.user_id` join for `Event`/`Block`) to each `whereIn`, and swap
 `TaskExecution::find` for the existing `scopeForUser`. This keeps admin tenant-local, which is ADR 0003's stated policy
 and the roadmap's own recommendation, and defers the separate global-operator role entirely.
+
+### APO-06 — the sense-check page (confirmed, shipped last)
+
+Eighteen unscoped read queries: three orphan hunts, five integration-validity checks, six embedding-coverage counts and
+four type-catalogue aggregates. Read-only, routed at `routes/web.php:331`, and behind the same `admin` middleware every
+sibling page uses — which gates power-user tooling, not cross-tenant access.
+
+Two of the checks needed more than a predicate, and the reason is worth recording because it is not obvious from the
+call site. `Event::integration()` (`Event.php:140`) and `Block::event()` (`Block.php:246`) are both `->withTrashed()`
+relations, so "orphaned" does not mean the parent is in the bin — it means the parent row is **gone**, taking its
+`user_id` with it:
+
+- An orphaned **event** is attributed through its actor/target objects, which carry `user_id` directly (`objects.user_id`)
+  and outlive the integration.
+- An orphaned **block** carries no `user_id` and no foreign key but `event_id`, so a dangling one cannot be attributed
+  to anybody. It is now shown to **nobody** rather than to everybody. A cross-tenant integrity sweep belongs in an
+  artisan command run by an operator, not in a per-user page.
+
+Both states are in fact unreachable behind the current `RESTRICT` foreign keys (`events.integration_id` is `NOT NULL`;
+`blocks.event_id` is nullable but constrained), so the regression tests reproduce them by dropping the constraint inside
+the test transaction — the referential corruption those checks exist to find.
+
+The integrations check also carried a latent OR-precedence bug — `whereNull(...)->orWhereDoesntHave(...)` — that the new
+owner predicate would have escaped, so its two conditions are now grouped.
 
 ### CC-01 — Spotlight lexical search (confirmed)
 
@@ -278,12 +333,45 @@ The codebase already knows how: `app/Models/LiveActivityToken.php:42` uses `'pus
 5. Tests: cast round-trip, backfill idempotency on mixed plaintext/ciphertext, redaction of API/serialisation/activity
    -log output.
 
-### Phase 2 — **not proposed**
+### Phase 2 — **shipped: leaf-value cast, no migration**
 
-Encrypting the JSON-embedded keys (Immich/Goodreads `auth_metadata.api_key`, Hevy `configuration.api_key`) cannot be
-done without either a column-type migration or a custom cast that encrypts only known secret leaf values while keeping
-the JSON structurally valid. The latter avoids a migration but is a substantial change touching ~67 call sites and
-needs its own design. Given the caution instruction, phase 1 ships alone and phase 2 is written up as a follow-up.
+The Product Owner chose the cast over a column-type migration, consistent with the caution instruction.
+`App\Casts\EncryptedJsonSecrets` encrypts only the secret leaves of `auth_metadata` and `configuration`, leaving the
+JSON structurally valid so all eleven SQL JSON paths keep working unchanged.
+
+The "~67 call sites" estimate in the phase 1 write-up was wrong, and worth correcting: **a cast is transparent, so no
+call site changed at all.** The plugins' array reads and writes are untouched. What the estimate should have counted
+was the risk that a JSON path query hits an encrypted leaf — and every one of the eleven was checked
+(`auth_metadata->gocardless_reference`, ten `configuration->migration_*` writes). None touches a secret key.
+
+Two rules, both deliberately narrower than `sensitive_log_keys()` — that list is tuned for logging, where
+over-redaction is free, and includes `key`, `auth` and `server_url`, which carry ordinary configuration here:
+
+- **Secret leaf keys**, encrypted individually: `access_token`, `api_key`, `api_token`, `client_secret`, `password`,
+  `refresh_token`, `secret`, `token`, `webhook_secret`.
+- **Secret subtrees**, every leaf encrypted whatever its own key is called: `cookies`. Fetch stores per-domain session
+  cookies at `auth_metadata.domains.{domain}.cookies` as arbitrary name/value pairs, which name matching cannot reach.
+  The phase 1 write-up missed these entirely.
+
+Reads fall back to the raw value when decryption fails, so rows the backfill has not reached still read correctly.
+There is no flag day and no deploy/backfill ordering requirement. `integrations:encrypt-credentials` now covers both
+the `text` columns and the `jsonb` leaves in two passes.
+
+Verified against the integration, migration and fetch suites: an **identical failure set with and without the cast**
+(20 pre-existing failures, no regressions).
+
+### The activity-log remediation — **shipped: redact, do not delete**
+
+Item 3 of phase 1 flagged that existing `activity_log` rows hold plaintext credentials, and left the retention call to
+the Product Owner. The decision was to **redact the values in place** rather than delete the rows: the audit trail is
+the point of the table, and every non-secret field in each diff survives.
+
+`activity-log:redact-credentials` rewrites the rows already written. `App\Traits\RedactsLoggedProperties` stops new
+ones, on both `IntegrationGroup` and `Integration` — the latter is a gap the phase 1 write-up did not spot, since
+`Integration` logs `configuration` via `logFillable()` with no `logExcept`, so Hevy and Goodreads API keys kept landing
+in the changelog. The trait taps each activity through the existing `sanitizeData()`, so only the secret leaves are
+replaced and the rest of the diff is preserved — strictly better than widening `logExcept`, which would have thrown
+away every legitimate settings change alongside the secret.
 
 ---
 
@@ -494,10 +582,55 @@ No migration. Item 1 is a **product decision** as much as a code change — see 
 
 ---
 
+## NOTIF-03 — The notification preference taxonomy
+
+**Validated: confirmed, and it made four of five toggles decorative.**
+
+The mobile API named five categories — `anomaly`, `digest`, `integration_failed`, `new_bookmark`, `calendar_event` —
+in `NotificationPreferencesController::CATEGORIES` and `NotificationSettingsController::CATEGORIES`. Only
+`integration_failed` corresponds to a notification Spark ever sends.
+
+That is not merely cosmetic, because `SparkNotification::via()` gates delivery on
+`hasPushNotificationsEnabledForType($this->getNotificationType())` — keyed by the **real** type string. So the four
+invented toggles wrote `push_types` keys nothing ever reads, and three types that are sent
+(`cookie_expiry_warning`, `fetch_content_changed`, `fetch_multiple_failures`) had no toggle at all. The web settings
+page kept its own hand-maintained list, which had fallen the same three types behind.
+
+The client side was worse than unhelpful: `NotificationPreferences.Category` in SparkKit carried the same five cases,
+and its decoder drops unrecognised keys — so the moment the server returned the real types, the Settings screen would
+have rendered an empty Categories section and saved an empty set.
+
+### Minimum viable change — shipped
+
+`App\Notifications\NotificationCatalogue` is the single source of truth, enumerated from the eleven classes that
+declare `getNotificationType()`. Four consumers derive from it: both mobile settings controllers, the web settings
+page, and `ApnsChannel`'s category map. The iOS client mirrors it in `NotificationPreferences.Category` and a new
+`PushCategory` enum used directly in `registerNotificationCategories()`.
+
+The APNs categories are regrouped so each one's action set is honest:
+
+| Category                | Actions         | Types                                                        |
+| ----------------------- | --------------- | ------------------------------------------------------------ |
+| `INTEGRATION_ATTENTION` | Reconnect, View | `integration_authentication_failed`, `cookie_expiry_warning` |
+| `INTEGRATION_STATUS`    | View            | the six sync/import outcomes                                 |
+| `SYSTEM`                | View            | `data_export_ready`, `system_maintenance`, `test_push`       |
+
+`ACKNOWLEDGE` and `SNOOZE` are withdrawn along with the categories that offered them.
+
+Drift protection is the point, so it is tested from both ends: two backend contract tests walk `app/Notifications`
+reflectively in both directions (no catalogue entry without a class, no class without an entry), and SparkKitTests —
+the layer CI can actually run — asserts both client raw-value sets against the backend lists.
+
+**Three existing test files encoded the invented taxonomy as intended behaviour** and were rewritten against the
+catalogue rather than re-hand-listed. That is the third time in this piece of work that a test has been found
+asserting the defect; it is worth treating as a pattern rather than three coincidences.
+
+---
+
 ## What shipped in this change
 
-Commit `f6562fd` on `claude/spark-product-priorities-b49ppr` implements the backend subset. No migration was
-introduced.
+`claude/spark-product-priorities-b49ppr` implements the backend work, from `f6562fd` through the six
+decision-driven commits that closed it out. **No migration was introduced anywhere.**
 
 | Item             | Landed                                                                                                                                                                                                                            |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -509,8 +642,13 @@ introduced.
 | PSEC-05 (web)    | malformed Blade in `objects/show.blade.php` repaired                                                                                                                                                                              |
 | PSEC-07 (server) | If-Match dropped from the two idempotent notification routes; `version` on `CompactNotificationResource`; strong ETag from `MeController`; `ApnsChannel::CLIENT_CATEGORIES`                                                       |
 | PSEC-08 phase 1  | three `encrypted` casts; `integrations:encrypt-credentials` backfill command; `logExcept()`; Hevy copy corrected                                                                                                                  |
+| PSEC-01 sweep    | `tokens:revoke-wildcard` — inventory then revoke, access token and paired refresh token together                                                                                                                                  |
+| PSEC-02b final   | `sense-check.blade.php` scoped, all 18 queries; orphan checks attributed through the surviving ownership path                                                                                                                     |
+| PSEC-08 phase 2  | `EncryptedJsonSecrets` leaf-value cast on `auth_metadata` and `configuration`; backfill extended to both jsonb columns                                                                                                            |
+| activity_log     | `RedactsLoggedProperties` on both models; `activity-log:redact-credentials` rewrites historical rows in place                                                                                                                     |
+| NOTIF-03         | `NotificationCatalogue` as the single source of truth for both mobile controllers, the web settings page, `ApnsChannel`, and the iOS client's category registrations                                                              |
 
-Nine test files added or rewritten, all using `#[Test]`.
+Fifteen test files added or rewritten, all using `#[Test]`.
 
 ### Deliberate behaviour changes worth knowing about
 
@@ -521,6 +659,15 @@ Nine test files added or rewritten, all using `#[Test]`.
   name the capability they need.
 - **Marking notifications read no longer takes a precondition.** See the decision list below — this is a contract
   change.
+- **`GET`/`PATCH /settings/notifications` no longer offers `anomaly`, `digest`, `new_bookmark` or `calendar_event`,
+  and now offers ten real types instead.** Breaking for any client that hard-codes the old set; `mobile_API.md` and
+  the OpenAPI spec are updated, and the spec's `NotificationType` enum was verified against
+  `NotificationCatalogue::configurableTypes()` rather than transcribed.
+- **APNs categories are now `INTEGRATION_ATTENTION`, `INTEGRATION_STATUS` and `SYSTEM`.** A client that has not
+  shipped the matching `UNNotificationCategory` registrations shows no action buttons — the same failure mode as
+  before, so no worse, but the client change should ship together with this.
+- **Three commands can touch production and none runs itself.** All take `--dry-run`; see the rollout order under
+  Verification.
 
 ## Not implemented — proposal only
 
@@ -529,20 +676,28 @@ tested, and committing unverified Swift would be worse than leaving it. Each ite
 targets. Note `SparkShare` is absent from the `SparkApp` test scheme, so CI would not catch a regression in
 PSEC-06 either — adding it is part of that fix.
 
-**Needs your decision:**
+**Decisions taken — all six are now closed:**
 
-1. **Wildcard-token revocation** — inventory `personal_access_tokens` for `["*"]` by provenance, then revoke-all
-   versus a notified rotation window.
-2. **Sentry exposure response** — window, deletion, whether users are told.
-3. **Plaintext credentials already in `activity_log`** — a finding the audit did not record. `logFillable()` has
-   been writing `access_token`/`refresh_token`/`webhook_secret` into changelog diffs. Purge or retain?
-4. **Notification preconditions** — I dropped `if-match` from `read-all` and `{id}/read` because they are
-   idempotent and the precondition cost the entire feature for no lost-update protection. That is a contract
-   change and is reversible if you disagree.
-5. **Admin authority** — tenant-local (implemented, and what ADR 0003 says) versus a distinct audited
-   global-operator role.
-6. **PSEC-08 phase 2** — the JSON-embedded secrets. Needs a column-type migration or a leaf-value cast touching
-   ~67 call sites. Not proposed here.
+| #   | Question                                | Decision                             | Outcome                                                       |
+| --- | --------------------------------------- | ------------------------------------ | ------------------------------------------------------------- |
+| 1   | Wildcard-token revocation               | **Revoke all now**                   | `tokens:revoke-wildcard` — see PSEC-01                        |
+| 2   | Sentry exposure response                | **Accept and move on**               | Recorded as an accepted risk under PSEC-02a                   |
+| 3   | Plaintext credentials in `activity_log` | **Redact the values, keep the rows** | `RedactsLoggedProperties` + `activity-log:redact-credentials` |
+| 4   | PSEC-08 phase 2                         | **Leaf-value cast, no migration**    | `EncryptedJsonSecrets` — see PSEC-08                          |
+| 5   | Notification preference taxonomy        | **Rebuild from the real types**      | `NotificationCatalogue` — see NOTIF-03                        |
+| 6   | `sense-check.blade.php`                 | **Scope to the signed-in user**      | See APO-06 under PSEC-02b                                     |
+
+**Still standing, unchanged:**
+
+- **Notification preconditions** — `if-match` was dropped from `read-all` and `{id}/read` because they are idempotent
+  and the precondition cost the entire feature for no lost-update protection. That is a contract change and is
+  reversible if you disagree.
+- **Admin authority** — tenant-local (implemented, and what ADR 0003 says) versus a distinct audited global-operator
+  role. The sense-check fix assumes tenant-local, consistent with every sibling page.
+- **`DailyDigestReady` has no APNs path.** It is a real notification but declares no `getNotificationType()` and
+  delivers over `WebPushChannel` only, so the client's old `DIGEST` category had no producer and has been withdrawn
+  rather than kept hollow. Giving the digest a type string and an APNs path is a feature, not containment, so it is
+  flagged here rather than folded in.
 
 **Adjacent, and it gates the evidence for all of the above:** APO-05. **767 test methods across 90 files do not
 run** under PHPUnit 13.1.14 because they carry only `@test` docblocks, and CI still cannot fail on a crash or a
@@ -581,7 +736,12 @@ vendor/bin/sail artisan test tests/Feature/Admin               # PSEC-02b admin
 vendor/bin/sail artisan test --filter=Spotlight                # PSEC-02b search
 vendor/bin/sail artisan test --filter=Receipt                  # PSEC-02b receipts
 vendor/bin/sail artisan test --filter=Notification             # PSEC-07
-vendor/bin/sail artisan test --filter=IntegrationGroupCredentialEncryption   # PSEC-08
+vendor/bin/sail artisan test --filter=IntegrationGroupCredentialEncryption   # PSEC-08 phase 1
+vendor/bin/sail artisan test --filter=EncryptedJsonSecrets      # PSEC-08 phase 2
+vendor/bin/sail artisan test --filter=RevokeWildcardTokens      # PSEC-01 sweep
+vendor/bin/sail artisan test --filter=RedactActivityLogCredentials  # activity log
+vendor/bin/sail artisan test --filter=SenseCheckTenancy         # PSEC-02b final gap
+vendor/bin/sail artisan test --filter=NotificationContract      # NOTIF-03
 vendor/bin/sail artisan test --filter=Logout                   # PSEC-04
 vendor/bin/sail artisan test tests/Feature/Tags                # PSEC-02b tags
 vendor/bin/sail bin duster fix                                 # required before finalising
@@ -599,7 +759,19 @@ pass.
 - After the backfill, `SELECT access_token FROM integration_groups LIMIT 1` shows ciphertext **and** the integration
   still authenticates against its provider. Run against a staging copy first — this rewrites live credentials.
 - Two-user pass on the Spotlight palette and the web tag catalogue.
-- A real-device push whose category now matches: the action buttons appear.
+- A real-device push whose category now matches: the action buttons appear — `INTEGRATION_ATTENTION` shows Reconnect,
+  `INTEGRATION_STATUS` and `SYSTEM` show View.
+- `php artisan tokens:revoke-wildcard --dry-run` against production, read the inventory, then run it for real. Every
+  client holding a `*` token must then re-authenticate with explicit abilities from `SparkAbility::DELEGABLE`.
+- Two-user pass on the admin sense-check page.
+
+**Rollout order.** The commands are deliberately separate from the code, so production is only touched when you choose:
+
+1. `integrations:encrypt-credentials` — safe at any time; the cast reads un-backfilled rows transparently.
+2. `activity-log:redact-credentials` — rewrites historical audit rows in place.
+3. `tokens:revoke-wildcard` — last, because it forces every client to re-authenticate.
+
+All three take `--dry-run`, and all three are idempotent and resumable.
 
 **iOS** — not verifiable here. Needs Xcode 27 + `tuist generate`, `swift test` in `Packages/SparkKit`, and
 `xcodebuild ... test` on the `SparkApp` scheme.
