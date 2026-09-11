@@ -171,6 +171,11 @@ class FlintDigestsController extends Controller
                 $base['answer_note'] = $meta['answer_note'] ?? null;
                 $base['answered_at'] = $meta['answered_at'] ?? null;
                 $base['answered'] = ! is_null($meta['answer'] ?? null);
+            } elseif ($block->block_type === 'flint_day_context') {
+                // Structured JSON, not markdown prose — skip linkify() entirely so
+                // an incidental `[[event:...]]`-shaped substring in a title can't
+                // get rewritten and corrupt the payload.
+                $base['day_context'] = $block->metadata['day_context'] ?? null;
             } else {
                 $references = collect($block->metadata['referenced_event_ids'] ?? [])
                     ->map(fn ($id) => $referenceLookup->get($id))

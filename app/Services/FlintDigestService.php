@@ -37,6 +37,19 @@ class FlintDigestService
             'blocks.*.priority' => ['nullable', 'in:low,medium,high'],
             'blocks.*.answer_options' => ['nullable', 'array', 'max:20'],
             'blocks.*.answer_options.*' => ['string', 'max:255'],
+            'blocks.*.day_context' => ['nullable', 'array'],
+            'blocks.*.day_context.calendar' => ['nullable', 'array', 'max:20'],
+            'blocks.*.day_context.calendar.*.title' => ['required_with:blocks.*.day_context.calendar', 'string', 'max:255'],
+            'blocks.*.day_context.calendar.*.all_day' => ['nullable', 'boolean'],
+            'blocks.*.day_context.calendar.*.start' => ['nullable', 'date'],
+            'blocks.*.day_context.calendar.*.person' => ['nullable', 'in:will,dan'],
+            'blocks.*.day_context.birthdays' => ['nullable', 'array', 'max:10'],
+            'blocks.*.day_context.birthdays.*.title' => ['required_with:blocks.*.day_context.birthdays', 'string', 'max:255'],
+            'blocks.*.day_context.weather' => ['nullable', 'array'],
+            'blocks.*.day_context.weather.location' => ['nullable', 'string', 'max:255'],
+            'blocks.*.day_context.weather.condition' => ['nullable', 'string', 'max:100'],
+            'blocks.*.day_context.weather.temp_high_c' => ['nullable', 'numeric'],
+            'blocks.*.day_context.weather.rain_probability_pct' => ['nullable', 'integer', 'min:0', 'max:100'],
         ])->validate();
 
         $date = Carbon::parse(
@@ -182,8 +195,8 @@ class FlintDigestService
         ]);
 
         foreach ($blocks as $block) {
-            $blockMetadata = $block['block_type'] === 'flint_user_question'
-                ? [
+            $blockMetadata = match (true) {
+                $block['block_type'] === 'flint_user_question' => [
                     'question' => $block['question'] ?? $block['title'],
                     'topic' => $block['topic'] ?? null,
                     'priority' => $block['priority'] ?? 'medium',
@@ -191,11 +204,15 @@ class FlintDigestService
                     'answer' => null,
                     'answer_note' => null,
                     'answered_at' => null,
-                ]
-                : [
+                ],
+                $block['block_type'] === 'flint_day_context' => [
+                    'day_context' => $this->normalizeDayContext($block['day_context'] ?? []),
+                ],
+                default => [
                     'content' => $block['content'] ?? '',
                     'referenced_event_ids' => $block['referenced_event_ids'] ?? [],
-                ];
+                ],
+            };
             $event->createBlock([
                 'block_type' => $block['block_type'],
                 'title' => $block['title'],
@@ -229,5 +246,37 @@ class FlintDigestService
             now()->hour <= 16 => 'afternoon',
             default => 'evening',
         };
+    }
+
+    /**
+     * Defaults a missing/invalid calendar entry's `person` to "will" server-side
+     * rather than rejecting the whole digest write over one field the skill got
+     * wrong — a validation failure here fails the entire routine run.
+     *
+     * @param  array<string, mixed>  $dayContext
+     * @return array<string, mixed>
+     */
+    private function normalizeDayContext(array $dayContext): array
+    {
+        $calendar = collect($dayContext['calendar'] ?? [])
+            ->map(fn (array $entry) => [
+                'title' => $entry['title'] ?? '',
+                'all_day' => (bool) ($entry['all_day'] ?? false),
+                'start' => $entry['start'] ?? null,
+                'person' => in_array($entry['person'] ?? null, ['will', 'dan'], true) ? $entry['person'] : 'will',
+            ])
+            ->values()
+            ->all();
+
+        $birthdays = collect($dayContext['birthdays'] ?? [])
+            ->map(fn (array $entry) => ['title' => $entry['title'] ?? ''])
+            ->values()
+            ->all();
+
+        return [
+            'calendar' => $calendar,
+            'birthdays' => $birthdays,
+            'weather' => $dayContext['weather'] ?? null,
+        ];
     }
 }

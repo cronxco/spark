@@ -129,10 +129,10 @@ Cursor-paginated list of the user's tags, each annotated with usage counts.
 **Query parameters**
 
 | Parameter | Type    | Default | Description                          |
-| --------- | ------- | ------- | ------------------------------------- |
+| --------- | ------- | ------- | ------------------------------------ |
 | `q`       | string  | —       | Filter by tag name or type (max 255) |
-| `cursor`  | string  | —       | Opaque pagination cursor              |
-| `limit`   | integer | 30      | Items per page (max 100)              |
+| `cursor`  | string  | —       | Opaque pagination cursor             |
+| `limit`   | integer | 30      | Items per page (max 100)             |
 
 **Response `200`**
 
@@ -177,11 +177,36 @@ objects, and blocks it's attached to, newest first.
 
 ```json
 {
-    "tag": { "id": "12", "name": "running", "type": "spark", "events_count": 42, "objects_count": 3, "total_count": 45 },
+    "tag": {
+        "id": "12",
+        "name": "running",
+        "type": "spark",
+        "events_count": 42,
+        "objects_count": 3,
+        "total_count": 45
+    },
     "data": [
-        { "kind": "event", "id": "uuid", "title": "5K Run", "subtitle": "2026-05-10T07:02:00+00:00", "domain": "health" },
-        { "kind": "object", "id": "uuid", "title": "Personal", "subtitle": "account", "concept": "account" },
-        { "kind": "block", "id": "uuid", "title": "Heart Rate", "subtitle": "biometric", "block_type": "biometric" }
+        {
+            "kind": "event",
+            "id": "uuid",
+            "title": "5K Run",
+            "subtitle": "2026-05-10T07:02:00+00:00",
+            "domain": "health"
+        },
+        {
+            "kind": "object",
+            "id": "uuid",
+            "title": "Personal",
+            "subtitle": "account",
+            "concept": "account"
+        },
+        {
+            "kind": "block",
+            "id": "uuid",
+            "title": "Heart Rate",
+            "subtitle": "biometric",
+            "block_type": "biometric"
+        }
     ],
     "next_cursor": null,
     "has_more": false
@@ -247,7 +272,12 @@ Morning/afternoon check-in completion status for a date.
 ```json
 {
     "date": "2026-05-10",
-    "morning": { "completed": true, "physical": 4, "mental": 3, "event_id": "uuid" },
+    "morning": {
+        "completed": true,
+        "physical": 4,
+        "mental": 3,
+        "event_id": "uuid"
+    },
     "afternoon": { "completed": false }
 }
 ```
@@ -281,13 +311,25 @@ check-ins).
             "id": "uuid",
             "type": "flint_digest",
             "caught_up_at": null,
-            "payload": { "date": "2026-05-10", "period": "morning", "title": "Morning Digest", "summary": "...", "block_count": 4, "unanswered_question_count": 1 }
+            "payload": {
+                "date": "2026-05-10",
+                "period": "morning",
+                "title": "Morning Digest",
+                "summary": "...",
+                "block_count": 4,
+                "unanswered_question_count": 1
+            }
         },
         {
             "id": "morning:2026-05-10",
             "type": "check_in",
             "caught_up_at": "2026-05-10T07:15:00+00:00",
-            "payload": { "period": "morning", "date": "2026-05-10", "completed": true, "event_id": "uuid" }
+            "payload": {
+                "period": "morning",
+                "date": "2026-05-10",
+                "completed": true,
+                "event_id": "uuid"
+            }
         }
     ]
 }
@@ -340,8 +382,17 @@ service name (`integrations:sync`).
 {
     "service": "oura",
     "integrations": [
-        { "integration_id": "uuid", "status": "triggered", "jobs_dispatched": 1 },
-        { "integration_id": "uuid", "status": "skipped", "reason": "paused", "jobs_dispatched": 0 }
+        {
+            "integration_id": "uuid",
+            "status": "triggered",
+            "jobs_dispatched": 1
+        },
+        {
+            "integration_id": "uuid",
+            "status": "skipped",
+            "reason": "paused",
+            "jobs_dispatched": 0
+        }
     ],
     "total_jobs_dispatched": 1
 }
@@ -444,17 +495,17 @@ Creates a manual account.
 }
 ```
 
-| Field                  | Type    | Required | Notes                                                                                |
-| ----------------------- | ------- | -------- | ------------------------------------------------------------------------------------- |
-| `name`                 | string  | Yes      | max 255                                                                              |
-| `account_type`         | string  | Yes      | `current_account`, `savings_account`, `mortgage`, `investment_account`, `credit_card`, `loan`, `pension`, `other` |
-| `currency`             | string  | Yes      | `GBP`, `USD`, `EUR`                                                                  |
-| `provider`             | string  | No       | max 255                                                                              |
-| `account_number`       | string  | No       | max 255                                                                              |
-| `sort_code`            | string  | No       | max 8                                                                                |
-| `interest_rate`        | number  | No       | 0–100                                                                                |
-| `start_date`           | date    | No       | `YYYY-MM-DD`                                                                         |
-| `is_negative_balance`  | boolean | No       | Forced `true` for `credit_card`/`loan`/`mortgage` regardless of what's sent          |
+| Field                 | Type    | Required | Notes                                                                                                             |
+| --------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
+| `name`                | string  | Yes      | max 255                                                                                                           |
+| `account_type`        | string  | Yes      | `current_account`, `savings_account`, `mortgage`, `investment_account`, `credit_card`, `loan`, `pension`, `other` |
+| `currency`            | string  | Yes      | `GBP`, `USD`, `EUR`                                                                                               |
+| `provider`            | string  | No       | max 255                                                                                                           |
+| `account_number`      | string  | No       | max 255                                                                                                           |
+| `sort_code`           | string  | No       | max 8                                                                                                             |
+| `interest_rate`       | number  | No       | 0–100                                                                                                             |
+| `start_date`          | date    | No       | `YYYY-MM-DD`                                                                                                      |
+| `is_negative_balance` | boolean | No       | Forced `true` for `credit_card`/`loan`/`mortgage` regardless of what's sent                                       |
 
 **Response `201`**: `{"data": MoneyAccount}` (no balance yet).
 
@@ -656,7 +707,45 @@ documented once to avoid drift.
 ```
 
 Non-question blocks instead carry `content` (markdown, with `[[event:...]]`
-references linkified) and an optional `references` array.
+references linkified) and an optional `references` array — except
+`flint_day_context`, which carries a structured `day_context` field instead
+(not linkified):
+
+```json
+{
+    "id": "uuid",
+    "block_type": "flint_day_context",
+    "title": "Today at a glance",
+    "time": "2026-05-10T06:00:00+00:00",
+    "day_context": {
+        "calendar": [
+            {
+                "title": "Will · Office",
+                "all_day": false,
+                "start": "2026-05-10T09:00:00+01:00",
+                "person": "will"
+            },
+            {
+                "title": "Dan · Office",
+                "all_day": false,
+                "start": "2026-05-10T09:00:00+01:00",
+                "person": "dan"
+            }
+        ],
+        "birthdays": [{ "title": "Daniel's birthday" }],
+        "weather": {
+            "location": "London",
+            "condition": "Overcast",
+            "temp_high_c": 20,
+            "rain_probability_pct": 38
+        }
+    }
+}
+```
+
+`person` on a `calendar` entry is always `"will"` or `"dan"` — never null or another
+value. `birthdays` entries carry no `person` — a birthday isn't a commitment either of
+you is attending.
 
 ### MoneyAccount
 

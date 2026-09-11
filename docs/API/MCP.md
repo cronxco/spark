@@ -93,142 +93,142 @@ annotation; **Idempotent** likewise reflects the compiled
 
 #### `get-day-summary-tool`
 
-*Class*: `GetDaySummaryTool` · *Ability*: `insights:read` · *Read-only, idempotent*
+_Class_: `GetDaySummaryTool` · _Ability_: `insights:read` · _Read-only, idempotent_
 
 Compact, pre-aggregated summary for one or more dates — structured domain
 sections (health, activity, money, media, knowledge) with baseline
 comparisons and anomaly detection. Preferred over `get-day-context-tool`
 for daily briefings.
 
-| Parameter | Type            | Required | Default    | Notes                                                        |
-| --------- | ---------------- | -------- | ---------- | -------------------------------------------------------------- |
-| `dates`   | array of string  | No       | `["today"]` | ISO or relative (`today`, `yesterday`, `tomorrow`)            |
-| `domains` | array of enum    | No       | all        | `health`, `activity`, `money`, `media`, `knowledge`            |
+| Parameter | Type            | Required | Default     | Notes                                               |
+| --------- | --------------- | -------- | ----------- | --------------------------------------------------- |
+| `dates`   | array of string | No       | `["today"]` | ISO or relative (`today`, `yesterday`, `tomorrow`)  |
+| `domains` | array of enum   | No       | all         | `health`, `activity`, `money`, `media`, `knowledge` |
 
 #### `get-day-context-tool`
 
-*Class*: `GetDayContextTool` · *Ability*: `insights:read` · *Read-only, idempotent*
+_Class_: `GetDayContextTool` · _Ability_: `insights:read` · _Read-only, idempotent_
 
 Full raw day context — events, metrics, and relationships for one date,
 grouped by service/action/hour, plus service breakdown. Larger response
 than `get-day-summary-tool`; prefer that unless you need the raw detail.
 Mirrors the `day-context-resource` MCP resource below.
 
-| Parameter | Type          | Required | Default | Notes                                                    |
-| --------- | -------------- | -------- | ------- | ----------------------------------------------------------- |
-| `date`    | string         | No       | `today` | ISO or relative (`today`, `yesterday`, `tomorrow`)          |
-| `domains` | array of enum  | No       | all     | `health`, `money`, `media`, `knowledge`, `online`           |
+| Parameter | Type          | Required | Default | Notes                                              |
+| --------- | ------------- | -------- | ------- | -------------------------------------------------- |
+| `date`    | string        | No       | `today` | ISO or relative (`today`, `yesterday`, `tomorrow`) |
+| `domains` | array of enum | No       | all     | `health`, `money`, `media`, `knowledge`, `online`  |
 
 #### `get-service-status-tool`
 
-*Class*: `GetServiceStatusTool` · *Ability*: `insights:read` · *Read-only, idempotent*
+_Class_: `GetServiceStatusTool` · _Ability_: `insights:read` · _Read-only, idempotent_
 
 Sync status and data coverage for all services on a given date — event
 count, last event time, distinct actions, coverage notes for services with
 known sync lag (e.g. Apple Health).
 
-| Parameter | Type   | Required | Default | Notes |
-| --------- | ------ | -------- | ------- | ----- |
+| Parameter | Type   | Required | Default | Notes           |
+| --------- | ------ | -------- | ------- | --------------- |
 | `date`    | string | No       | `today` | ISO or relative |
 
 #### `get-check-ins`
 
-*Class*: `GetCheckInsTool` · *Ability*: `insights:read` · *Read-only, idempotent*
+_Class_: `GetCheckInsTool` · _Ability_: `insights:read` · _Read-only, idempotent_
 
 Morning and afternoon daily check-in records for a date, including
 completion and recorded energy values.
 
-| Parameter | Type   | Required | Default | Notes                       |
-| --------- | ------ | -------- | ------- | ----------------------------- |
+| Parameter | Type   | Required | Default | Notes                              |
+| --------- | ------ | -------- | ------- | ---------------------------------- |
 | `date`    | string | No       | `today` | `YYYY-MM-DD`, `today`, `yesterday` |
 
 ### Metrics & Trends
 
 #### `get-metric-trend-tool`
 
-*Class*: `GetMetricTrendTool` · *Ability*: `insights:read` · *Read-only, idempotent*
+_Class_: `GetMetricTrendTool` · _Ability_: `insights:read` · _Read-only, idempotent_
 
 Daily metric values over a date range with baseline comparison — per-day
 values, `vs_baseline_pct`, anomaly flags, and summary statistics. Accepts
 flexible identifiers (`oura.had_sleep_score.percent`, `oura.sleep_score`);
 the `had_` prefix and unit suffix can be omitted when unambiguous.
 
-| Parameter | Type   | Required | Default        | Notes                                                                  |
-| --------- | ------ | -------- | --------------- | ------------------------------------------------------------------------- |
-| `metric`  | string | **Yes**  | —               | Dot-notation identifier                                                  |
-| `from`    | string | No       | `30_days_ago`   | ISO, relative, or range keyword (`last_7_days`, `this_week`, `last_month`) |
-| `to`      | string | No       | `today`         | ISO or relative                                                          |
+| Parameter | Type   | Required | Default       | Notes                                                                      |
+| --------- | ------ | -------- | ------------- | -------------------------------------------------------------------------- |
+| `metric`  | string | **Yes**  | —             | Dot-notation identifier                                                    |
+| `from`    | string | No       | `30_days_ago` | ISO, relative, or range keyword (`last_7_days`, `this_week`, `last_month`) |
+| `to`      | string | No       | `today`       | ISO or relative                                                            |
 
 #### `get-baselines-tool`
 
-*Class*: `GetBaselinesTool` · *Ability*: `insights:read` · *Read-only, idempotent*
+_Class_: `GetBaselinesTool` · _Ability_: `insights:read` · _Read-only, idempotent_
 
 Baseline statistics (mean, stddev, min, max, normal bounds, sample size)
 for one or more metrics. Omit `metrics` entirely to discover every
 available baseline.
 
-| Parameter | Type            | Required | Notes                            |
-| --------- | ---------------- | -------- | ----------------------------------- |
-| `metrics` | array of string  | No       | Omit to get all available baselines |
+| Parameter | Type            | Required | Notes                               |
+| --------- | --------------- | -------- | ----------------------------------- |
+| `metrics` | array of string | No       | Omit to get all available baselines |
 
 ### Precise Filtering
 
 #### `get-events-by-filter-tool`
 
-*Class*: `GetEventsByFilterTool` · *Ability*: `data:read` · *Read-only, idempotent*
+_Class_: `GetEventsByFilterTool` · _Ability_: `data:read` · _Read-only, idempotent_
 
 Exact filtering by service, action, and date range — for precise queries
 ("all Monzo transactions this week") that semantic search handles poorly.
 
-| Parameter   | Type    | Required | Default | Notes                                  |
-| ----------- | ------- | -------- | ------- | ----------------------------------------- |
-| `service`   | string  | **Yes**  | —       | e.g. `oura`, `apple_health`, `monzo`      |
-| `action`    | string  | No       | —       | Omit for all actions on the service       |
-| `from_date` | string  | No       | last 30 days | ISO, relative, or range keyword     |
-| `to_date`   | string  | No       | today   | ISO or relative                           |
-| `limit`     | integer | No       | 50      | 1–100                                     |
+| Parameter   | Type    | Required | Default      | Notes                                |
+| ----------- | ------- | -------- | ------------ | ------------------------------------ |
+| `service`   | string  | **Yes**  | —            | e.g. `oura`, `apple_health`, `monzo` |
+| `action`    | string  | No       | —            | Omit for all actions on the service  |
+| `from_date` | string  | No       | last 30 days | ISO, relative, or range keyword      |
+| `to_date`   | string  | No       | today        | ISO or relative                      |
+| `limit`     | integer | No       | 50           | 1–100                                |
 
 ### Search & Detail
 
 #### `search-events-tool` / `search-blocks-tool` / `search-objects-tool`
 
-*Classes*: `SearchEventsTool`, `SearchBlocksTool`, `SearchObjectsTool` ·
-*Ability*: `data:read` · *Read-only, idempotent*
+_Classes_: `SearchEventsTool`, `SearchBlocksTool`, `SearchObjectsTool` ·
+_Ability_: `data:read` · _Read-only, idempotent_
 
 Semantic (vector similarity) or keyword search over events, blocks, or
 objects respectively. Semantic mode adds a `similarity` score per result.
 
-| Parameter    | Type    | Required | Default | Notes                                                        | Which tool(s) |
-| ------------ | ------- | -------- | ------- | ---------------------------------------------------------------- | -------------- |
-| `query`      | string  | **Yes**  | —       | Search text                                                       | all three      |
-| `semantic`   | boolean | No       | `true`  | Enable vector similarity search                                   | all three      |
-| `service`    | string  | No       | —       | e.g. `monzo`, `oura`, `spotify`                                   | events only    |
-| `domain`     | enum    | No       | —       | `health`, `money`, `media`, `knowledge`, `online`                 | events only    |
-| `block_type` | string  | No       | —       | e.g. `fetch_summary_paragraph`, `heart_rate`                      | blocks only    |
-| `concept`    | string  | No       | —       | e.g. `user`, `track`, `account`, `merchant`, `place`              | objects only   |
-| `type`       | string  | No       | —       | e.g. `spotify_track`, `monzo_merchant`                            | objects only   |
-| `from_date` / `to_date` | string | No | — | ISO date filter                                                 | events, blocks |
-| `limit`      | integer | No       | 20      | max 50                                                            | all three      |
+| Parameter               | Type    | Required | Default | Notes                                                | Which tool(s)  |
+| ----------------------- | ------- | -------- | ------- | ---------------------------------------------------- | -------------- |
+| `query`                 | string  | **Yes**  | —       | Search text                                          | all three      |
+| `semantic`              | boolean | No       | `true`  | Enable vector similarity search                      | all three      |
+| `service`               | string  | No       | —       | e.g. `monzo`, `oura`, `spotify`                      | events only    |
+| `domain`                | enum    | No       | —       | `health`, `money`, `media`, `knowledge`, `online`    | events only    |
+| `block_type`            | string  | No       | —       | e.g. `fetch_summary_paragraph`, `heart_rate`         | blocks only    |
+| `concept`               | string  | No       | —       | e.g. `user`, `track`, `account`, `merchant`, `place` | objects only   |
+| `type`                  | string  | No       | —       | e.g. `spotify_track`, `monzo_merchant`               | objects only   |
+| `from_date` / `to_date` | string  | No       | —       | ISO date filter                                      | events, blocks |
+| `limit`                 | integer | No       | 20      | max 50                                               | all three      |
 
 #### `get-event-tool` / `get-object-tool` / `get-block-tool`
 
-*Classes*: `GetEventTool`, `GetObjectTool`, `GetBlockTool` ·
-*Ability*: `data:read` · *Read-only, idempotent*
+_Classes_: `GetEventTool`, `GetObjectTool`, `GetBlockTool` ·
+_Ability_: `data:read` · _Read-only, idempotent_
 
 Full detail for a specific entity by UUID, ownership-scoped through the
 caller — a cross-user ID is treated as not found.
 
-| Tool             | Parameter        | Type    | Required | Default | Notes                                          |
-| ----------------- | ---------------- | ------- | -------- | ------- | ------------------------------------------------- |
-| `get-event-tool`  | `id`             | string  | **Yes**  | —       | Event UUID                                       |
-| `get-object-tool` | `id`             | string  | **Yes**  | —       | Object UUID                                      |
-| `get-object-tool` | `include_events` | boolean | No       | `true`  | Attach recent events where this object appears    |
-| `get-object-tool` | `event_limit`    | integer | No       | 10      | 1–25                                              |
-| `get-block-tool`  | `id`             | string  | **Yes**  | —       | Block UUID                                       |
+| Tool              | Parameter        | Type    | Required | Default | Notes                                          |
+| ----------------- | ---------------- | ------- | -------- | ------- | ---------------------------------------------- |
+| `get-event-tool`  | `id`             | string  | **Yes**  | —       | Event UUID                                     |
+| `get-object-tool` | `id`             | string  | **Yes**  | —       | Object UUID                                    |
+| `get-object-tool` | `include_events` | boolean | No       | `true`  | Attach recent events where this object appears |
+| `get-object-tool` | `event_limit`    | integer | No       | 10      | 1–25                                           |
+| `get-block-tool`  | `id`             | string  | **Yes**  | —       | Block UUID                                     |
 
 #### `list-integrations`
 
-*Class*: `ListIntegrationsTool` · *Ability*: `integrations:read` · *Read-only, idempotent*
+_Class_: `ListIntegrationsTool` · _Ability_: `integrations:read` · _Read-only, idempotent_
 
 Lists the user's integrations — service, status, and identifying details. No
 parameters.
@@ -237,80 +237,80 @@ parameters.
 
 #### `set-event-note`
 
-*Class*: `SetEventNoteTool` · *Ability*: `data:write`
+_Class_: `SetEventNoteTool` · _Ability_: `data:write`
 
 Sets or clears the user-authored note attached to an event. Pass `null` or
 an empty string to clear.
 
-| Parameter  | Type   | Required | Notes                              |
-| ----------- | ------ | -------- | ------------------------------------- |
-| `event_id`  | string | **Yes**  | Event UUID                           |
-| `note`      | string | No       | Omit or empty to clear                |
+| Parameter  | Type   | Required | Notes                  |
+| ---------- | ------ | -------- | ---------------------- |
+| `event_id` | string | **Yes**  | Event UUID             |
+| `note`     | string | No       | Omit or empty to clear |
 
 #### `update-entity`
 
-*Class*: `UpdateEntityTool` · *Ability*: `data:write`
+_Class_: `UpdateEntityTool` · _Ability_: `data:write`
 
 Safely updates an owned event, object, or block. Never deletes records or
 changes integration ownership. Same allow-list and validation
 (`EntityMutationService::validateUpdate`) that `PATCH /api/v1/{kind}/{id}`
 uses.
 
-| Parameter    | Type   | Required | Notes                                                                                                                      |
-| ------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `kind`        | string | **Yes**  | `event`, `object`, or `block`                                                                                                 |
-| `id`          | string | **Yes**  | Entity UUID                                                                                                                    |
-| `attributes`  | object | **Yes**  | Allowed fields — event: `action`/`value`/`value_multiplier`/`value_unit`/`time`; object: `title`/`type`/`concept`/`url`; block: `title`/`block_type`/`value`/`value_multiplier`/`value_unit`/`time`/`url` |
+| Parameter    | Type   | Required | Notes                                                                                                                                                                                                     |
+| ------------ | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`       | string | **Yes**  | `event`, `object`, or `block`                                                                                                                                                                             |
+| `id`         | string | **Yes**  | Entity UUID                                                                                                                                                                                               |
+| `attributes` | object | **Yes**  | Allowed fields — event: `action`/`value`/`value_multiplier`/`value_unit`/`time`; object: `title`/`type`/`concept`/`url`; block: `title`/`block_type`/`value`/`value_multiplier`/`value_unit`/`time`/`url` |
 
 #### `manage-relationship`
 
-*Class*: `ManageRelationshipTool` · *Ability*: `data:read` for `operation: list`, otherwise `data:write`
+_Class_: `ManageRelationshipTool` · _Ability_: `data:read` for `operation: list`, otherwise `data:write`
 
 Lists, creates, or deletes an owned relationship between events, objects,
 and blocks. Creation prevents self-links and respects registered
 relationship-type directionality.
 
-| Parameter          | Type   | Required | Notes                                          |
-| ------------------- | ------ | -------- | ------------------------------------------------- |
-| `operation`         | string | **Yes**  | `list`, `create`, or `delete`                     |
-| `kind` / `id`       | string | No       | Source entity, for `list`/`create`                |
-| `relationship_id`   | string | No       | For `delete`                                       |
-| `to_kind` / `to_id` | string | No       | Target entity, for `create`                        |
-| `type`              | string | No       | Registered relationship type, for `create`         |
-| `value` / `value_multiplier` | number | No | Optional, for `create`                          |
-| `value_unit`        | string | No       | Optional, for `create`                             |
-| `metadata`          | object | No       | Optional, for `create`                             |
+| Parameter                    | Type   | Required | Notes                                      |
+| ---------------------------- | ------ | -------- | ------------------------------------------ |
+| `operation`                  | string | **Yes**  | `list`, `create`, or `delete`              |
+| `kind` / `id`                | string | No       | Source entity, for `list`/`create`         |
+| `relationship_id`            | string | No       | For `delete`                               |
+| `to_kind` / `to_id`          | string | No       | Target entity, for `create`                |
+| `type`                       | string | No       | Registered relationship type, for `create` |
+| `value` / `value_multiplier` | number | No       | Optional, for `create`                     |
+| `value_unit`                 | string | No       | Optional, for `create`                     |
+| `metadata`                   | object | No       | Optional, for `create`                     |
 
 #### `trigger-integration-update-tool`
 
-*Class*: `TriggerIntegrationUpdateTool` · *Ability*: `integrations:sync`
+_Class_: `TriggerIntegrationUpdateTool` · _Ability_: `integrations:sync`
 
 Triggers an immediate on-demand fetch for one integration instance or every
 non-paused instance of a service, without affecting the scheduled pull
 cycle.
 
-| Parameter        | Type   | Required | Notes                                                     |
-| ----------------- | ------ | -------- | -------------------------------------------------------------- |
-| `integration_id`  | string | No       | Specific instance UUID — takes precedence over `service`      |
-| `service`        | string | No       | Triggers all non-paused instances of this service               |
+| Parameter        | Type   | Required | Notes                                                    |
+| ---------------- | ------ | -------- | -------------------------------------------------------- |
+| `integration_id` | string | No       | Specific instance UUID — takes precedence over `service` |
+| `service`        | string | No       | Triggers all non-paused instances of this service        |
 
 ### Flint Digest
 
 #### `create-flint-digest`
 
-*Class*: `CreateFlintDigestTool` · *Ability*: `flint:write`
+_Class_: `CreateFlintDigestTool` · _Ability_: `flint:write`
 
 Creates a Flint digest event with an array of blocks. **Non-idempotent** —
 do not retry after an unknown outcome without checking
 `get-latest-flint-digest` first. Returns `event_id` and `block_ids`.
 
-| Parameter | Type            | Required | Default | Notes                                                                    |
-| --------- | ---------------- | -------- | ------- | ----------------------------------------------------------------------- |
-| `title`   | string           | **Yes**  | —       | Digest title                                                             |
-| `period`  | string           | No       | inferred from current time | `morning`, `afternoon`, or `evening`                  |
-| `date`    | string           | No       | `today` | ISO date                                                                 |
-| `summary` | string           | No       | —       | Optional headline summary                                                |
-| `blocks`  | array of object  | No       | —       | Each requires `block_type` + `title`; see field notes below              |
+| Parameter | Type            | Required | Default                    | Notes                                                       |
+| --------- | --------------- | -------- | -------------------------- | ----------------------------------------------------------- |
+| `title`   | string          | **Yes**  | —                          | Digest title                                                |
+| `period`  | string          | No       | inferred from current time | `morning`, `afternoon`, or `evening`                        |
+| `date`    | string          | No       | `today`                    | ISO date                                                    |
+| `summary` | string          | No       | —                          | Optional headline summary                                   |
+| `blocks`  | array of object | No       | —                          | Each requires `block_type` + `title`; see field notes below |
 
 Each block object supports: `content` (markdown, for `flint_editorial_note`
 and other content types), `referenced_event_ids` (surfaced as tappable
@@ -318,39 +318,51 @@ reference chips and linkified inline), and for `flint_user_question`:
 `question`, `topic`, `priority` (`low`/`medium`/`high`), `answer_options`
 (omit for freeform).
 
+For `flint_day_context` — structured calendar + weather for the mobile "Your
+day" screen, built from the same grounding calls as the prose briefing —
+supply `day_context: { calendar: [{title, all_day, start, person}],
+birthdays: [{title}], weather: {location, condition, temp_high_c,
+rain_probability_pct} }` instead of `content`. `person` is `"will"` or
+`"dan"`, required on every `calendar` entry: `"dan"` only when the title
+names Dan/Daniel without also naming Will, `"will"` otherwise (including an
+unspecified title). A missing/invalid `person` is defaulted to `"will"`
+server-side rather than failing the whole digest write. A birthday is not a
+person-attributed commitment — it goes in `birthdays` (title only, no
+`person`), not `calendar`.
+
 #### `get-latest-flint-digest`
 
-*Class*: `GetLatestFlintDigestTool` · *Ability*: `flint:read` · *Read-only, idempotent*
+_Class_: `GetLatestFlintDigestTool` · _Ability_: `flint:read` · _Read-only, idempotent_
 
 Retrieves Flint digest(s) for a date, including all blocks. Defaults to
 today's most recent digest. For `flint_user_question` blocks, returns the
 user's `answer`, `answer_note`, and `answered_at` (null until answered) —
 use this to check whether previously-asked questions have been answered.
 
-| Parameter | Type    | Required | Default | Notes                                                        |
+| Parameter | Type    | Required | Default | Notes                                                       |
 | --------- | ------- | -------- | ------- | ----------------------------------------------------------- |
-| `date`    | string  | No       | `today` | ISO date                                                     |
-| `period`  | string  | No       | latest  | `morning`, `afternoon`, or `evening`                          |
+| `date`    | string  | No       | `today` | ISO date                                                    |
+| `period`  | string  | No       | latest  | `morning`, `afternoon`, or `evening`                        |
 | `all`     | boolean | No       | `false` | Return every digest for the date instead of just the latest |
 
 #### `answer-flint-question`
 
-*Class*: `AnswerFlintQuestionTool` · *Ability*: `flint:write`
+_Class_: `AnswerFlintQuestionTool` · _Ability_: `flint:write`
 
 Answers a `flint_user_question` block. Use after retrieving a digest with
 `get-latest-flint-digest`.
 
-| Parameter     | Type   | Required | Notes                        |
-| ------------- | ------ | -------- | ------------------------------ |
+| Parameter     | Type   | Required | Notes                                 |
+| ------------- | ------ | -------- | ------------------------------------- |
 | `block_id`    | string | **Yes**  | UUID of a `flint_user_question` block |
-| `answer`      | string | **Yes**  | The user's answer               |
-| `answer_note` | string | No       | Optional supporting note        |
+| `answer`      | string | **Yes**  | The user's answer                     |
+| `answer_note` | string | No       | Optional supporting note              |
 
 ### Web Fetching
 
 #### `fetch-webpage-html`
 
-*Class*: `FetchWebpageHtmlTool` · *Ability*: `web:fetch` (MCP-only — never
+_Class_: `FetchWebpageHtmlTool` · _Ability_: `web:fetch` (MCP-only — never
 available through REST or mobile, since it can use saved browser cookies)
 
 Renders a URL with Playwright and returns its raw HTML. Saved Fetch cookies
@@ -359,9 +371,9 @@ refreshed cookies are persisted back to the caller's Fetch cookie store.
 HTML is capped at 1 MB; the response says explicitly if it was truncated.
 URLs are validated by `UrlSafetyValidator` before any request is made.
 
-| Parameter | Type   | Required | Notes                          |
-| --------- | ------ | -------- | --------------------------------- |
-| `url`     | string | No*      | Public HTTP/HTTPS URL to render   |
+| Parameter | Type   | Required | Notes                           |
+| --------- | ------ | -------- | ------------------------------- |
+| `url`     | string | No\*     | Public HTTP/HTTPS URL to render |
 
 \* The compiled schema does not mark `url` required, but the tool errors
 without a usable URL in practice — treat it as required.
@@ -372,7 +384,7 @@ without a usable URL in practice — treat it as required.
 
 ### `day-context-resource`
 
-*Class*: `App\Mcp\Resources\DayContextResource` · *Ability*: `insights:read`
+_Class_: `App\Mcp\Resources\DayContextResource` · _Ability_: `insights:read`
 
 - **URI template**: `spark://context/day/{date}`
 - **MIME type**: `application/json`
@@ -403,7 +415,7 @@ Every tool and the one resource share the same enforcement path:
    `App\Support\SparkAbility::allows($user, $ability)` — the identical
    class the REST `spark.ability:*` middleware uses. If the token lacks the
    ability, the tool returns `Response::error("Token lacks required
-   capability: {$ability}.")` without touching any data.
+capability: {$ability}.")` without touching any data.
 3. A request with no user at all (auth failed) returns
    `Response::error('Authentication required.')`.
 
