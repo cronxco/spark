@@ -110,7 +110,7 @@ class AnomalyAcknowledgement
             ->where('metric_statistic_id', $statistic->id)
             ->where('type', $anomaly->type)
             ->whereNotNull('acknowledged_at')
-            ->get(['metadata'])
+            ->get()
             ->map(fn (MetricTrend $trend): ?Carbon => isset($trend->metadata['suppress_until'])
                 ? Carbon::parse($trend->metadata['suppress_until'])->endOfDay()
                 : null)
