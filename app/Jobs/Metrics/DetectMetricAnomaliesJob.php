@@ -14,6 +14,12 @@ use Illuminate\Support\Facades\Log;
 
 class DetectMetricAnomaliesJob implements ShouldQueue
 {
+    /**
+     * Days of unbroken anomalies after which the baseline, not the reading, is
+     * what has moved.
+     */
+    private const PERSISTENT_ANOMALY_DAYS = 7;
+
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 60;
@@ -123,6 +129,8 @@ class DetectMetricAnomaliesJob implements ShouldQueue
             ],
         ]);
 
+        $this->suggestBaselineReviewIfPersistent($metricStatistic, $type);
+
         Log::info('Detected metric anomaly', [
             'event_id' => $this->event->id,
             'service' => $this->event->service,
@@ -133,6 +141,30 @@ class DetectMetricAnomaliesJob implements ShouldQueue
             'mean' => $metricStatistic->mean_value,
             'deviation' => $deviation,
         ]);
+    }
+
+    /**
+     * A metric that has been anomalous every day for a week has not been
+     * surprising for six of them — its baseline has drifted. Flag it for review
+     * so the level can be re-learned, rather than leaving it to announce the
+     * same "unusual" reading indefinitely.
+     */
+    protected function suggestBaselineReviewIfPersistent(MetricStatistic $metricStatistic, string $type): void
+    {
+        if ($metricStatistic->baseline_reset_suggested_at !== null) {
+            return;
+        }
+
+        $consecutiveDays = MetricTrend::query()
+            ->where('metric_statistic_id', $metricStatistic->id)
+            ->where('type', $type)
+            ->where('detected_at', '>=', now()->subDays(self::PERSISTENT_ANOMALY_DAYS))
+            ->distinct()
+            ->count('start_date');
+
+        if ($consecutiveDays >= self::PERSISTENT_ANOMALY_DAYS) {
+            $metricStatistic->update(['baseline_reset_suggested_at' => now()]);
+        }
     }
 
     /**

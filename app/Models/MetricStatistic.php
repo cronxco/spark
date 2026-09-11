@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Services\MetricPresentation;
 use Illuminate\Support\Str;
 
 class MetricStatistic extends Model
@@ -103,7 +104,7 @@ class MetricStatistic extends Model
      */
     public function getDisplayName(): string
     {
-        return format_action_title($this->action);
+        return app(MetricPresentation::class)->displayName($this);
     }
 
     /**

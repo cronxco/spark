@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Services\MetricPresentation;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,18 @@ use Spatie\Activitylog\Models\Activity;
 
 class UpToSpeedController extends Controller
 {
+    /**
+     * Consecutive days of the same anomaly after which the baseline — not the
+     * reading — is what has moved, and the metric should stop being raised.
+     */
+    private const REBASELINE_STREAK_DAYS = 7;
+
+    /**
+     * Standard deviations a first-day anomaly must clear to be worth raising.
+     * Below this a single day's movement is noise.
+     */
+    private const SINGLE_DAY_DEVIATION_THRESHOLD = 3.0;
+
     /**
      * GET /api/v1/mobile/up-to-speed
      *
@@ -176,31 +189,87 @@ class UpToSpeedController extends Controller
                 return ! ($suppressUntil && Carbon::parse($suppressUntil)->isFuture());
             });
 
-        return $trends->map(function (MetricTrend $trend): array {
-            $stat = $trend->metricStatistic;
+        $presentation = app(MetricPresentation::class);
 
-            $streakCount = $this->calculateStreakDays($trend, $stat);
+        return $trends
+            ->reject(fn (MetricTrend $trend): bool => $this->isNoise($trend, $presentation))
+            ->map(function (MetricTrend $trend) use ($presentation): array {
+                $stat = $trend->metricStatistic;
+                $direction = $trend->getDirection();
+                $streakCount = $this->calculateStreakDays($trend, $stat);
+                $currentValue = round($trend->current_value, 2);
+                $baselineValue = round($trend->baseline_value, 2);
 
-            return [
-                'id' => $trend->id,
-                'type' => 'anomaly',
-                'caught_up_at' => null,
-                '_subject_id' => $trend->id,
-                '_subject_key' => MetricTrend::class.':'.$trend->id,
-                'payload' => [
-                    'metric' => $stat->getIdentifier(),
-                    'display_name' => $stat->getDisplayName(),
-                    'type' => $trend->type,
-                    'direction' => $trend->getDirection(),
-                    'current_value' => round($trend->current_value, 2),
-                    'baseline_value' => round($trend->baseline_value, 2),
-                    'deviation' => round($trend->deviation, 2),
-                    'streak_days' => $streakCount,
-                    'detected_at' => $trend->detected_at->toIso8601String(),
-                    'acknowledged_at' => $trend->acknowledged_at?->toIso8601String(),
-                ],
-            ];
-        })->values()->all();
+                return [
+                    'id' => $trend->id,
+                    'type' => 'anomaly',
+                    'caught_up_at' => null,
+                    '_subject_id' => $trend->id,
+                    '_subject_key' => MetricTrend::class.':'.$trend->id,
+                    'payload' => [
+                        'metric' => $stat->getIdentifier(),
+                        'display_name' => $presentation->displayName($stat),
+                        'domain' => $presentation->domain($stat),
+                        'service' => $stat->service,
+                        'unit' => $stat->value_unit,
+                        'type' => $trend->type,
+                        'direction' => $direction,
+                        'valence' => $presentation->valence($stat, $direction),
+                        'is_ordinal' => $presentation->isOrdinal($stat),
+                        'current_value' => $currentValue,
+                        'baseline_value' => $baselineValue,
+                        'current_display' => $presentation->formatValue($stat, $currentValue),
+                        'baseline_display' => $presentation->formatValue($stat, $baselineValue),
+                        'deviation' => round($trend->deviation, 2),
+                        'streak_days' => $streakCount,
+                        'detected_at' => $trend->detected_at->toIso8601String(),
+                        'acknowledged_at' => $trend->acknowledged_at?->toIso8601String(),
+                    ],
+                ];
+            })->values()->all();
+    }
+
+    /**
+     * Whether an anomaly is not worth raising.
+     *
+     * The briefing styleguide is explicit that a single-day movement is noise
+     * unless the deviation is genuinely large, and that a topic should not keep
+     * resurfacing merely because it has appeared for several days running. Both
+     * were being ignored: a cardiovascular age that moved five years overnight
+     * was shown on day one, and a balance sitting above its baseline for a
+     * fortnight was still being announced as a surprise.
+     *
+     * A long streak means the baseline is stale, not that today is unusual —
+     * that is surfaced as `baseline_stale` rather than as a fresh anomaly.
+     */
+    private function isNoise(MetricTrend $trend, MetricPresentation $presentation): bool
+    {
+        $stat = $trend->metricStatistic;
+
+        if ($stat === null) {
+            return true;
+        }
+
+        // The plugin has asked for this metric to stay out of Flint.
+        if ($presentation->isExcludedFromFlint($stat)) {
+            return true;
+        }
+
+        $streak = $this->calculateStreakDays($trend, $stat);
+        $deviation = abs((float) $trend->deviation);
+
+        // Seen every day for long enough that the baseline, not the reading, is
+        // what has drifted.
+        if ($streak >= self::REBASELINE_STREAK_DAYS) {
+            return true;
+        }
+
+        // A one-off move has to be large to be worth interrupting for.
+        if ($streak <= 1 && $deviation < self::SINGLE_DAY_DEVIATION_THRESHOLD) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
