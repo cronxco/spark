@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Activity;
 
 class UpToSpeedController extends Controller
@@ -29,6 +30,21 @@ class UpToSpeedController extends Controller
      * Below this a single day's movement is noise.
      */
     private const SINGLE_DAY_DEVIATION_THRESHOLD = 3.0;
+
+    /**
+     * Hours of reading material to offer. A rolling window, so unaffected by
+     * the reader's timezone.
+     */
+    private const NEWS_WINDOW_HOURS = 48;
+
+    /**
+     * Most news items to return. A heavy newsletter day previously returned
+     * every one of them in a single unbounded response, which is neither a
+     * sensible payload nor a readable queue.
+     */
+    private const DEFAULT_NEWS_LIMIT = 20;
+
+    private const MAX_NEWS_LIMIT = 100;
 
     /**
      * GET /api/v1/mobile/up-to-speed
@@ -51,6 +67,7 @@ class UpToSpeedController extends Controller
     {
         $validated = $request->validate([
             'include_acknowledged' => ['sometimes', 'boolean'],
+            'news_limit' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_NEWS_LIMIT],
         ]);
 
         $user = $request->user();
@@ -58,11 +75,12 @@ class UpToSpeedController extends Controller
         $today = Carbon::today($timezone);
         $integrationIds = $user->integrations()->pluck('id');
         $includeAcknowledged = (bool) ($validated['include_acknowledged'] ?? false);
+        $newsLimit = (int) ($validated['news_limit'] ?? self::DEFAULT_NEWS_LIMIT);
 
-        $digestItems = $this->buildDigestItems($user, $today, $integrationIds);
+        $digestItems = $this->buildDigestItems($user, $today, $integrationIds, $timezone);
         $checkInItems = $this->buildCheckInItems($user, $today);
-        $anomalyItems = $this->buildAnomalyItems($user, $today, $includeAcknowledged);
-        $newsItems = $this->buildNewsItems($user, $integrationIds);
+        $anomalyItems = $this->buildAnomalyItems($user, $today, $timezone, $includeAcknowledged);
+        $newsItems = $this->buildNewsItems($user, $integrationIds, $newsLimit);
 
         // Batch-fetch caught_up activities for all activity-log-tracked items
         $subjectIds = collect($digestItems)
@@ -105,12 +123,12 @@ class UpToSpeedController extends Controller
      * @param  Collection<int, mixed>  $integrationIds
      * @return array<int, array<string, mixed>>
      */
-    private function buildDigestItems(User $user, Carbon $today, mixed $integrationIds): array
+    private function buildDigestItems(User $user, Carbon $today, mixed $integrationIds, string $timezone): array
     {
         $events = Event::whereIn('integration_id', $integrationIds)
             ->where('service', 'flint')
             ->where('action', 'had_summary')
-            ->whereDate('time', $today)
+            ->whereBetween('time', $this->localDayRange($today, $timezone))
             ->with('blocks')
             ->orderBy('time', 'desc')
             ->get();
@@ -128,6 +146,7 @@ class UpToSpeedController extends Controller
                     'date' => Carbon::parse($event->time)->toDateString(),
                     'period' => $meta['period'] ?? null,
                     'title' => $meta['title'] ?? null,
+                    'kind' => $this->digestKind($event, $meta),
                     'summary' => $meta['summary'] ?? null,
                     'block_count' => $event->blocks->count(),
                     'unanswered_question_count' => $event->blocks->filter(
@@ -170,13 +189,17 @@ class UpToSpeedController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function buildAnomalyItems(User $user, Carbon $today, bool $includeAcknowledged = false): array
-    {
+    private function buildAnomalyItems(
+        User $user,
+        Carbon $today,
+        string $timezone,
+        bool $includeAcknowledged = false
+    ): array {
         $trends = MetricTrend::query()
             ->whereHas('metricStatistic', fn ($q) => $q->where('user_id', $user->id))
             ->anomalies()
             ->when(! $includeAcknowledged, fn ($q) => $q->unacknowledged())
-            ->whereDate('detected_at', $today)
+            ->whereBetween('detected_at', $this->localDayRange($today, $timezone))
             ->with('metricStatistic')
             ->get()
             ->filter(function (MetricTrend $trend) use ($includeAcknowledged): bool {
@@ -276,7 +299,7 @@ class UpToSpeedController extends Controller
      * @param  Collection<int, mixed>  $integrationIds
      * @return array<int, array<string, mixed>>
      */
-    private function buildNewsItems(User $user, mixed $integrationIds): array
+    private function buildNewsItems(User $user, mixed $integrationIds, int $limit): array
     {
         $summaryBlockTypes = [
             'fetch_tldr',
@@ -296,10 +319,11 @@ class UpToSpeedController extends Controller
                             ->where('action', 'received_post');
                     });
             })
-            ->where('time', '>=', now()->subHours(48))
+            ->where('time', '>=', now()->subHours(self::NEWS_WINDOW_HOURS))
             ->whereHas('blocks', fn ($q) => $q->whereIn('block_type', $summaryBlockTypes))
             ->with(['blocks', 'target', 'actor'])
             ->orderBy('time', 'desc')
+            ->limit($limit)
             ->get();
 
         return $events->map(function (Event $event) use ($summaryBlockTypes): array {
@@ -325,7 +349,7 @@ class UpToSpeedController extends Controller
                 } elseif (str_contains($blockType, 'summary')) {
                     $payload['summary'] = $block->getContent();
                 } elseif (str_contains($blockType, 'key_takeaways')) {
-                    $payload['key_takeaways'] = $block->getContent();
+                    $payload['key_takeaways'] = $this->normaliseKeyTakeaways($block->getContent());
                 }
             }
 
@@ -338,6 +362,102 @@ class UpToSpeedController extends Controller
                 'payload' => $payload,
             ];
         })->all();
+    }
+
+    /**
+     * The UTC instants bounding a local calendar day.
+     *
+     * `whereDate()` compares against the stored UTC date, so pairing it with a
+     * timezone-aware Carbon::today() silently mixed two different notions of
+     * "today" — an evening digest could land on the wrong side of midnight for
+     * anyone east or west of UTC.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function localDayRange(Carbon $localDay, string $timezone): array
+    {
+        $start = $localDay->copy()->startOfDay()->setTimezone('UTC');
+        $end = $localDay->copy()->endOfDay()->setTimezone('UTC');
+
+        return [$start, $end];
+    }
+
+    /**
+     * What sort of digest this is: the daily briefing, a news roundup, or a
+     * reading list.
+     *
+     * The client was deciding this by looking for "news" or "reading list" in
+     * the title and inspecting block types, which means presentation depended
+     * on how a digest happened to be named. Deriving it once here keeps every
+     * surface agreeing, and gives digests somewhere to declare it explicitly
+     * later without another round of guessing.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function digestKind(Event $event, array $meta): string
+    {
+        $declared = $meta['kind'] ?? null;
+        if (is_string($declared) && in_array($declared, ['briefing', 'news_roundup', 'reading_list'], true)) {
+            return $declared;
+        }
+
+        $title = Str::lower((string) ($meta['title'] ?? ''));
+
+        if (Str::contains($title, ['reading list', 'saved to read'])) {
+            return 'reading_list';
+        }
+
+        if (Str::contains($title, ['news', 'roundup'])) {
+            return 'news_roundup';
+        }
+
+        $contentBlocks = $event->blocks->filter(
+            fn (Block $block): bool => ! in_array($block->block_type, ['flint_editorial_note', 'flint_user_question'], true)
+        );
+
+        if ($contentBlocks->isNotEmpty() && $contentBlocks->every(fn (Block $block): bool => $block->block_type === 'flint_news')) {
+            return 'news_roundup';
+        }
+
+        return 'briefing';
+    }
+
+    /**
+     * Normalise a key-takeaways block into a clean list of strings.
+     *
+     * The block stores a JSON-encoded array whose entries sometimes carry a
+     * literal markdown bullet and sometimes do not, depending on which
+     * summariser wrote them. Clients were each re-deriving the same repair.
+     *
+     * @return array<int, string>|null
+     */
+    private function normaliseKeyTakeaways(mixed $content): ?array
+    {
+        if ($content === null) {
+            return null;
+        }
+
+        $items = is_array($content) ? $content : json_decode((string) $content, true);
+
+        if (! is_array($items)) {
+            // Not a JSON array — treat it as bullet-per-line prose.
+            $items = preg_split('/\R+/', (string) $content) ?: [];
+        }
+
+        $clean = [];
+        foreach ($items as $item) {
+            if (! is_scalar($item)) {
+                continue;
+            }
+
+            $text = trim(preg_replace('/^\s*[-*\x{2022}]\s+/u', '', (string) $item) ?? '');
+
+            if ($text !== '') {
+                $clean[] = $text;
+            }
+        }
+
+        return $clean === [] ? null : $clean;
     }
 
     private function calculateStreakDays(MetricTrend $trend, MetricStatistic $stat): int

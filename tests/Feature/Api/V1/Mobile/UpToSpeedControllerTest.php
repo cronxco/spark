@@ -207,7 +207,7 @@ class UpToSpeedControllerTest extends TestCase
             'integration_id' => $integration->id,
             'service' => 'daily_checkin',
             'action' => 'had_morning_checkin',
-            'source_id' => 'daily_checkin_morning_' . $today,
+            'source_id' => 'daily_checkin_morning_'.$today,
             'time' => $checkinTime,
             'event_metadata' => ['date' => $today],
         ]);
@@ -243,9 +243,8 @@ class UpToSpeedControllerTest extends TestCase
     public function includes_todays_unacknowledged_anomalies(): void
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        $anomaly = MetricTrend::factory()->create([
+        $anomaly = MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => null,
         ]);
@@ -266,9 +265,8 @@ class UpToSpeedControllerTest extends TestCase
     public function excludes_acknowledged_anomalies(): void
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        MetricTrend::factory()->create([
+        MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => now(),
         ]);
@@ -283,9 +281,8 @@ class UpToSpeedControllerTest extends TestCase
     public function excludes_suppressed_anomalies(): void
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        MetricTrend::factory()->create([
+        MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => null,
             'metadata' => ['suppress_until' => now()->addDay()->toDateString()],
@@ -301,9 +298,8 @@ class UpToSpeedControllerTest extends TestCase
     public function anomaly_caught_up_at_is_set_when_marked(): void
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        $anomaly = MetricTrend::factory()->create([
+        $anomaly = MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => null,
         ]);
@@ -441,9 +437,8 @@ class UpToSpeedControllerTest extends TestCase
         ]);
 
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        MetricTrend::factory()->create([
+        MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => null,
         ]);
@@ -704,7 +699,7 @@ class UpToSpeedControllerTest extends TestCase
     public function caught_up_items_are_still_returned(): void
     {
         $event = Event::factory()->create([
-            'integration_id' => $this->integration->id,
+            'integration_id' => $this->flintIntegration->id,
             'service' => 'flint',
             'action' => 'had_summary',
             'time' => now(),
@@ -758,9 +753,8 @@ class UpToSpeedControllerTest extends TestCase
     public function include_acknowledged_returns_suppressed_anomalies(): void
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        $anomaly = MetricTrend::factory()->create([
+        $anomaly = MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => null,
             'metadata' => ['suppress_until' => now()->addDays(7)->toDateString()],
@@ -781,7 +775,7 @@ class UpToSpeedControllerTest extends TestCase
     public function internal_subject_keys_are_not_exposed(): void
     {
         Event::factory()->create([
-            'integration_id' => $this->integration->id,
+            'integration_id' => $this->flintIntegration->id,
             'service' => 'flint',
             'action' => 'had_summary',
             'time' => now(),
@@ -801,9 +795,11 @@ class UpToSpeedControllerTest extends TestCase
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
 
-        return MetricTrend::factory()->create([
+        // significant() sets the deviation as well as the type: the factory
+        // definition picks its deviation scale from the type it generated, so
+        // overriding type alone can leave a trend-scale value behind.
+        return MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => now(),
         ]);
