@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Services;
 
+use App\Models\EventObject;
 use App\Models\MetricStatistic;
 use App\Services\MetricPresentation;
 use PHPUnit\Framework\Attributes\Test;
@@ -86,6 +87,10 @@ class MetricPresentationTest extends TestCase
 
         $this->assertSame('£2,082.23', $this->presentation->formatValue($statistic, 2082.23));
         $this->assertSame('£241.68', $this->presentation->formatValue($statistic, 241.68));
+        $this->assertSame('€241.68', $this->presentation->formatValue(
+            $this->statistic('gocardless', 'had_balance', 'EUR'),
+            241.68
+        ));
     }
 
     /**
@@ -134,7 +139,19 @@ class MetricPresentationTest extends TestCase
     {
         $this->assertTrue($this->presentation->isOrdinal($this->statistic('oura', 'had_resilience_score', 'resilience_level')));
         $this->assertTrue($this->presentation->isOrdinal($this->statistic('oura', 'had_stress_score', 'stress_level')));
+        $this->assertFalse($this->presentation->isOrdinal($this->statistic('oura', 'had_resilience_score', 'percent')));
+        $this->assertFalse($this->presentation->isOrdinal($this->statistic('oura', 'had_stress_score', 'percent')));
         $this->assertFalse($this->presentation->isOrdinal($this->statistic('oura', 'had_sleep_score', 'percent')));
+    }
+
+    #[Test]
+    public function formats_oura_percent_variants_as_continuous_metrics(): void
+    {
+        $stress = $this->statistic('oura', 'had_stress_score', 'percent');
+        $resilience = $this->statistic('oura', 'had_resilience_score', 'percent');
+
+        $this->assertSame('78%', $this->presentation->formatValue($stress, 78.0));
+        $this->assertSame('84%', $this->presentation->formatValue($resilience, 84.0));
     }
 
     // -------------------------------------------------------------------------
@@ -147,12 +164,29 @@ class MetricPresentationTest extends TestCase
      * warnings because it only had `direction`.
      */
     #[Test]
-    public function a_rising_balance_is_good_news(): void
+    public function a_rising_asset_balance_is_good_news(): void
     {
         $statistic = $this->statistic('gocardless', 'had_balance', 'GBP');
+        $account = new EventObject(['metadata' => ['account_type' => 'current_account']]);
 
-        $this->assertSame('good', $this->presentation->valence($statistic, 'up'));
-        $this->assertSame('bad', $this->presentation->valence($statistic, 'down'));
+        $this->assertSame('good', $this->presentation->valence($statistic, 'up', $account));
+        $this->assertSame('bad', $this->presentation->valence($statistic, 'down', $account));
+    }
+
+    #[Test]
+    public function a_rising_liability_balance_is_bad_news(): void
+    {
+        $manualStatistic = $this->statistic('manual_account', 'had_balance', 'GBP');
+        $manualLiability = new EventObject(['metadata' => ['is_negative_balance' => true]]);
+        $bankStatistic = $this->statistic('gocardless', 'had_balance', 'EUR');
+
+        $this->assertSame('bad', $this->presentation->valence($manualStatistic, 'up', $manualLiability));
+
+        foreach (['credit_card', 'loan'] as $accountType) {
+            $account = new EventObject(['metadata' => ['account_type' => $accountType]]);
+            $this->assertSame('bad', $this->presentation->valence($bankStatistic, 'up', $account));
+            $this->assertSame('good', $this->presentation->valence($bankStatistic, 'down', $account));
+        }
     }
 
     #[Test]
@@ -188,6 +222,14 @@ class MetricPresentationTest extends TestCase
         $statistic = $this->statistic('gocardless', 'had_balance', 'GBP');
 
         $this->assertSame('neutral', $this->presentation->valence($statistic, 'neutral'));
+    }
+
+    #[Test]
+    public function an_account_metric_without_account_identity_is_neutral(): void
+    {
+        $statistic = $this->statistic('gocardless', 'had_balance', 'GBP');
+
+        $this->assertSame('neutral', $this->presentation->valence($statistic, 'up'));
     }
 
     // -------------------------------------------------------------------------

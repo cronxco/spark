@@ -194,6 +194,35 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     }
 
     #[Test]
+    public function unmarking_an_anomaly_retains_another_acknowledged_suppression_window(): void
+    {
+        $first = $this->anomaly();
+        $second = MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $first->metric_statistic_id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+        ]);
+        $remainingSuppression = now()->addDays(7)->endOfDay();
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson("/api/v1/mobile/anomalies/{$first->id}/acknowledge", [
+            'suppress_until' => $remainingSuppression->toDateString(),
+        ])->assertOk();
+        $this->postJson("/api/v1/mobile/anomalies/{$second->id}/acknowledge", [
+            'suppress_until' => now()->addDays(14)->toDateString(),
+        ])->assertOk();
+
+        $this->postJson('/api/v1/mobile/up-to-speed/unmark', [
+            'items' => [['type' => 'anomaly', 'id' => $second->id]],
+        ])->assertOk()->assertJsonPath('unmarked', 1);
+
+        $this->assertTrue(
+            $first->metricStatistic->fresh()->anomaly_high_suppressed_until->equalTo($remainingSuppression)
+        );
+    }
+
+    #[Test]
     public function a_recovered_anomaly_returns_to_the_unread_feed(): void
     {
         $anomaly = $this->anomaly();

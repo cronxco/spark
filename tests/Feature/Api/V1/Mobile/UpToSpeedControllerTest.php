@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
@@ -734,6 +735,68 @@ class UpToSpeedControllerTest extends TestCase
         $found = $items->firstWhere('id', $anomaly->id);
         $this->assertNotNull($found, 'a dismissed anomaly must be recoverable');
         $this->assertNotNull($found['payload']['acknowledged_at']);
+    }
+
+    #[Test]
+    public function include_acknowledged_bypasses_noise_only_for_acknowledged_anomalies(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $acknowledged = MetricTrend::factory()->marginal()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+        ]);
+        $unacknowledged = MetricTrend::factory()->marginal()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+
+        $this->assertNotNull($items->firstWhere('id', $acknowledged->id));
+        $this->assertNull($items->firstWhere('id', $unacknowledged->id));
+    }
+
+    #[Test]
+    public function acknowledged_balance_anomaly_uses_its_account_direction(): void
+    {
+        $account = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'metadata' => ['account_type' => 'credit_card'],
+        ]);
+        $event = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'actor_id' => $account->id,
+            'service' => 'gocardless',
+            'domain' => 'money',
+            'action' => 'had_balance',
+            'value_unit' => 'GBP',
+        ]);
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'gocardless',
+            'action' => 'had_balance',
+            'value_unit' => 'GBP',
+        ]);
+        $anomaly = MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+            'metadata' => ['event_id' => $event->id],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+
+        $this->assertSame('bad', $items->firstWhere('id', $anomaly->id)['payload']['valence']);
     }
 
     #[Test]

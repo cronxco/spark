@@ -5,6 +5,7 @@ namespace App\Jobs\Metrics;
 use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -154,15 +155,31 @@ class DetectMetricAnomaliesJob implements ShouldQueue
             return;
         }
 
-        $consecutiveDays = MetricTrend::query()
+        $anomalyDates = MetricTrend::query()
             ->where('metric_statistic_id', $metricStatistic->id)
             ->where('type', $type)
             ->where('detected_at', '>=', now()->subDays(self::PERSISTENT_ANOMALY_DAYS))
+            ->whereNotNull('start_date')
             ->distinct()
-            ->count('start_date');
+            ->orderBy('start_date')
+            ->pluck('start_date')
+            ->map(fn (string $date): Carbon => Carbon::parse($date));
 
-        if ($consecutiveDays >= self::PERSISTENT_ANOMALY_DAYS) {
-            $metricStatistic->update(['baseline_reset_suggested_at' => now()]);
+        $consecutiveDays = 0;
+        $previousDate = null;
+
+        foreach ($anomalyDates as $date) {
+            $consecutiveDays = $previousDate?->copy()->addDay()->isSameDay($date)
+                ? $consecutiveDays + 1
+                : 1;
+
+            if ($consecutiveDays >= self::PERSISTENT_ANOMALY_DAYS) {
+                $metricStatistic->update(['baseline_reset_suggested_at' => now()]);
+
+                return;
+            }
+
+            $previousDate = $date;
         }
     }
 

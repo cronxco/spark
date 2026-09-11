@@ -214,14 +214,25 @@ class UpToSpeedController extends Controller
 
         $presentation = app(MetricPresentation::class);
 
+        $trends = $trends->reject(
+            fn (MetricTrend $trend): bool => ! ($includeAcknowledged && $trend->acknowledged_at !== null)
+                && $this->isNoise($trend, $presentation)
+        );
+
+        $events = Event::query()
+            ->with('actor')
+            ->whereKey($trends->pluck('metadata.event_id')->filter()->unique())
+            ->get()
+            ->keyBy('id');
+
         return $trends
-            ->reject(fn (MetricTrend $trend): bool => $this->isNoise($trend, $presentation))
-            ->map(function (MetricTrend $trend) use ($presentation): array {
+            ->map(function (MetricTrend $trend) use ($events, $presentation): array {
                 $stat = $trend->metricStatistic;
                 $direction = $trend->getDirection();
                 $streakCount = $this->calculateStreakDays($trend, $stat);
                 $currentValue = round($trend->current_value, 2);
                 $baselineValue = round($trend->baseline_value, 2);
+                $account = $events->get($trend->metadata['event_id'] ?? null)?->actor;
 
                 return [
                     'id' => $trend->id,
@@ -237,7 +248,7 @@ class UpToSpeedController extends Controller
                         'unit' => $stat->value_unit,
                         'type' => $trend->type,
                         'direction' => $direction,
-                        'valence' => $presentation->valence($stat, $direction),
+                        'valence' => $presentation->valence($stat, $direction, $account),
                         'is_ordinal' => $presentation->isOrdinal($stat),
                         'current_value' => $currentValue,
                         'baseline_value' => $baselineValue,

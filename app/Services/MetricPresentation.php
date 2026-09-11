@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Integrations\PluginRegistry;
+use App\Models\EventObject;
 use App\Models\MetricStatistic;
 
 /**
@@ -79,13 +80,16 @@ class MetricPresentation
         // strictly — match(2.0) never hits a `2 =>` arm and silently falls
         // through to the raw number. Hand whole values over as integers so a
         // band renders as its word.
-        $formatted = format_event_value_display(
-            $this->normaliseValue($value),
-            $statistic->value_unit,
-            $statistic->service,
-            $statistic->action,
-            'action'
-        );
+        $actionType = $this->actionType($statistic);
+        $formatted = isset($actionType['value_formatter'])
+            ? format_event_value_display(
+                $this->normaliseValue($value),
+                $statistic->value_unit,
+                $statistic->service,
+                $statistic->action,
+                'action'
+            )
+            : format_block_value_display($this->normaliseValue($value), $statistic->value_unit);
 
         // Plugin formatters are Blade templates written for the web and some
         // wrap their units in markup ('78<span class="...">%</span>'). API
@@ -112,9 +116,13 @@ class MetricPresentation
      * `higher_is_better` return 'neutral' — better to say nothing than to tint
      * a windfall as a warning.
      */
-    public function valence(MetricStatistic $statistic, string $direction): string
+    public function valence(MetricStatistic $statistic, string $direction, ?EventObject $account = null): string
     {
         $higherIsBetter = $this->actionType($statistic)['higher_is_better'] ?? null;
+
+        if (is_callable($higherIsBetter)) {
+            $higherIsBetter = $account ? $higherIsBetter($account) : null;
+        }
 
         if (! is_bool($higherIsBetter) || ! in_array($direction, ['up', 'down'], true)) {
             return 'neutral';
@@ -143,11 +151,20 @@ class MetricPresentation
             return [];
         }
 
-        $actionTypes = $plugin::getActionTypes();
+        $actionType = $plugin::getActionTypes()[$statistic->action] ?? null;
 
-        return is_array($actionTypes[$statistic->action] ?? null)
-            ? $actionTypes[$statistic->action]
-            : [];
+        if (! is_array($actionType)) {
+            return [];
+        }
+
+        $valueUnits = $actionType['value_units']
+            ?? (array_key_exists('value_unit', $actionType) ? [$actionType['value_unit']] : null);
+
+        if ($valueUnits !== null && ! in_array($statistic->value_unit, $valueUnits, true)) {
+            return [];
+        }
+
+        return $actionType;
     }
 
     private function strippedAction(string $action): string

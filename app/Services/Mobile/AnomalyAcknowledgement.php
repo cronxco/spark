@@ -87,9 +87,9 @@ class AnomalyAcknowledgement
     }
 
     /**
-     * Lift the directional suppression window on the parent MetricStatistic.
-     * Only clears a window that is still in the future — an already-elapsed one
-     * is inert, and blanking it would discard unrelated history.
+     * Recalculate the directional suppression window after releasing an
+     * acknowledgement, retaining the latest future window set by another
+     * acknowledged anomaly of the same type.
      */
     private function clearSuppression(MetricTrend $anomaly): void
     {
@@ -106,10 +106,19 @@ class AnomalyAcknowledgement
             ? 'anomaly_high_suppressed_until'
             : 'anomaly_low_suppressed_until';
 
-        $existing = $statistic->{$column};
-        if ($existing !== null && Carbon::parse($existing)->isFuture()) {
-            $statistic->update([$column => null]);
-        }
+        $suppressUntil = MetricTrend::query()
+            ->where('metric_statistic_id', $statistic->id)
+            ->where('type', $anomaly->type)
+            ->whereNotNull('acknowledged_at')
+            ->get(['metadata'])
+            ->map(fn (MetricTrend $trend): ?Carbon => isset($trend->metadata['suppress_until'])
+                ? Carbon::parse($trend->metadata['suppress_until'])->endOfDay()
+                : null)
+            ->filter(fn (?Carbon $date): bool => $date?->isFuture() ?? false)
+            ->sortByDesc(fn (Carbon $date): int => $date->getTimestamp())
+            ->first();
+
+        $statistic->update([$column => $suppressUntil]);
     }
 
     /**

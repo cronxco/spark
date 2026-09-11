@@ -159,11 +159,17 @@ class FinancialPlugin extends ManualPlugin
                 'description' => 'Account balance was updated',
                 'display_with_object' => false,
                 'value_unit' => 'GBP',
-                'higher_is_better' => true,
+                'value_units' => ['GBP', 'EUR', 'USD'],
+                'higher_is_better' => [self::class, 'balanceHigherIsBetter'],
                 'hidden' => true,
                 'exclude_from_flint' => true,
             ],
         ];
+    }
+
+    public static function balanceHigherIsBetter(EventObject $account): bool
+    {
+        return ! (bool) ($account->metadata['is_negative_balance'] ?? false);
     }
 
     public static function getBlockTypes(): array
