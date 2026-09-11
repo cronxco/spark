@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Mobile\EntityMutationsController;
 use App\Http\Controllers\Api\V1\Mobile\EventsController;
 use App\Http\Controllers\Api\V1\Mobile\FeedController;
 use App\Http\Controllers\Api\V1\Mobile\FlintDigestsController;
+use App\Http\Controllers\Api\V1\Mobile\FlintTopicsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\InsightDiscoveryController;
 use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
@@ -292,6 +293,9 @@ Route::post('flint/digests', [FlintDigestsController::class, 'store'])
 Route::post('flint/questions/{block}/answer', [FlintDigestsController::class, 'answer'])
     ->middleware('ability:ios:write')
     ->name('flint.questions.answer');
+
+Route::get('flint/topics', [FlintTopicsController::class, 'index'])
+    ->name('flint.topics.index');
 
 /*
 |--------------------------------------------------------------------------

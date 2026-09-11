@@ -186,6 +186,7 @@ Pass the `next_cursor` value as the `cursor` query parameter on the next request
 | `GET`  | `/up-to-speed`                  | Ordered catch-up queue (Flint digests, check-ins, anomalies, news)              |
 | `GET`  | `/flint/digests`                | Flint digest(s) for a date                                                      |
 | `GET`  | `/flint/digests/{id}`           | A single Flint digest                                                           |
+| `GET`  | `/flint/topics`                 | Flint's long-lived strategic/thematic/tactical threads                          |
 | `GET`  | `/money/accounts`               | All non-archived manual/synced finance accounts                                 |
 | `GET`  | `/money/accounts/{id}`          | A single finance account                                                        |
 | `GET`  | `/money/accounts/{id}/balances` | Cursor-paginated balance history                                                |
@@ -1236,6 +1237,40 @@ returns every digest created that day.
 ### `GET /flint/digests/{id}`
 
 A single digest by event UUID. Same [FlintDigest](API_v1.md#flintdigest) shape.
+
+---
+
+### `GET /flint/topics`
+
+Flint's long-lived strategic/thematic/tactical threads — the "running threads"
+list on the Flint tab. Topics are created and maintained by the
+`manage-flint-topic` MCP tool; this endpoint is read-only.
+
+**Query Parameters**: `status` (`active`/`dormant`/`resolved`/`expired`),
+`kind` (`strategic`/`thematic`/`tactical`). Both optional — omit either to
+include every value.
+
+**Response `200`**
+
+```json
+{
+    "data": [
+        {
+            "id": "uuid",
+            "title": "US–Iran escalation",
+            "content": "Optional free-text note.",
+            "kind": "strategic",
+            "status": "active",
+            "first_seen_at": "2026-09-05T00:00:00+00:00",
+            "last_touched_at": "2026-09-10T07:01:28+00:00",
+            "next_review_at": null,
+            "origin": "digest_inference"
+        }
+    ]
+}
+```
+
+Ordered newest-touched first (`updated_at desc`).
 
 ---
 
