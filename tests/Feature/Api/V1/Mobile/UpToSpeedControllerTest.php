@@ -207,7 +207,7 @@ class UpToSpeedControllerTest extends TestCase
             'integration_id' => $integration->id,
             'service' => 'daily_checkin',
             'action' => 'had_morning_checkin',
-            'source_id' => 'daily_checkin_morning_'.$today,
+            'source_id' => 'daily_checkin_morning_' . $today,
             'time' => $checkinTime,
             'event_metadata' => ['date' => $today],
         ]);
@@ -672,19 +672,6 @@ class UpToSpeedControllerTest extends TestCase
         $this->assertEmpty($items->where('type', 'anomaly'));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function firstAnomalyPayload(): array
-    {
-        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
-        $anomaly = $items->firstWhere('type', 'anomaly');
-
-        $this->assertNotNull($anomaly, 'expected an anomaly item in the feed');
-
-        return $anomaly['payload'];
-    }
-
     // -------------------------------------------------------------------------
     // Read state is exposed, never enforced
     // -------------------------------------------------------------------------
@@ -791,20 +778,6 @@ class UpToSpeedControllerTest extends TestCase
         }
     }
 
-    private function acknowledgedAnomaly(): MetricTrend
-    {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-
-        // significant() sets the deviation as well as the type: the factory
-        // definition picks its deviation scale from the type it generated, so
-        // overriding type alone can leave a trend-scale value behind.
-        return MetricTrend::factory()->significant()->create([
-            'metric_statistic_id' => $stat->id,
-            'detected_at' => now(),
-            'acknowledged_at' => now(),
-        ]);
-    }
-
     // -------------------------------------------------------------------------
     // Data isolation
     // -------------------------------------------------------------------------
@@ -831,5 +804,32 @@ class UpToSpeedControllerTest extends TestCase
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'flint_digest'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function firstAnomalyPayload(): array
+    {
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $anomaly = $items->firstWhere('type', 'anomaly');
+
+        $this->assertNotNull($anomaly, 'expected an anomaly item in the feed');
+
+        return $anomaly['payload'];
+    }
+
+    private function acknowledgedAnomaly(): MetricTrend
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+
+        // significant() sets the deviation as well as the type: the factory
+        // definition picks its deviation scale from the type it generated, so
+        // overriding type alone can leave a trend-scale value behind.
+        return MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+        ]);
     }
 }

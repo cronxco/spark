@@ -67,7 +67,7 @@ class UpToSpeedController extends Controller
     {
         $validated = $request->validate([
             'include_acknowledged' => ['sometimes', 'boolean'],
-            'news_limit' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_NEWS_LIMIT],
+            'news_limit' => ['sometimes', 'integer', 'min:1', 'max:' . self::MAX_NEWS_LIMIT],
         ]);
 
         $user = $request->user();
@@ -141,7 +141,7 @@ class UpToSpeedController extends Controller
                 'type' => 'flint_digest',
                 'caught_up_at' => null,
                 '_subject_id' => $event->id,
-                '_subject_key' => Event::class.':'.$event->id,
+                '_subject_key' => Event::class . ':' . $event->id,
                 'payload' => [
                     'date' => Carbon::parse($event->time)->toDateString(),
                     'period' => $meta['period'] ?? null,
@@ -228,7 +228,7 @@ class UpToSpeedController extends Controller
                     'type' => 'anomaly',
                     'caught_up_at' => null,
                     '_subject_id' => $trend->id,
-                    '_subject_key' => MetricTrend::class.':'.$trend->id,
+                    '_subject_key' => MetricTrend::class . ':' . $trend->id,
                     'payload' => [
                         'metric' => $stat->getIdentifier(),
                         'display_name' => $presentation->displayName($stat),
@@ -358,7 +358,7 @@ class UpToSpeedController extends Controller
                 'type' => 'news_summary',
                 'caught_up_at' => null,
                 '_subject_id' => $event->id,
-                '_subject_key' => Event::class.':'.$event->id,
+                '_subject_key' => Event::class . ':' . $event->id,
                 'payload' => $payload,
             ];
         })->all();

@@ -93,13 +93,6 @@ class MetricPresentation
         return trim(preg_replace('/\s+/', ' ', strip_tags($formatted)) ?? '');
     }
 
-    private function normaliseValue(float $value): int|float
-    {
-        return floor($value) === $value && abs($value) < PHP_INT_MAX
-            ? (int) $value
-            : $value;
-    }
-
     /**
      * Whether the metric is an ordinal band rather than a continuous quantity.
      * A mean and standard deviation over "Limited / Adequate / Solid / Strong /
@@ -130,6 +123,13 @@ class MetricPresentation
         $isGood = $direction === 'up' ? $higherIsBetter : ! $higherIsBetter;
 
         return $isGood ? 'good' : 'bad';
+    }
+
+    private function normaliseValue(float $value): int|float
+    {
+        return floor($value) === $value && abs($value) < PHP_INT_MAX
+            ? (int) $value
+            : $value;
     }
 
     /**

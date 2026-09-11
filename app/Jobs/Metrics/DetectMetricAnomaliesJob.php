@@ -14,13 +14,12 @@ use Illuminate\Support\Facades\Log;
 
 class DetectMetricAnomaliesJob implements ShouldQueue
 {
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
     /**
      * Days of unbroken anomalies after which the baseline, not the reading, is
      * what has moved.
      */
     private const PERSISTENT_ANOMALY_DAYS = 7;
-
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 60;
 
