@@ -471,25 +471,37 @@ class UpToSpeedController extends Controller
         return $clean === [] ? null : $clean;
     }
 
+    /**
+     * How many consecutive days, ending on this anomaly's own day, this
+     * statistic has produced an anomaly.
+     *
+     * Counted in distinct days, not rows: a metric can detect more than one
+     * anomaly in a day, and counting rows would let a single day report a
+     * streak of two — long enough to clear the `streak <= 1` noise gate that
+     * keeps marginal one-off moves out of the feed.
+     */
     private function calculateStreakDays(MetricTrend $trend, MetricStatistic $stat): int
     {
-        $recentAnomalies = MetricTrend::where('metric_statistic_id', $stat->id)
+        $days = MetricTrend::where('metric_statistic_id', $stat->id)
             ->anomalies()
             ->where('detected_at', '<=', $trend->detected_at)
             ->where('detected_at', '>=', $trend->detected_at->copy()->subDays(30))
             ->orderByDesc('detected_at')
-            ->get();
+            ->get()
+            ->map(fn (MetricTrend $t): Carbon => $t->detected_at->copy()->startOfDay())
+            ->unique(fn (Carbon $day): string => $day->toDateString())
+            ->values();
 
         $streakCount = 0;
-        $lastDate = $trend->detected_at;
+        $lastDate = $trend->detected_at->copy()->startOfDay();
 
-        foreach ($recentAnomalies as $t) {
-            if ($t->detected_at->diffInDays($lastDate) > 1) {
+        foreach ($days as $day) {
+            if (abs($day->diffInDays($lastDate)) > 1) {
                 break;
             }
 
             $streakCount++;
-            $lastDate = $t->detected_at;
+            $lastDate = $day;
         }
 
         return $streakCount;

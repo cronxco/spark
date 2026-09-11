@@ -217,8 +217,12 @@ class UpToSpeedUnmarkControllerTest extends TestCase
             'items' => [['type' => 'anomaly', 'id' => $second->id]],
         ])->assertOk()->assertJsonPath('unmarked', 1);
 
-        $this->assertTrue(
-            $first->metricStatistic->fresh()->anomaly_high_suppressed_until->equalTo($remainingSuppression)
+        // To the second: the datetime cast writes 'Y-m-d H:i:s', so the
+        // microseconds endOfDay() puts on the in-memory Carbon never survive
+        // the round trip. The date and time are the whole assertion.
+        $this->assertSame(
+            $remainingSuppression->format('Y-m-d H:i:s'),
+            $first->metricStatistic->fresh()->anomaly_high_suppressed_until?->format('Y-m-d H:i:s')
         );
     }
 
