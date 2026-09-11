@@ -21,7 +21,7 @@ class IntegrationFailed extends SparkNotification
 
     public function isPriority(): bool
     {
-        return true;
+        return parent::isPriority();
     }
 
     public function getIcon(): string
@@ -36,19 +36,41 @@ class IntegrationFailed extends SparkNotification
 
     public function getTitle(): string
     {
-        return 'Integration Failed';
+        $name = $this->integration->name ?? ucfirst($this->integration->service);
+
+        return "{$name} stopped syncing";
     }
 
     public function getMessage(): string
     {
         $name = $this->integration->name ?? ucfirst($this->integration->service);
 
-        return "{$name} integration failed: {$this->errorMessage}";
+        return "Your {$name} data may be out of date. Spark will retry automatically.";
     }
 
     public function getActionUrl(): ?string
     {
         return route('integrations.details', $this->integration->id);
+    }
+
+    public function getEntityType(): ?string
+    {
+        return 'integration';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return (string) $this->integration->id;
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return "integration_failed:{$this->integration->id}";
+    }
+
+    public function getTechnicalDetail(): ?string
+    {
+        return $this->sanitiseTechnicalDetail($this->errorMessage);
     }
 
     /**
@@ -62,16 +84,8 @@ class IntegrationFailed extends SparkNotification
             ->error()
             ->subject("Integration Failed: {$name}")
             ->greeting("Hello {$notifiable->name}!")
-            ->line("Your {$name} integration encountered an error:")
-            ->line($this->errorMessage)
+            ->line("Your {$name} data may be out of date. Spark will retry automatically.")
             ->action('View Integration', $this->getActionUrl());
-
-        if ($this->details) {
-            $mail->line('Additional Details:');
-            foreach ($this->details as $key => $value) {
-                $mail->line(ucfirst(str_replace('_', ' ', $key)) . ': ' . $value);
-            }
-        }
 
         $mail->line('Please check your integration settings and try again.');
 

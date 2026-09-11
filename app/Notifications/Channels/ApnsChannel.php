@@ -109,11 +109,13 @@ class ApnsChannel
         }
 
         $envelope = array_filter([
+            'contract_version' => 1,
+            'notification_id' => $notification->id,
             'type' => $type,
-            'entity_type' => $notification->sparkEntityType ?? null,
-            'entity_id' => $notification->sparkEntityId ?? null,
-            'deep_link' => $notification->sparkDeepLink ?? null,
-            'sync_cursor' => $notification->sparkSyncCursor ?? null,
+            'entity_type' => method_exists($notification, 'getEntityType') ? $notification->getEntityType() : null,
+            'entity_id' => method_exists($notification, 'getEntityId') ? $notification->getEntityId() : null,
+            'deep_link' => method_exists($notification, 'getDeepLink') ? $notification->getDeepLink() : null,
+            'sync_cursor' => method_exists($notification, 'getSyncCursor') ? $notification->getSyncCursor() : null,
         ], fn ($value) => $value !== null);
 
         if ($envelope === []) {
@@ -138,10 +140,14 @@ class ApnsChannel
             ->pushType(ApnMessagePushType::Background)
             ->custom([
                 'spark' => array_filter([
+                    'contract_version' => 1,
+                    'notification_id' => $notification->id,
                     'type' => method_exists($notification, 'getNotificationType')
                         ? $notification->getNotificationType()
                         : null,
-                    'sync_cursor' => $notification->sparkSyncCursor ?? null,
+                    'sync_cursor' => method_exists($notification, 'getSyncCursor')
+                        ? $notification->getSyncCursor()
+                        : null,
                 ], fn ($value) => $value !== null),
             ]);
 

@@ -91,7 +91,9 @@ class ApnsChannelTest extends TestCase
 
         // thread-id is a client-agnostic grouping key and still carries the type.
         $this->assertSame('test_push', $alert['aps']['thread-id']);
-        $this->assertSame(['type' => 'test_push'], $alert['spark']);
+        $this->assertSame(1, $alert['spark']['contract_version']);
+        $this->assertSame('test_push', $alert['spark']['type']);
+        $this->assertNotEmpty($alert['spark']['notification_id']);
 
         $silent = json_decode($this->capturedNotifications[1]->getPayload()->toJson(), true);
 
@@ -100,7 +102,9 @@ class ApnsChannelTest extends TestCase
             ApnMessagePushType::Background->value,
             $this->capturedNotifications[1]->getPayload()->getPushType(),
         );
-        $this->assertSame(['type' => 'test_push'], $silent['spark']);
+        $this->assertSame(1, $silent['spark']['contract_version']);
+        $this->assertSame('test_push', $silent['spark']['type']);
+        $this->assertSame($alert['spark']['notification_id'], $silent['spark']['notification_id']);
     }
 
     #[Test]

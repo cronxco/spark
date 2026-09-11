@@ -7,6 +7,7 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Jobs\GoCardless\HandleExpiredEuaJob;
 use App\Models\Integration;
 use App\Notifications\IntegrationFailed;
+use App\Services\Notifications\NotificationIncidentResolver;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -71,6 +72,10 @@ abstract class BaseFetchJob implements ShouldQueue
 
             // Mark the integration as successfully updated
             $this->integration->markAsSuccessfullyUpdated();
+            app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
+                "integration_failed:{$this->integration->id}",
+                "integration_authentication_failed:{$this->integration->id}",
+            ]);
 
             // Log completion to all levels
             log_hierarchical($this->integration, 'info', "Completed {$this->getJobType()} fetch", [

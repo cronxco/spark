@@ -1,848 +1,179 @@
 <?php
 
-use App\Models\ActionProgress;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Collection;
-use Illuminate\Notifications\DatabaseNotification;
 use App\Services\Flint\FlintRunDispatcher;
+use App\Services\Notifications\NotificationFeedService;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
-new class extends Component {
-    public Collection $activeProgresses;
-    public Collection $recentlyCompleted;
-    public Collection $recentHistory;
-    public Collection $unreadNotifications;
-    public bool $showHistory = false;
-    public bool $showNotifications = false;
-    public bool $showMobileModal = false;
-    public array $expandedUpdates = [];
+new class extends Component
+{
+    public array $feed = [];
 
     public function mount(): void
     {
-        $this->checkProgress();
-        $this->loadNotifications();
+        $this->refreshFeed();
+    }
+
+    public function refreshFeed(): void
+    {
+        $this->feed = app(NotificationFeedService::class)->feed(Auth::user(), limit: 6);
     }
 
     #[On('run-flint-routine')]
     public function runFlintRoutine(?string $skill = null, ?string $routine = null, string $period = 'morning'): void
     {
         try {
-            app(FlintRunDispatcher::class)->dispatch(
-                Auth::user(),
-                skill: $skill,
-                routine: $routine,
-                period: $period,
-            );
-        } catch (\InvalidArgumentException) {
+            app(FlintRunDispatcher::class)->dispatch(Auth::user(), skill: $skill, routine: $routine, period: $period);
+        } catch (InvalidArgumentException) {
             return;
         }
-        $this->checkProgress();
+
+        $this->refreshFeed();
     }
 
-    public function toggleUpdates(string $progressId): void
+    public function markAsRead(string $notificationId): void
     {
-        if (in_array($progressId, $this->expandedUpdates)) {
-            $this->expandedUpdates = array_values(array_diff($this->expandedUpdates, [$progressId]));
-        } else {
-            $this->expandedUpdates[] = $progressId;
-        }
+        Auth::user()->notifications()->whereNull('archived_at')->find($notificationId)?->markAsRead();
+        $this->refreshFeed();
     }
 
-    public function checkProgress(): void
+    public function markAllAsRead(): void
     {
-        $now = now();
-
-        // Active operations (in progress)
-        $this->activeProgresses = ActionProgress::where('user_id', Auth::id())
-            ->whereNull('completed_at')
-            ->whereNull('failed_at')
-            ->where('created_at', '>', $now->copy()->subHour())
-            ->latest()
-            ->get();
-
-        // Recently completed (last 1 minute)
-        $this->recentlyCompleted = ActionProgress::where('user_id', Auth::id())
-            ->where(function ($query) {
-                $query->whereNotNull('completed_at')
-                    ->orWhereNotNull('failed_at');
-            })
-            ->where(function ($query) use ($now) {
-                $query->where('completed_at', '>', $now->copy()->subMinute())
-                    ->orWhere('failed_at', '>', $now->copy()->subMinute());
-            })
-            ->latest('updated_at')
-            ->limit(3)
-            ->get();
-
-        // Recent history (1-5 minutes ago)
-        $this->recentHistory = ActionProgress::where('user_id', Auth::id())
-            ->where(function ($query) {
-                $query->whereNotNull('completed_at')
-                    ->orWhereNotNull('failed_at');
-            })
-            ->where(function ($query) use ($now) {
-                $query->where(function ($q) use ($now) {
-                    $q->where('completed_at', '<=', $now->copy()->subMinute())
-                        ->where('completed_at', '>', $now->copy()->subMinutes(5));
-                })->orWhere(function ($q) use ($now) {
-                    $q->where('failed_at', '<=', $now->copy()->subMinute())
-                        ->where('failed_at', '>', $now->copy()->subMinutes(5));
-                });
-            })
-            ->latest('updated_at')
-            ->get();
-
-        $this->loadNotifications();
+        Auth::user()->unreadNotifications()->whereNull('archived_at')->update(['read_at' => now()]);
+        $this->refreshFeed();
     }
 
-    public function loadNotifications(): void
+    public function archive(string $notificationId): void
     {
-        $this->unreadNotifications = Auth::user()->unreadNotifications()
-            ->latest()
-            ->limit(3)
-            ->get();
-    }
-
-    public function markNotificationAsRead(string $notificationId): void
-    {
-        $notification = Auth::user()->notifications()->find($notificationId);
+        $notification = Auth::user()->notifications()->whereNull('archived_at')->find($notificationId);
         if ($notification) {
-            $notification->markAsRead();
+            $data = is_array($notification->data) ? $notification->data : [];
+            $notification->forceFill([
+                'archived_at' => now(),
+                'data' => [...$data, 'archive_reason' => 'manual'],
+            ])->save();
         }
-        $this->loadNotifications();
+        $this->refreshFeed();
     }
+}; ?>
 
-    public function markAllNotificationsAsRead(): void
-    {
-        Auth::user()->unreadNotifications->markAsRead();
-        $this->loadNotifications();
-    }
+@php
+    $counts = $feed['counts'] ?? ['unread' => 0, 'unresolved_attention' => 0, 'active_activity' => 0];
+    $items = $feed['data'] ?? [];
+    $badgeCount = $counts['unresolved_attention'] ?: ($counts['active_activity'] ?: $counts['unread']);
+@endphp
 
-    public function deleteNotification(string $notificationId): void
-    {
-        $notification = Auth::user()->notifications()->find($notificationId);
-        if ($notification) {
-            $notification->delete();
-        }
-        $this->loadNotifications();
-    }
+<div
+    x-data="{ open: false }"
+    @click.outside="open = false"
+    class="relative"
+    @if ($counts['active_activity'] > 0) wire:poll.3s="refreshFeed" @elseif ($counts['unread'] > 0) wire:poll.30s="refreshFeed" @endif
+>
+    <a href="{{ route('notifications.index') }}" class="btn btn-ghost btn-sm sm:hidden" aria-label="Open notifications">
+        <div class="indicator">
+            @if ($badgeCount > 0)
+                <span class="indicator-item badge badge-xs {{ $counts['unresolved_attention'] ? 'badge-error' : 'badge-info' }}">{{ min($badgeCount, 99) }}</span>
+            @endif
+            <x-icon :name="$counts['active_activity'] ? 'o-arrow-path' : 'o-bell'" @class(['size-5', 'animate-spin' => $counts['active_activity']]) />
+        </div>
+    </a>
 
-    public function toggleHistory(): void
-    {
-        $this->showHistory = !$this->showHistory;
-    }
+    <button
+        type="button"
+        @click="open = !open"
+        :aria-expanded="open"
+        class="btn btn-ghost btn-sm hidden sm:flex"
+        aria-label="Open notifications"
+    >
+        <div class="indicator">
+            @if ($badgeCount > 0)
+                <span class="indicator-item badge badge-xs {{ $counts['unresolved_attention'] ? 'badge-error' : 'badge-info' }}">{{ min($badgeCount, 99) }}</span>
+            @endif
+            <x-icon :name="$counts['active_activity'] ? 'o-arrow-path' : 'o-bell'" @class(['size-5', 'animate-spin' => $counts['active_activity']]) />
+        </div>
+    </button>
 
-    public function openMobileModal(): void
-    {
-        $this->showMobileModal = true;
-    }
-
-    public function getActionIcon(string $actionType): string
-    {
-        return match ($actionType) {
-            'migration' => 'fas.rotate',
-            'deletion' => 'fas.trash',
-            'sync' => 'fas.repeat',
-            'backup' => 'fas.box-archive',
-            'export' => 'fas.download',
-            'import' => 'fas.upload',
-            'bulk_operation' => 'o-queue-list',
-            'report' => 'o-document-chart-bar',
-            'maintenance' => 'o-wrench-screwdriver',
-            default => 'fas.gear',
-        };
-    }
-
-    public function getRelativeTime($timestamp): string
-    {
-        if (!$timestamp) {
-            return '';
-        }
-
-        $seconds = abs(now()->diffInSeconds($timestamp, false));
-
-        if ($seconds < 60) {
-            return (int) $seconds . 's ago';
-        }
-
-        if ($seconds < 3600) {
-            $minutes = (int) floor($seconds / 60);
-            return $minutes . 'm ago';
-        }
-
-        if ($seconds < 86400) {
-            $hours = (int) floor($seconds / 3600);
-            return $hours . 'h ago';
-        }
-
-        $days = (int) floor($seconds / 86400);
-        return $days . 'd ago';
-    }
-
-    public function getRunningDuration($startTime): string
-    {
-        if (!$startTime) {
-            return '';
-        }
-
-        $seconds = abs(now()->diffInSeconds($startTime, false));
-
-        if ($seconds < 60) {
-            return (int) $seconds . 's';
-        }
-
-        if ($seconds < 3600) {
-            $minutes = (int) floor($seconds / 60);
-            $secs = (int) ($seconds % 60);
-            return $minutes . 'm ' . $secs . 's';
-        }
-
-        $hours = (int) floor($seconds / 3600);
-        $minutes = (int) floor(($seconds % 3600) / 60);
-        return $hours . 'h ' . $minutes . 'm';
-    }
-};
-?>
-
-<div>
-    {{-- Always show the notification bell, with polling when there are active operations --}}
-    <div x-data="{ open: false }" @click.outside="open = false" class="relative"
-        @if ($activeProgresses->isNotEmpty()) wire:poll.3s="checkProgress" @elseif ($unreadNotifications->isNotEmpty()) wire:poll.30s="loadNotifications" @endif>
-
-        <button class="btn btn-ghost btn-sm gap-2 sm:hidden" wire:click="openMobileModal">
-            <div class="indicator">
-                @if ($activeProgresses->isNotEmpty())
-                <span class="indicator-item badge badge-info badge-xs">
-                    {{ $activeProgresses->count() }}
-                </span>
-                <span class="loading loading-spinner loading-xs"></span>
-                @elseif ($unreadNotifications->isNotEmpty())
-                <span class="indicator-item badge badge-info badge-xs">
-                    {{ $unreadNotifications->count() }}
-                </span>
-                <x-icon name="fas.bell" class="w-4 h-4" />
-                @elseif ($recentlyCompleted->isNotEmpty())
-                @if ($recentlyCompleted->where('failed_at', '!=', null)->isNotEmpty())
-                <span class="indicator-item badge badge-error badge-xs">
-                    {{ $recentlyCompleted->count() }}
-                </span>
-                <x-icon name="o-exclamation-circle" class="w-4 h-4" />
-                @else
-                <span class="indicator-item badge badge-success badge-xs">
-                    {{ $recentlyCompleted->count() }}
-                </span>
-                <x-icon name="fas.circle-check" class="w-4 h-4" />
-                @endif
-                @elseif ($recentHistory->isNotEmpty())
-                <span class="indicator-item badge badge-ghost badge-xs">
-                    {{ $recentHistory->count() }}
-                </span>
-                <x-icon name="fas.clock" class="w-4 h-4" />
-                @else
-                {{-- Show bell icon when nothing is happening --}}
-                <x-icon name="fas.bell" class="w-4 h-4" />
-                @endif
+    <section
+        x-cloak
+        x-show="open"
+        x-transition.origin.top.right
+        class="absolute right-0 top-full z-[100] mt-3 hidden w-[26rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-xl sm:block"
+        aria-label="Recent notifications"
+    >
+        <header class="flex items-center justify-between border-b border-base-200 px-4 py-3">
+            <div>
+                <h2 class="font-semibold">Notifications</h2>
+                <p class="text-xs text-base-content/55">
+                    @if ($counts['unresolved_attention'])
+                        {{ $counts['unresolved_attention'] }} need{{ $counts['unresolved_attention'] === 1 ? 's' : '' }} attention
+                    @elseif ($counts['active_activity'])
+                        {{ $counts['active_activity'] }} active
+                    @elseif ($counts['unread'])
+                        {{ $counts['unread'] }} unread
+                    @else
+                        You’re all caught up
+                    @endif
+                </p>
             </div>
-        </button>
+            @if ($counts['unread'])
+                <button wire:click="markAllAsRead" class="btn btn-ghost btn-xs">Mark all read</button>
+            @endif
+        </header>
 
-        <button @click="open = !open" class="btn btn-ghost btn-sm gap-2 hidden sm:flex">
-            <div class="indicator">
-                @if ($activeProgresses->isNotEmpty())
-                <span class="indicator-item badge badge-info badge-xs">
-                    {{ $activeProgresses->count() }}
-                </span>
-                <span class="loading loading-spinner loading-xs"></span>
-                @elseif ($unreadNotifications->isNotEmpty())
-                <span class="indicator-item badge badge-info badge-xs">
-                    {{ $unreadNotifications->count() }}
-                </span>
-                <x-icon name="fas.bell" class="w-4 h-4" />
-                @elseif ($recentlyCompleted->isNotEmpty())
-                @if ($recentlyCompleted->where('failed_at', '!=', null)->isNotEmpty())
-                <span class="indicator-item badge badge-error badge-xs">
-                    {{ $recentlyCompleted->count() }}
-                </span>
-                <x-icon name="o-exclamation-circle" class="w-4 h-4" />
-                @else
-                <span class="indicator-item badge badge-success badge-xs">
-                    {{ $recentlyCompleted->count() }}
-                </span>
-                <x-icon name="fas.circle-check" class="w-4 h-4" />
-                @endif
-                @elseif ($recentHistory->isNotEmpty())
-                <span class="indicator-item badge badge-ghost badge-xs">
-                    {{ $recentHistory->count() }}
-                </span>
-                <x-icon name="fas.clock" class="w-4 h-4" />
-                @else
-                {{-- Show bell icon when nothing is happening --}}
-                <x-icon name="fas.bell" class="w-4 h-4" />
-                @endif
-            </div>
-        </button>
-
-        {{-- Desktop dropdown --}}
-        <div x-show="open"
-             x-transition
-             class="hidden sm:block absolute right-0 top-full z-[100] card card-compact w-[28rem] p-0 shadow-lg bg-base-200 mt-3 max-h-[80vh] overflow-y-auto"
-             style="display: none;">
-            @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty() || $unreadNotifications->isNotEmpty())
-            <div class="card-body">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="font-semibold text-sm">Updates</h3>
-                    <a href="{{ route('notifications.index') }}" class="btn btn-ghost btn-xs gap-1">
-                        View All
-                        <x-icon name="fas.arrow-right" class="w-3 h-3" />
-                    </a>
-                </div>
-
-                {{-- Active Operations --}}
-                @if ($activeProgresses->isNotEmpty())
-                <div class="space-y-3 mb-4">
-                    @foreach ($activeProgresses as $progress)
-                    <div class="card bg-base-100 border border-primary/20">
-                        <div class="card-body p-3">
-                            <div class="flex items-start gap-2">
-                                <x-icon :name="$this->getActionIcon($progress->action_type)"
-                                    class="w-4 h-4 mt-0.5 animate-spin text-primary" />
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <div class="font-semibold text-sm">
-                                            {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
-                                        </div>
-                                        <div class="text-xs text-base-content/50 font-mono">
-                                            {{ $this->getRunningDuration($progress->created_at) }}
-                                        </div>
-                                    </div>
-                                    <div class="text-xs text-base-content/70 truncate">
-                                        {{ $progress->message }}
-                                    </div>
-
-                                    <div class="flex items-center gap-2 mt-2">
-                                        <progress class="progress progress-primary flex-1 h-1.5"
-                                            value="{{ $progress->progress }}"
-                                            max="{{ $progress->total }}"></progress>
-                                        <span class="text-xs font-mono text-base-content/70 min-w-[3rem] text-right">
-                                            {{ $progress->progress }}%
-                                        </span>
-                                    </div>
-
-                                    @if ($progress->step)
-                                    <div class="text-xs text-base-content/60 mt-1">
-                                        <span class="opacity-70">Step:</span> {{ $progress->step }}
-                                    </div>
-                                    @endif
-
-                                    @if ($progress->details && count($progress->details) > 0)
-                                    <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-2 pt-2 border-t border-base-300">
-                                        @foreach ($progress->details as $key => $value)
-                                        @if (is_numeric($value))
-                                        <div class="flex justify-between">
-                                            <span class="text-base-content/60">{{ ucfirst($key) }}:</span>
-                                            <span class="font-semibold">{{ number_format($value) }}</span>
-                                        </div>
-                                        @endif
-                                        @endforeach
-                                    </div>
-                                    @endif
-
-                                    @if ($progress->updates && count($progress->updates) > 0)
-                                    <div class="mt-2 pt-2 border-t border-base-300">
-                                        <button wire:click="toggleUpdates('{{ $progress->id }}')"
-                                            class="flex items-center gap-1 text-xs text-base-content/60 hover:text-base-content">
-                                            <x-icon name="o-chevron-{{ in_array($progress->id, $expandedUpdates) ? 'up' : 'down' }}" class="w-3 h-3" />
-                                            <span>{{ count($progress->updates) }} update{{ count($progress->updates) !== 1 ? 's' : '' }}</span>
-                                        </button>
-
-                                        @if (in_array($progress->id, $expandedUpdates))
-                                        <div class="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                                            @foreach (array_reverse($progress->updates) as $update)
-                                            <div class="text-xs text-base-content/60 pl-2 border-l-2 border-base-300">
-                                                <div class="flex items-start justify-between gap-2">
-                                                    <span>{{ $update['message'] ?? '' }}</span>
-                                                    @if (isset($update['timestamp']))
-                                                    <span class="text-base-content/40 font-mono text-[10px]">
-                                                        {{ $this->getRelativeTime($update['timestamp']) }}
-                                                    </span>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                            @endforeach
-                                        </div>
-                                        @endif
-                                    </div>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
-                @endif
-
-                {{-- Notifications --}}
-                @if ($unreadNotifications->isNotEmpty())
-                @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty())
-                <div class="divider my-2 text-xs">Notifications</div>
-                @endif
-
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-semibold">Unread Notifications</span>
-                    <button wire:click="markAllNotificationsAsRead" class="text-xs text-base-content/60 hover:text-base-content">
-                        Mark all as read
-                    </button>
-                </div>
-
-                <div class="space-y-2">
-                    @foreach ($unreadNotifications as $notification)
+        @if (count($items))
+            <div class="max-h-[32rem] overflow-y-auto">
+                @foreach ($items as $item)
                     @php
-                    $data = $notification->data;
-                    $iconName = $data['icon'] ?? 'fas.bell';
-                    $color = $data['color'] ?? 'primary';
-                    $title = $data['title'] ?? 'Notification';
-                    $message = $data['message'] ?? '';
-                    $actionUrl = $data['action_url'] ?? null;
+                        $isActivity = $item['kind'] === 'activity';
+                        $icon = match (true) {
+                            $isActivity && $item['state'] === 'active' => 'o-arrow-path',
+                            in_array($item['severity'], ['critical', 'error'], true) => 'o-exclamation-circle',
+                            $item['severity'] === 'warning' => 'o-exclamation-triangle',
+                            $item['severity'] === 'success' => 'o-check-circle',
+                            default => 'o-bell',
+                        };
+                        $iconTone = match ($item['severity']) {
+                            'critical', 'error' => 'text-error',
+                            'warning' => 'text-warning',
+                            'success' => 'text-success',
+                            default => 'text-info',
+                        };
                     @endphp
-
-                    <div class="card bg-base-100 border border-{{ $color }}/20">
-                        <div class="card-body p-3">
-                            <div class="flex items-start gap-2">
-                                <x-icon :name="$iconName" class="w-4 h-4 mt-0.5 text-{{ $color }}" />
-
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <div class="font-semibold text-sm">
-                                            {{ $title }}
-                                        </div>
-                                        <div class="flex items-center gap-1">
-                                            <span class="text-xs text-base-content/50">
-                                                {{ $this->getRelativeTime($notification->created_at) }}
-                                            </span>
-                                            <button wire:click="deleteNotification('{{ $notification->id }}')"
-                                                class="btn btn-ghost btn-xs">
-                                                <x-icon name="fas.xmark" class="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div class="text-xs text-base-content/70">
-                                        {{ $message }}
-                                    </div>
-
-                                    <div class="flex items-center gap-2 mt-2">
-                                        @if ($actionUrl)
-                                        <a href="{{ $actionUrl }}"
-                                            wire:click="markNotificationAsRead('{{ $notification->id }}')"
-                                            class="btn btn-xs btn-{{ $color }}">
-                                            View
-                                        </a>
-                                        @endif
-                                        <button wire:click="markNotificationAsRead('{{ $notification->id }}')"
-                                            class="btn btn-xs btn-ghost">
-                                            Mark as read
-                                        </button>
-                                    </div>
-                                </div>
+                    <article @class(['flex gap-3 border-b border-base-200 p-4 last:border-0', 'bg-base-200/30' => ! $item['is_read'] && ! $isActivity])>
+                        <x-icon :name="$icon" class="mt-0.5 size-5 shrink-0 {{ $iconTone }} {{ $isActivity && $item['state'] === 'active' ? 'animate-spin' : '' }}" />
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-start justify-between gap-3">
+                                <h3 class="truncate text-sm font-semibold">{{ $item['title'] }}</h3>
+                                <time class="shrink-0 text-[0.7rem] text-base-content/45">{{ \Carbon\Carbon::parse($item['updated_at'] ?? $item['occurred_at'])->diffForHumans(short: true) }}</time>
                             </div>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
-                @endif
-
-                {{-- Recently Completed (last 1 minute) --}}
-                @if ($recentlyCompleted->isNotEmpty())
-                @if ($activeProgresses->isNotEmpty() || $unreadNotifications->isNotEmpty())
-                <div class="divider my-2 text-xs">Recently Completed</div>
-                @endif
-
-                <div class="space-y-2 mb-4">
-                    @foreach ($recentlyCompleted as $progress)
-                    <div class="card bg-base-100 border @if ($progress->isFailed()) border-error/20 @else border-success/20 @endif">
-                        <div class="card-body p-3">
-                            <div class="flex items-start gap-2">
-                                @if ($progress->isFailed())
-                                <x-icon name="fas.circle-xmark" class="w-4 h-4 mt-0.5 text-error" />
-                                @else
-                                <x-icon name="fas.circle-check" class="w-4 h-4 mt-0.5 text-success" />
-                                @endif
-
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <div class="font-semibold text-sm">
-                                            {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
-                                        </div>
-                                        <div class="text-xs text-base-content/50">
-                                            {{ $this->getRelativeTime($progress->completed_at ?? $progress->failed_at) }}
-                                        </div>
-                                    </div>
-
-                                    <div class="text-xs @if ($progress->isFailed()) text-error @else text-success @endif">
-                                        @if ($progress->isFailed())
-                                        Failed: {{ $progress->error_message ?? $progress->message }}
-                                        @else
-                                        {{ $progress->message }}
-                                        @endif
-                                    </div>
-
-                                    @if ($progress->details && count($progress->details) > 0)
-                                    <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-2 pt-2 border-t border-base-300">
-                                        @foreach ($progress->details as $key => $value)
-                                        @if (is_numeric($value))
-                                        <div class="flex justify-between">
-                                            <span class="text-base-content/60">{{ ucfirst($key) }}:</span>
-                                            <span class="font-semibold">{{ number_format($value) }}</span>
-                                        </div>
-                                        @endif
-                                        @endforeach
-                                    </div>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
-                @endif
-
-                {{-- Recent History (1-5 minutes ago) - Collapsible --}}
-                @if ($recentHistory->isNotEmpty())
-                <div x-data="{ open: @entangle('showHistory') }">
-                    <button @click="open = !open"
-                        class="flex items-center justify-between w-full text-xs text-base-content/70 hover:text-base-content py-2 px-1">
-                        <span>Recent History ({{ $recentHistory->count() }})</span>
-                        <x-icon name="fas.chevron-down" class="w-3 h-3 transition-transform" ::class="open && 'rotate-180'" />
-                    </button>
-
-                    <div x-show="open"
-                        x-collapse
-                        class="space-y-2">
-                        @foreach ($recentHistory as $progress)
-                        <div class="card bg-base-100/50 border border-base-300/50">
-                            <div class="card-body p-2">
-                                <div class="flex items-start gap-2">
-                                    @if ($progress->isFailed())
-                                    <x-icon name="fas.circle-xmark" class="w-3.5 h-3.5 mt-0.5 text-error/70" />
-                                    @else
-                                    <x-icon name="fas.circle-check" class="w-3.5 h-3.5 mt-0.5 text-success/70" />
-                                    @endif
-
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center justify-between gap-2">
-                                            <div class="text-xs font-medium">
-                                                {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
-                                            </div>
-                                            <div class="text-xs text-base-content/40">
-                                                {{ $this->getRelativeTime($progress->completed_at ?? $progress->failed_at) }}
-                                            </div>
-                                        </div>
-
-                                        <div class="text-xs text-base-content/60 truncate">
-                                            @if ($progress->isFailed())
-                                            {{ $progress->error_message ?? $progress->message }}
-                                            @else
-                                            {{ $progress->message }}
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        @endforeach
-                    </div>
-                </div>
-                @endif
-
-                {{-- Footer with View All Link --}}
-                <div class="px-4 py-3 border-t border-base-300">
-                    <a href="{{ route('notifications.index') }}" class="btn btn-sm btn-block btn-ghost">
-                        View All Notifications
-                    </a>
-                </div>
-            </div>
-            @else
-            {{-- Empty state --}}
-            <div class="card-body">
-                <div class="flex flex-col items-center justify-center py-8 text-center">
-                    <x-icon name="fas.bell-slash" class="w-12 h-12 text-base-content/30 mb-3" />
-                    <p class="text-sm text-base-content/60">No notifications</p>
-                    <p class="text-xs text-base-content/40 mt-1">You're all caught up!</p>
-                </div>
-            </div>
-            @endif
-        </div>
-    </div>
-
-    {{-- Mobile drawer --}}
-    <x-drawer wire:model="showMobileModal" class="sm:hidden w-full max-w-lg" title="Updates" right with-close-button>
-        <div class="p-4">
-            @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty() || $unreadNotifications->isNotEmpty())
-
-            {{-- Active Operations --}}
-            @if ($activeProgresses->isNotEmpty())
-            <div class="space-y-3 mb-4">
-                @foreach ($activeProgresses as $progress)
-                <div class="card bg-base-100 border border-primary/20">
-                    <div class="card-body p-3">
-                        <div class="flex items-start gap-2">
-                            <x-icon :name="$this->getActionIcon($progress->action_type)"
-                                class="w-4 h-4 mt-0.5 animate-spin text-primary" />
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center justify-between gap-2">
-                                    <div class="font-semibold text-sm">
-                                        {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
-                                    </div>
-                                    <div class="text-xs text-base-content/50 font-mono">
-                                        {{ $this->getRunningDuration($progress->created_at) }}
-                                    </div>
-                                </div>
-                                <div class="text-xs text-base-content/70 truncate">
-                                    {{ $progress->message }}
-                                </div>
-
-                                <div class="flex items-center gap-2 mt-2">
-                                    <progress class="progress progress-primary flex-1 h-1.5"
-                                        value="{{ $progress->progress }}"
-                                        max="{{ $progress->total }}"></progress>
-                                    <span class="text-xs font-mono text-base-content/70 min-w-[3rem] text-right">
-                                        {{ $progress->progress }}%
-                                    </span>
-                                </div>
-
-                                @if ($progress->step)
-                                <div class="text-xs text-base-content/60 mt-1">
-                                    <span class="opacity-70">Step:</span> {{ $progress->step }}
-                                </div>
-                                @endif
-
-                                @if ($progress->details && count($progress->details) > 0)
-                                <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-2 pt-2 border-t border-base-300">
-                                    @foreach ($progress->details as $key => $value)
-                                    @if (is_numeric($value))
-                                    <div class="flex justify-between">
-                                        <span class="text-base-content/60">{{ ucfirst($key) }}:</span>
-                                        <span class="font-semibold">{{ number_format($value) }}</span>
-                                    </div>
-                                    @endif
-                                    @endforeach
-                                </div>
-                                @endif
-
-                                @if ($progress->updates && count($progress->updates) > 0)
-                                <div class="mt-2 pt-2 border-t border-base-300">
-                                    <button wire:click="toggleUpdates('{{ $progress->id }}')"
-                                        class="flex items-center gap-1 text-xs text-base-content/60 hover:text-base-content">
-                                        <x-icon name="o-chevron-{{ in_array($progress->id, $expandedUpdates) ? 'up' : 'down' }}" class="w-3 h-3" />
-                                        <span>{{ count($progress->updates) }} update{{ count($progress->updates) !== 1 ? 's' : '' }}</span>
-                                    </button>
-
-                                    @if (in_array($progress->id, $expandedUpdates))
-                                    <div class="mt-2 space-y-1 max-h-32 overflow-y-auto">
-                                        @foreach (array_reverse($progress->updates) as $update)
-                                        <div class="text-xs text-base-content/60 pl-2 border-l-2 border-base-300">
-                                            <div class="flex items-start justify-between gap-2">
-                                                <span>{{ $update['message'] ?? '' }}</span>
-                                                @if (isset($update['timestamp']))
-                                                <span class="text-base-content/40 font-mono text-[10px]">
-                                                    {{ $this->getRelativeTime($update['timestamp']) }}
-                                                </span>
-                                                @endif
-                                            </div>
-                                        </div>
-                                        @endforeach
-                                    </div>
-                                    @endif
-                                </div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                @endforeach
-            </div>
-            @endif
-
-            {{-- Notifications --}}
-            @if ($unreadNotifications->isNotEmpty())
-            @if ($activeProgresses->isNotEmpty() || $recentlyCompleted->isNotEmpty() || $recentHistory->isNotEmpty())
-            <div class="divider my-2 text-xs">Notifications</div>
-            @endif
-
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-semibold">Unread Notifications</span>
-                <button wire:click="markAllNotificationsAsRead" class="text-xs text-base-content/60 hover:text-base-content">
-                    Mark all as read
-                </button>
-            </div>
-
-            <div class="space-y-2">
-                @foreach ($unreadNotifications as $notification)
-                @php
-                $data = $notification->data;
-                $iconName = $data['icon'] ?? 'fas.bell';
-                $color = $data['color'] ?? 'primary';
-                $title = $data['title'] ?? 'Notification';
-                $message = $data['message'] ?? '';
-                $actionUrl = $data['action_url'] ?? null;
-                @endphp
-
-                <div class="card bg-base-100 border border-{{ $color }}/20">
-                    <div class="card-body p-3">
-                        <div class="flex items-start gap-2">
-                            <x-icon :name="$iconName" class="w-4 h-4 mt-0.5 text-{{ $color }}" />
-
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center justify-between gap-2">
-                                    <div class="font-semibold text-sm">
-                                        {{ $title }}
-                                    </div>
-                                    <div class="flex items-center gap-1">
-                                        <span class="text-xs text-base-content/50">
-                                            {{ $this->getRelativeTime($notification->created_at) }}
-                                        </span>
-                                        <button wire:click="deleteNotification('{{ $notification->id }}')"
-                                            class="btn btn-ghost btn-xs">
-                                            <x-icon name="fas.xmark" class="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="text-xs text-base-content/70">
-                                    {{ $message }}
-                                </div>
-
-                                <div class="flex items-center gap-2 mt-2">
-                                    @if ($actionUrl)
-                                    <a href="{{ $actionUrl }}"
-                                        wire:click="markNotificationAsRead('{{ $notification->id }}')"
-                                        class="btn btn-xs btn-{{ $color }}">
-                                        View
-                                    </a>
-                                    @endif
-                                    <button wire:click="markNotificationAsRead('{{ $notification->id }}')"
-                                        class="btn btn-xs btn-ghost">
-                                        Mark as read
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                @endforeach
-            </div>
-            @endif
-
-            {{-- Recently Completed (last 1 minute) --}}
-            @if ($recentlyCompleted->isNotEmpty())
-            @if ($activeProgresses->isNotEmpty())
-            <div class="divider my-2 text-xs">Recently Completed</div>
-            @endif
-
-            <div class="space-y-2 mb-4">
-                @foreach ($recentlyCompleted as $progress)
-                <div class="card bg-base-100 border @if ($progress->isFailed()) border-error/20 @else border-success/20 @endif">
-                    <div class="card-body p-3">
-                        <div class="flex items-start gap-2">
-                            @if ($progress->isFailed())
-                            <x-icon name="fas.circle-xmark" class="w-4 h-4 mt-0.5 text-error" />
-                            @else
-                            <x-icon name="fas.circle-check" class="w-4 h-4 mt-0.5 text-success" />
+                            @if ($item['body'])
+                                <p class="mt-0.5 line-clamp-2 text-xs leading-5 text-base-content/65">{{ $item['body'] }}</p>
                             @endif
-
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center justify-between gap-2">
-                                    <div class="font-semibold text-sm">
-                                        {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
-                                    </div>
-                                    <div class="text-xs text-base-content/50">
-                                        {{ $this->getRelativeTime($progress->completed_at ?? $progress->failed_at) }}
-                                    </div>
-                                </div>
-
-                                <div class="text-xs @if ($progress->isFailed()) text-error @else text-success @endif">
-                                    @if ($progress->isFailed())
-                                    Failed: {{ $progress->error_message ?? $progress->message }}
-                                    @else
-                                    {{ $progress->message }}
+                            @if ($item['progress'])
+                                <progress class="progress progress-primary mt-2 h-1.5 w-full" value="{{ $item['progress']['current'] }}" max="{{ $item['progress']['total'] }}" aria-label="Progress"></progress>
+                            @endif
+                            @if (! $isActivity)
+                                <div class="mt-2 flex gap-1">
+                                    @if (! $item['is_read'])
+                                        <button wire:click="markAsRead('{{ $item['id'] }}')" class="btn btn-ghost btn-xs">Mark read</button>
                                     @endif
+                                    <button wire:click="archive('{{ $item['id'] }}')" class="btn btn-ghost btn-xs text-base-content/55" aria-label="Archive {{ $item['title'] }}">Archive</button>
                                 </div>
-
-                                @if ($progress->details && count($progress->details) > 0)
-                                <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mt-2 pt-2 border-t border-base-300">
-                                    @foreach ($progress->details as $key => $value)
-                                    @if (is_numeric($value))
-                                    <div class="flex justify-between">
-                                        <span class="text-base-content/60">{{ ucfirst($key) }}:</span>
-                                        <span class="font-semibold">{{ number_format($value) }}</span>
-                                    </div>
-                                    @endif
-                                    @endforeach
-                                </div>
-                                @endif
-                            </div>
+                            @endif
                         </div>
-                    </div>
-                </div>
+                    </article>
                 @endforeach
             </div>
-            @endif
-
-            {{-- Recent History (1-5 minutes ago) - Collapsible --}}
-            @if ($recentHistory->isNotEmpty())
-            <div x-data="{ open: @entangle('showHistory') }">
-                <button @click="open = !open"
-                    class="flex items-center justify-between w-full text-xs text-base-content/70 hover:text-base-content py-2 px-1">
-                    <span>Recent History ({{ $recentHistory->count() }})</span>
-                    <x-icon name="fas.chevron-down" class="w-3 h-3 transition-transform" ::class="open && 'rotate-180'" />
-                </button>
-
-                <div x-show="open"
-                    x-collapse
-                    class="space-y-2">
-                    @foreach ($recentHistory as $progress)
-                    <div class="card bg-base-100/50 border border-base-300/50">
-                        <div class="card-body p-2">
-                            <div class="flex items-start gap-2">
-                                @if ($progress->isFailed())
-                                <x-icon name="fas.circle-xmark" class="w-3.5 h-3.5 mt-0.5 text-error/70" />
-                                @else
-                                <x-icon name="fas.circle-check" class="w-3.5 h-3.5 mt-0.5 text-success/70" />
-                                @endif
-
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <div class="text-xs font-medium">
-                                            {{ ucfirst(str_replace('_', ' ', $progress->action_type)) }}
-                                        </div>
-                                        <div class="text-xs text-base-content/40">
-                                            {{ $this->getRelativeTime($progress->completed_at ?? $progress->failed_at) }}
-                                        </div>
-                                    </div>
-
-                                    <div class="text-xs text-base-content/60 truncate">
-                                        @if ($progress->isFailed())
-                                        {{ $progress->error_message ?? $progress->message }}
-                                        @else
-                                        {{ $progress->message }}
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
+        @else
+            <div class="px-6 py-10 text-center">
+                <x-icon name="o-check-circle" class="mx-auto size-8 text-success" />
+                <p class="mt-2 text-sm font-medium">Nothing needs your attention</p>
             </div>
-            @endif
-            @else
-            {{-- Empty state --}}
-            <div class="flex flex-col items-center justify-center py-8 text-center">
-                <x-icon name="fas.bell-slash" class="w-12 h-12 text-base-content/30 mb-3" />
-                <p class="text-sm text-base-content/60">No notifications</p>
-                <p class="text-xs text-base-content/40 mt-1">You're all caught up!</p>
-            </div>
-            @endif
-        </div>
-    </x-drawer>
+        @endif
+
+        <footer class="border-t border-base-200 p-2">
+            <a href="{{ route('notifications.index') }}" class="btn btn-ghost btn-sm w-full">View all notifications <x-icon name="o-arrow-right" class="size-4" /></a>
+        </footer>
+    </section>
 </div>

@@ -6,6 +6,7 @@ use App\Models\ActionProgress;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Notifications\MigrationCompleted;
+use App\Services\Notifications\NotificationIncidentResolver;
 use App\Traits\MigrationPauser;
 use Carbon\Carbon;
 use Exception;
@@ -64,6 +65,9 @@ class CompleteMigration implements ShouldQueue
             $this->integration->user->notify(
                 new MigrationCompleted($this->integration, $statistics)
             );
+            app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
+                "migration_failed:{$this->integration->id}",
+            ]);
 
             Log::info('Migration completion notification sent', [
                 'integration_id' => $this->integration->id,

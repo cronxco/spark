@@ -123,7 +123,7 @@ class ActionProgress extends Model
     }
 
     /**
-     * Clean up old progress records (older than 24 hours)
+     * Clean up terminal progress records after the notification history window.
      *
      * This method should be called regularly (e.g., daily) to prevent
      * the action_progress table from growing too large.
@@ -132,7 +132,10 @@ class ActionProgress extends Model
      */
     public static function cleanupOldRecords(): int
     {
-        return self::where('created_at', '<', now()->subDay())
+        return self::where(function ($query) {
+            $query->whereNotNull('completed_at')->orWhereNotNull('failed_at');
+        })
+            ->where('updated_at', '<', now()->subDays(30))
             ->delete();
     }
 

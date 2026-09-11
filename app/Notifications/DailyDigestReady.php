@@ -3,18 +3,12 @@
 namespace App\Notifications;
 
 use App\Models\EventObject;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Models\User;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
-use NotificationChannels\WebPush\WebPushChannel;
-use NotificationChannels\WebPush\WebPushMessage;
 
-class DailyDigestReady extends Notification implements ShouldQueue
+class DailyDigestReady extends SparkNotification
 {
-    use Queueable;
-
     public function __construct(
         public ?EventObject $digestObject,
         public string $period,
@@ -23,19 +17,39 @@ class DailyDigestReady extends Notification implements ShouldQueue
         public int $unansweredQuestionCount = 0,
     ) {}
 
-    public function via($notifiable): array
+    public function getNotificationType(): string
     {
-        $channels = ['database'];
+        return 'daily_digest';
+    }
 
-        if ($notifiable->hasEmailNotificationsEnabled('daily_digest')) {
-            $channels[] = 'mail';
-        }
+    public function getTitle(): string
+    {
+        return $this->title ?? $this->digestObject?->title ?? $this->getTimeBasedGreeting() . ' digest';
+    }
 
-        if ($notifiable->hasPushNotificationsEnabled() && $notifiable->pushSubscriptions()->validWebPush()->exists()) {
-            $channels[] = WebPushChannel::class;
-        }
+    public function getMessage(): string
+    {
+        return $this->headline() ?? 'Your daily digest is ready to review.';
+    }
 
-        return $channels;
+    public function getActionUrl(): ?string
+    {
+        return $this->digestUrl();
+    }
+
+    public function getEntityType(): ?string
+    {
+        return $this->digestObject === null ? null : 'object';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return $this->digestObject?->id === null ? null : (string) $this->digestObject->id;
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return "daily_digest:{$this->period}";
     }
 
     public function toMail($notifiable): MailMessage
@@ -58,35 +72,15 @@ class DailyDigestReady extends Notification implements ShouldQueue
         return $message;
     }
 
-    public function toArray($notifiable): array
+    public function toArray(User $notifiable): array
     {
         return [
+            ...parent::toArray($notifiable),
             'digest_object_id' => $this->digestObject?->id,
             'period' => $this->period,
-            'title' => $this->title ?? $this->digestObject?->title,
             'headline' => $this->headline(),
             'unanswered_question_count' => $this->unansweredQuestionCount,
         ];
-    }
-
-    public function toWebPush($notifiable, $notification): WebPushMessage
-    {
-        return (new WebPushMessage)
-            ->title($this->title ?? $this->getTimeBasedGreeting())
-            ->icon('/icons/Spark-iOS-Default-60x60@3x.png')
-            ->body($this->headline() ?? 'Your daily digest is ready to review.')
-            ->badge('/favicon.ico')
-            ->tag('daily-digest-' . $this->period)
-            ->data([
-                'url' => $this->digestUrl(),
-                'type' => 'daily_digest',
-                'digest_object_id' => $this->digestObject?->id,
-                'period' => $this->period,
-            ])
-            ->options([
-                'TTL' => 86400, // 24 hours
-                'urgency' => 'normal',
-            ]);
     }
 
     /**

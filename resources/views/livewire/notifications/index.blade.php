@@ -1,357 +1,248 @@
 <?php
 
-use App\Models\ActionProgress;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Pagination\LengthAwarePaginator;
+use App\Services\Notifications\NotificationFeedService;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
-use Livewire\WithPagination;
+
 use function Livewire\Volt\layout;
-use function Livewire\Volt\state;
 
 layout('components.layouts.app');
 
-new class extends Component {
-    use WithPagination;
+new class extends Component
+{
+    #[Url]
+    public string $scope = 'active';
 
+    #[Url]
+    public string $stream = 'all';
+
+    #[Url]
     public string $search = '';
-    public string $typeFilter = 'all'; // all, notifications, progress
-    public string $statusFilter = 'all'; // all, unread, active
-    public string $timeRange = 'all'; // all, today, week, month
 
-    public function mount(): void
+    public ?string $cursor = null;
+
+    /** @var array<int, string|null> */
+    public array $previousCursors = [];
+
+    public function getFeedProperty(): array
     {
-        //
-    }
-
-    public function getItemsProperty()
-    {
-        $user = Auth::user();
-        $items = collect();
-
-        // Fetch notifications if filter allows
-        if ($this->typeFilter === 'all' || $this->typeFilter === 'notifications') {
-            $notifications = $user->notifications();
-
-            // Apply status filter for notifications
-            if ($this->statusFilter === 'unread') {
-                $notifications = $notifications->whereNull('read_at');
-            }
-
-            // Apply time range filter
-            $notifications = $this->applyTimeRangeFilter($notifications);
-
-            // Apply search
-            if ($this->search) {
-                $notifications = $notifications->where('data', 'like', '%' . $this->search . '%');
-            }
-
-            $notificationItems = $notifications->get()->map(function ($notification) {
-                return (object) [
-                    'type' => 'notification',
-                    'id' => $notification->id,
-                    'title' => $notification->data['title'] ?? 'Notification',
-                    'message' => $notification->data['message'] ?? '',
-                    'time' => $notification->created_at,
-                    'read_at' => $notification->read_at,
-                    'model' => $notification,
-                ];
-            });
-
-            $items = $items->merge($notificationItems);
-        }
-
-        // Fetch action progress if filter allows
-        if ($this->typeFilter === 'all' || $this->typeFilter === 'progress') {
-            $progress = ActionProgress::where('user_id', $user->id);
-
-            // Apply status filter for progress
-            if ($this->statusFilter === 'active') {
-                $progress = $progress->whereNull('completed_at')->whereNull('failed_at');
-            }
-
-            // Apply time range filter
-            $progress = $this->applyTimeRangeFilter($progress);
-
-            // Apply search
-            if ($this->search) {
-                $progress = $progress->where('message', 'like', '%' . $this->search . '%');
-            }
-
-            $progressItems = $progress->get()->map(function ($item) {
-                return (object) [
-                    'type' => 'progress',
-                    'id' => $item->id,
-                    'title' => ucfirst($item->action_type),
-                    'message' => $item->message,
-                    'time' => $item->updated_at,
-                    'progress' => $item->progress,
-                    'total' => $item->total,
-                    'completed_at' => $item->completed_at,
-                    'failed_at' => $item->failed_at,
-                    'model' => $item,
-                ];
-            });
-
-            $items = $items->merge($progressItems);
-        }
-
-        // Sort by time, newest first
-        $items = $items->sortByDesc('time')->values();
-
-        // Paginate
-        $perPage = 25;
-        $currentPage = LengthAwarePaginator::resolveCurrentPage();
-        $currentItems = $items->slice(($currentPage - 1) * $perPage, $perPage)->values();
-
-        return new LengthAwarePaginator(
-            $currentItems,
-            $items->count(),
-            $perPage,
-            $currentPage,
-            ['path' => LengthAwarePaginator::resolveCurrentPath()]
+        return app(NotificationFeedService::class)->feed(
+            user: Auth::user(),
+            scope: $this->scope,
+            stream: $this->stream === 'all' ? null : $this->stream,
+            search: trim($this->search) === '' ? null : trim($this->search),
+            cursor: $this->cursor,
+            limit: 25,
         );
     }
 
-    protected function applyTimeRangeFilter($query)
+    public function updatedScope(): void
     {
-        return match ($this->timeRange) {
-            'today' => $query->where('created_at', '>=', now()->startOfDay()),
-            'week' => $query->where('created_at', '>=', now()->subWeek()),
-            'month' => $query->where('created_at', '>=', now()->subMonth()),
-            default => $query,
-        };
+        $this->resetCursor();
     }
 
-    public function markAsRead($notificationId): void
+    public function updatedStream(): void
     {
-        $notification = Auth::user()->notifications()->find($notificationId);
-        if ($notification) {
-            $notification->markAsRead();
-        }
+        $this->resetCursor();
     }
 
-    public function deleteNotification($notificationId): void
+    public function updatedSearch(): void
     {
-        $notification = Auth::user()->notifications()->find($notificationId);
-        if ($notification) {
-            $notification->delete();
+        $this->resetCursor();
+    }
+
+    public function nextPage(): void
+    {
+        if (! $this->feed['next_cursor']) {
+            return;
         }
+
+        $this->previousCursors[] = $this->cursor;
+        $this->cursor = $this->feed['next_cursor'];
+    }
+
+    public function previousPage(): void
+    {
+        $this->cursor = array_pop($this->previousCursors);
+    }
+
+    public function markAsRead(string $notificationId): void
+    {
+        Auth::user()->notifications()->whereNull('archived_at')->find($notificationId)?->markAsRead();
+    }
+
+    public function markAsUnread(string $notificationId): void
+    {
+        Auth::user()->notifications()->whereNull('archived_at')->find($notificationId)?->markAsUnread();
+    }
+
+    public function archive(string $notificationId): void
+    {
+        $notification = Auth::user()->notifications()->whereNull('archived_at')->find($notificationId);
+        if (! $notification) {
+            return;
+        }
+
+        $data = is_array($notification->data) ? $notification->data : [];
+        $notification->forceFill([
+            'archived_at' => now(),
+            'data' => [...$data, 'archive_reason' => 'manual'],
+        ])->save();
     }
 
     public function markAllAsRead(): void
     {
-        Auth::user()->unreadNotifications->markAsRead();
+        Auth::user()->unreadNotifications()->whereNull('archived_at')->update(['read_at' => now()]);
     }
 
-    public function clearCompleted(): void
+    private function resetCursor(): void
     {
-        $cutoff = now()->subDay();
-        ActionProgress::where('user_id', Auth::user()->id)
-            ->where(function ($query) {
-                $query->whereNotNull('completed_at')
-                    ->orWhereNotNull('failed_at');
-            })
-            ->where(function ($query) use ($cutoff) {
-                $query->where('completed_at', '<', $cutoff)
-                    ->orWhere('failed_at', '<', $cutoff);
-            })
-            ->delete();
-    }
-
-    public function clearFilters(): void
-    {
-        $this->search = '';
-        $this->typeFilter = 'all';
-        $this->statusFilter = 'all';
-        $this->timeRange = 'all';
-        $this->resetPage();
-    }
-
-    public function updatingSearch(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingTypeFilter(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingStatusFilter(): void
-    {
-        $this->resetPage();
-    }
-
-    public function updatingTimeRange(): void
-    {
-        $this->resetPage();
+        $this->cursor = null;
+        $this->previousCursors = [];
     }
 }; ?>
 
-<div>
+<div class="mx-auto w-full max-w-5xl pb-12">
     <x-header
         title="Notifications"
-        subtitle="View your notifications and active progress"
+        subtitle="Updates, active work, and anything that needs your attention."
         separator
-    />
+    >
+        <x-slot:actions>
+            @if ($this->feed['counts']['unread'] > 0 && $scope === 'active')
+                <button wire:click="markAllAsRead" class="btn btn-ghost btn-sm">Mark all read</button>
+            @endif
+        </x-slot:actions>
+    </x-header>
 
-    <div class="flex flex-col gap-6">
-        {{-- Filters --}}
-        <div class="flex flex-wrap gap-4 items-center justify-between">
-            <div class="flex gap-4 items-center flex-wrap">
-                {{-- Search --}}
-                <div class="relative">
-                    <input
-                        type="text"
-                        wire:model.live.debounce.300ms="search"
-                        placeholder="Search..."
-                        class="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                </div>
-
-                {{-- Type Filter --}}
-                <select
-                    wire:model.live="typeFilter"
-                    class="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="all">Type: All</option>
-                    <option value="notifications">Type: Notifications</option>
-                    <option value="progress">Type: Progress</option>
-                </select>
-
-                {{-- Status Filter --}}
-                <select
-                    wire:model.live="statusFilter"
-                    class="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="all">Status: All</option>
-                    <option value="unread">Status: Unread</option>
-                    <option value="active">Status: Active</option>
-                </select>
-
-                {{-- Time Range Filter --}}
-                <select
-                    wire:model.live="timeRange"
-                    class="px-4 py-2 border border-neutral-300 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="all">Time: All</option>
-                    <option value="today">Time: Today</option>
-                    <option value="week">Time: This Week</option>
-                    <option value="month">Time: This Month</option>
-                </select>
-
-                @if ($search || $typeFilter !== 'all' || $statusFilter !== 'all' || $timeRange !== 'all')
-                    <button
-                        wire:click="clearFilters"
-                        class="px-4 py-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
-                    >
-                        Clear Filters
-                    </button>
-                @endif
-            </div>
-
-            <div class="flex gap-2">
-                <button
-                    wire:click="markAllAsRead"
-                    class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                    Mark All Read
-                </button>
-                <button
-                    wire:click="clearCompleted"
-                    class="px-4 py-2 text-sm bg-neutral-600 text-white rounded-lg hover:bg-neutral-700"
-                >
-                    Clear Completed
-                </button>
-            </div>
+    <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div role="tablist" aria-label="Notification history" class="tabs tabs-box w-fit bg-base-200">
+            <button type="button" role="tab" wire:click="$set('scope', 'active')" @class(['tab', 'tab-active' => $scope === 'active'])>Inbox</button>
+            <button type="button" role="tab" wire:click="$set('scope', 'history')" @class(['tab', 'tab-active' => $scope === 'history'])>History</button>
         </div>
 
-        {{-- Items List --}}
-        @if ($this->items->count() > 0)
-            <div class="space-y-4">
-                @foreach ($this->items as $item)
-                    <div class="p-4 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2">
-                                    <h3 class="font-semibold text-neutral-900 dark:text-neutral-100">
-                                        {{ $item->title }}
-                                    </h3>
-                                    @if ($item->type === 'notification' && !$item->read_at)
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                            Unread
-                                        </span>
-                                    @endif
-                                    @if ($item->type === 'progress' && !$item->completed_at && !$item->failed_at)
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                            Active
-                                        </span>
-                                    @endif
-                                </div>
-                                <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
-                                    {{ $item->message }}
-                                </p>
-                                @if ($item->type === 'progress' && isset($item->progress) && isset($item->total))
-                                    <div class="mt-2">
-                                        <div class="flex justify-between text-xs text-neutral-600 dark:text-neutral-400 mb-1">
-                                            <span>Progress</span>
-                                            <span>{{ $item->progress }}/{{ $item->total }}</span>
-                                        </div>
-                                        <div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-2">
-                                            <div
-                                                class="bg-blue-600 h-2 rounded-full"
-                                                style="width: {{ $item->total > 0 ? ($item->progress / $item->total * 100) : 0 }}%"
-                                            ></div>
-                                        </div>
-                                    </div>
+        <label class="input input-bordered flex w-full items-center gap-2 sm:max-w-xs">
+            <x-icon name="o-magnifying-glass" class="size-4 opacity-60" />
+            <input type="search" wire:model.live.debounce.300ms="search" class="grow" placeholder="Search notifications" aria-label="Search notifications" />
+        </label>
+    </div>
+
+    <div class="mb-6 flex gap-2 overflow-x-auto pb-1" aria-label="Notification streams">
+        @foreach ([
+            'all' => ['All', null],
+            'attention' => ['Attention', $this->feed['counts']['unresolved_attention']],
+            'activity' => ['Activity', $this->feed['counts']['active_activity']],
+            'updates' => ['Updates', null],
+            'system' => ['System', null],
+        ] as $value => [$label, $count])
+            <button
+                type="button"
+                wire:click="$set('stream', '{{ $value }}')"
+                @class(['btn btn-sm shrink-0', 'btn-neutral' => $stream === $value, 'btn-ghost' => $stream !== $value])
+                aria-pressed="{{ $stream === $value ? 'true' : 'false' }}"
+            >
+                {{ $label }}
+                @if ($count)
+                    <span class="badge badge-sm {{ $value === 'attention' ? 'badge-error' : 'badge-info' }}">{{ $count }}</span>
+                @endif
+            </button>
+        @endforeach
+    </div>
+
+    <div wire:loading.delay class="mb-3 w-full">
+        <progress class="progress progress-primary w-full" aria-label="Loading notifications"></progress>
+    </div>
+
+    @if (count($this->feed['data']) > 0)
+        <div class="overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm">
+            @foreach ($this->feed['data'] as $item)
+                @php
+                    $isActivity = $item['kind'] === 'activity';
+                    $isAttention = $item['stream'] === 'attention';
+                    $icon = match (true) {
+                        $isActivity && $item['state'] === 'active' => 'o-arrow-path',
+                        $item['severity'] === 'critical', $item['severity'] === 'error' => 'o-exclamation-circle',
+                        $item['severity'] === 'warning' => 'o-exclamation-triangle',
+                        $item['severity'] === 'success' => 'o-check-circle',
+                        $item['stream'] === 'updates' => 'o-sparkles',
+                        default => 'o-bell',
+                    };
+                    $tone = match ($item['severity']) {
+                        'critical', 'error' => 'text-error bg-error/10',
+                        'warning' => 'text-warning bg-warning/10',
+                        'success' => 'text-success bg-success/10',
+                        default => 'text-info bg-info/10',
+                    };
+                    $destination = $item['destination'];
+                @endphp
+
+                <article @class([
+                    'group flex gap-3 border-b border-base-200 p-4 last:border-b-0 sm:gap-4 sm:p-5',
+                    'bg-base-200/35' => ! $item['is_read'] && ! $isActivity,
+                ])>
+                    <div class="grid size-10 shrink-0 place-items-center rounded-full {{ $tone }}" aria-hidden="true">
+                        <x-icon :name="$icon" @class(['size-5', 'animate-spin' => $isActivity && $item['state'] === 'active']) />
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+                            <div class="flex min-w-0 items-center gap-2">
+                                <h2 class="truncate font-semibold text-base-content">{{ $item['title'] }}</h2>
+                                @if (! $item['is_read'] && ! $isActivity)
+                                    <span class="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread"></span>
                                 @endif
-                                <p class="text-xs text-neutral-500 dark:text-neutral-500 mt-2">
-                                    {{ $item->time->diffForHumans() }}
-                                </p>
+                                @if ($item['occurrence_count'] > 1)
+                                    <span class="badge badge-ghost badge-sm">{{ $item['occurrence_count'] }} times</span>
+                                @endif
                             </div>
-                            <div class="flex gap-2 ml-4">
-                                @if ($item->type === 'notification' && !$item->read_at)
-                                    <button
-                                        wire:click="markAsRead('{{ $item->id }}')"
-                                        class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                                    >
-                                        Mark Read
-                                    </button>
-                                @endif
-                                @if ($item->type === 'notification')
-                                    <button
-                                        wire:click="deleteNotification('{{ $item->id }}')"
-                                        class="text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                                    >
-                                        Delete
-                                    </button>
-                                @endif
+                            <time class="shrink-0 text-xs text-base-content/55" datetime="{{ $item['occurred_at'] }}">
+                                {{ \Carbon\Carbon::parse($item['updated_at'] ?? $item['occurred_at'])->diffForHumans() }}
+                            </time>
+                        </div>
+
+                        @if ($item['body'])
+                            <p class="mt-1 text-sm leading-6 text-base-content/70">{{ $item['body'] }}</p>
+                        @endif
+
+                        @if ($item['progress'])
+                            @php $percent = min(100, round(($item['progress']['current'] / max(1, $item['progress']['total'])) * 100)); @endphp
+                            <div class="mt-3 flex items-center gap-3">
+                                <progress class="progress progress-primary h-2 flex-1" value="{{ $item['progress']['current'] }}" max="{{ $item['progress']['total'] }}" aria-label="{{ $percent }} percent complete"></progress>
+                                <span class="text-xs tabular-nums text-base-content/60">{{ $percent }}%</span>
                             </div>
+                        @endif
+
+                        <div class="mt-3 flex flex-wrap items-center gap-1">
+                            @if (is_string($destination) && str_starts_with($destination, 'http'))
+                                <a href="{{ $destination }}" class="btn btn-primary btn-xs">{{ $item['primary_action']['label'] ?? 'View' }}</a>
+                            @endif
+                            @if (! $isActivity && $scope === 'active')
+                                <button type="button" wire:click="{{ $item['is_read'] ? 'markAsUnread' : 'markAsRead' }}('{{ $item['id'] }}')" class="btn btn-ghost btn-xs">
+                                    Mark {{ $item['is_read'] ? 'unread' : 'read' }}
+                                </button>
+                                <button type="button" wire:click="archive('{{ $item['id'] }}')" wire:confirm="Move this notification to history?" class="btn btn-ghost btn-xs text-base-content/60">Archive</button>
+                            @endif
+                            @if ($isAttention && $item['has_technical_detail'])
+                                <span class="ml-auto text-xs text-base-content/45">Technical detail available</span>
+                            @endif
                         </div>
                     </div>
-                @endforeach
-            </div>
+                </article>
+            @endforeach
+        </div>
 
-            {{-- Pagination --}}
-            <div class="mt-6">
-                {{ $this->items->links() }}
+        <nav class="mt-5 flex items-center justify-between" aria-label="Notification pages">
+            <button wire:click="previousPage" class="btn btn-ghost btn-sm" @disabled(count($previousCursors) === 0)><x-icon name="o-chevron-left" class="size-4" /> Previous</button>
+            <button wire:click="nextPage" class="btn btn-ghost btn-sm" @disabled(! $this->feed['has_more'])>Next <x-icon name="o-chevron-right" class="size-4" /></button>
+        </nav>
+    @else
+        <div class="rounded-box border border-dashed border-base-300 bg-base-100 px-6 py-16 text-center">
+            <div class="mx-auto mb-4 grid size-12 place-items-center rounded-full bg-base-200">
+                <x-icon :name="$scope === 'history' ? 'o-archive-box' : 'o-check-circle'" class="size-6 text-base-content/55" />
             </div>
-        @else
-            {{-- Empty State --}}
-            <div class="text-center py-12">
-                <div class="text-neutral-400 dark:text-neutral-600 mb-2">
-                    <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                    </svg>
-                </div>
-                <h3 class="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-1">
-                    No Notifications
-                </h3>
-                <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                    You're all caught up! There's nothing to see here.
-                </p>
-            </div>
-        @endif
-    </div>
+            <h2 class="font-semibold">{{ $scope === 'history' ? 'No notification history' : 'You’re all caught up' }}</h2>
+            <p class="mt-1 text-sm text-base-content/60">{{ $search ? 'Try a different search or stream.' : 'New updates and active work will appear here.' }}</p>
+        </div>
+    @endif
 </div>

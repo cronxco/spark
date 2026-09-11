@@ -16,8 +16,10 @@ use App\Services\EffectiveTimezoneResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Notifications\Events\NotificationSent;
 /** @phpstan-ignore-next-line */
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
@@ -128,14 +130,53 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $payload = $event->notification->toArray($notifiable);
+            $notificationId = (string) ($event->notification->id ?? '');
+
+            if ($event->response instanceof DatabaseNotification) {
+                $groupKey = $payload['group_key'] ?? null;
+                if (is_string($groupKey) && $groupKey !== '') {
+                    $notificationId = DB::transaction(function () use ($event, $groupKey, $notifiable, $payload) {
+                        DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', [
+                            "notification:{$notifiable->getKey()}:{$groupKey}",
+                        ]);
+
+                        $existing = $notifiable->notifications()
+                            ->whereNull('archived_at')
+                            ->where('group_key', $groupKey)
+                            ->whereKeyNot($event->response->id)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if ($existing === null) {
+                            $event->response->forceFill(['group_key' => $groupKey])->save();
+
+                            return (string) $event->response->id;
+                        }
+
+                        $existingData = is_array($existing->data) ? $existing->data : [];
+                        $existing->forceFill([
+                            'data' => [
+                                ...$payload,
+                                'occurrence_count' => max(1, (int) ($existingData['occurrence_count'] ?? 1)) + 1,
+                            ],
+                            'read_at' => null,
+                            'updated_at' => now(),
+                        ])->save();
+                        $event->response->delete();
+
+                        return (string) $existing->id;
+                    });
+                    $event->notification->id = $notificationId;
+                }
+            }
 
             event(new NotificationReceived(
                 userId: (string) $notifiable->getKey(),
-                notificationId: (string) ($event->notification->id ?? ''),
+                notificationId: $notificationId,
                 type: (string) ($payload['type'] ?? $event->notification->getNotificationType()),
                 title: $payload['title'] ?? null,
-                body: $payload['message'] ?? null,
-                deepLink: $payload['action_url'] ?? null,
+                body: $payload['body'] ?? $payload['message'] ?? null,
+                deepLink: $payload['deep_link'] ?? null,
             ));
         });
 

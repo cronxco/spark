@@ -12,6 +12,7 @@ use App\Models\Integration;
 use App\Notifications\FetchMultipleFailures;
 use App\Services\Fetch\UrlSafetyValidator;
 use App\Services\Media\MediaDownloadHelper;
+use App\Services\Notifications\NotificationIncidentResolver;
 use App\Services\PlaywrightHealthMetrics;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
@@ -261,6 +262,9 @@ class FetchSingleUrl implements ShouldQueue
             $metadata['last_playwright_worker_status'] = $result['playwright_worker_status'] ?? null;
             $metadata['last_fallback_status_code'] = $result['fallback_status_code'] ?? null;
             $webpage->update(['metadata' => $metadata]);
+            app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
+                "fetch_multiple_failures:{$webpage->id}",
+            ]);
 
             // Update history with success
             $engine->updateLastHistoryEntry($webpage, [

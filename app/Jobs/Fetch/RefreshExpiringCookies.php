@@ -6,6 +6,7 @@ use App\Integrations\Fetch\PlaywrightFetchClient;
 use App\Models\EventObject;
 use App\Models\IntegrationGroup;
 use App\Notifications\CookiesAutoRefreshed;
+use App\Services\Notifications\NotificationIncidentResolver;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Carbon\Carbon;
@@ -136,6 +137,9 @@ class RefreshExpiringCookies implements ShouldQueue
                                 $expiryDate
                             )
                         );
+                        app(NotificationIncidentResolver::class)->resolve($group->user, [
+                            "cookie_expiry_warning:{$group->id}:{$domain}",
+                        ]);
 
                         $refreshedCount++;
 

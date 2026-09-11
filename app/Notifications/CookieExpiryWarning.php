@@ -23,8 +23,7 @@ class CookieExpiryWarning extends SparkNotification
 
     public function isPriority(): bool
     {
-        // High priority if expires in 3 days or less
-        return $this->daysUntilExpiry <= 3;
+        return parent::isPriority();
     }
 
     public function getIcon(): string
@@ -45,25 +44,28 @@ class CookieExpiryWarning extends SparkNotification
 
     public function getTitle(): string
     {
-        return 'Cookie Expiring Soon';
+        return "Refresh your sign-in for {$this->domain}";
     }
 
     public function getMessage(): string
     {
-        $expiryDate = Carbon::parse($this->expiresAt);
-
         if ($this->daysUntilExpiry === 0) {
-            return "Cookies for {$this->domain} expire today ({$expiryDate->format('M j')}).";
+            return 'Spark may stop updating this site today. Refresh the saved sign-in to keep it working.';
         } elseif ($this->daysUntilExpiry === 1) {
-            return "Cookies for {$this->domain} expire tomorrow ({$expiryDate->format('M j')}).";
+            return 'Spark may stop updating this site tomorrow. Refresh the saved sign-in to keep it working.';
         } else {
-            return "Cookies for {$this->domain} expire in {$this->daysUntilExpiry} days ({$expiryDate->format('M j')}).";
+            return "Spark may stop updating this site in {$this->daysUntilExpiry} days. Refresh the saved sign-in to keep it working.";
         }
     }
 
     public function getActionUrl(): ?string
     {
         return route('bookmarks') . '?tab=cookies';
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return "cookie_expiry_warning:{$this->group->id}:{$this->domain}";
     }
 
     /**

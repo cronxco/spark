@@ -2,36 +2,58 @@
 
 namespace App\Notifications;
 
+use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
 
-class CookiesAutoRefreshed extends Notification
+class CookiesAutoRefreshed extends SparkNotification
 {
-    use Queueable;
-
     public function __construct(
         public string $domain,
         public int $cookieCount,
         public Carbon $newExpiryDate
     ) {}
 
-    public function via($notifiable): array
+    public function getNotificationType(): string
     {
-        return ['database'];
+        return 'cookie_auto_refreshed';
     }
 
-    public function toArray($notifiable): array
+    public function getTitle(): string
+    {
+        return "Saved sign-in refreshed for {$this->domain}";
+    }
+
+    public function getMessage(): string
+    {
+        return "Spark can keep updating this site. The refreshed sign-in is expected to work until {$this->newExpiryDate->format('j M Y')}.";
+    }
+
+    public function getIcon(): string
+    {
+        return 'o-check-circle';
+    }
+
+    public function getColor(): string
+    {
+        return 'success';
+    }
+
+    public function getActionUrl(): ?string
+    {
+        return route('bookmarks') . '?tab=cookies';
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return "cookie_auto_refreshed:{$this->domain}";
+    }
+
+    public function toArray(User $notifiable): array
     {
         return [
-            'type' => 'info',
-            'title' => 'Cookies Auto-Refreshed',
-            'message' => "Cookies for {$this->domain} were automatically refreshed ({$this->cookieCount} cookies). New expiry: {$this->newExpiryDate->format('M j, Y')}",
-            'data' => [
-                'domain' => $this->domain,
-                'cookie_count' => $this->cookieCount,
-                'new_expiry' => $this->newExpiryDate->toIso8601String(),
-            ],
+            ...parent::toArray($notifiable),
+            'domain' => $this->domain,
+            'new_expiry' => $this->newExpiryDate->toIso8601String(),
         ];
     }
 }
