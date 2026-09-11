@@ -302,6 +302,18 @@ Ordered, typed catch-up queue: `flint_digest` → `check_in` → `anomaly` →
 marked read via `POST /up-to-speed/read`, or automatically for completed
 check-ins).
 
+**Read state is reported, never enforced.** Items already caught up are still
+returned; the client decides what to show. This is what lets it offer a recap
+of everything seen today, so an item dismissed by accident can be recovered
+via `POST /up-to-speed/unmark`.
+
+**Query parameters**
+
+| Parameter              | Type | Default | Description                                                                                                                                     |
+| ---------------------- | ---- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `include_acknowledged` | bool | `false` | Also return anomalies the user has acknowledged or suppressed. Off by default, since those are dismissed; ask for them when building the recap. |
+| `news_limit`           | int  | `20`    | Cap on `news_summary` items (max 100).                                                                                                          |
+
 **Response `200`**
 
 ```json
@@ -335,11 +347,49 @@ check-ins).
 }
 ```
 
-`anomaly` payloads include `metric`, `display_name`, `direction`,
-`current_value`, `baseline_value`, `deviation`, `streak_days`,
-`detected_at`. `news_summary` payloads include `title`, `source`, `url`,
-`tldr`, `summary`, `key_takeaways` (each nullable, populated from whichever
-summary block exists).
+`flint_digest` payloads include `date`, `period`, `title`, `kind`, `summary`,
+`block_count` and `unanswered_question_count`. `kind` is one of `briefing`,
+`news_roundup` or `reading_list`, resolved server-side so clients need not
+infer a digest's role from its title.
+
+`anomaly` payloads include `metric`, `display_name`, `domain`, `service`,
+`unit`, `type`, `direction`, `valence`, `is_ordinal`, `current_value`,
+`baseline_value`, `current_display`, `baseline_display`, `deviation`,
+`streak_days`, `detected_at` and `acknowledged_at`.
+
+- `display_name`, `current_display` and `baseline_display` come from the
+  plugin that defines the metric, so a balance reads "Balance Update" and
+  "£2,082.23" rather than "Had Balance" and `2082.23`.
+- `domain` is the plugin's domain (`health`, `money`, …) — use it to file the
+  anomaly, not the metric identifier.
+- `valence` (`good` / `bad` / `neutral`) says whether the movement is welcome.
+  It is **not** the same as `direction`: a balance rising is good news, a
+  cardiovascular age rising is not. Metrics that have not declared which way is
+  better report `neutral`.
+- `is_ordinal` marks a banded score, where a percentage change against a
+  fractional baseline is meaningless.
+
+Anomalies are gated before they are returned: a single day's movement needs a
+large deviation, a metric anomalous for a week is treated as a stale baseline
+rather than a surprise, and metrics the plugin marks `exclude_from_flint` are
+omitted.
+
+`news_summary` payloads include `title`, `source`, `url`, `tldr`, `summary`,
+`key_takeaways` (each nullable, populated from whichever summary block
+exists). `key_takeaways` is a JSON array of clean strings — no bullet
+prefixes.
+
+### `POST /api/v1/up-to-speed/unmark`
+
+The inverse of `up-to-speed/read`: returns items to the unread queue. For
+digests and news this deletes the `caught_up` record; for anomalies it also
+clears `acknowledged_at` and lifts any suppression window, since those — not
+the read record — are what evict an anomaly from the feed.
+
+Same body as `up-to-speed/read`: `{"items": [{"type": "...", "id": "<uuid>"}]}`,
+1–50 items, `type` ∈ `flint_digest | anomaly | news_summary`. Idempotent.
+
+**Response `200`**: `{"unmarked": 2}` — the number of items actually released.
 
 ### `GET /api/v1/health/dashboard`
 
@@ -800,27 +850,27 @@ Eloquent models rather than Resource classes — no Form Request classes
 exist anywhere in the app, so all validation is inline. Treated as a
 maintained but non-primary surface; use `/api/v1` for new integrations.
 
-| Method                             | Path                                    | Controller / action                              | Description                                                                    | `/api/v1` equivalent |
-| ----------------------------------- | ---------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------- |
-| GET/POST/PUT/DELETE                 | `/api/events[/{event}]`                 | `EventApiController` (index/show/store/update/destroy) | Full event CRUD, including nested actor/target/blocks creation in one request | `GET /events[/{id}]`, `PATCH /events/{id}` (no create/delete on v1) |
-| POST                                 | `/api/search/events`                     | `SearchApiController@searchEvents`                | Keyword/semantic event search                                                    | `GET /search`         |
-| POST                                 | `/api/search/blocks`                     | `SearchApiController@searchBlocks`                | Block search                                                                     | `GET /search`         |
-| POST                                 | `/api/search/objects`                    | `SearchApiController@searchObjects`               | Object search                                                                    | `GET /search`         |
-| POST                                 | `/api/search`                            | `SearchApiController@searchAll`                   | Combined search across events/objects                                           | `GET /search`         |
-| POST                                 | `/api/search/semantic`                   | `SemanticSearchController@search`                 | Pure semantic (embedding) search, 5-minute cached                              | `GET /search?mode=semantic` |
-| POST                                 | `/api/tokens/create`                     | inline closure                                    | Creates a Sanctum token. Requires an explicit `abilities` array drawn from `SparkAbility::DELEGABLE`; a caller may not request more than its own credential holds. Previously issued `['*']` | — (web settings only) |
-| GET                                  | `/api/tokens`                            | inline closure                                    | Lists the caller's tokens                                                        | —                     |
-| DELETE                               | `/api/tokens/{token}`                    | inline closure                                    | Revokes a token                                                                  | —                     |
-| GET                                  | `/api/integrations[/{integration}]`      | `IntegrationApiController@index/show`             | List/show integrations                                                          | `GET /integrations[/{id}]` |
-| POST                                 | `/api/integrations/{integration}/configure` | `IntegrationApiController@configure`           | Update integration configuration                                                | —                     |
-| POST                                 | `/api/integrations/{integration}/trigger`| `IntegrationApiController@trigger`                | Trigger an immediate fetch                                                       | `POST /integrations/{id}/sync` |
-| DELETE                               | `/api/integrations/{integration}`        | `IntegrationApiController@destroy`                | Remove an integration                                                           | —                     |
-| POST                                 | `/api/fetch/bookmarks` (`ability:bookmark:write`) | `FetchApiController@bookmarkUrl`         | Bookmark a URL                                                                   | `POST /bookmarks`     |
-| GET                                  | `/api/assistant/context`                 | `AssistantContextController@index`                | Assistant-oriented context payload                                              | `GET /day-summary`, `GET /events/{id}` (no direct 1:1) |
-| POST                                 | `/api/flint/questions/{block}/answer`    | `FlintQuestionsController@answer`                 | Answer a Flint user-question block                                             | `POST /flint/questions/{block}/answer` |
-| GET                                  | `/api/task-executions[/{taskExecution}]` | `TaskExecutionController@index/show`              | Task pipeline execution records (uses `TaskExecutionResource`)                  | —                     |
-| GET                                  | `/api/user`                              | inline closure                                    | Returns the authenticated user model                                            | —                     |
-| POST                                 | `/api/oauth/token`, `/api/oauth/refresh` | `Auth\OAuthController@token/refresh`              | Unauthenticated iOS PKCE token exchange/refresh (`throttle:oauth`)              | —                     |
+| Method              | Path                                              | Controller / action                                    | Description                                                                                                                                                                                  | `/api/v1` equivalent                                                |
+| ------------------- | ------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| GET/POST/PUT/DELETE | `/api/events[/{event}]`                           | `EventApiController` (index/show/store/update/destroy) | Full event CRUD, including nested actor/target/blocks creation in one request                                                                                                                | `GET /events[/{id}]`, `PATCH /events/{id}` (no create/delete on v1) |
+| POST                | `/api/search/events`                              | `SearchApiController@searchEvents`                     | Keyword/semantic event search                                                                                                                                                                | `GET /search`                                                       |
+| POST                | `/api/search/blocks`                              | `SearchApiController@searchBlocks`                     | Block search                                                                                                                                                                                 | `GET /search`                                                       |
+| POST                | `/api/search/objects`                             | `SearchApiController@searchObjects`                    | Object search                                                                                                                                                                                | `GET /search`                                                       |
+| POST                | `/api/search`                                     | `SearchApiController@searchAll`                        | Combined search across events/objects                                                                                                                                                        | `GET /search`                                                       |
+| POST                | `/api/search/semantic`                            | `SemanticSearchController@search`                      | Pure semantic (embedding) search, 5-minute cached                                                                                                                                            | `GET /search?mode=semantic`                                         |
+| POST                | `/api/tokens/create`                              | inline closure                                         | Creates a Sanctum token. Requires an explicit `abilities` array drawn from `SparkAbility::DELEGABLE`; a caller may not request more than its own credential holds. Previously issued `['*']` | — (web settings only)                                               |
+| GET                 | `/api/tokens`                                     | inline closure                                         | Lists the caller's tokens                                                                                                                                                                    | —                                                                   |
+| DELETE              | `/api/tokens/{token}`                             | inline closure                                         | Revokes a token                                                                                                                                                                              | —                                                                   |
+| GET                 | `/api/integrations[/{integration}]`               | `IntegrationApiController@index/show`                  | List/show integrations                                                                                                                                                                       | `GET /integrations[/{id}]`                                          |
+| POST                | `/api/integrations/{integration}/configure`       | `IntegrationApiController@configure`                   | Update integration configuration                                                                                                                                                             | —                                                                   |
+| POST                | `/api/integrations/{integration}/trigger`         | `IntegrationApiController@trigger`                     | Trigger an immediate fetch                                                                                                                                                                   | `POST /integrations/{id}/sync`                                      |
+| DELETE              | `/api/integrations/{integration}`                 | `IntegrationApiController@destroy`                     | Remove an integration                                                                                                                                                                        | —                                                                   |
+| POST                | `/api/fetch/bookmarks` (`ability:bookmark:write`) | `FetchApiController@bookmarkUrl`                       | Bookmark a URL                                                                                                                                                                               | `POST /bookmarks`                                                   |
+| GET                 | `/api/assistant/context`                          | `AssistantContextController@index`                     | Assistant-oriented context payload                                                                                                                                                           | `GET /day-summary`, `GET /events/{id}` (no direct 1:1)              |
+| POST                | `/api/flint/questions/{block}/answer`             | `FlintQuestionsController@answer`                      | Answer a Flint user-question block                                                                                                                                                           | `POST /flint/questions/{block}/answer`                              |
+| GET                 | `/api/task-executions[/{taskExecution}]`          | `TaskExecutionController@index/show`                   | Task pipeline execution records (uses `TaskExecutionResource`)                                                                                                                               | —                                                                   |
+| GET                 | `/api/user`                                       | inline closure                                         | Returns the authenticated user model                                                                                                                                                         | —                                                                   |
+| POST                | `/api/oauth/token`, `/api/oauth/refresh`          | `Auth\OAuthController@token/refresh`                   | Unauthenticated iOS PKCE token exchange/refresh (`throttle:oauth`)                                                                                                                           | —                                                                   |
 
 ---
 
