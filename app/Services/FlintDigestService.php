@@ -61,8 +61,8 @@ class FlintDigestService
             ? app(FlintRunToken::class)->verify($data['run_token'], $user, $date->toDateString(), $period)
             : null;
         $sourceId = $run
-            ? 'flint_digest_run:'.$run['run_uuid']
-            : 'flint_digest:'.Str::uuid();
+            ? 'flint_digest_run:' . $run['run_uuid']
+            : 'flint_digest:' . Str::uuid();
         $integration = $this->resolveIntegration($user);
 
         try {
@@ -117,8 +117,8 @@ class FlintDigestService
             [
                 'user_id' => $user->id,
                 'concept' => 'digest',
-                'type' => ($ownObject ? $routine : $period).'_digest',
-                'title' => $date->format('Y-m-d').' '.($ownObject
+                'type' => ($ownObject ? $routine : $period) . '_digest',
+                'title' => $date->format('Y-m-d') . ' ' . ($ownObject
                     ? strtoupper(str_replace('_', ' ', $routine))
                     : match ($period) {
                         'morning' => 'AM',
