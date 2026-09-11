@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
@@ -243,9 +244,8 @@ class UpToSpeedControllerTest extends TestCase
     public function includes_todays_unacknowledged_anomalies(): void
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        $anomaly = MetricTrend::factory()->create([
+        $anomaly = MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => null,
         ]);
@@ -266,9 +266,8 @@ class UpToSpeedControllerTest extends TestCase
     public function excludes_acknowledged_anomalies(): void
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        MetricTrend::factory()->create([
+        MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => now(),
         ]);
@@ -283,9 +282,8 @@ class UpToSpeedControllerTest extends TestCase
     public function excludes_suppressed_anomalies(): void
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        MetricTrend::factory()->create([
+        MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => null,
             'metadata' => ['suppress_until' => now()->addDay()->toDateString()],
@@ -301,9 +299,8 @@ class UpToSpeedControllerTest extends TestCase
     public function anomaly_caught_up_at_is_set_when_marked(): void
     {
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        $anomaly = MetricTrend::factory()->create([
+        $anomaly = MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => null,
         ]);
@@ -441,9 +438,8 @@ class UpToSpeedControllerTest extends TestCase
         ]);
 
         $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
-        MetricTrend::factory()->create([
+        MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
-            'type' => 'anomaly_high',
             'detected_at' => now(),
             'acknowledged_at' => null,
         ]);
@@ -463,6 +459,386 @@ class UpToSpeedControllerTest extends TestCase
             ->all();
 
         $this->assertEquals(['flint_digest', 'check_in', 'check_in', 'anomaly', 'news_summary'], $types);
+    }
+
+    // -------------------------------------------------------------------------
+    // Anomaly presentation
+    // -------------------------------------------------------------------------
+
+    /**
+     * The payload carried only a metric identifier string, so the client had no
+     * way to tell a bank balance from a sleep score — which is why every
+     * anomaly, money included, was filed under "Your body".
+     */
+    #[Test]
+    public function anomaly_payload_carries_its_domain_and_unit(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_cardiovascular_age',
+            'value_unit' => 'years',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'current_value' => 44,
+            'baseline_value' => 38.87,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $payload = $this->firstAnomalyPayload();
+
+        $this->assertSame('health', $payload['domain']);
+        $this->assertSame('oura', $payload['service']);
+        $this->assertSame('years', $payload['unit']);
+        $this->assertSame('Cardiovascular Age', $payload['display_name']);
+    }
+
+    #[Test]
+    public function anomaly_payload_carries_preformatted_values(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+            'value_unit' => 'percent',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'current_value' => 78,
+            'baseline_value' => 85,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $payload = $this->firstAnomalyPayload();
+
+        $this->assertSame('78%', $payload['current_display']);
+        $this->assertSame('85%', $payload['baseline_display']);
+        $this->assertStringNotContainsString('<', $payload['current_display']);
+    }
+
+    /**
+     * Direction is not valence, and the shipped UI had only direction — so it
+     * tinted a rising number as a warning whatever the number meant.
+     */
+    #[Test]
+    public function anomaly_payload_distinguishes_valence_from_direction(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_cardiovascular_age',
+            'value_unit' => 'years',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'current_value' => 44,
+            'baseline_value' => 38.87,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $payload = $this->firstAnomalyPayload();
+
+        $this->assertSame('up', $payload['direction']);
+        $this->assertSame('bad', $payload['valence']);
+    }
+
+    #[Test]
+    public function anomaly_payload_flags_ordinal_metrics(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_resilience_score',
+            'value_unit' => 'resilience_level',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'type' => 'anomaly_low',
+            'detected_at' => now(),
+            'current_value' => 2,
+            'baseline_value' => 3.2,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $payload = $this->firstAnomalyPayload();
+
+        $this->assertTrue($payload['is_ordinal']);
+        $this->assertSame('Adequate', $payload['current_display']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Noise gating — the briefing styleguide, applied
+    // -------------------------------------------------------------------------
+
+    /**
+     * "A single-day movement should usually be treated as noise unless the
+     * deviation is genuinely large."
+     */
+    #[Test]
+    public function excludes_a_marginal_single_day_anomaly(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+        ]);
+        MetricTrend::factory()->marginal()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'anomaly'));
+    }
+
+    #[Test]
+    public function includes_a_large_single_day_anomaly(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertCount(1, $items->where('type', 'anomaly'));
+    }
+
+    /**
+     * A metric anomalous every day for a fortnight is not surprising — its
+     * baseline has drifted. The card was announcing "I've seen this 14 days
+     * running, so I'm raising it", which is backwards.
+     */
+    #[Test]
+    public function excludes_an_anomaly_that_has_run_for_a_week(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+        ]);
+
+        foreach (range(0, 8) as $daysAgo) {
+            MetricTrend::factory()->significant()->create([
+                'metric_statistic_id' => $stat->id,
+                'detected_at' => now()->subDays($daysAgo),
+            ]);
+        }
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'anomaly'));
+    }
+
+    /**
+     * The plugin marks account balances as exclude_from_flint, and Flint was
+     * leading the anomaly chapter with one anyway.
+     */
+    #[Test]
+    public function excludes_metrics_the_plugin_keeps_out_of_flint(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'gocardless',
+            'action' => 'had_balance',
+            'value_unit' => 'GBP',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'current_value' => 2082.23,
+            'baseline_value' => 241.68,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'anomaly'));
+    }
+
+    // -------------------------------------------------------------------------
+    // Read state is exposed, never enforced
+    // -------------------------------------------------------------------------
+
+    /**
+     * The client builds its "already seen today" recap out of the caught-up
+     * items in this response, so they must keep being returned after they are
+     * marked. Filtering them here would make an accidental dismissal
+     * unrecoverable.
+     */
+    #[Test]
+    public function caught_up_items_are_still_returned(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson('/api/v1/mobile/up-to-speed/read', [
+            'items' => [['type' => 'flint_digest', 'id' => $event->id]],
+        ])->assertOk();
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $digest = $items->firstWhere('id', $event->id);
+
+        $this->assertNotNull($digest, 'a caught-up digest must still appear in the feed');
+        $this->assertNotNull($digest['caught_up_at']);
+    }
+
+    // -------------------------------------------------------------------------
+    // include_acknowledged
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function acknowledged_anomalies_are_excluded_by_default(): void
+    {
+        $anomaly = $this->acknowledgedAnomaly();
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertNull($items->firstWhere('id', $anomaly->id));
+    }
+
+    #[Test]
+    public function include_acknowledged_returns_dismissed_anomalies(): void
+    {
+        $anomaly = $this->acknowledgedAnomaly();
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+
+        $found = $items->firstWhere('id', $anomaly->id);
+        $this->assertNotNull($found, 'a dismissed anomaly must be recoverable');
+        $this->assertNotNull($found['payload']['acknowledged_at']);
+    }
+
+    #[Test]
+    public function include_acknowledged_bypasses_noise_only_for_acknowledged_anomalies(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $acknowledged = MetricTrend::factory()->marginal()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+        ]);
+        $unacknowledged = MetricTrend::factory()->marginal()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+
+        $this->assertNotNull($items->firstWhere('id', $acknowledged->id));
+        $this->assertNull($items->firstWhere('id', $unacknowledged->id));
+    }
+
+    #[Test]
+    public function acknowledged_balance_anomaly_uses_its_account_direction(): void
+    {
+        $account = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'metadata' => ['account_type' => 'credit_card'],
+        ]);
+        $event = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'actor_id' => $account->id,
+            'service' => 'gocardless',
+            'domain' => 'money',
+            'action' => 'had_balance',
+            'value_unit' => 'GBP',
+        ]);
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'gocardless',
+            'action' => 'had_balance',
+            'value_unit' => 'GBP',
+        ]);
+        $anomaly = MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+            'metadata' => ['event_id' => $event->id],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+
+        $this->assertSame('bad', $items->firstWhere('id', $anomaly->id)['payload']['valence']);
+    }
+
+    #[Test]
+    public function include_acknowledged_returns_suppressed_anomalies(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $anomaly = MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+            'metadata' => ['suppress_until' => now()->addDays(7)->toDateString()],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $default = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertNull($default->firstWhere('id', $anomaly->id));
+
+        $included = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+        $this->assertNotNull($included->firstWhere('id', $anomaly->id));
+    }
+
+    #[Test]
+    public function internal_subject_keys_are_not_exposed(): void
+    {
+        Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = $this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items');
+
+        foreach ($items as $item) {
+            $this->assertArrayNotHasKey('_subject_id', $item);
+            $this->assertArrayNotHasKey('_subject_key', $item);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -491,5 +867,32 @@ class UpToSpeedControllerTest extends TestCase
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'flint_digest'));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function firstAnomalyPayload(): array
+    {
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $anomaly = $items->firstWhere('type', 'anomaly');
+
+        $this->assertNotNull($anomaly, 'expected an anomaly item in the feed');
+
+        return $anomaly['payload'];
+    }
+
+    private function acknowledgedAnomaly(): MetricTrend
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+
+        // significant() sets the deviation as well as the type: the factory
+        // definition picks its deviation scale from the type it generated, so
+        // overriding type alone can leave a trend-scale value behind.
+        return MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+        ]);
     }
 }

@@ -182,11 +182,18 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'description' => 'Account balance was updated',
                 'display_with_object' => false,
                 'value_unit' => 'GBP',
+                'value_units' => ['GBP', 'EUR', 'USD'],
                 'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
+                'higher_is_better' => [self::class, 'balanceHigherIsBetter'],
                 'hidden' => true,
                 'exclude_from_flint' => true,
             ],
         ];
+    }
+
+    public static function balanceHigherIsBetter(EventObject $account): bool
+    {
+        return ! in_array($account->metadata['account_type'] ?? null, ['credit_card', 'loan'], true);
     }
 
     public static function getBlockTypes(): array

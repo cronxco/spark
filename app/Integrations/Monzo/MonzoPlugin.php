@@ -146,6 +146,7 @@ class MonzoPlugin extends OAuthPlugin
                 'display_with_object' => true,
                 'value_unit' => 'GBP',
                 'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'higher_is_better' => true,
                 'hidden' => true,
                 'exclude_from_flint' => true,
             ],

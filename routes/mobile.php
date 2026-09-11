@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\V1\Mobile\TagsController;
 use App\Http\Controllers\Api\V1\Mobile\TypedSearchController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedReadController;
+use App\Http\Controllers\Api\V1\Mobile\UpToSpeedUnmarkController;
 use App\Http\Controllers\Api\V1\Mobile\WidgetsController;
 use App\Http\Controllers\Auth\OAuthController;
 use Illuminate\Support\Facades\Route;
@@ -273,6 +274,10 @@ Route::get('up-to-speed', UpToSpeedController::class)
 Route::post('up-to-speed/read', UpToSpeedReadController::class)
     ->middleware('ability:ios:write')
     ->name('up-to-speed.read');
+
+Route::post('up-to-speed/unmark', UpToSpeedUnmarkController::class)
+    ->middleware('ability:ios:write')
+    ->name('up-to-speed.unmark');
 
 /*
 |--------------------------------------------------------------------------

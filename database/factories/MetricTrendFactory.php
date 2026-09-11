@@ -33,6 +33,17 @@ class MetricTrendFactory extends Factory
             ? $baselineValue * (1 + $percentChange)
             : $baselineValue * (1 - $percentChange);
 
+        $isAnomaly = in_array($type, ['anomaly_high', 'anomaly_low'], true);
+
+        // Anomalies and trends measure deviation differently, and the
+        // difference matters: DetectMetricAnomaliesJob records standard
+        // deviations from the mean, while trend detection records a
+        // proportional change. Producing a proportion for an anomaly made
+        // every factory-built anomaly look statistically trivial.
+        $deviation = $isAnomaly
+            ? fake()->randomFloat(2, 3.5, 5.0)
+            : abs($currentValue - $baselineValue) / $baselineValue;
+
         return [
             'metric_statistic_id' => MetricStatistic::factory(),
             'type' => $type,
@@ -41,10 +52,33 @@ class MetricTrendFactory extends Factory
             'end_date' => now()->toDateString(),
             'baseline_value' => $baselineValue,
             'current_value' => $currentValue,
-            'deviation' => abs($currentValue - $baselineValue) / $baselineValue,
+            'deviation' => $deviation,
             'significance_score' => fake()->randomFloat(4, 0.5, 1.0),
             'metadata' => [],
             'acknowledged_at' => null,
         ];
+    }
+
+    /**
+     * An anomaly large enough that a single day's appearance is worth raising.
+     */
+    public function significant(): static
+    {
+        return $this->state(fn (): array => [
+            'type' => 'anomaly_high',
+            'deviation' => 4.0,
+        ]);
+    }
+
+    /**
+     * An anomaly that clears the detection bounds but is not, on its own,
+     * large enough to interrupt someone for on day one.
+     */
+    public function marginal(): static
+    {
+        return $this->state(fn (): array => [
+            'type' => 'anomaly_high',
+            'deviation' => 2.2,
+        ]);
     }
 }

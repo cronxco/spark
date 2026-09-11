@@ -1216,6 +1216,13 @@ acknowledgement exists (see `POST /check-ins/timezone`), `source` is
 Ordered, typed catch-up queue: `flint_digest` → `check_in` → `anomaly` →
 `news_summary` items, each with a `caught_up_at` timestamp.
 
+Read state is reported, never enforced — already-read items are still
+returned, which is what lets the client offer a recap of the day and undo an
+accidental dismissal.
+
+**Query Parameters**: `include_acknowledged` (bool, default false — also
+return dismissed anomalies), `news_limit` (int, default 20, max 100).
+
 **Response `200`**: see [API_v1.md](API_v1.md#get-apiv1up-to-speed) for the
 full shape (identical on both surfaces).
 
@@ -1338,6 +1345,7 @@ All write endpoints require `ios:write` ability.
 | `POST`   | `/check-ins/timezone`              | Record an acknowledged timezone change                                                     |
 | `POST`   | `/check-ins/media`                 | Upload a check-in photo (raw binary body)                                                  |
 | `POST`   | `/up-to-speed/read`                | Mark Up to Speed items as caught up                                                        |
+| `POST`   | `/up-to-speed/unmark`              | Return Up to Speed items to the unread queue                                               |
 | `POST`   | `/flint/digests`                   | Create a Flint digest                                                                      |
 | `POST`   | `/flint/questions/{block}/answer`  | Answer a Flint user-question block                                                         |
 | `POST`   | `/bookmarks`                       | Bookmark a URL                                                                             |

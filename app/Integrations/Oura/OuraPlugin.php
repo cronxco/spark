@@ -118,6 +118,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'percent',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_sleep_score' => [
@@ -127,6 +128,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'percent',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_activity_score' => [
@@ -136,6 +138,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'percent',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_stress_score' => [
@@ -145,6 +148,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'stress_level',
                 'value_formatter' => '{{ match($value) { 3 => "Stressful", 2 => "Normal", 1 => "Restored", default => $value } }}',
+                'higher_is_better' => false,
+                'ordinal' => true,
                 'hidden' => false,
             ],
             'had_resilience_score' => [
@@ -154,6 +159,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'resilience_level',
                 'value_formatter' => '{{ match($value) { 5 => "Exceptional", 4 => "Strong", 3 => "Solid", 2 => "Adequate", 1 => "Limited", default => $value } }}',
+                'higher_is_better' => true,
+                'ordinal' => true,
                 'hidden' => false,
             ],
             'had_spo2' => [
@@ -163,6 +170,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'percent',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_cardiovascular_age' => [
@@ -172,6 +180,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">years</span>',
                 'value_unit' => 'years',
+                'higher_is_better' => false,
                 'hidden' => false,
             ],
             'had_vo2_max' => [
@@ -181,6 +190,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'ml/kg/min',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">ml</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_enhanced_tag' => [
