@@ -466,6 +466,125 @@ class UpToSpeedControllerTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // Read state is exposed, never enforced
+    // -------------------------------------------------------------------------
+
+    /**
+     * The client builds its "already seen today" recap out of the caught-up
+     * items in this response, so they must keep being returned after they are
+     * marked. Filtering them here would make an accidental dismissal
+     * unrecoverable.
+     */
+    #[Test]
+    public function caught_up_items_are_still_returned(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson('/api/v1/mobile/up-to-speed/read', [
+            'items' => [['type' => 'flint_digest', 'id' => $event->id]],
+        ])->assertOk();
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $digest = $items->firstWhere('id', $event->id);
+
+        $this->assertNotNull($digest, 'a caught-up digest must still appear in the feed');
+        $this->assertNotNull($digest['caught_up_at']);
+    }
+
+    // -------------------------------------------------------------------------
+    // include_acknowledged
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function acknowledged_anomalies_are_excluded_by_default(): void
+    {
+        $anomaly = $this->acknowledgedAnomaly();
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertNull($items->firstWhere('id', $anomaly->id));
+    }
+
+    #[Test]
+    public function include_acknowledged_returns_dismissed_anomalies(): void
+    {
+        $anomaly = $this->acknowledgedAnomaly();
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+
+        $found = $items->firstWhere('id', $anomaly->id);
+        $this->assertNotNull($found, 'a dismissed anomaly must be recoverable');
+        $this->assertNotNull($found['payload']['acknowledged_at']);
+    }
+
+    #[Test]
+    public function include_acknowledged_returns_suppressed_anomalies(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $anomaly = MetricTrend::factory()->create([
+            'metric_statistic_id' => $stat->id,
+            'type' => 'anomaly_high',
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+            'metadata' => ['suppress_until' => now()->addDays(7)->toDateString()],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $default = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertNull($default->firstWhere('id', $anomaly->id));
+
+        $included = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+        $this->assertNotNull($included->firstWhere('id', $anomaly->id));
+    }
+
+    #[Test]
+    public function internal_subject_keys_are_not_exposed(): void
+    {
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = $this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items');
+
+        foreach ($items as $item) {
+            $this->assertArrayNotHasKey('_subject_id', $item);
+            $this->assertArrayNotHasKey('_subject_key', $item);
+        }
+    }
+
+    private function acknowledgedAnomaly(): MetricTrend
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+
+        return MetricTrend::factory()->create([
+            'metric_statistic_id' => $stat->id,
+            'type' => 'anomaly_high',
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+        ]);
+    }
+
+    // -------------------------------------------------------------------------
     // Data isolation
     // -------------------------------------------------------------------------
 

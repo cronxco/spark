@@ -26,17 +26,29 @@ class UpToSpeedController extends Controller
      * Ordering: flint_digest → check_in → anomaly → news_summary
      * All items are included; caught_up_at is populated for items that have
      * been marked via POST /up-to-speed/read (or via completion for check-ins).
+     * Read state is exposed, never enforced — the client decides what to show,
+     * which is what lets it offer a recap of everything already seen.
+     *
+     * Query: include_acknowledged (bool) — also return anomalies the user has
+     * acknowledged or suppressed. Off by default, since those are dismissed;
+     * the client asks for them when building the recap so a mis-tapped
+     * dismissal can be undone.
      */
     public function __invoke(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'include_acknowledged' => ['sometimes', 'boolean'],
+        ]);
+
         $user = $request->user();
         $timezone = $user->timezone ?? 'UTC';
         $today = Carbon::today($timezone);
         $integrationIds = $user->integrations()->pluck('id');
+        $includeAcknowledged = (bool) ($validated['include_acknowledged'] ?? false);
 
         $digestItems = $this->buildDigestItems($user, $today, $integrationIds);
         $checkInItems = $this->buildCheckInItems($user, $today);
-        $anomalyItems = $this->buildAnomalyItems($user, $today);
+        $anomalyItems = $this->buildAnomalyItems($user, $today, $includeAcknowledged);
         $newsItems = $this->buildNewsItems($user, $integrationIds);
 
         // Batch-fetch caught_up activities for all activity-log-tracked items
@@ -53,15 +65,16 @@ class UpToSpeedController extends Controller
             ->where('causer_type', User::class)
             ->where('causer_id', $user->id)
             ->where('event', 'caught_up')
+            ->whereIn('subject_type', [Event::class, MetricTrend::class])
             ->whereIn('subject_id', $subjectIds)
             ->get()
-            ->keyBy('subject_id');
+            ->keyBy(fn (Activity $activity): string => "{$activity->subject_type}:{$activity->subject_id}");
 
         $enrich = function (array $item) use ($caughtUpMap): array {
-            $subjectId = $item['_subject_id'] ?? null;
-            $activity = $subjectId ? $caughtUpMap->get($subjectId) : null;
+            $subjectKey = $item['_subject_key'] ?? null;
+            $activity = $subjectKey ? $caughtUpMap->get($subjectKey) : null;
             $item['caught_up_at'] = $activity?->created_at?->toIso8601String();
-            unset($item['_subject_id']);
+            unset($item['_subject_id'], $item['_subject_key']);
 
             return $item;
         };
@@ -97,6 +110,7 @@ class UpToSpeedController extends Controller
                 'type' => 'flint_digest',
                 'caught_up_at' => null,
                 '_subject_id' => $event->id,
+                '_subject_key' => Event::class.':'.$event->id,
                 'payload' => [
                     'date' => Carbon::parse($event->time)->toDateString(),
                     'period' => $meta['period'] ?? null,
@@ -143,16 +157,20 @@ class UpToSpeedController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function buildAnomalyItems(User $user, Carbon $today): array
+    private function buildAnomalyItems(User $user, Carbon $today, bool $includeAcknowledged = false): array
     {
         $trends = MetricTrend::query()
             ->whereHas('metricStatistic', fn ($q) => $q->where('user_id', $user->id))
             ->anomalies()
-            ->unacknowledged()
+            ->when(! $includeAcknowledged, fn ($q) => $q->unacknowledged())
             ->whereDate('detected_at', $today)
             ->with('metricStatistic')
             ->get()
-            ->filter(function (MetricTrend $trend): bool {
+            ->filter(function (MetricTrend $trend) use ($includeAcknowledged): bool {
+                if ($includeAcknowledged) {
+                    return true;
+                }
+
                 $suppressUntil = $trend->metadata['suppress_until'] ?? null;
 
                 return ! ($suppressUntil && Carbon::parse($suppressUntil)->isFuture());
@@ -168,6 +186,7 @@ class UpToSpeedController extends Controller
                 'type' => 'anomaly',
                 'caught_up_at' => null,
                 '_subject_id' => $trend->id,
+                '_subject_key' => MetricTrend::class.':'.$trend->id,
                 'payload' => [
                     'metric' => $stat->getIdentifier(),
                     'display_name' => $stat->getDisplayName(),
@@ -178,6 +197,7 @@ class UpToSpeedController extends Controller
                     'deviation' => round($trend->deviation, 2),
                     'streak_days' => $streakCount,
                     'detected_at' => $trend->detected_at->toIso8601String(),
+                    'acknowledged_at' => $trend->acknowledged_at?->toIso8601String(),
                 ],
             ];
         })->values()->all();
@@ -245,6 +265,7 @@ class UpToSpeedController extends Controller
                 'type' => 'news_summary',
                 'caught_up_at' => null,
                 '_subject_id' => $event->id,
+                '_subject_key' => Event::class.':'.$event->id,
                 'payload' => $payload,
             ];
         })->all();

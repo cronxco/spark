@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\V1\Mobile\SearchController as V1SearchController;
 use App\Http\Controllers\Api\V1\Mobile\TagsController as V1TagsController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedController as V1UpToSpeedController;
 use App\Http\Controllers\Api\V1\Mobile\UpToSpeedReadController as V1UpToSpeedReadController;
+use App\Http\Controllers\Api\V1\Mobile\UpToSpeedUnmarkController as V1UpToSpeedUnmarkController;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\EventApiController;
 use App\Support\SparkAbility;
@@ -237,6 +238,7 @@ Route::prefix('v1')
         Route::post('check-ins', [V1CheckInsController::class, 'store'])->middleware('spark.ability:insights:write')->name('check-ins.store');
         Route::post('anomalies/{id}/acknowledge', [V1AnomaliesController::class, 'acknowledge'])->middleware('spark.ability:insights:write')->name('anomalies.acknowledge');
         Route::post('up-to-speed/read', V1UpToSpeedReadController::class)->middleware('spark.ability:insights:write')->name('up-to-speed.read');
+        Route::post('up-to-speed/unmark', V1UpToSpeedUnmarkController::class)->middleware('spark.ability:insights:write')->name('up-to-speed.unmark');
         Route::post('flint/questions/{block}/answer', [V1FlintDigestsController::class, 'answer'])->middleware('spark.ability:flint:write')->name('flint.questions.answer');
         Route::post('flint/digests', [V1FlintDigestsController::class, 'store'])->middleware('spark.ability:flint:write')->name('flint.digests.store');
         Route::post('finance/accounts', [V1MoneyAccountsController::class, 'store'])->middleware('spark.ability:finance:write')->name('finance.accounts.store');
