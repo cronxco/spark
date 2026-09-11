@@ -26,7 +26,15 @@ class CreateFlintDigestTool extends Tool
         - `flint_user_question`: A question for the user. Provide `question`, optional `topic`,
           `priority` (low/medium/high), and optional `answer_options` array.
         - `flint_editorial_note`: Freeform AI commentary. Provide `content` (markdown).
-        - Any `flint_*` type: Provide `content` (markdown) for the block body.
+        - `flint_day_context`: Structured calendar + weather for today, drawn from the same
+          grounding calls used for the prose briefing. Provide `day_context` — an object with
+          `calendar` (array of `{title, all_day, start, person}` for actual commitments; `person`
+          is "will" or "dan": "dan" only when the title names Dan/Daniel and does not also name
+          Will, "will" for everything else including an unspecified title — never omit `person`),
+          `birthdays` (array of `{title}` — a birthday is not a commitment either of you is
+          attending, so no `person` field; keep it out of `calendar`), and `weather`
+          (`{location, condition, temp_high_c, rain_probability_pct}`). Do not put this in `content`.
+        - Any other `flint_*` type: Provide `content` (markdown) for the block body.
 
         Calls create a new digest. Do not retry after an unknown outcome without
         checking get-latest-flint-digest first. Routine callers must pass the
@@ -104,6 +112,31 @@ class CreateFlintDigestTool extends Tool
                     'answer_options' => $schema->array()
                         ->items($schema->string())
                         ->description('For flint_user_question: optional multiple-choice answers. Omit for freeform.'),
+                    'day_context' => $schema->object([
+                        'calendar' => $schema->array()
+                            ->items($schema->object([
+                                'title' => $schema->string()->required(),
+                                'all_day' => $schema->boolean(),
+                                'start' => $schema->string()
+                                    ->description('ISO 8601 timestamp; omit for all-day entries.'),
+                                'person' => $schema->string()
+                                    ->enum(['will', 'dan'])
+                                    ->required()
+                                    ->description('"dan" only when the title names Dan/Daniel without also naming Will; "will" otherwise.'),
+                            ]))
+                            ->description('Today\'s calendar rows for the Day screen — actual commitments, not birthdays.'),
+                        'birthdays' => $schema->array()
+                            ->items($schema->object([
+                                'title' => $schema->string()->required(),
+                            ]))
+                            ->description('Today\'s birthdays — title only, no person attribution.'),
+                        'weather' => $schema->object([
+                            'location' => $schema->string(),
+                            'condition' => $schema->string(),
+                            'temp_high_c' => $schema->number(),
+                            'rain_probability_pct' => $schema->integer(),
+                        ]),
+                    ])->description('For flint_day_context: structured calendar + weather. See block-type notes above.'),
                 ]))
                 ->description('Blocks to attach to this digest.'),
         ];

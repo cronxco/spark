@@ -559,6 +559,61 @@ Never search hourly weather for opportunities to invent activities.
 
 High readiness + an empty calendar is not a reason to hunt for a running window.
 
+## Step 6a: Emit structured day context
+
+Alongside the prose briefing, attach one `flint_day_context` block **on every run**
+(every period, not morning only) built from the same calendar (Step 4b) and weather
+(Step 6) grounding above — this is packaging the data already gathered, not a new
+research step. Spark's mobile client renders it directly as its own "Your day" screen,
+so it needs to be structured, not additional prose.
+
+```json
+{
+  "block_type": "flint_day_context",
+  "title": "Today at a glance",
+  "day_context": {
+    "calendar": [
+      { "title": "Will · Office", "all_day": false, "start": "2026-09-10T09:00:00+01:00", "person": "will" },
+      { "title": "Dan · Office", "all_day": false, "start": "2026-09-10T09:00:00+01:00", "person": "dan" }
+    ],
+    "birthdays": [
+      { "title": "Daniel's birthday" }
+    ],
+    "weather": { "location": "London", "condition": "Overcast", "temp_high_c": 20, "rain_probability_pct": 38 }
+  }
+}
+```
+
+`calendar` and `birthdays` are **today's** rows only (the wider plan-vs-actual window
+from Step 4b is for the prose, not this block). `weather` is a compact subset of the
+summary tool's output — today's headline condition/high/rain-chance for the
+contextually correct location, not the full forecast payload.
+
+A birthday is a fact about the day, not a commitment either of you is attending — put it
+in `birthdays` (title only) instead of `calendar`, and do not attempt to attribute it to
+a person.
+
+### Person attribution — required on every calendar entry (not birthdays)
+
+Every `calendar` entry needs a `person`, decided from the event **title only**, checked
+in this order:
+
+1. Title names Dan or Daniel **and does not also name Will** → `"dan"`.
+2. Otherwise → `"will"`. This covers "Will" on its own, "Will" together with Dan/Daniel,
+   and a title that names neither.
+
+Worked examples:
+
+- "Will · Office" → `will` (names Will).
+- "Dan · Office" → `dan` (names Dan, not Will).
+- "Will & Dan — dinner" → `will` (names both; Will wins).
+- "Team standup" → `will` (names neither; default to Will).
+- "Daniel's birthday" → not a `calendar` entry at all; goes in `birthdays`, no `person`.
+
+Never omit `person` and never infer it from anything other than the title (attendee
+lists, calendar ownership, etc. are not available here) — the mobile client renders
+exactly what this field says.
+
 ## Step 7: Interpret with calibrated confidence
 
 Before editorial planning, separate:
@@ -1133,6 +1188,9 @@ Before writing today's digest verify:
 - [ ] Spark service status checked before interpreting absence/totals;
 - [ ] fallback morning data treated as unavailable rather than absent;
 - [ ] weather summary fetched for relevant location;
+- [ ] `flint_day_context` block attached with today's calendar + birthdays + weather,
+      every `calendar` entry carrying a `person` decided by the title-attribution rule,
+      birthdays kept out of `calendar` and left person-free;
 - [ ] any hourly weather / HA / Karakeep / Trek / refresh usage passed its relevance
       gate;
 - [ ] lede is consequential, not merely interesting;

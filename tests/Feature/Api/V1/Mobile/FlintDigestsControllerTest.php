@@ -141,6 +141,41 @@ class FlintDigestsControllerTest extends TestCase
     }
 
     #[Test]
+    public function day_context_blocks_expose_structured_data_without_linkifying(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_day_context',
+            'title' => 'Today at a glance',
+            'metadata' => [
+                'day_context' => [
+                    'calendar' => [
+                        ['title' => 'Will · Office', 'all_day' => false, 'start' => '2026-05-10T09:00:00+01:00', 'person' => 'will'],
+                        ['title' => 'Dan · Office', 'all_day' => false, 'start' => '2026-05-10T09:00:00+01:00', 'person' => 'dan'],
+                    ],
+                    'birthdays' => [
+                        ['title' => "Daniel's birthday"],
+                    ],
+                    'weather' => ['location' => 'London', 'condition' => 'Overcast', 'temp_high_c' => 20, 'rain_probability_pct' => 38],
+                ],
+            ],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('blocks.0.day_context.calendar.0.person', 'will')
+            ->assertJsonPath('blocks.0.day_context.calendar.1.person', 'dan')
+            ->assertJsonPath('blocks.0.day_context.birthdays.0.title', "Daniel's birthday")
+            ->assertJsonMissingPath('blocks.0.day_context.birthdays.0.person')
+            ->assertJsonPath('blocks.0.day_context.weather.condition', 'Overcast')
+            ->assertJsonMissingPath('blocks.0.content');
+    }
+
+    #[Test]
     public function content_blocks_expose_resolved_references_and_linkified_prose(): void
     {
         $event = $this->createDigestEvent('morning');
@@ -173,7 +208,7 @@ class FlintDigestsControllerTest extends TestCase
             ->assertJsonPath('blocks.0.references.0.domain', 'health');
 
         $this->assertStringContainsString(
-            '[Morning Walk](https://spark.cronx.co/event/' . $referenced->id . ')',
+            '[Morning Walk](https://spark.cronx.co/event/'.$referenced->id.')',
             $response->json('blocks.0.content'),
         );
     }
@@ -224,7 +259,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read']);
 
-        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+        $this->getJson('/api/v1/mobile/flint/digests/'.$event->id)
             ->assertOk()
             ->assertJsonPath('event_id', $event->id)
             ->assertJsonPath('period', 'morning')
@@ -254,7 +289,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read']);
 
-        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+        $this->getJson('/api/v1/mobile/flint/digests/'.$event->id)
             ->assertNotFound();
     }
 
@@ -285,7 +320,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Good',
             'answer_note' => 'Feeling productive today',
         ])
@@ -313,7 +348,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Yes',
         ])
             ->assertOk()
@@ -334,7 +369,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Yes',
         ])->assertStatus(403);
     }
@@ -366,7 +401,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Yes',
         ])->assertStatus(403);
     }
@@ -385,7 +420,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Yes',
         ])->assertStatus(422);
     }
@@ -404,7 +439,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [])
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['answer']);
     }
@@ -428,7 +463,7 @@ class FlintDigestsControllerTest extends TestCase
             'time' => $date->midDay(),
             'event_metadata' => array_merge([
                 'period' => $period,
-                'title' => ucfirst($period) . ' Digest',
+                'title' => ucfirst($period).' Digest',
             ], $meta),
         ]);
     }
