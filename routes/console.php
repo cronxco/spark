@@ -58,6 +58,13 @@ Schedule::command('queue:prune-failed --hours=720')
     ->onOneServer()
     ->withoutOverlapping();
 
+// Keep the notification feed bounded while retaining 30 days of completed history.
+Schedule::command('notifications:maintain-history')
+    ->daily()
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->sentryMonitor();
+
 // Check cookie expiry daily at 6am
 Schedule::job(new CheckCookieExpiryJob)
     ->dailyAt('06:00')

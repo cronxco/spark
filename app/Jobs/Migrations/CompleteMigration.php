@@ -6,6 +6,7 @@ use App\Models\ActionProgress;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Notifications\MigrationCompleted;
+use App\Services\Notifications\NotificationIncidentResolver;
 use App\Traits\MigrationPauser;
 use Carbon\Carbon;
 use Exception;
@@ -77,6 +78,14 @@ class CompleteMigration implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
         }
+
+        // Left outside the notification's error boundary: a failure here must
+        // not be logged away as a delivery failure. Letting it throw allows
+        // the queue to retry, so `migration_failed:{id}` doesn't stay active
+        // forever after a recovery this job failed to record.
+        app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
+            "migration_failed:{$this->integration->id}",
+        ]);
     }
 
     /**

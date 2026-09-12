@@ -21,7 +21,7 @@ class MigrationFailed extends SparkNotification
 
     public function isPriority(): bool
     {
-        return true;
+        return parent::isPriority();
     }
 
     public function getIcon(): string
@@ -36,19 +36,39 @@ class MigrationFailed extends SparkNotification
 
     public function getTitle(): string
     {
-        return 'Historical Data Import Failed';
+        return ucfirst($this->integration->service) . ' import stopped';
     }
 
     public function getMessage(): string
     {
         $serviceName = ucfirst($this->integration->service);
 
-        return "Your {$serviceName} historical data import failed: {$this->errorMessage}";
+        return "Some {$serviceName} history may be missing. Retry the import or view the connection.";
     }
 
     public function getActionUrl(): ?string
     {
         return route('integrations.details', $this->integration->id);
+    }
+
+    public function getEntityType(): ?string
+    {
+        return 'integration';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return (string) $this->integration->id;
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return "migration_failed:{$this->integration->id}";
+    }
+
+    public function getTechnicalDetail(): ?string
+    {
+        return $this->sanitiseTechnicalDetail($this->errorMessage);
     }
 
     public function toMail(User $notifiable): MailMessage
@@ -58,8 +78,7 @@ class MigrationFailed extends SparkNotification
         $message = (new MailMessage)
             ->subject("{$serviceName} Historical Data Import Failed")
             ->greeting("Hello {$notifiable->name}!")
-            ->line("Unfortunately, your {$serviceName} historical data import has failed.")
-            ->line("**Error:** {$this->errorMessage}");
+            ->line("Some {$serviceName} history may be missing. Retry the import or view the connection.");
 
         if ($this->details && isset($this->details['attempted_date_range'])) {
             $message->line("**Attempted date range:** {$this->details['attempted_date_range']}");

@@ -118,6 +118,8 @@ class IconValidationTest extends TestCase
             <x-icon name="invalid-icon" />
             "icon" => "not-an-icon"
             class="icon invalid"
+            <div class="tabs tabs-box"></div>
+            <div class="tabs_s-box"></div>
             <x-icon name="fas.invalid-icon" />
             <x-icon name="fab.not-real" />
         ';
@@ -134,6 +136,7 @@ class IconValidationTest extends TestCase
         $this->assertNotContains('invalid-icon', $this->foundIcons);
         $this->assertNotContains('not-an-icon', $this->foundIcons);
         $this->assertNotContains('invalid', $this->foundIcons);
+        $this->assertNotContains('s-box', $this->foundIcons);
 
         // FontAwesome patterns with invalid icon names should be detected as valid patterns
         // but we can test that they're not in the valid icons list
@@ -277,7 +280,7 @@ class IconValidationTest extends TestCase
             '/[\'"`]((?:fas|fab|far)\.[a-zA-Z0-9-]+)[\'"`]/i',
 
             // CSS classes: class="icon o-heart" (but not CSS-like classes)
-            '/class\s*=\s*["\'][^"\']*?(?:icon\s+)?([mso]-[a-zA-Z0-9-]{2,})[^"\']*["\']/i',
+            '/class\s*=\s*["\'][^"\']*?(?:icon\s+)?(?<![a-zA-Z0-9_-])([mso]-[a-zA-Z0-9-]{2,})(?![a-zA-Z0-9_-])[^"\']*["\']/i',
         ];
 
         foreach ($patterns as $pattern) {

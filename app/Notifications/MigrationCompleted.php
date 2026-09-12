@@ -51,6 +51,16 @@ class MigrationCompleted extends SparkNotification
         return route('integrations.details', $this->integration->id);
     }
 
+    public function getEntityType(): ?string
+    {
+        return 'integration';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return (string) $this->integration->id;
+    }
+
     public function toMail(User $notifiable): MailMessage
     {
         $serviceName = ucfirst($this->integration->service);

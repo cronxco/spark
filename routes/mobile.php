@@ -76,6 +76,10 @@ Route::get('context/day', [ContextController::class, 'day'])->name('context.day'
 Route::get('context/service-status', [ContextController::class, 'status'])->name('context.service-status');
 
 Route::get('notifications', [NotificationsController::class, 'index'])->name('notifications.index');
+Route::get('notifications/feed', [NotificationsController::class, 'feed'])->name('notifications.feed');
+Route::get('notifications/feed/{id}', [NotificationsController::class, 'show'])
+    ->where('id', 'activity:[0-9]+|[0-9a-fA-F-]{36}')
+    ->name('notifications.show');
 
 Route::get('events/{id}', [EventsController::class, 'show'])->name('events.show');
 Route::patch('{kind}/{id}/location', [LocationsController::class, 'set'])->whereIn('kind', ['events', 'objects'])->middleware(['ability:ios:write', 'if-match:entity'])->name('locations.set');
@@ -187,6 +191,14 @@ Route::post('notifications/read-all', [NotificationsController::class, 'markAllR
 Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead'])
     ->middleware('ability:ios:write')
     ->name('notifications.read');
+
+Route::post('notifications/{id}/unread', [NotificationsController::class, 'markUnread'])
+    ->middleware('ability:ios:write')
+    ->name('notifications.unread');
+
+Route::post('notifications/{id}/archive', [NotificationsController::class, 'archive'])
+    ->middleware(['ability:ios:write', 'if-match:notification'])
+    ->name('notifications.archive');
 
 Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
     ->middleware(['ability:ios:write', 'if-match:notification'])

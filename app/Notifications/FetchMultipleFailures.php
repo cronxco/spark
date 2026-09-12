@@ -22,8 +22,7 @@ class FetchMultipleFailures extends SparkNotification
 
     public function isPriority(): bool
     {
-        // High priority after 5+ failures
-        return $this->consecutiveFailures >= 5;
+        return parent::isPriority();
     }
 
     public function getIcon(): string
@@ -38,20 +37,37 @@ class FetchMultipleFailures extends SparkNotification
 
     public function getTitle(): string
     {
-        return 'Fetch Failed Multiple Times';
+        return "Spark can't update '{$this->webpage->title}'";
     }
 
     public function getMessage(): string
     {
-        $title = $this->webpage->title;
-        $domain = $this->webpage->metadata['domain'] ?? parse_url($this->webpage->url, PHP_URL_HOST);
-
-        return "Failed to fetch {$title} ({$domain}) {$this->consecutiveFailures} times: {$this->errorMessage}";
+        return "The site blocked {$this->consecutiveFailures} attempts. Spark will try again; you can manage this source.";
     }
 
     public function getActionUrl(): ?string
     {
         return route('bookmarks') . '?tab=urls&domain=' . urlencode($this->webpage->metadata['domain'] ?? '');
+    }
+
+    public function getEntityType(): ?string
+    {
+        return 'object';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return (string) $this->webpage->id;
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return "fetch_multiple_failures:{$this->webpage->id}";
+    }
+
+    public function getTechnicalDetail(): ?string
+    {
+        return $this->sanitiseTechnicalDetail($this->errorMessage);
     }
 
     /**

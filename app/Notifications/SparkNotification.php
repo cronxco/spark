@@ -7,6 +7,7 @@ use App\Notifications\Channels\ApnsChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Str;
 use NotificationChannels\Apn\ApnMessage;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
@@ -44,7 +45,7 @@ abstract class SparkNotification extends Notification implements ShouldQueue
      */
     public function isPriority(): bool
     {
-        return false;
+        return NotificationCatalogue::forcesDelivery($this->getNotificationType());
     }
 
     /**
@@ -140,20 +141,76 @@ abstract class SparkNotification extends Notification implements ShouldQueue
         return null;
     }
 
+    public function databaseType(User $notifiable): string
+    {
+        return $this->getNotificationType();
+    }
+
+    public function getEntityType(): ?string
+    {
+        return null;
+    }
+
+    public function getEntityId(): ?string
+    {
+        return null;
+    }
+
+    public function getDeepLink(): ?string
+    {
+        $type = $this->getEntityType();
+        $id = $this->getEntityId();
+
+        return $type !== null && $id !== null ? "{$type}:{$id}" : null;
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return null;
+    }
+
+    public function getTechnicalDetail(): ?string
+    {
+        return null;
+    }
+
     /**
      * Get the array representation of the notification for database storage
      */
     public function toArray(User $notifiable): array
     {
         return [
+            'contract_version' => 1,
             'type' => $this->getNotificationType(),
+            'stream' => NotificationCatalogue::streamFor($this->getNotificationType()),
+            'severity' => NotificationCatalogue::severityFor($this->getNotificationType()),
             'title' => $this->getTitle(),
+            'body' => $this->getMessage(),
             'message' => $this->getMessage(),
             'icon' => $this->getIcon(),
             'color' => $this->getColor(),
             'action_url' => $this->getActionUrl(),
+            'deep_link' => $this->getDeepLink(),
+            'entity_type' => $this->getEntityType(),
+            'entity_id' => $this->getEntityId(),
+            'group_key' => $this->getGroupKey(),
+            'technical_detail' => $this->getTechnicalDetail(),
+            'occurrence_count' => 1,
             'priority' => $this->isPriority(),
         ];
+    }
+
+    protected function sanitiseTechnicalDetail(string $detail): string
+    {
+        $redacted = redact_sensitive_urls(strip_tags($detail));
+        $redacted = preg_replace(
+            '/(?i)"?(token|access_token|refresh_token|api_key|key|password|secret)"?\s*[:=]\s*"?([^&\s"\'<>]+)"?/',
+            '$1=[REDACTED]',
+            $redacted,
+        ) ?? $redacted;
+        $redacted = preg_replace('/(?i)bearer\s+[a-z0-9._~+\/-]+=*/', 'Bearer [REDACTED]', $redacted) ?? $redacted;
+
+        return Str::limit($redacted, 2_000);
     }
 
     /**
