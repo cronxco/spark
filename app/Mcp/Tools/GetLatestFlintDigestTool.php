@@ -130,7 +130,9 @@ class GetLatestFlintDigestTool extends Tool
             'created_at' => $event->created_at->toIso8601String(),
             'block_count' => $blocks->count(),
             'unanswered_question_count' => $blocks->filter(
-                fn (array $b) => $b['block_type'] === 'flint_user_question' && ! $b['answered']
+                fn (array $b) => $b['block_type'] === 'flint_user_question'
+                    && ! $b['answered']
+                    && ! $b['retired']
             )->count(),
             'blocks' => $blocks->values(),
         ];

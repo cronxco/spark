@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Block;
+use App\Support\FlintQuestion;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -149,7 +150,9 @@ class BlockResource extends JsonResource
                 'answer' => $meta['answer'] ?? null,
                 'answer_note' => $meta['answer_note'] ?? null,
                 'answered_at' => $meta['answered_at'] ?? null,
-                'answered' => ! is_null($meta['answer'] ?? null),
+                'answered' => FlintQuestion::isAnswered($this->resource),
+                'retired_at' => $meta['retired_at'] ?? null,
+                'retired' => FlintQuestion::isRetired($this->resource),
             ],
             'flint_day_context' => [
                 'day_context' => $meta['day_context'] ?? null,

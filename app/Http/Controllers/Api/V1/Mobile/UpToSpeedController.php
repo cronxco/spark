@@ -11,6 +11,7 @@ use App\Models\MetricTrend;
 use App\Models\User;
 use App\Services\MetricPresentation;
 use App\Support\FlintDigestKind;
+use App\Support\FlintQuestion;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -150,8 +151,7 @@ class UpToSpeedController extends Controller
                     'summary' => $meta['summary'] ?? null,
                     'block_count' => $event->blocks->count(),
                     'unanswered_question_count' => $event->blocks->filter(
-                        fn (Block $b) => $b->block_type === 'flint_user_question'
-                            && is_null($b->metadata['answer'] ?? null)
+                        fn (Block $b) => FlintQuestion::isOpen($b)
                     )->count(),
                 ],
             ];

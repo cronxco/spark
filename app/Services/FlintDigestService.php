@@ -10,6 +10,7 @@ use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Flint\FlintRunToken;
 use App\Services\Flint\RoutineConfig;
+use App\Support\FlintQuestion;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -84,6 +85,10 @@ class FlintDigestService
                 $data['title'],
             ]));
         $integration = $this->resolveIntegration($user);
+
+        // A digest is the only thing that asks a question, so it is also the
+        // moment to close the ones that were never answered. See FlintQuestion.
+        FlintQuestion::retireStale($user);
 
         try {
             return DB::transaction(fn () => $this->createTransactionally(

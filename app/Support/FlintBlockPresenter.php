@@ -86,7 +86,12 @@ class FlintBlockPresenter
                 'answer' => $meta['answer'] ?? null,
                 'answer_note' => $meta['answer_note'] ?? null,
                 'answered_at' => $meta['answered_at'] ?? null,
-                'answered' => ! is_null($meta['answer'] ?? null),
+                'answered' => FlintQuestion::isAnswered($block),
+                // Retired means "no longer waiting on a reply", not gone: the
+                // block still renders and still accepts a late answer. See
+                // FlintQuestion.
+                'retired_at' => $meta['retired_at'] ?? null,
+                'retired' => FlintQuestion::isRetired($block),
             ];
         }
 

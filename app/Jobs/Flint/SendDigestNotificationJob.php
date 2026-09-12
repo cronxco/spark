@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Flint;
 
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
@@ -9,6 +10,7 @@ use App\Services\EffectiveTimezoneResolver;
 use App\Services\FlintDigestService;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Support\FlintQuestion;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -108,8 +110,7 @@ class SendDigestNotificationJob implements ShouldQueue
                 title: $metadata['title'] ?? null,
                 summary: $metadata['summary'] ?? null,
                 unansweredQuestionCount: $digest->blocks
-                    ->where('block_type', 'flint_user_question')
-                    ->filter(fn ($block) => is_null($block->metadata['answer'] ?? null))
+                    ->filter(fn (Block $block) => FlintQuestion::isOpen($block))
                     ->count(),
             ));
 

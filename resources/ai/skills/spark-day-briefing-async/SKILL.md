@@ -440,12 +440,16 @@ Without this, an ignored question suppresses its whole subject indefinitely whil
 appearing nowhere Will can see it. One question from 8 September sat open for five
 days doing exactly that.
 
-Retirement is **editorial, not a state change.** The block stays in the digest and
-stays answerable: Spark has no retired state, so the question still shows in the app
-and still counts toward its unanswered badge, and Will can answer it whenever he
-likes. If he does, treat the answer as current — it outranks anything inferred, the
-same as any other answer. What retirement changes is only what Flint does next:
-it stops waiting on it.
+Spark retires the question itself. Seven days after it was asked, if it is still
+unanswered, the server stamps `retired_at` on the block and it stops counting toward
+the unanswered badge on every surface. Retirement is **not** deletion: the block stays
+in its digest, still renders — marked stale — and still accepts an answer. If Will
+answers a retired question, treat that answer as current: it outranks anything
+inferred, the same as any other answer.
+
+So do not ask Spark to retire anything; there is no tool for it and none is needed.
+Your part is editorial: note the retirement once so the digest says out loud that
+Flint has stopped waiting, and stop carrying the question forward.
 
 Do not persist this short-term editorial register. The durable memory already lives in
 Topics; recent digest history is intentionally transient.
