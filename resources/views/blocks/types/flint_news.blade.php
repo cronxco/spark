@@ -7,7 +7,7 @@
                 <x-icon name="fas.newspaper" class="w-3 h-3" />
                 News Story
             </div>
-            <div class="text-xs text-base-content/50">{{ $block->time->diffForHumans() }}</div>
+            <div class="text-xs text-base-content/50">{{ $block->time?->diffForHumans() }}</div>
         </div>
 
         <h3 class="text-base font-semibold text-base-content">{{ $block->title }}</h3>

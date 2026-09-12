@@ -35,15 +35,26 @@ class FlintDigestsController extends Controller
             'period' => ['nullable', 'string', 'in:morning,afternoon,evening'],
         ]);
 
-        $date = isset($validated['date']) ? Carbon::parse($validated['date']) : Carbon::today();
+        $timezone = $request->user()->getTimezone();
+        $date = isset($validated['date'])
+            ? Carbon::parse($validated['date'], $timezone)
+            : Carbon::today($timezone);
         $all = $request->boolean('all');
 
         $integrationIds = $request->user()->integrations()->pluck('id');
 
+        // `whereDate()` compares the stored UTC date, so a timezone-aware date
+        // alone changes nothing — see UpToSpeedController::localDayRange(),
+        // whose docblock warns about exactly this. A digest is filed at the
+        // start of the user's local day, which for anyone east or west of UTC
+        // is a different UTC calendar date.
+        [$dayStart, $dayEnd] = $this->localDayRange($date, $timezone);
+
         $query = Event::whereIn('integration_id', $integrationIds)
             ->where('service', 'flint')
             ->where('action', 'had_summary')
-            ->whereDate('time', $date)
+            ->where('time', '>=', $dayStart)
+            ->where('time', '<', $dayEnd)
             ->with('blocks')
             ->orderBy('time', 'desc');
 
@@ -61,7 +72,7 @@ class FlintDigestsController extends Controller
             ], 404);
         }
 
-        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $date));
+        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $date, $integrationIds));
 
         if ($all) {
             return response()->json([
@@ -93,7 +104,7 @@ class FlintDigestsController extends Controller
             return response()->json(['error' => 'Digest not found.'], 404);
         }
 
-        return response()->json($this->formatDigest($event, Carbon::parse($event->time)));
+        return response()->json($this->formatDigest($event, Carbon::parse($event->time), $integrationIds));
     }
 
     /**
@@ -127,14 +138,35 @@ class FlintDigestsController extends Controller
         );
     }
 
+
+    /**
+     * The half-open UTC interval covering one local calendar day:
+     * `[start of local day, start of the next local day)`.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function localDayRange(Carbon $localDay, string $timezone): array
+    {
+        $start = $localDay->copy()->timezone($timezone)->startOfDay();
+
+        return [
+            $start->copy()->setTimezone('UTC'),
+            $start->copy()->addDay()->setTimezone('UTC'),
+        ];
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function formatDigest(Event $event, Carbon $date): array
+    private function formatDigest(Event $event, Carbon $date, mixed $integrationIds = null): array
     {
         $eventMeta = $event->event_metadata ?? [];
 
-        $blocks = collect(FlintBlockPresenter::collection($event->blocks, linkify: true));
+        $blocks = collect(FlintBlockPresenter::collection(
+            $event->blocks,
+            linkify: true,
+            integrationIds: $integrationIds,
+        ));
 
         return [
             'event_id' => $event->id,

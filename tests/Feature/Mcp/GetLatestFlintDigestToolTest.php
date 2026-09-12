@@ -180,6 +180,58 @@ class GetLatestFlintDigestToolTest extends TestCase
         $response->assertSee("Daniel's birthday");
     }
 
+    /**
+     * A digest is filed at the start of the user's local day, which for anyone
+     * east or west of UTC is a different UTC calendar date. whereDate() compares
+     * the stored UTC date, so pairing it with a timezone-aware "today" silently
+     * mixed two notions of the same day and could return nothing.
+     */
+    #[Test]
+    public function finds_a_digest_filed_at_the_start_of_a_local_day_ahead_of_utc(): void
+    {
+        $this->user->setTimezone('Australia/Sydney');
+        $localDay = Carbon::parse('2026-09-12', 'Australia/Sydney')->startOfDay();
+
+        // 2026-09-12 00:00 in Sydney is 2026-09-11 14:00 UTC — a different
+        // UTC calendar date from the one being asked for.
+        $this->assertSame('2026-09-11', $localDay->copy()->setTimezone('UTC')->toDateString());
+
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => $localDay,
+            'event_metadata' => ['period' => 'morning', 'title' => 'Morning Digest'],
+        ]);
+
+        $response = SparkServer::actingAs($this->user)->tool(GetLatestFlintDigestTool::class, [
+            'date' => '2026-09-12',
+        ]);
+
+        $response->assertOk();
+        $response->assertSee('Morning Digest');
+    }
+
+    #[Test]
+    public function does_not_return_a_digest_from_the_neighbouring_local_day(): void
+    {
+        $this->user->setTimezone('Australia/Sydney');
+
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => Carbon::parse('2026-09-13', 'Australia/Sydney')->startOfDay(),
+            'event_metadata' => ['period' => 'morning', 'title' => 'Tomorrow Digest'],
+        ]);
+
+        $response = SparkServer::actingAs($this->user)->tool(GetLatestFlintDigestTool::class, [
+            'date' => '2026-09-12',
+        ]);
+
+        $response->assertHasErrors(['No Flint digest found']);
+    }
+
     /** Citations are useless if only the writer can see them. */
     #[Test]
     public function returns_referenced_event_ids_on_a_content_block(): void

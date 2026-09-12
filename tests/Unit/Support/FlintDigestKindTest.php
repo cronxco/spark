@@ -72,6 +72,29 @@ class FlintDigestKindTest extends TestCase
         $this->assertSame(FlintDigestKind::NEWS_ROUNDUP, FlintDigestKind::for($event));
     }
 
+    /**
+     * Before the type was pinned down the same story block was written as
+     * flint_story and then flint_news_roundup_story within one week. The
+     * fallback exists for that material, so it has to recognise it.
+     */
+    #[Test]
+    public function recognises_the_legacy_news_block_types(): void
+    {
+        foreach (['flint_story', 'flint_news_roundup_story'] as $legacyType) {
+            $event = $this->digest(['title' => 'Saturday']);
+            $event->setRelation('blocks', new Collection([
+                new Block(['block_type' => $legacyType, 'title' => 'A story']),
+                new Block(['block_type' => 'flint_editorial_note', 'title' => 'Run notes']),
+            ]));
+
+            $this->assertSame(
+                FlintDigestKind::NEWS_ROUNDUP,
+                FlintDigestKind::for($event),
+                "expected {$legacyType} to classify as a news roundup",
+            );
+        }
+    }
+
     #[Test]
     public function reading_blocks_identify_a_reading_list(): void
     {

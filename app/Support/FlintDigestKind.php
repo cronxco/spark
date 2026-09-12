@@ -34,6 +34,18 @@ class FlintDigestKind
     public const ALL = [self::BRIEFING, self::NEWS_ROUNDUP, self::READING_LIST];
 
     /**
+     * Every block type a roundup's stories have been written as.
+     *
+     * `flint_news` is the registered one. The other two are the back
+     * catalogue: before the type was pinned down the same block was written as
+     * `flint_story` and then `flint_news_roundup_story` within one week, which
+     * is exactly the material this fallback exists to classify.
+     *
+     * @var array<int, string>
+     */
+    private const NEWS_BLOCK_TYPES = ['flint_news', 'flint_story', 'flint_news_roundup_story'];
+
+    /**
      * @param  array<string, mixed>|null  $meta
      */
     public static function for(Event $event, ?array $meta = null): string
@@ -79,7 +91,7 @@ class FlintDigestKind
         );
 
         if ($contentBlocks->isNotEmpty()
-            && $contentBlocks->every(fn (Block $block): bool => $block->block_type === 'flint_news')) {
+            && $contentBlocks->every(fn (Block $block): bool => in_array($block->block_type, self::NEWS_BLOCK_TYPES, true))) {
             return self::NEWS_ROUNDUP;
         }
 

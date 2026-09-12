@@ -44,12 +44,17 @@ class GetLatestFlintDigestTool extends Tool
             return Response::error('Authentication required.');
         }
 
-        // Digests are filed against the user's local day, so resolve "today"
-        // in their timezone rather than the app's.
+        // Digests are filed at the start of the user's local day, which for
+        // anyone east or west of UTC is a different UTC calendar date — so a
+        // timezone-aware date has to be paired with a UTC range, not
+        // whereDate(). See UpToSpeedController::localDayRange().
+        $timezone = $user->getTimezone();
         $date = $request->get('date', 'today');
         $parsedDate = $date === 'today'
-            ? Carbon::today($user->getTimezone())
-            : Carbon::parse($date, $user->getTimezone());
+            ? Carbon::today($timezone)
+            : Carbon::parse($date, $timezone);
+        $dayStart = $parsedDate->copy()->timezone($timezone)->startOfDay();
+        $dayEnd = $dayStart->copy()->addDay();
         $period = $request->get('period');
         $all = $request->boolean('all', false);
 
@@ -58,7 +63,8 @@ class GetLatestFlintDigestTool extends Tool
         $query = Event::whereIn('integration_id', $integrationIds)
             ->where('service', 'flint')
             ->where('action', 'had_summary')
-            ->whereDate('time', $parsedDate)
+            ->where('time', '>=', $dayStart->copy()->setTimezone('UTC'))
+            ->where('time', '<', $dayEnd->copy()->setTimezone('UTC'))
             ->with('blocks')
             ->orderBy('time', 'desc');
 

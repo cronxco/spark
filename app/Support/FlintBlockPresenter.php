@@ -24,12 +24,20 @@ class FlintBlockPresenter
 {
     /**
      * @param  Collection<int, Block>  $blocks
+     * @param  array<int, string>|Collection<int, string>|null  $integrationIds  the digest owner's integrations, so a
+     *                                                                          citation cannot resolve someone else's event
      * @return array<int, array<string, mixed>>
      */
-    public static function collection(Collection $blocks, bool $linkify = false): array
-    {
+    public static function collection(
+        Collection $blocks,
+        bool $linkify = false,
+        mixed $integrationIds = null,
+    ): array {
         $referenceLookup = $linkify
-            ? collect(EntityReferenceResolver::resolveEvents(self::referencedIds($blocks)))->keyBy('id')
+            ? collect(EntityReferenceResolver::resolveEvents(
+                self::referencedIds($blocks),
+                $integrationIds,
+            ))->keyBy('id')
             : collect();
 
         return $blocks

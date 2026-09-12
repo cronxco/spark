@@ -78,10 +78,16 @@ piece earns a slot is that it speaks to one of them.
 Then the recent digests, for tone and for what has already been said:
 
 ```text
-spark__get-latest-flint-digest(date: "<local_date>")
+spark__get-latest-flint-digest(date: "<local_date>", all: true)
 spark__get-latest-flint-digest(date: "<local_date - 1d>", all: true)
 ... back seven days
 ```
+
+`all: true` on every call, including today's. Without it the tool returns only
+the *newest* digest for that date — and since three or four digests are written
+each day, the reading list is rarely the newest one. The repeat guard below
+would then read a briefing, find no picks, and conclude the backlog was
+untouched.
 
 **Collect every `flint_reading_pick` and `flint_reading_drop` from the last seven
 days and treat that list as spent.** Do not recommend something on it again, and

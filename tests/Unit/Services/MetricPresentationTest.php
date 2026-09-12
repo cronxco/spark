@@ -302,7 +302,14 @@ class MetricPresentationTest extends TestCase
         $this->assertNull($this->presentation->baselineDeltaPct($bare, 1.0));
     }
 
-    /** Will's real resilience baseline over the 90 days to 12 September 2026. */
+    /**
+     * A five-point band whose baseline sits just above its middle value.
+     *
+     * The figures matter: a fractional mean of 3.19 with a standard deviation
+     * of 0.49 puts the lower bound at 2.2, which is what made every single
+     * reading of the band below the usual one register as a double-digit fall
+     * and trip the anomaly threshold.
+     */
     private function resilience(): MetricStatistic
     {
         return $this->withStats(

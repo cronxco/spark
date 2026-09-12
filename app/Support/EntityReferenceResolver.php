@@ -28,10 +28,18 @@ class EntityReferenceResolver
      * Resolve an array of event UUIDs into compact reference dicts,
      * preserving input order and skipping unknown/invalid IDs.
      *
+     * `$integrationIds` scopes the lookup to one owner and should always be
+     * supplied when the ids came from stored content. A block's
+     * `referenced_event_ids` are written by a routine that reads inbound
+     * newsletters, so the ids are ultimately attacker-influenced: without a
+     * scope, a citation naming any UUID in the table would resolve it and
+     * return another user's event title, service and domain.
+     *
      * @param  array<int, mixed>  $eventIds
+     * @param  array<int, string>|\Illuminate\Support\Collection<int, string>|null  $integrationIds
      * @return array<int, array{type: string, id: string, title: string, service: string, domain: string}>
      */
-    public static function resolveEvents(array $eventIds): array
+    public static function resolveEvents(array $eventIds, mixed $integrationIds = null): array
     {
         $validIds = array_values(array_filter(
             $eventIds,
@@ -43,6 +51,10 @@ class EntityReferenceResolver
         }
 
         $events = Event::whereIn('id', $validIds)
+            ->when(
+                $integrationIds !== null,
+                fn ($query) => $query->whereIn('integration_id', $integrationIds),
+            )
             ->get(['id', 'service', 'domain', 'action'])
             ->keyBy('id');
 
