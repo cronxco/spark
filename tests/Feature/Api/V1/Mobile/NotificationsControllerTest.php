@@ -108,13 +108,14 @@ class NotificationsControllerTest extends TestCase
         $notification = $this->notification(['title' => 'Not cacheable'], Carbon::now());
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->getJson('/api/v1/mobile/notifications/feed')
-            ->assertOk()
-            ->assertHeader('Cache-Control', 'no-store');
+        // Symfony's Response::prepare() appends its own "private" directive
+        // alongside ours, so assert the directive we actually care about is
+        // present rather than an exact header match.
+        $feed = $this->getJson('/api/v1/mobile/notifications/feed')->assertOk();
+        $this->assertStringContainsString('no-store', $feed->headers->get('Cache-Control'));
 
-        $this->getJson("/api/v1/mobile/notifications/feed/{$notification->id}")
-            ->assertOk()
-            ->assertHeader('Cache-Control', 'no-store');
+        $show = $this->getJson("/api/v1/mobile/notifications/feed/{$notification->id}")->assertOk();
+        $this->assertStringContainsString('no-store', $show->headers->get('Cache-Control'));
     }
 
     #[Test]

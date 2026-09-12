@@ -47,10 +47,16 @@ class NotificationArchiverTest extends TestCase
         ]);
 
         $archiver = app(NotificationArchiver::class);
-        $firstArchivedAt = $archiver->archive($notification, 'manual')->archived_at;
-        $secondArchivedAt = $archiver->archive($notification->fresh(), 'resolved')->archived_at;
+        $archiver->archive($notification, 'manual');
+        // Reload from the database (rather than comparing the in-memory value
+        // from the first call) so both sides go through the same
+        // whole-second `timestamp` column precision.
+        $firstArchivedAt = $notification->fresh()->archived_at;
 
-        $this->assertTrue($firstArchivedAt->equalTo($secondArchivedAt));
+        $archiver->archive($notification->fresh(), 'resolved');
+        $secondArchivedAt = $notification->fresh()->archived_at;
+
+        $this->assertSame($firstArchivedAt, $secondArchivedAt);
     }
 
     #[Test]

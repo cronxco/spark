@@ -17,7 +17,6 @@ class BackfillNotificationMetadataTest extends TestCase
     public function rerunning_the_backfill_does_not_reset_an_already_normalised_notifications_updated_at(): void
     {
         $user = User::factory()->create();
-        $staleUpdatedAt = now()->subDays(10);
 
         $notification = DatabaseNotification::query()->create([
             'id' => (string) Str::uuid(),
@@ -25,18 +24,27 @@ class BackfillNotificationMetadataTest extends TestCase
             'notifiable_type' => $user->getMorphClass(),
             'notifiable_id' => $user->id,
             'data' => ['title' => 'Reconnect Monzo', 'entity_id' => (string) Str::uuid()],
-            'created_at' => $staleUpdatedAt,
-            'updated_at' => $staleUpdatedAt,
+            'created_at' => now()->subDays(10),
+            'updated_at' => now()->subDays(10),
         ]);
+        // Reload rather than reuse the in-memory Carbon: the column has
+        // whole-second precision, so the persisted value is truncated versus
+        // what we just passed in.
+        $staleUpdatedAt = $notification->fresh()->updated_at;
 
         $this->artisan('notifications:backfill-metadata')->assertSuccessful();
 
+        // The backfill is a one-time data/schema normalisation, not a
+        // lifecycle event: it must never touch updated_at, not even on the
+        // run that first adds the new metadata, or it resets the notification's
+        // expiry clock in MaintainNotificationHistory.
         $afterFirstRun = $notification->fresh()->updated_at;
         $this->assertTrue(
-            $afterFirstRun->gt($staleUpdatedAt),
-            'The first normalising run adds real metadata and is a genuine update.',
+            $afterFirstRun->equalTo($staleUpdatedAt),
+            'The normalising run must not touch updated_at, even though it changes other fields.',
         );
         $this->assertSame('integration_failed', $notification->fresh()->data['type']);
+        $this->assertNotNull($notification->fresh()->group_key);
 
         $this->artisan('notifications:backfill-metadata')->assertSuccessful();
 
