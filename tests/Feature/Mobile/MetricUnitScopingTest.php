@@ -8,8 +8,10 @@ use App\Models\MetricStatistic;
 use App\Models\User;
 use App\Services\Mobile\HealthDashboardService;
 use App\Services\Mobile\MetricTrendService;
+use DateTimeInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -133,12 +135,12 @@ class MetricUnitScopingTest extends TestCase
     {
         $events = Event::query()->where('service', 'oura')->get();
 
-        $method = new \ReflectionMethod(HealthDashboardService::class, 'firstMetricEvent');
+        $method = new ReflectionMethod(HealthDashboardService::class, 'firstMetricEvent');
 
         return $method->invoke(app(HealthDashboardService::class), $events, $config);
     }
 
-    private function createMetricEvent(string $action, string $unit, float $value, \DateTimeInterface $time): Event
+    private function createMetricEvent(string $action, string $unit, float $value, DateTimeInterface $time): Event
     {
         return Event::factory()->create([
             'integration_id' => $this->integration->id,
