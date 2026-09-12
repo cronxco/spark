@@ -53,6 +53,17 @@ class MetricTrendService
             ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
             ->where('service', $statistic->service)
             ->where('action', $statistic->action)
+            // A MetricStatistic is identified by service + action + value_unit,
+            // so an action reported in more than one unit has more than one
+            // baseline. Without this filter the other unit's events are scored
+            // against this statistic — and since presentation now branches on
+            // whether the statistic is ordinal, a continuous value could be
+            // rendered as an ordinal band.
+            ->when(
+                $statistic->value_unit === null,
+                fn ($q) => $q->whereNull('value_unit'),
+                fn ($q) => $q->where('value_unit', $statistic->value_unit),
+            )
             ->whereBetween('time', [$startDate, $endDate])
             ->orderBy('time', 'asc')
             ->get(['id', 'time', 'value', 'value_multiplier']);

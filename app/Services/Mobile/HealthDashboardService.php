@@ -455,13 +455,28 @@ class HealthDashboardService
             ->all();
     }
 
+    /**
+     * The latest event for this metric, preferring the unit the config
+     * declares.
+     *
+     * An action reported in more than one unit has one baseline per unit, so
+     * taking whichever event landed last makes the tile's unit — and the
+     * statistic it is scored against — vary by day. The config's unit is not
+     * treated as a hard filter, though: a unit string that has since drifted
+     * on the ingest side would silently hide the tile altogether, so fall back
+     * to the latest event of any unit.
+     *
+     * @param  array{label: string, service: string, action: string, unit: string, lower_better?: bool}  $config
+     */
     private function firstMetricEvent(Collection $events, array $config): ?Event
     {
-        return $events
+        $candidates = $events
             ->where('service', $config['service'])
             ->where('action', $config['action'])
-            ->sortByDesc('time')
-            ->first();
+            ->sortByDesc('time');
+
+        return $candidates->firstWhere('value_unit', $config['unit'])
+            ?? $candidates->first();
     }
 
     private function baselineComparison(Event $event, array $statistics): ?array
