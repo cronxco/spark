@@ -82,12 +82,12 @@ class GetLatestFlintDigestTool extends Tool
                 'date' => $parsedDate->toDateString(),
                 'count' => $formatted->count(),
                 'digests' => $formatted->values(),
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         }
 
         return Response::text(json_encode(
             $formatted->first(),
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         ));
     }
 

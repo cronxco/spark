@@ -257,8 +257,8 @@ class FlintDigestService
     private function result(Event $event, string $period, bool $deduplicated): array
     {
         return [
-            'event_id' => $event->id,
-            'digest_object_id' => $event->target_id,
+            'event_id' => (string) $event->id,
+            'digest_object_id' => (string) $event->target_id,
             'date' => data_get($event->event_metadata, 'local_date', $event->time->toDateString()),
             'period' => $period,
             'title' => data_get($event->event_metadata, 'title'),
