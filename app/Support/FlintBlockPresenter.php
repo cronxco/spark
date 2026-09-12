@@ -112,6 +112,16 @@ class FlintBlockPresenter
             $base['referenced_event_ids'] = array_values($referencedIds);
         }
 
+        // A reading pick's link and length live on the block's own columns.
+        // Without these the client is back to recovering them from prose.
+        if ($block->url) {
+            $base['url'] = $block->url;
+        }
+
+        if ($block->value !== null && $block->value_unit === 'minutes') {
+            $base['minutes'] = (int) $block->formatted_value;
+        }
+
         return $base;
     }
 }

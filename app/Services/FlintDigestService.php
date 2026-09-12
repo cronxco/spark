@@ -14,7 +14,6 @@ use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /** Creates the same Flint digest payload for REST and MCP callers. */
@@ -72,9 +71,18 @@ class FlintDigestService
         $run = isset($data['run_token'])
             ? app(FlintRunToken::class)->verify($data['run_token'], $user, $date->toDateString(), $period)
             : null;
+        // Without a run token there is no run to key on, and a fresh uuid made
+        // every retry write another digest. The natural key is what a person
+        // would call the same digest: this user's briefing for this date,
+        // period and title.
         $sourceId = $run
             ? 'flint_digest_run:' . $run['run_uuid']
-            : 'flint_digest:' . Str::uuid();
+            : 'flint_digest:' . sha1(implode('|', [
+                $user->id,
+                $date->toDateString(),
+                $period,
+                $data['title'],
+            ]));
         $integration = $this->resolveIntegration($user);
 
         try {
@@ -88,10 +96,9 @@ class FlintDigestService
                 $run,
             ));
         } catch (UniqueConstraintViolationException $exception) {
-            if (! $run) {
-                throw $exception;
-            }
-
+            // Two concurrent writes of the same digest. Both source ids are now
+            // deterministic — from the run uuid, or from user/date/period/title
+            // — so the loser returns what the winner wrote rather than failing.
             $event = Event::query()
                 ->where('integration_id', $integration->id)
                 ->where('source_id', $sourceId)

@@ -229,6 +229,43 @@ class FlintDigestServiceTest extends TestCase
     }
 
     /** @param array<string, mixed> $result */
+    /**
+     * Without a run token the source id was a fresh uuid, so a conversational
+     * digest retried after an unknown outcome wrote a second copy. The natural
+     * key is the same one a person would use: this user's digest for this date,
+     * period and title.
+     */
+    #[Test]
+    public function a_tokenless_digest_is_idempotent_on_date_period_and_title(): void
+    {
+        $payload = [
+            'title' => 'Morning Digest — Sat 12 Sep',
+            'period' => 'morning',
+            'date' => '2026-09-12',
+            'summary' => 'Good Saturday morning.',
+        ];
+
+        $first = $this->service->create($this->user, $payload);
+        $second = $this->service->create($this->user, $payload);
+
+        $this->assertFalse($first['deduplicated']);
+        $this->assertTrue($second['deduplicated']);
+        $this->assertSame($first['event_id'], $second['event_id']);
+        $this->assertSame(1, Event::where('service', 'flint')->where('action', 'had_summary')->count());
+    }
+
+    #[Test]
+    public function a_different_title_on_the_same_day_is_a_different_digest(): void
+    {
+        $base = ['period' => 'morning', 'date' => '2026-09-12'];
+
+        $briefing = $this->service->create($this->user, $base + ['title' => 'Morning Digest — Sat 12 Sep']);
+        $roundup = $this->service->create($this->user, $base + ['title' => 'News roundup — Saturday']);
+
+        $this->assertNotSame($briefing['event_id'], $roundup['event_id']);
+        $this->assertFalse($roundup['deduplicated']);
+    }
+
     private function runTokenFor(string $routine, string $period): string
     {
         return app(FlintRunToken::class)->issue([

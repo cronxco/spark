@@ -65,8 +65,12 @@ class CreateFlintDigestTool extends Tool
 
         try {
             $payload = $request->all();
+
+            // "today" is resolved by the service, in the user's own timezone.
+            // Rewriting it here used the app timezone, so a digest written late
+            // in a user's evening could be filed against the wrong local date.
             if (($payload['date'] ?? null) === 'today') {
-                $payload['date'] = now()->toDateString();
+                unset($payload['date']);
             }
 
             return Response::json($this->digests->create($user, $payload));

@@ -44,8 +44,12 @@ class GetLatestFlintDigestTool extends Tool
             return Response::error('Authentication required.');
         }
 
+        // Digests are filed against the user's local day, so resolve "today"
+        // in their timezone rather than the app's.
         $date = $request->get('date', 'today');
-        $parsedDate = $date === 'today' ? Carbon::today() : Carbon::parse($date);
+        $parsedDate = $date === 'today'
+            ? Carbon::today($user->getTimezone())
+            : Carbon::parse($date, $user->getTimezone());
         $period = $request->get('period');
         $all = $request->boolean('all', false);
 
