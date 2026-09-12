@@ -71,6 +71,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         ]);
     }
 
+
     /**
      * How long one dispatch suppresses the next. Longer than the routine's own
      * timeout, so a run still in flight is never dispatched twice.
