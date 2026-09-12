@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Notifications\Messages\MailMessage;
 
 class CookiesAutoRefreshed extends SparkNotification
 {
@@ -46,6 +47,17 @@ class CookiesAutoRefreshed extends SparkNotification
     public function getGroupKey(): ?string
     {
         return "cookie_auto_refreshed:{$this->domain}";
+    }
+
+    public function toMail(User $notifiable): MailMessage
+    {
+        return (new MailMessage)
+            ->success()
+            ->subject($this->getTitle())
+            ->greeting("Hello {$notifiable->name}!")
+            ->line($this->getMessage())
+            ->line("Spark refreshed {$this->cookieCount} saved " . ($this->cookieCount === 1 ? 'cookie' : 'cookies') . " for {$this->domain}.")
+            ->action('Manage Saved Logins', $this->getActionUrl());
     }
 
     public function toArray(User $notifiable): array
