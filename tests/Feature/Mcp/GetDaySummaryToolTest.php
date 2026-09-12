@@ -83,6 +83,50 @@ class GetDaySummaryToolTest extends TestCase
     }
 
     #[Test]
+    public function fetched_content_uses_the_revision_snapshot_and_its_own_enrichments(): void
+    {
+        $fetchGroup = IntegrationGroup::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'fetch',
+        ]);
+        $fetchIntegration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $fetchGroup->id,
+            'service' => 'fetch',
+        ]);
+        $webpage = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'Later mutable title',
+            'url' => 'https://example.com/live',
+        ]);
+        $event = Event::factory()->create([
+            'integration_id' => $fetchIntegration->id,
+            'service' => 'fetch',
+            'domain' => 'knowledge',
+            'action' => 'fetched',
+            'time' => Carbon::today()->setHour(12),
+            'target_id' => $webpage->id,
+            'target_metadata' => [
+                'title' => 'Noon revision title',
+                'url' => 'https://example.com/revision',
+            ],
+        ]);
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_summary_paragraph',
+            'title' => 'Paragraph Summary',
+            'metadata' => ['content' => 'Noon revision summary'],
+        ]);
+
+        $summary = app(DaySummaryService::class)->generateSummary($this->user, Carbon::today());
+        $fetched = $summary['sections']['knowledge']['fetched_content'][0];
+
+        $this->assertSame('Noon revision title', $fetched['title']);
+        $this->assertSame('https://example.com/revision', $fetched['url']);
+        $this->assertSame('Noon revision summary', $fetched['summary']);
+    }
+
+    #[Test]
     public function generates_summary_with_activity_section(): void
     {
         $ahGroup = IntegrationGroup::factory()->create([

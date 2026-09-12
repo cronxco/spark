@@ -34,6 +34,7 @@ class FetchExtractContentTaskTest extends TestCase
         (new FetchExtractContentTask($event, $this->task()))->handle();
 
         $this->assertSame('# Clean Article', $webpage->refresh()->content);
+        $this->assertSame('# Clean Article', $event->blocks()->where('block_type', 'fetch_content')->first()->metadata['article_text']);
         $this->assertSame('success', $event->refresh()->event_metadata['task_executions']['fetch_extract_content']['last_attempt']['status']);
         Queue::assertPushed(ProcessTaskPipelineJob::class);
         $fake->assertSent(Chat::class, 1);
@@ -69,7 +70,10 @@ class FetchExtractContentTaskTest extends TestCase
             'service' => 'fetch',
             'domain' => 'knowledge',
             'action' => 'fetched',
+            'target_metadata' => ['title' => 'Article Title'],
         ]);
+
+        $webpage->update(['metadata' => array_merge($webpage->metadata ?? [], ['latest_event_id' => $event->id])]);
 
         $definition = collect(FetchPlugin::getTaskDefinitions())
             ->firstWhere('key', 'fetch_extract_content');
@@ -91,6 +95,29 @@ class FetchExtractContentTaskTest extends TestCase
         }
     }
 
+    #[Test]
+    public function a_stale_extraction_enriches_its_revision_without_overwriting_the_latest_object(): void
+    {
+        OpenAI::fake([$this->openAiResponse('# Older clean article')]);
+        [$event, $webpage] = $this->fetchEvent(webpageContent: 'Latest article', blockText: 'Older raw article');
+        $newerEvent = Event::factory()->create([
+            'integration_id' => $event->integration_id,
+            'target_id' => $webpage->id,
+            'service' => 'fetch',
+            'domain' => 'knowledge',
+            'action' => 'fetched',
+        ]);
+        $webpage->update([
+            'content' => 'Latest article',
+            'metadata' => array_merge($webpage->metadata ?? [], ['latest_event_id' => $newerEvent->id]),
+        ]);
+
+        (new FetchExtractContentTask($event, $this->task()))->handle();
+
+        $this->assertSame('# Older clean article', $event->blocks()->where('block_type', 'fetch_content')->first()->metadata['article_text']);
+        $this->assertSame('Latest article', $webpage->fresh()->content);
+    }
+
     private function fetchEvent(?string $webpageContent, string $blockText): array
     {
         Queue::fake([ProcessTaskPipelineJob::class]);
@@ -110,7 +137,10 @@ class FetchExtractContentTaskTest extends TestCase
             'service' => 'fetch',
             'domain' => 'knowledge',
             'action' => 'fetched',
+            'target_metadata' => ['title' => 'Article Title'],
         ]);
+
+        $webpage->update(['metadata' => array_merge($webpage->metadata ?? [], ['latest_event_id' => $event->id])]);
 
         Block::factory()->create([
             'event_id' => $event->id,

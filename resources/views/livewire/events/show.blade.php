@@ -1023,19 +1023,19 @@ new class extends Component
             @endif
 
             <!-- Target Object Content -->
-            @if ($this->event->target?->content)
+            @if ($this->event->displayTargetContent())
             <div class="mb-6">
                 <x-collapse wire:model="targetContentOpen">
                     <x-slot:heading>
                         <div class="text-lg font-semibold text-base-content flex items-center gap-2">
                             <x-icon name="fas.file-lines" class="w-5 h-5 text-info" />
-                            {{ $this->event->target->title }}
+                            {{ $this->event->displayTargetTitle() }}
                         </div>
                     </x-slot:heading>
                     <x-slot:content>
                         <div class="max-w-prose mx-auto pt-4">
                             <div class="prose dark:prose-invert prose-base lg:prose-lg">
-                                {!! render_markdown($this->event->target->content) !!}
+                                {!! render_markdown($this->event->displayTargetContent()) !!}
                             </div>
                         </div>
                     </x-slot:content>
@@ -1410,9 +1410,9 @@ new class extends Component
                             </x-metadata-row>
                         @endif
                         @if ($this->event->target)
-                            <x-metadata-row label="Target" :copy-value="$this->event->target->title">
+                            <x-metadata-row label="Target" :copy-value="$this->event->displayTargetTitle()">
                                 <a href="{{ route('objects.show', $this->event->target->id) }}" class="hover:underline">
-                                    {{ $this->event->target->title }}
+                                    {{ $this->event->displayTargetTitle() }}
                                 </a>
                             </x-metadata-row>
                         @endif
@@ -1685,16 +1685,16 @@ new class extends Component
                                 <h4 class="text-sm font-semibold">Target</h4>
                             </div>
                             <dl>
-                                <x-metadata-row label="Title" :value="$this->event->target->title" />
+                                <x-metadata-row label="Title" :value="$this->event->displayTargetTitle()" />
                                 @if ($this->event->target->type)
                                     <x-metadata-row label="Type" :value="$this->event->target->type" />
                                 @endif
                                 @if ($this->event->target->concept)
                                     <x-metadata-row label="Concept" :value="$this->event->target->concept" />
                                 @endif
-                                @if ($this->event->target->url)
-                                    <x-metadata-row label="URL" :copy-value="$this->event->target->url">
-                                        <a href="{{ $this->event->target->url }}" target="_blank" class="hover:underline">View</a>
+                                @if ($this->event->displayTargetUrl())
+                                    <x-metadata-row label="URL" :copy-value="$this->event->displayTargetUrl()">
+                                        <a href="{{ $this->event->displayTargetUrl() }}" target="_blank" class="hover:underline">View</a>
                                     </x-metadata-row>
                                 @endif
                                 @if ($this->event->target->tags->isNotEmpty())

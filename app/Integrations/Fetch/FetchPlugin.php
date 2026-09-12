@@ -246,11 +246,11 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
                 dependencies: ['fetch_extract_content'],
                 runOnCreate: true,
                 runOnUpdate: false,
-                shouldRun: fn (Event $event) => ! empty($event->target?->content)
-                    && ! $event->blocks()->where('block_type', 'fetch_tldr')
-                        ->whereNotNull('metadata->content')
-                        ->whereNull('deleted_at')
-                        ->exists(),
+                shouldRun: fn (Event $event) => $event->blocks()
+                    ->where('block_type', 'fetch_content')
+                    ->whereNotNull('metadata->article_text')
+                    ->whereNull('deleted_at')
+                    ->exists(),
             ),
         ];
     }

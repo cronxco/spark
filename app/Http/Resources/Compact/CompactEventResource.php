@@ -64,10 +64,10 @@ class CompactEventResource extends JsonResource
         if ($this->relationLoaded('target') && $this->target) {
             $data['target'] = [
                 'id' => $this->target->id,
-                'title' => $this->target->title,
+                'title' => $this->displayTargetTitle(),
                 'concept' => $this->target->concept,
                 'type' => $this->target->type,
-                'media_url' => $this->target->media_url,
+                'media_url' => $this->displayTargetMediaUrl(),
             ];
         }
 

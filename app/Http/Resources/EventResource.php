@@ -86,7 +86,15 @@ class EventResource extends JsonResource
 
         // Target relationship
         if ($this->relationLoaded('target') && $this->target) {
-            $data['target'] = EventObjectResource::condensed($this->target);
+            $target = EventObjectResource::condensed($this->target)->resolve(request());
+
+            if ($this->hasFetchTargetSnapshot()) {
+                $target['title'] = $this->displayTargetTitle();
+                $target['url'] = $this->displayTargetUrl();
+                $target['content'] = $this->displayTargetContent();
+            }
+
+            $data['target'] = $target;
         }
 
         // Integration

@@ -45,7 +45,7 @@ class FetchGenerateSummariesTaskTest extends TestCase
     }
 
     #[Test]
-    public function should_run_guard_skips_when_tldr_already_exists(): void
+    public function should_run_guard_uses_revision_article_text_even_when_tldr_exists(): void
     {
         [$event] = $this->fetchEvent(content: 'Clean article text');
         Block::factory()->create([
@@ -58,7 +58,7 @@ class FetchGenerateSummariesTaskTest extends TestCase
         $definition = collect(FetchPlugin::getTaskDefinitions())
             ->firstWhere('key', 'fetch_generate_summaries');
 
-        $this->assertFalse($definition->isApplicableTo($event));
+        $this->assertTrue($definition->isApplicableTo($event));
     }
 
     #[Test]
@@ -73,6 +73,28 @@ class FetchGenerateSummariesTaskTest extends TestCase
         } finally {
             $this->assertSame('failed', $event->refresh()->event_metadata['task_executions']['fetch_generate_summaries']['last_attempt']['status']);
         }
+    }
+
+    #[Test]
+    public function it_replaces_ai_tags_on_the_latest_revision_but_preserves_manual_tags(): void
+    {
+        $payload = $this->summaryPayload();
+        $payload['emoji'] = '🗞️';
+        $payload['tags'] = [
+            ['tag' => 'Current affairs', 'tag_type' => 'topic-tag'],
+            ['tag' => 'London', 'tag_type' => 'place-tag'],
+        ];
+        OpenAI::fake([$this->openAiResponse(json_encode($payload))]);
+        [$event, $webpage] = $this->fetchEvent(content: 'Clean article text');
+        $event->attachTags(['Old topic'], 'topic-tag');
+        $webpage->attachTags(['Old topic'], 'topic-tag');
+        $webpage->attachTags(['Editorial pick'], 'manual-tag');
+
+        (new FetchGenerateSummariesTask($event, $this->task()))->handle();
+
+        $this->assertSame(['Current affairs'], $event->fresh()->tagsWithType('topic-tag')->pluck('name')->values()->all());
+        $this->assertSame(['Current affairs'], $webpage->fresh()->tagsWithType('topic-tag')->pluck('name')->values()->all());
+        $this->assertSame(['Editorial pick'], $webpage->fresh()->tagsWithType('manual-tag')->pluck('name')->values()->all());
     }
 
     private function fetchEvent(?string $content): array
@@ -94,7 +116,10 @@ class FetchGenerateSummariesTaskTest extends TestCase
             'service' => 'fetch',
             'domain' => 'knowledge',
             'action' => 'fetched',
+            'target_metadata' => ['title' => 'Article Title'],
         ]);
+
+        $webpage->update(['metadata' => array_merge($webpage->metadata ?? [], ['latest_event_id' => $event->id])]);
 
         Block::factory()->create([
             'event_id' => $event->id,
@@ -104,6 +129,7 @@ class FetchGenerateSummariesTaskTest extends TestCase
                 'html' => '<article>Raw article text</article>',
                 'text' => 'Raw article text',
                 'excerpt' => 'Excerpt',
+                'article_text' => $content,
             ],
         ]);
 

@@ -117,6 +117,47 @@ class Event extends Model
         return data_get($this->event_metadata, 'internal') === true;
     }
 
+    public function hasFetchTargetSnapshot(): bool
+    {
+        return $this->service === 'fetch' && ! empty($this->target_metadata);
+    }
+
+    public function displayTargetTitle(): ?string
+    {
+        return $this->hasFetchTargetSnapshot()
+            ? ($this->target_metadata['title'] ?? $this->target?->title)
+            : $this->target?->title;
+    }
+
+    public function displayTargetUrl(): ?string
+    {
+        return $this->hasFetchTargetSnapshot()
+            ? ($this->target_metadata['url'] ?? $this->event_metadata['url'] ?? $this->target?->url)
+            : ($this->url ?? $this->target?->url);
+    }
+
+    public function displayTargetMediaUrl(): ?string
+    {
+        return $this->hasFetchTargetSnapshot()
+            ? ($this->target_metadata['media_url'] ?? $this->target?->media_url)
+            : $this->target?->media_url;
+    }
+
+    public function displayTargetContent(): ?string
+    {
+        if (! $this->hasFetchTargetSnapshot()) {
+            return $this->target?->content;
+        }
+
+        $this->loadMissing('blocks');
+        $rawBlock = $this->blocks->firstWhere('block_type', 'fetch_content');
+
+        return $rawBlock?->metadata['article_text']
+            ?? $rawBlock?->metadata['text']
+            ?? $this->target_metadata['excerpt']
+            ?? $this->target?->content;
+    }
+
     public function scopeWithoutInternal(Builder $query): Builder
     {
         return $query->where(function (Builder $query): void {
@@ -431,8 +472,8 @@ class Event extends Model
         }
 
         // Target title
-        if ($this->target && $this->target->title) {
-            $parts[] = $this->target->title;
+        if ($targetTitle = $this->displayTargetTitle()) {
+            $parts[] = $targetTitle;
         }
 
         // Value/units OR summary block (prefer summary if it exists)
