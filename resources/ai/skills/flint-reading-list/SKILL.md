@@ -69,13 +69,28 @@ spark__manage-flint-topic(operation: "list", status: "active")
 These are the threads a pick can connect to. Hold them; the strongest reason a
 piece earns a slot is that it speaks to one of them.
 
-Then today's digest, for tone and for what has already been said:
+Then the recent digests, for tone and for what has already been said:
 
 ```text
 spark__get-latest-flint-digest(date: "<local_date>")
+spark__get-latest-flint-digest(date: "<local_date - 1d>", all: true)
+... back seven days
 ```
 
-Do not repeat a reading recommendation the digest already made today.
+**Collect every `flint_reading_pick` and `flint_reading_drop` from the last seven
+days and treat that list as spent.** Do not recommend something on it again, and
+do not re-suggest dropping something you have already suggested dropping.
+
+This matters more than it sounds. The same essay has been offered three evenings
+out of four, with a different read-time estimate each time; the same drop has
+been suggested twice running. Nothing in the backlog changed — the routine simply
+could not see its own history, because it only ever looked at today.
+
+The one exception: a piece may come back if the *reason* has genuinely changed —
+a new Topic makes it newly relevant, not "it is still good". Say what changed, in
+the pitch, so it does not read as a repeat.
+
+Do not repeat a reading recommendation the day's own digest already made either.
 
 ## Step 3: Survey the backlog
 
@@ -92,6 +107,9 @@ short-read passes.
 Use `karakeep__get-bookmark-content` only for a candidate you are close to
 picking, to check that it is what its title claims and to write an honest pitch.
 Do not fetch content for the whole backlog.
+
+Exclude anything already archived or marked read — a piece Will has dealt with is
+not a candidate, however well it fits.
 
 ## Step 4: Choose
 
@@ -125,12 +143,43 @@ spark__create-flint-digest(
   date: "<local_date>",
   period: "evening",
   summary: "<the picks, as prose>",
-  blocks: [ <optional insight blocks> ]
+  blocks: [ <one flint_reading_pick per pick>, <flint_reading_drop if you named one> ]
 )
 ```
 
-The `summary` is the deliverable. Write it as prose with a short paragraph per
-pick, not a bare table — the reason is the point, and a table flattens it.
+Write the `summary` as prose with a short paragraph per pick, not a bare table —
+the reason is the point, and a table flattens it.
+
+### Also emit one block per pick
+
+The prose is what Will reads; the blocks are what the app can act on. A pick is
+already structured — a title, a link, a length and a reason — and leaving that
+only in prose means the client has to guess it back out with a regex, which it
+currently does, badly: it recovers **one** pick per digest, so a second pick is
+simply never shown.
+
+```text
+{
+  "block_type": "flint_reading_pick",
+  "title": "<the piece's title>",
+  "content": "<the one sentence on why this, tonight — the same reason as the prose>",
+  "url": "<the link>",
+  "minutes": <estimated read time as a whole number>
+}
+```
+
+`minutes` is a single number, not a range. "12–15 minutes" is a hedge; pick one.
+
+If you named something worth dropping, give it a `flint_reading_drop` block with
+the same shape (no `minutes`). Keeping drops in their own type matters: a drop
+and a pick look identical in prose, and a client that cannot tell them apart will
+eventually recommend something you told him to delete.
+
+**Zero picks means zero blocks** — just the one honest line in the summary. Do
+not manufacture a block to make the digest look populated.
+
+`block_type` must be exactly `flint_reading_pick` or `flint_reading_drop`; these
+are registered types and the server rejects anything else.
 
 Add a `flint_insight` block only when a pick raises something that stands on its
 own beyond "read this" — a fact that changes a plan, say. Most runs need none.
@@ -164,6 +213,10 @@ start of one, leave it; if it is real, it will show up again.
 - [ ] every pick has a concrete reason about tonight, not a description of the
       article;
 - [ ] no pitch implies content that was not actually checked;
-- [ ] nothing repeats a recommendation today's digest already made;
+- [ ] nothing repeats a pick or a drop from the last seven days, unless the
+      reason genuinely changed and the pitch says so;
+- [ ] archived/read bookmarks excluded from the candidate set;
+- [ ] one `flint_reading_pick` block per pick (and a `flint_reading_drop` for a
+      drop), each carrying url and a single whole-number `minutes`;
 - [ ] picks that bear on a Topic are linked to it;
 - [ ] no new Topics created, no questions asked.

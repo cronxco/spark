@@ -659,6 +659,34 @@ solely from readiness, HRV, sleep, stress, resting HR, or VO2 max.
 A metric should earn its place by adding context, consequence, or interpretation.
 It does **not** need to generate an action.
 
+#### Banded metrics have no percentage
+
+Some metrics are **ordinal bands**, not quantities. Oura's resilience is a five-point
+scale — Limited, Adequate, Solid, Strong, Exceptional — and its stress score is a
+three-point one. Spark marks these with `is_ordinal: true` and supplies `band` instead of
+`vs_baseline_pct`.
+
+For an ordinal metric:
+
+- **Report the band, never a percentage.** "Resilience read Adequate, a step below its
+  usual Solid" is the honest sentence. "Resilience down 38% on baseline" is not — a mean
+  of 3.19 and a one-step move produce that number mechanically, and it reads like a
+  collapse when nothing happened.
+- **A single step is ordinary variation.** Treat it as worth a clause at most. Only a
+  move of more than one band is worth a sentence of its own.
+- **A run of the same band is not an escalating story.** Three days at Adequate is one
+  fact reported once, not a thread that gets more alarming each morning.
+- **It is a weak candidate for the question slot.** Before spending the day's one
+  question on a banded metric, check the trend with `spark__get-metric-trend-tool` and
+  see what the band actually is. If the answer is "he is one step below his usual band,
+  as he was on four other days this month", there is no question here — and the slot
+  should go to something Will can actually tell you.
+
+More generally: **check the trend before promoting any anomaly flag to the lede.** An
+`is_anomaly` flag says a reading sits outside a computed range; it does not say the
+reading is interesting. A quick trend call is cheap and has repeatedly been the
+difference between a real signal and an artefact of how the baseline is computed.
+
 ### Topic interpretation restraint
 
 Do not let a Topic create confirmation bias.
