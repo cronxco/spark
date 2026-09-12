@@ -4,6 +4,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Services\AgentWorkingMemoryService;
 use App\Services\FlintTopicService;
+use App\Support\FlintDigestKind;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -119,7 +120,12 @@ new class extends Component {
      * The digest's blocks, split so the view can lead with anything awaiting an
      * answer rather than burying it under commentary.
      *
-     * @return array{questions: \Illuminate\Support\Collection, notes: \Illuminate\Support\Collection}
+     * Editorial notes are separated from the rest. They are Flint's own run
+     * diagnostics — several hundred words of selection reasoning per digest,
+     * four times a day — and showing them expanded alongside the content made
+     * the debugging artefact the loudest thing on the page.
+     *
+     * @return array{questions: \Illuminate\Support\Collection, notes: \Illuminate\Support\Collection, editorial: \Illuminate\Support\Collection}
      */
     public function digestBlocks(?Event $digest): array
     {
@@ -129,10 +135,22 @@ new class extends Component {
             'questions' => $blocks->where('block_type', 'flint_user_question')
                 ->sortBy(fn ($block) => is_null($block->metadata['answer'] ?? null) ? 0 : 1)
                 ->values(),
-            'notes' => $blocks->whereNotIn('block_type', ['flint_user_question'])
+            'notes' => $blocks->whereNotIn('block_type', ['flint_user_question', 'flint_editorial_note'])
+                ->sortBy('time')
+                ->values(),
+            'editorial' => $blocks->where('block_type', 'flint_editorial_note')
                 ->sortBy('time')
                 ->values(),
         ];
+    }
+
+    /**
+     * How this digest should be laid out — the briefing, a news roundup, or a
+     * reading list. Resolved server-side from the routine that wrote it.
+     */
+    public function digestKind(Event $digest): string
+    {
+        return FlintDigestKind::for($digest);
     }
 
     /** Topics this digest touched, via the `discussed_in` relationship. */
@@ -380,13 +398,27 @@ new class extends Component {
                             </div>
                         @endif
 
-                        {{-- Insights and editorial notes --}}
+                        {{-- Content blocks, headed and laid out by digest kind --}}
                         @if ($grouped['notes']->isNotEmpty())
+                            @php
+                                $kind = $this->digestKind($digest);
+                                $heading = match ($kind) {
+                                    FlintDigestKind::NEWS_ROUNDUP => __('The stories'),
+                                    FlintDigestKind::READING_LIST => __('Worth reading'),
+                                    default => __('In this digest'),
+                                };
+                                // A news story is a read, not a tile: one column keeps the
+                                // prose at a sane measure. Briefing blocks are short and
+                                // pair well two-up.
+                                $gridClass = $kind === FlintDigestKind::BRIEFING
+                                    ? 'grid grid-cols-1 xl:grid-cols-2 gap-3'
+                                    : 'flex flex-col gap-3';
+                            @endphp
                             <div class="space-y-3">
                                 <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/60">
-                                    {{ __('In this digest') }}
+                                    {{ $heading }}
                                 </h3>
-                                <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                                <div class="{{ $gridClass }}">
                                     @foreach ($grouped['notes'] as $block)
                                         <div wire:key="block-{{ $block->id }}">
                                             <x-block-card :block="$block" />
@@ -394,6 +426,26 @@ new class extends Component {
                                     @endforeach
                                 </div>
                             </div>
+                        @endif
+
+                        {{-- Flint's own run diagnostics, collapsed --}}
+                        @if ($grouped['editorial']->isNotEmpty())
+                            <details class="group">
+                                <summary class="cursor-pointer text-sm font-semibold uppercase tracking-wider text-base-content/50 hover:text-base-content/80 flex items-center gap-2">
+                                    <x-icon name="fas.pen-nib" class="w-3 h-3" />
+                                    {{ __('Run notes') }}
+                                    <span class="text-xs font-normal normal-case tracking-normal text-base-content/40">
+                                        {{ __('how Flint put this together') }}
+                                    </span>
+                                </summary>
+                                <div class="flex flex-col gap-3 pt-3">
+                                    @foreach ($grouped['editorial'] as $block)
+                                        <div wire:key="editorial-{{ $block->id }}">
+                                            <x-block-card :block="$block" />
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </details>
                         @endif
                     </div>
 
