@@ -746,15 +746,6 @@ class DaySummaryService
     }
 
     /**
-     * `attachBaseline()` runs once per event, so resolve the presenter once
-     * rather than hitting the container on every row.
-     */
-    private function presentation(): MetricPresentation
-    {
-        return $this->presentation ??= app(MetricPresentation::class);
-    }
-
-    /**
      * Attach baseline comparison data to an entry array.
      */
     protected function attachBaseline(array &$entry, Event $event, array $metricsCache): void
@@ -804,5 +795,14 @@ class DaySummaryService
         }
 
         return $actionTypes[$action]['exclude_from_flint'] ?? false;
+    }
+
+    /**
+     * `attachBaseline()` runs once per event, so resolve the presenter once
+     * rather than hitting the container on every row.
+     */
+    private function presentation(): MetricPresentation
+    {
+        return $this->presentation ??= app(MetricPresentation::class);
     }
 }

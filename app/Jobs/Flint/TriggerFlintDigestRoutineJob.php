@@ -35,6 +35,19 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * How long one dispatch suppresses the next. Longer than the routine's own
+     * timeout, so a run still in flight is never dispatched twice.
+     */
+    private const RETRY_GRACE_SECONDS = 1800;
+
+    /**
+     * Total scheduled dispatches allowed per user, day and period. Enough to
+     * ride out a transient failure, few enough that a broken routine does not
+     * retry until midnight.
+     */
+    private const MAX_SCHEDULED_ATTEMPTS = 3;
+
     public int $tries = 3;
 
     public int $timeout = 660;
@@ -71,20 +84,6 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         ]);
     }
 
-
-    /**
-     * How long one dispatch suppresses the next. Longer than the routine's own
-     * timeout, so a run still in flight is never dispatched twice.
-     */
-    private const RETRY_GRACE_SECONDS = 1800;
-
-    /**
-     * Total scheduled dispatches allowed per user, day and period. Enough to
-     * ride out a transient failure, few enough that a broken routine does not
-     * retry until midnight.
-     */
-    private const MAX_SCHEDULED_ATTEMPTS = 3;
-
     /**
      * Cache key marking that this user's digest for this local date + period has
      * already been triggered.
@@ -92,6 +91,16 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
     public static function markerKey(int|string $userId, string $localDate, string $period): string
     {
         return "flint:digest-triggered:{$userId}:{$localDate}:{$period}";
+    }
+
+    /**
+     * Cache key counting how many times this digest has been dispatched today,
+     * so a routine that is simply broken is retried a few times rather than
+     * every grace window until midnight.
+     */
+    public static function attemptsKey(int|string $userId, string $localDate, string $period): string
+    {
+        return "flint:digest-attempts:{$userId}:{$localDate}:{$period}";
     }
 
     public function handle(): void
@@ -294,16 +303,6 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         $untilEndOfDay = max(60, (int) now()->diffInSeconds($endOfDay, false));
 
         return min(self::RETRY_GRACE_SECONDS, $untilEndOfDay);
-    }
-
-    /**
-     * Cache key counting how many times this digest has been dispatched today,
-     * so a routine that is simply broken is retried a few times rather than
-     * every grace window until midnight.
-     */
-    public static function attemptsKey(int|string $userId, string $localDate, string $period): string
-    {
-        return "flint:digest-attempts:{$userId}:{$localDate}:{$period}";
     }
 
     /**

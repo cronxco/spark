@@ -9,13 +9,12 @@ use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
-use App\Support\FlintDigestKind;
 use App\Services\MetricPresentation;
+use App\Support\FlintDigestKind;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Activity;
 
 class UpToSpeedController extends Controller
