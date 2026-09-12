@@ -239,6 +239,10 @@ new class extends Component
 
     public function getBookmarkUrl(Event $event): ?string
     {
+        if ($event->service === 'fetch' && $event->displayTargetUrl()) {
+            return $event->displayTargetUrl();
+        }
+
         // Check target metadata for URL
         if ($event->target && ! empty($event->target->metadata['url'])) {
             return $event->target->metadata['url'];
@@ -265,6 +269,10 @@ new class extends Component
 
     public function getBookmarkTitle(Event $event): string
     {
+        if ($event->service === 'fetch' && $event->displayTargetTitle()) {
+            return $event->displayTargetTitle();
+        }
+
         // Try target title first
         if ($event->target && ! empty($event->target->title)) {
             return $event->target->title;
@@ -281,6 +289,10 @@ new class extends Component
 
     public function getBookmarkImage(Event $event): ?string
     {
+        if ($event->service === 'fetch' && $event->displayTargetMediaUrl()) {
+            return $event->displayTargetMediaUrl();
+        }
+
         // Check Fetch metadata block
         $metadataBlock = $event->blocks->firstWhere('block_type', 'fetch_metadata');
         if ($metadataBlock && ! empty($metadataBlock->metadata['image'])) {

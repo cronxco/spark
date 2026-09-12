@@ -552,9 +552,9 @@ class DaySummaryService
             $section['bookmarks'] = $bookmarks->map(function ($event) {
                 $bookmark = [
                     'event_id' => $event->id,
-                    'title' => $event->target?->title ?? 'Untitled',
+                    'title' => $event->displayTargetTitle() ?? 'Untitled',
                     'source' => $event->service,
-                    'url' => $event->url ?? $event->target?->url,
+                    'url' => $event->displayTargetUrl(),
                 ];
 
                 // Summary from blocks
@@ -576,8 +576,8 @@ class DaySummaryService
             $section['fetched_content'] = $fetched->map(function ($event) {
                 $item = [
                     'event_id' => $event->id,
-                    'title' => $event->target?->title ?? 'Untitled',
-                    'url' => $event->url ?? $event->target?->url,
+                    'title' => $event->displayTargetTitle() ?? 'Untitled',
+                    'url' => $event->displayTargetUrl(),
                 ];
 
                 // Include summary blocks (prefer short summary, fall back to any summary)

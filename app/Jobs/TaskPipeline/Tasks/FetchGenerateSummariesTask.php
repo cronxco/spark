@@ -4,13 +4,24 @@ namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Services\Ai\AiModel;
 use App\Services\Ai\Knowledge\SummaryGenerator;
 use Exception;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class FetchGenerateSummariesTask extends BaseTaskJob
 {
+    private const AI_TAG_TYPES = [
+        'spark-emoji',
+        'topic-tag',
+        'person-tag',
+        'organisation-tag',
+        'organization-tag',
+        'place-tag',
+    ];
+
     protected function execute(): void
     {
         if (! $this->model instanceof Event) {
@@ -19,11 +30,16 @@ class FetchGenerateSummariesTask extends BaseTaskJob
 
         $event = $this->model->loadMissing(['target', 'integration', 'blocks']);
         $webpage = $event->target?->fresh();
-        $articleText = $webpage?->content;
 
         if (! $webpage) {
             throw new Exception('Fetch event does not have a webpage target.');
         }
+
+        $contentBlock = $event->blocks->firstWhere('block_type', 'fetch_content');
+        $articleText = $contentBlock?->metadata['article_text'] ?? null;
+
+        // Legacy events may not yet have article_text persisted on their raw block.
+        $articleText ??= $webpage->content;
 
         if (! is_string($articleText) || trim($articleText) === '') {
             throw new Exception('Fetch event has no extracted content to summarize.');
@@ -33,22 +49,23 @@ class FetchGenerateSummariesTask extends BaseTaskJob
 
         try {
             $summaries = $this->generateSummaries($extracted['title'], $articleText);
-
-            $this->createSummaryBlocks($event, $webpage, $extracted, $summaries);
-
-            if (! empty($summaries['emoji']) || ! empty($summaries['tags'])) {
-                $this->attachTags($event, $webpage, $summaries);
-            }
+            $this->persistSummaries($event, $extracted, $summaries);
 
             Log::info('Fetch: Summaries generated via TaskPipeline', [
                 'event_id' => $event->id,
                 'webpage_id' => $webpage->id,
             ]);
         } catch (Exception $e) {
-            $metadata = $webpage->metadata ?? [];
-            $metadata['last_summary_error'] = $e->getMessage();
-            $metadata['last_summary_error_at'] = now()->toIso8601String();
-            $webpage->update(['metadata' => $metadata]);
+            // Discard attributes mutated inside a rolled-back transaction before
+            // BaseTaskJob records the failed task attempt on this model instance.
+            $event->refresh();
+
+            $this->withLatestRevision($event, function (EventObject $webpage) use ($e): void {
+                $metadata = $webpage->metadata ?? [];
+                $metadata['last_summary_error'] = $e->getMessage();
+                $metadata['last_summary_error_at'] = now()->toIso8601String();
+                $webpage->update(['metadata' => $metadata]);
+            });
 
             throw $e;
         }
@@ -65,7 +82,7 @@ class FetchGenerateSummariesTask extends BaseTaskJob
         $webpageMetadata = $webpage?->metadata ?? [];
 
         return [
-            'title' => $webpage?->title ?: ($event->event_metadata['title'] ?? 'Untitled'),
+            'title' => $event->target_metadata['title'] ?? $webpage?->title ?? $event->event_metadata['title'] ?? 'Untitled',
             'content' => (string) ($blockMetadata['html'] ?? $webpage?->content ?? ''),
             'text_content' => (string) ($blockMetadata['text'] ?? ''),
             'excerpt' => (string) ($blockMetadata['excerpt'] ?? $webpage?->content ?? ''),
@@ -80,16 +97,9 @@ class FetchGenerateSummariesTask extends BaseTaskJob
         return app(SummaryGenerator::class)->generate($title, $articleText, ['event_id' => $this->model->id]);
     }
 
-    private function createSummaryBlocks(Event $event, $webpage, array $extracted, array $summaries): void
+    private function createSummaryBlocks(Event $event, array $summaries): void
     {
         $model = AiModel::Extraction->model();
-
-        $webpageMetadata = $webpage->metadata ?? [];
-        $webpageMetadata['author'] = $extracted['author'];
-        $webpageMetadata['image_url'] = $extracted['image'];
-        $webpageMetadata['direction'] = $extracted['direction'];
-        $webpageMetadata['extracted_at'] = now()->toIso8601String();
-        $webpage->update(['metadata' => $webpageMetadata]);
 
         $eventTime = $event->time;
         $tweetContent = is_array($summaries['summary_tweet']) ? json_encode($summaries['summary_tweet']) : $summaries['summary_tweet'];
@@ -103,6 +113,7 @@ class FetchGenerateSummariesTask extends BaseTaskJob
                 'char_count' => strlen($tweetContent),
                 'generated_at' => now()->toIso8601String(),
                 'model' => $model,
+                'source_content_hash' => $event->event_metadata['content_hash'] ?? null,
             ],
         ]);
 
@@ -115,6 +126,7 @@ class FetchGenerateSummariesTask extends BaseTaskJob
                 'word_count' => str_word_count($summaries['summary_short']),
                 'generated_at' => now()->toIso8601String(),
                 'model' => $model,
+                'source_content_hash' => $event->event_metadata['content_hash'] ?? null,
             ],
         ]);
 
@@ -127,6 +139,7 @@ class FetchGenerateSummariesTask extends BaseTaskJob
                 'word_count' => str_word_count($summaries['summary_paragraph']),
                 'generated_at' => now()->toIso8601String(),
                 'model' => $model,
+                'source_content_hash' => $event->event_metadata['content_hash'] ?? null,
             ],
         ]);
 
@@ -139,6 +152,7 @@ class FetchGenerateSummariesTask extends BaseTaskJob
                 'count' => count($summaries['key_takeaways']),
                 'generated_at' => now()->toIso8601String(),
                 'model' => $model,
+                'source_content_hash' => $event->event_metadata['content_hash'] ?? null,
             ],
         ]);
 
@@ -151,37 +165,94 @@ class FetchGenerateSummariesTask extends BaseTaskJob
                 'word_count' => str_word_count($summaries['tldr']),
                 'generated_at' => now()->toIso8601String(),
                 'model' => $model,
+                'source_content_hash' => $event->event_metadata['content_hash'] ?? null,
             ],
         ]);
     }
 
-    private function attachTags(Event $event, $webpage, array $summaries): void
+    private function persistSummaries(Event $event, array $extracted, array $summaries): void
     {
+        DB::transaction(function () use ($event, $extracted, $summaries): void {
+            $webpage = EventObject::query()->lockForUpdate()->findOrFail($event->target_id);
+            $isLatestRevision = ($webpage->metadata['latest_event_id'] ?? null) === $event->id;
+            $eventTagSets = $this->tagSets($summaries);
+
+            $this->createSummaryBlocks($event, $summaries);
+            $this->replaceAiTags($event, $eventTagSets);
+
+            $event->refresh();
+            $event->update([
+                'event_metadata' => array_merge($event->event_metadata ?? [], [
+                    'enrichment_status' => 'complete',
+                    'enriched_content_hash' => $event->event_metadata['content_hash'] ?? null,
+                    'enriched_at' => now()->toIso8601String(),
+                ]),
+            ]);
+
+            if (! $isLatestRevision) {
+                return;
+            }
+
+            $this->replaceAiTags($webpage, $eventTagSets);
+
+            $metadata = $webpage->metadata ?? [];
+            $metadata['author'] = $extracted['author'];
+            $metadata['image_url'] = $extracted['image'];
+            $metadata['direction'] = $extracted['direction'];
+            $metadata['pipeline_status'] = 'complete';
+            $metadata['enriched_content_hash'] = $event->event_metadata['content_hash'] ?? null;
+            $metadata['extracted_at'] = now()->toIso8601String();
+
+            if (($metadata['fetch_mode'] ?? 'recurring') === 'once') {
+                $metadata['discovery_status'] = 'completed';
+            }
+
+            $webpage->update(['metadata' => $metadata]);
+        }, 3);
+    }
+
+    private function tagSets(array $summaries): array
+    {
+        $tagsByType = [];
+
         if (! empty($summaries['emoji'])) {
-            $webpage->attachTags([$summaries['emoji']], 'spark-emoji');
-            $event->detachTags($event->tagsWithType('spark-emoji'));
-            $event->attachTags([$summaries['emoji']], 'spark-emoji');
+            $tagsByType['spark-emoji'] = [$summaries['emoji']];
         }
 
         if (! empty($summaries['tags']) && is_array($summaries['tags'])) {
-            $tagsByType = [];
             foreach ($summaries['tags'] as $tagData) {
                 if (isset($tagData['tag'], $tagData['tag_type'])) {
                     $tagsByType[$tagData['tag_type']][] = $tagData['tag'];
                 }
             }
+        }
 
-            foreach ($tagsByType as $type => $tags) {
-                $webpage->attachTags($tags, $type);
-                $event->detachTags($event->tagsWithType($type));
-                $event->attachTags($tags, $type);
+        return $tagsByType;
+    }
+
+    private function replaceAiTags($model, array $tagsByType): void
+    {
+        foreach (self::AI_TAG_TYPES as $type) {
+            $model->detachTags($model->tagsWithType($type));
+
+            if (! empty($tagsByType[$type])) {
+                $model->attachTags(array_values(array_unique($tagsByType[$type])), $type);
             }
         }
+    }
 
-        $metadata = $webpage->metadata ?? [];
-        if (($metadata['fetch_mode'] ?? 'recurring') === 'once') {
-            $metadata['discovery_status'] = 'completed';
-            $webpage->update(['metadata' => $metadata]);
-        }
+    private function withLatestRevision(Event $event, callable $callback): bool
+    {
+        return DB::transaction(function () use ($callback, $event): bool {
+            $webpage = EventObject::query()->lockForUpdate()->find($event->target_id);
+
+            if (! $webpage || ($webpage->metadata['latest_event_id'] ?? null) !== $event->id) {
+                return false;
+            }
+
+            $callback($webpage);
+
+            return true;
+        });
     }
 }

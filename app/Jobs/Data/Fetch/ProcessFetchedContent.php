@@ -7,13 +7,16 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Services\Media\MediaDeduplicationService;
+use Carbon\CarbonImmutable;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ProcessFetchedContent implements ShouldQueue
 {
@@ -23,13 +26,18 @@ class ProcessFetchedContent implements ShouldQueue
 
     public $maxExceptions = 1;
 
+    public string $fetchRunId;
+
     public function __construct(
         public Integration $integration,
         public EventObject $webpage,
         public array $extracted,
         public string $contentHash,
-        public bool $forceRefresh = false
-    ) {}
+        public bool $forceRefresh = false,
+        ?string $fetchRunId = null,
+    ) {
+        $this->fetchRunId = $fetchRunId ?? (string) Str::uuid();
+    }
 
     public function uniqueId(): string
     {
@@ -46,163 +54,35 @@ class ProcessFetchedContent implements ShouldQueue
             'url' => $this->webpage->url,
         ]);
 
-        $metadata = $this->webpage->metadata ?? [];
-        $previousHash = $metadata['content_hash'] ?? null;
-
-        // Check if content has changed (skip if force refresh is enabled)
-        if (! $this->forceRefresh && $previousHash && $previousHash === $this->contentHash) {
-            // Content unchanged - just update last_checked_at
-            Log::info('Fetch: Content unchanged, skipping processing', [
-                'url' => $this->webpage->url,
-                'content_hash' => substr($this->contentHash, 0, 8),
-            ]);
-
-            $metadata['last_checked_at'] = now()->toIso8601String();
-            $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
-            $this->webpage->update(['metadata' => $metadata]);
-
-            return;
-        }
-
-        // Content is new or changed - process it
-        Log::info('Fetch: Content changed, creating event and dispatching extraction', [
-            'url' => $this->webpage->url,
-            'previous_hash' => $previousHash ? substr($previousHash, 0, 8) : 'none',
-            'new_hash' => substr($this->contentHash, 0, 8),
-            'force_refresh' => $this->forceRefresh,
-        ]);
-
         try {
-            // Check if this is a discovered linkable URL (should update source object/event)
+            $metadata = $this->webpage->metadata ?? [];
             $isLinkable = $metadata['is_linkable'] ?? false;
             $sourceObjectId = $isLinkable ? ($metadata['discovered_from_object_id'] ?? null) : null;
             $sourceEventId = $isLinkable ? ($metadata['discovered_from_event_id'] ?? null) : null;
             $sourceIsObject = $metadata['source_is_object'] ?? false;
-
-            // Get fetch mode (used for determining one-time vs recurring behavior)
-            $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
-
-            // Only create daily fetch event for non-linkable URLs (manual subscriptions)
-            $event = null;
-            if (! $isLinkable) {
-                // Create or find actor (fetch_user)
-                $actorObject = EventObject::firstOrCreate(
-                    [
-                        'user_id' => $this->integration->user_id,
-                        'concept' => 'user',
-                        'type' => 'fetch_user',
-                        'title' => 'Fetch',
-                    ],
-                    [
-                        'time' => now(),
-                        'metadata' => ['service' => 'fetch'],
-                    ]
-                );
-
-                // Create or update today's Event
-                $sourceId = 'fetch_' . $this->webpage->id . '_' . now()->format('Y-m-d');
-                if ($fetchMode === 'once') {
-                    $action = 'bookmarked';
-                } else {
-                    $action = 'fetched';
+            if ($isLinkable) {
+                if (! $this->processLinkableWebpage()) {
+                    return;
                 }
 
-                $event = Event::updateOrCreate(
-                    [
-                        'source_id' => $sourceId,
-                        'integration_id' => $this->integration->id,
-                    ],
-                    [
-                        'user_id' => $this->integration->user_id,
-                        'service' => 'fetch',
-                        'domain' => 'knowledge',
-                        'action' => $action,
-                        'time' => now(),
-                        'actor_id' => $actorObject->id,
-                        'target_id' => $this->webpage->id,
-                        'event_metadata' => [
-                            'url' => $this->webpage->url,
-                            'fetch_time' => now()->toIso8601String(),
-                            'content_hash' => $this->contentHash,
-                            'content_changed' => true,
-                            'previous_hash' => $previousHash,
-                        ],
-                    ]
-                );
-
-                Log::info('Fetch: Event created/updated', [
-                    'event_id' => $event->id,
-                    'action' => $action,
-                ]);
-
-                // Link the webpage object to the Event so saved pages can open Event detail
-                $webpageMetadata = $this->webpage->metadata ?? [];
-                $webpageMetadata['latest_event_id'] = $event->id;
-                $webpageMetadata['latest_event_at'] = now()->toIso8601String();
-                $webpageMetadata['pipeline_status'] = 'processed';
-                $this->webpage->update(['metadata' => $webpageMetadata]);
-
-                // Create Block 1: Raw Content
-                $event->createBlock([
-                    'title' => 'Raw Content',
-                    'block_type' => 'fetch_content',
-                    'time' => $event->time,
-                    'metadata' => [
-                        'html' => $this->extracted['content'],
-                        'text' => $this->extracted['text_content'],
-                        'excerpt' => $this->extracted['excerpt'],
-                    ],
-                ]);
-
-                Log::info('Fetch: Created raw content block', [
-                    'event_id' => $event->id,
-                ]);
+                $event = null;
             } else {
-                Log::info('Fetch: Skipping event creation for linkable discovered URL', [
-                    'url' => $this->webpage->url,
-                    'source_object_id' => $sourceObjectId,
-                    'source_event_id' => $sourceEventId,
-                ]);
+                $event = $this->createRevision();
+
+                if ($event === null) {
+                    return;
+                }
             }
-
-            // Check if this is a one-time fetch that should be disabled after successful fetch
-            $newFetchCount = ($metadata['fetch_count'] ?? 0) + 1;
-            $shouldDisable = ($fetchMode === 'once' && $newFetchCount >= 1);
-
-            // Update webpage EventObject
-            // Prefer ArticleImageExtractor's media_url over Readability's extraction
-            $mediaUrl = $this->webpage->media_url ?: $this->extracted['image'];
-
-            $this->webpage->update([
-                'title' => $this->extracted['title'],
-                'content' => $this->extracted['excerpt'],
-                'media_url' => $mediaUrl,
-                'metadata' => array_merge($metadata, [
-                    'last_checked_at' => now()->toIso8601String(),
-                    'last_changed_at' => now()->toIso8601String(),
-                    'content_hash' => $this->contentHash,
-                    'previous_hash' => $previousHash,
-                    'fetch_count' => $newFetchCount,
-                    'last_error' => null, // Clear any previous errors
-                    'enabled' => $shouldDisable ? false : ($metadata['enabled'] ?? true), // Disable one-time fetches after first successful fetch
-                ]),
-            ]);
 
             // If this is a discovered URL with a source object, also attach the article image to the source
             if ($sourceObjectId && $this->webpage->hasMedia('article_images')) {
                 $this->attachArticleImageToSourceObject($sourceObjectId);
             }
 
-            if ($shouldDisable) {
-                Log::info('Fetch: One-time bookmark fetched successfully and disabled', [
-                    'url' => $this->webpage->url,
-                    'fetch_mode' => $fetchMode,
-                    'fetch_count' => $newFetchCount,
-                ]);
-            }
-
             // Check if this is a one-time fetch that's already completed
-            $discoveryStatus = $metadata['discovery_status'] ?? 'pending';
+            $latestMetadata = $this->webpage->fresh()->metadata ?? [];
+            $fetchMode = $latestMetadata['fetch_mode'] ?? 'recurring';
+            $discoveryStatus = $latestMetadata['discovery_status'] ?? 'pending';
 
             if ($fetchMode === 'once' && $discoveryStatus === 'completed') {
                 Log::info('Fetch: Skipping AI processing - one-time bookmark already completed', [
@@ -241,6 +121,184 @@ class ProcessFetchedContent implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    private function createRevision(): ?Event
+    {
+        $fetchedAt = CarbonImmutable::now();
+        $timezone = $this->integration->configuration['schedule_timezone'] ?? 'UTC';
+        $fetchDay = $fetchedAt->setTimezone($timezone)->toDateString();
+        $localDayStart = CarbonImmutable::parse($fetchDay, $timezone)->startOfDay();
+        $dayStart = $localDayStart->utc();
+        $dayEnd = $localDayStart->addDay()->utc();
+
+        $actorObject = EventObject::firstOrCreate(
+            [
+                'user_id' => $this->integration->user_id,
+                'concept' => 'user',
+                'type' => 'fetch_user',
+                'title' => 'Fetch',
+            ],
+            [
+                'time' => $fetchedAt,
+                'metadata' => ['service' => 'fetch'],
+            ]
+        );
+
+        return DB::transaction(function () use ($actorObject, $dayEnd, $dayStart, $fetchDay, $fetchedAt): ?Event {
+            $webpage = EventObject::query()->lockForUpdate()->findOrFail($this->webpage->id);
+            $metadata = $webpage->metadata ?? [];
+            $previousHash = $metadata['content_hash'] ?? null;
+            $newFetchCount = ($metadata['fetch_count'] ?? 0) + 1;
+
+            $existingRevision = Event::query()
+                ->where('integration_id', $this->integration->id)
+                ->where('source_id', 'fetch_' . $webpage->id . '_' . $this->fetchRunId)
+                ->first();
+
+            if ($existingRevision) {
+                return $existingRevision;
+            }
+
+            if (! $this->forceRefresh && $previousHash === $this->contentHash) {
+                $webpage->update([
+                    'metadata' => array_merge($metadata, [
+                        'last_checked_at' => $fetchedAt->toIso8601String(),
+                        'fetch_count' => $newFetchCount,
+                        'last_error' => null,
+                    ]),
+                ]);
+
+                Log::info('Fetch: Content unchanged, skipping revision', [
+                    'url' => $webpage->url,
+                    'content_hash' => substr($this->contentHash, 0, 8),
+                ]);
+
+                return null;
+            }
+
+            $fetchMode = $metadata['fetch_mode'] ?? 'recurring';
+            $action = $fetchMode === 'once' ? 'bookmarked' : 'fetched';
+            $mediaUrl = $webpage->media_url ?: ($this->extracted['image'] ?? null);
+
+            if ($fetchMode !== 'once') {
+                Event::query()
+                    ->where('integration_id', $this->integration->id)
+                    ->where('target_id', $webpage->id)
+                    ->where('service', 'fetch')
+                    ->where('action', 'fetched')
+                    ->where('time', '>=', $dayStart)
+                    ->where('time', '<', $dayEnd)
+                    ->update(['action' => 'updated']);
+            }
+
+            $event = Event::create([
+                'source_id' => 'fetch_' . $webpage->id . '_' . $this->fetchRunId,
+                'integration_id' => $this->integration->id,
+                'service' => 'fetch',
+                'domain' => 'knowledge',
+                'action' => $action,
+                'time' => $fetchedAt,
+                'actor_id' => $actorObject->id,
+                'target_id' => $webpage->id,
+                'target_metadata' => [
+                    'title' => $this->extracted['title'],
+                    'url' => $webpage->url,
+                    'media_url' => $mediaUrl,
+                    'excerpt' => $this->extracted['excerpt'],
+                    'content_hash' => $this->contentHash,
+                    'fetched_at' => $fetchedAt->toIso8601String(),
+                ],
+                'event_metadata' => [
+                    'url' => $webpage->url,
+                    'fetch_time' => $fetchedAt->toIso8601String(),
+                    'fetch_day' => $fetchDay,
+                    'fetch_run_id' => $this->fetchRunId,
+                    'revision_model_version' => 1,
+                    'content_hash' => $this->contentHash,
+                    'content_changed' => true,
+                    'previous_hash' => $previousHash,
+                    'enrichment_status' => 'pending',
+                ],
+            ]);
+
+            $event->createBlock([
+                'title' => 'Raw Content',
+                'block_type' => 'fetch_content',
+                'time' => $fetchedAt,
+                'metadata' => [
+                    'html' => $this->extracted['content'],
+                    'text' => $this->extracted['text_content'],
+                    'excerpt' => $this->extracted['excerpt'],
+                    'content_hash' => $this->contentHash,
+                ],
+            ]);
+
+            $shouldDisable = $fetchMode === 'once' && $newFetchCount >= 1;
+            $webpage->update([
+                'title' => $this->extracted['title'],
+                'content' => $this->extracted['excerpt'],
+                'media_url' => $mediaUrl,
+                'metadata' => array_merge($metadata, [
+                    'last_checked_at' => $fetchedAt->toIso8601String(),
+                    'last_changed_at' => $fetchedAt->toIso8601String(),
+                    'content_hash' => $this->contentHash,
+                    'previous_hash' => $previousHash,
+                    'fetch_count' => $newFetchCount,
+                    'last_error' => null,
+                    'enabled' => $shouldDisable ? false : ($metadata['enabled'] ?? true),
+                    'latest_event_id' => $event->id,
+                    'latest_event_at' => $fetchedAt->toIso8601String(),
+                    'pipeline_status' => 'pending',
+                    'revision_repair_queued_for_hash' => null,
+                    'revision_repair_completed_at' => $fetchedAt->toIso8601String(),
+                ]),
+            ]);
+
+            Log::info('Fetch: Immutable revision created', [
+                'event_id' => $event->id,
+                'action' => $action,
+                'fetch_day' => $fetchDay,
+                'previous_hash' => $previousHash ? substr($previousHash, 0, 8) : null,
+                'new_hash' => substr($this->contentHash, 0, 8),
+            ]);
+
+            return $event;
+        }, 3);
+    }
+
+    private function processLinkableWebpage(): bool
+    {
+        $webpage = $this->webpage->fresh();
+        $metadata = $webpage->metadata ?? [];
+        $previousHash = $metadata['content_hash'] ?? null;
+
+        if (! $this->forceRefresh && $previousHash === $this->contentHash) {
+            $webpage->update([
+                'metadata' => array_merge($metadata, [
+                    'last_checked_at' => now()->toIso8601String(),
+                    'fetch_count' => ($metadata['fetch_count'] ?? 0) + 1,
+                ]),
+            ]);
+
+            return false;
+        }
+
+        $webpage->update([
+            'title' => $this->extracted['title'],
+            'content' => $this->extracted['excerpt'],
+            'media_url' => $webpage->media_url ?: ($this->extracted['image'] ?? null),
+            'metadata' => array_merge($metadata, [
+                'last_checked_at' => now()->toIso8601String(),
+                'last_changed_at' => now()->toIso8601String(),
+                'content_hash' => $this->contentHash,
+                'previous_hash' => $previousHash,
+                'fetch_count' => ($metadata['fetch_count'] ?? 0) + 1,
+                'last_error' => null,
+            ]),
+        ]);
+
+        return true;
     }
 
     /**

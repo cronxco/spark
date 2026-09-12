@@ -3,10 +3,11 @@
 namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
-use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Services\Ai\Knowledge\ContentExtractor;
 use Exception;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class FetchExtractContentTask extends BaseTaskJob
@@ -32,13 +33,18 @@ class FetchExtractContentTask extends BaseTaskJob
         try {
             $articleText = $this->extractArticleText($extracted['title'], $extracted['text_content']);
 
-            $webpage->update(['content' => $articleText]);
+            $contentBlock = $event->blocks->firstWhere('block_type', 'fetch_content');
+            $contentBlock->update([
+                'metadata' => array_merge($contentBlock->metadata ?? [], [
+                    'article_text' => $articleText,
+                    'article_text_hash' => $event->event_metadata['content_hash'] ?? null,
+                    'extracted_at' => now()->toIso8601String(),
+                ]),
+            ]);
 
-            ProcessTaskPipelineJob::dispatch(
-                model: $event->fresh(['target', 'integration', 'blocks']),
-                trigger: 'manual',
-                taskFilter: ['fetch_generate_summaries'],
-            );
+            $this->withLatestRevision($event, function (EventObject $webpage) use ($articleText): void {
+                $webpage->update(['content' => $articleText]);
+            });
 
             Log::info('Fetch: Article text extracted via TaskPipeline', [
                 'event_id' => $event->id,
@@ -46,10 +52,12 @@ class FetchExtractContentTask extends BaseTaskJob
                 'word_count' => str_word_count($articleText),
             ]);
         } catch (Exception $e) {
-            $metadata = $webpage->metadata ?? [];
-            $metadata['last_extraction_error'] = $e->getMessage();
-            $metadata['last_extraction_error_at'] = now()->toIso8601String();
-            $webpage->update(['metadata' => $metadata]);
+            $this->withLatestRevision($event, function (EventObject $webpage) use ($e): void {
+                $metadata = $webpage->metadata ?? [];
+                $metadata['last_extraction_error'] = $e->getMessage();
+                $metadata['last_extraction_error_at'] = now()->toIso8601String();
+                $webpage->update(['metadata' => $metadata]);
+            });
 
             throw $e;
         }
@@ -66,7 +74,7 @@ class FetchExtractContentTask extends BaseTaskJob
         $webpageMetadata = $webpage?->metadata ?? [];
 
         return [
-            'title' => $webpage?->title ?: ($event->event_metadata['title'] ?? 'Untitled'),
+            'title' => $event->target_metadata['title'] ?? $webpage?->title ?? $event->event_metadata['title'] ?? 'Untitled',
             'content' => (string) ($blockMetadata['html'] ?? $webpage?->content ?? ''),
             'text_content' => (string) ($blockMetadata['text'] ?? ''),
             'excerpt' => (string) ($blockMetadata['excerpt'] ?? $webpage?->content ?? ''),
@@ -85,5 +93,20 @@ class FetchExtractContentTask extends BaseTaskJob
             $content,
             ['event_id' => $this->model->id],
         );
+    }
+
+    private function withLatestRevision(Event $event, callable $callback): bool
+    {
+        return DB::transaction(function () use ($callback, $event): bool {
+            $webpage = EventObject::query()->lockForUpdate()->find($event->target_id);
+
+            if (! $webpage || ($webpage->metadata['latest_event_id'] ?? null) !== $event->id) {
+                return false;
+            }
+
+            $callback($webpage);
+
+            return true;
+        });
     }
 }
