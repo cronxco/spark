@@ -7,6 +7,7 @@ use App\Mcp\Helpers\MetricIdentifierMap;
 use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\User;
+use App\Services\MetricPresentation;
 
 class MetricTrendService
 {
@@ -57,8 +58,11 @@ class MetricTrendService
             ->get(['id', 'time', 'value', 'value_multiplier']);
 
         $hasValidStats = $statistic->hasValidStatistics();
+        $presentation = app(MetricPresentation::class);
+        $isOrdinal = $presentation->isOrdinal($statistic);
+
         $dailyValues = $events->groupBy(fn ($e) => $e->time->toDateString())
-            ->map(function ($dayEvents) use ($statistic, $hasValidStats) {
+            ->map(function ($dayEvents) use ($statistic, $hasValidStats, $presentation, $isOrdinal) {
                 $latest = $dayEvents->sortByDesc('time')->first();
                 $value = $latest->formatted_value;
 
@@ -68,12 +72,16 @@ class MetricTrendService
                 ];
 
                 if ($hasValidStats) {
-                    $baseline = $statistic->mean_value;
-                    $entry['vs_baseline_pct'] = $baseline != 0
-                        ? round((($value - $baseline) / abs($baseline)) * 100, 1)
-                        : 0;
-                    $entry['is_anomaly'] = $value < $statistic->normal_lower_bound
-                        || $value > $statistic->normal_upper_bound;
+                    // Ordinal metrics carry their band instead of a percentage
+                    // against a fractional mean — see
+                    // MetricPresentation::baselineDeltaPct().
+                    if ($isOrdinal) {
+                        $entry['band'] = $presentation->formatValue($statistic, $value);
+                    } else {
+                        $entry['vs_baseline_pct'] = $presentation->baselineDeltaPct($statistic, $value);
+                    }
+
+                    $entry['is_anomaly'] = $presentation->isAnomalous($statistic, $value);
                 }
 
                 return $entry;
@@ -95,6 +103,7 @@ class MetricTrendService
         ];
 
         if ($hasValidStats) {
+            $result['is_ordinal'] = $isOrdinal;
             $result['baseline'] = [
                 'mean' => round($statistic->mean_value, 2),
                 'stddev' => round($statistic->stddev_value, 2),
@@ -102,6 +111,13 @@ class MetricTrendService
                 'normal_upper' => round($statistic->normal_upper_bound, 2),
                 'sample_days' => $statistic->event_count,
             ];
+
+            if ($isOrdinal) {
+                $result['baseline']['usual_band'] = $presentation->formatValue(
+                    $statistic,
+                    round((float) $statistic->mean_value)
+                );
+            }
         }
 
         return $result;

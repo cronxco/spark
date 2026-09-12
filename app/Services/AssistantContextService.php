@@ -401,6 +401,8 @@ class AssistantContextService
     ): array {
         $currentValue = $event->formatted_value;
         $baseline = $statistic->mean_value;
+        $presentation = app(MetricPresentation::class);
+        $isOrdinal = $presentation->isOrdinal($statistic);
 
         return [
             'baseline' => [
@@ -413,12 +415,14 @@ class AssistantContextService
                 'lower' => round($statistic->normal_lower_bound, 2),
                 'upper' => round($statistic->normal_upper_bound, 2),
             ],
-            'vs_baseline' => round($currentValue - $baseline, 2),
-            'vs_baseline_pct' => $baseline != 0
-                ? round((($currentValue - $baseline) / abs($baseline)) * 100, 1)
-                : 0,
-            'is_anomaly' => $currentValue < $statistic->normal_lower_bound ||
-                           $currentValue > $statistic->normal_upper_bound,
+            'is_ordinal' => $isOrdinal,
+            'band' => $isOrdinal ? $presentation->formatValue($statistic, $currentValue) : null,
+            'usual_band' => $isOrdinal
+                ? $presentation->formatValue($statistic, round((float) $statistic->mean_value))
+                : null,
+            'vs_baseline' => $isOrdinal ? null : round($currentValue - $baseline, 2),
+            'vs_baseline_pct' => $presentation->baselineDeltaPct($statistic, $currentValue),
+            'is_anomaly' => $presentation->isAnomalous($statistic, $currentValue),
             'recent_trends' => $trends->map(fn ($t) => [
                 'type' => $t->type,
                 'detected_at' => $t->detected_at->toISOString(),

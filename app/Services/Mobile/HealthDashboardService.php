@@ -6,6 +6,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\User;
+use App\Services\MetricPresentation;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -302,6 +303,8 @@ class HealthDashboardService
                 'value' => $this->rounded($event->formatted_value),
                 'unit' => $event->value_unit ?? $config['unit'],
                 'vs_baseline_pct' => $baseline['vs_baseline_pct'] ?? null,
+                'is_ordinal' => $baseline['is_ordinal'] ?? false,
+                'band' => $baseline['band'] ?? null,
                 'is_anomaly' => $baseline['is_anomaly'] ?? false,
                 'status' => $this->status($event->formatted_value, $baseline, (bool) ($config['lower_better'] ?? false)),
             ];
@@ -472,14 +475,18 @@ class HealthDashboardService
 
         $value = (float) $event->formatted_value;
         $mean = (float) $statistic->mean_value;
+        $presentation = app(MetricPresentation::class);
+        $isOrdinal = $presentation->isOrdinal($statistic);
 
         return [
             'mean' => $mean,
             'normal_lower' => (float) $statistic->normal_lower_bound,
             'normal_upper' => (float) $statistic->normal_upper_bound,
             'sample_days' => $statistic->event_count,
-            'vs_baseline_pct' => $mean !== 0.0 ? round((($value - $mean) / abs($mean)) * 100, 1) : 0.0,
-            'is_anomaly' => $value < (float) $statistic->normal_lower_bound || $value > (float) $statistic->normal_upper_bound,
+            'is_ordinal' => $isOrdinal,
+            'band' => $isOrdinal ? $presentation->formatValue($statistic, $value) : null,
+            'vs_baseline_pct' => $presentation->baselineDeltaPct($statistic, $value),
+            'is_anomaly' => $presentation->isAnomalous($statistic, $value),
         ];
     }
 
@@ -490,6 +497,15 @@ class HealthDashboardService
         }
 
         $value = (float) $value;
+
+        // An ordinal metric has no percentage and its 2σ lower bound sits
+        // inside the ordinary range of bands, so neither of the thresholds
+        // below means anything for it. Its own anomaly rule is the whole
+        // signal.
+        if ($baseline['is_ordinal'] ?? false) {
+            return $baseline['is_anomaly'] ? 'critical' : 'normal';
+        }
+
         $vs = (float) $baseline['vs_baseline_pct'];
         $worse = $lowerBetter ? $vs : -$vs;
         $better = $lowerBetter ? -$vs : $vs;
