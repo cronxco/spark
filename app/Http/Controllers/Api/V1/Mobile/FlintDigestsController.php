@@ -6,7 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
 use App\Services\FlintDigestService;
-use App\Support\EntityReferenceResolver;
+use App\Support\FlintBlockPresenter;
+use App\Support\FlintDigestKind;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -141,66 +142,14 @@ class FlintDigestsController extends Controller
     {
         $eventMeta = $event->event_metadata ?? [];
 
-        // Batch-resolve every referenced event across all blocks in one query,
-        // then hand each block its own ordered slice — avoids N+1.
-        $allReferencedIds = $event->blocks
-            ->flatMap(fn (Block $block) => $block->metadata['referenced_event_ids'] ?? [])
-            ->unique()
-            ->values()
-            ->all();
-
-        $referenceLookup = collect(
-            EntityReferenceResolver::resolveEvents($allReferencedIds)
-        )->keyBy('id');
-
-        $blocks = $event->blocks->map(function (Block $block) use ($referenceLookup): array {
-            $base = [
-                'id' => $block->id,
-                'block_type' => $block->block_type,
-                'title' => $block->title,
-                'time' => $block->time?->toIso8601String(),
-            ];
-
-            if ($block->block_type === 'flint_user_question') {
-                $meta = $block->metadata ?? [];
-                $base['question'] = $meta['question'] ?? null;
-                $base['topic'] = $meta['topic'] ?? null;
-                $base['priority'] = $meta['priority'] ?? null;
-                $base['answer_options'] = $meta['answer_options'] ?? null;
-                $base['answer'] = $meta['answer'] ?? null;
-                $base['answer_note'] = $meta['answer_note'] ?? null;
-                $base['answered_at'] = $meta['answered_at'] ?? null;
-                $base['answered'] = ! is_null($meta['answer'] ?? null);
-            } elseif ($block->block_type === 'flint_day_context') {
-                // Structured JSON, not markdown prose — skip linkify() entirely so
-                // an incidental `[[event:...]]`-shaped substring in a title can't
-                // get rewritten and corrupt the payload.
-                $base['day_context'] = $block->metadata['day_context'] ?? null;
-            } else {
-                $references = collect($block->metadata['referenced_event_ids'] ?? [])
-                    ->map(fn ($id) => $referenceLookup->get($id))
-                    ->filter()
-                    ->values()
-                    ->all();
-
-                $base['content'] = EntityReferenceResolver::linkify(
-                    $block->getContent(),
-                    $references,
-                );
-
-                if (! empty($references)) {
-                    $base['references'] = $references;
-                }
-            }
-
-            return $base;
-        });
+        $blocks = collect(FlintBlockPresenter::collection($event->blocks, linkify: true));
 
         return [
             'event_id' => $event->id,
             'digest_object_id' => $eventMeta['digest_object_id'] ?? null,
             'date' => $date->toDateString(),
             'period' => $eventMeta['period'] ?? null,
+            'kind' => FlintDigestKind::for($event, $eventMeta),
             'title' => $eventMeta['title'] ?? $event->action,
             'summary' => $eventMeta['summary'] ?? null,
             'created_at' => $event->created_at->toIso8601String(),

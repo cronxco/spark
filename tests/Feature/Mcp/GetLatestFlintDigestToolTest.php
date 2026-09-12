@@ -10,6 +10,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -145,6 +146,77 @@ class GetLatestFlintDigestToolTest extends TestCase
         $response = SparkServer::actingAs($this->user)->tool(GetLatestFlintDigestTool::class, []);
 
         $response->assertHasErrors(['No Flint digest found']);
+    }
+
+    /**
+     * A day-context block keeps its payload in metadata, not content. The REST
+     * controller unwrapped it and this tool did not, so the calendar and
+     * weather came back as `"content": null` — invisible to the Flint routines
+     * that read their own digests back.
+     */
+    #[Test]
+    public function returns_the_structured_payload_of_a_day_context_block(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_day_context',
+            'title' => 'Today at a glance',
+            'metadata' => [
+                'day_context' => [
+                    'calendar' => [['title' => 'Will · Office', 'all_day' => false, 'start' => null, 'person' => 'will']],
+                    'birthdays' => [['title' => "Daniel's birthday"]],
+                    'weather' => ['location' => 'Newquay', 'condition' => 'Overcast', 'temp_high_c' => 20, 'rain_probability_pct' => 8],
+                ],
+            ],
+        ]);
+
+        $response = SparkServer::actingAs($this->user)->tool(GetLatestFlintDigestTool::class, []);
+
+        $response->assertOk();
+        $response->assertSee('Will · Office');
+        $response->assertSee('Newquay');
+        $response->assertSee("Daniel's birthday");
+    }
+
+    /** Citations are useless if only the writer can see them. */
+    #[Test]
+    public function returns_referenced_event_ids_on_a_content_block(): void
+    {
+        $event = $this->createDigestEvent('morning');
+        $referenced = (string) Str::uuid();
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_news',
+            'title' => 'A story',
+            'metadata' => ['content' => 'Something happened.', 'referenced_event_ids' => [$referenced]],
+        ]);
+
+        $response = SparkServer::actingAs($this->user)->tool(GetLatestFlintDigestTool::class, []);
+
+        $response->assertOk();
+        $response->assertSee($referenced);
+    }
+
+    /**
+     * The layout a client picks must not depend on how the digest happened to
+     * be named. A reading list is a reading list even when its title says
+     * nothing.
+     */
+    #[Test]
+    public function reports_the_digest_kind_from_the_routine_not_the_title(): void
+    {
+        $this->createDigestEvent('evening', eventMeta: [
+            'title' => 'Anything At All',
+            'routine' => 'reading_list',
+        ]);
+
+        $response = SparkServer::actingAs($this->user)->tool(GetLatestFlintDigestTool::class, []);
+
+        $response->assertOk();
+        $response->assertSee('"kind": "reading_list"');
     }
 
     #[Test]

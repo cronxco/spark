@@ -4,6 +4,8 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Event;
+use App\Support\FlintBlockPresenter;
+use App\Support\FlintDigestKind;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -105,40 +107,21 @@ class GetLatestFlintDigestTool extends Tool
     {
         $eventMeta = $event->event_metadata ?? [];
 
-        $blocks = $event->blocks->map(function ($block) {
-            $base = [
-                'id' => $block->id,
-                'block_type' => $block->block_type,
-                'title' => $block->title,
-                'time' => $block->time?->toIso8601String(),
-            ];
-
-            if ($block->block_type === 'flint_user_question') {
-                $meta = $block->metadata ?? [];
-                $base['question'] = $meta['question'] ?? null;
-                $base['topic'] = $meta['topic'] ?? null;
-                $base['priority'] = $meta['priority'] ?? null;
-                $base['answer_options'] = $meta['answer_options'] ?? null;
-                $base['answer'] = $meta['answer'] ?? null;
-                $base['answer_note'] = $meta['answer_note'] ?? null;
-                $base['answered_at'] = $meta['answered_at'] ?? null;
-                $base['answered'] = ! is_null($meta['answer'] ?? null);
-            } else {
-                $base['content'] = $block->getContent();
-            }
-
-            return $base;
-        });
+        $blocks = collect(FlintBlockPresenter::collection($event->blocks));
 
         return [
             'event_id' => $event->id,
             'digest_object_id' => $eventMeta['digest_object_id'] ?? null,
             'date' => $date->toDateString(),
             'period' => $eventMeta['period'] ?? null,
+            'kind' => FlintDigestKind::for($event, $eventMeta),
             'title' => $eventMeta['title'] ?? $event->action,
             'summary' => $eventMeta['summary'] ?? null,
             'created_at' => $event->created_at->toIso8601String(),
             'block_count' => $blocks->count(),
+            'unanswered_question_count' => $blocks->filter(
+                fn (array $b) => $b['block_type'] === 'flint_user_question' && ! $b['answered']
+            )->count(),
             'blocks' => $blocks->values(),
         ];
     }

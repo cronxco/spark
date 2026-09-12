@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Support\FlintDigestKind;
 use App\Services\MetricPresentation;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -394,43 +395,14 @@ class UpToSpeedController extends Controller
     }
 
     /**
-     * What sort of digest this is: the daily briefing, a news roundup, or a
-     * reading list.
-     *
-     * The client was deciding this by looking for "news" or "reading list" in
-     * the title and inspecting block types, which means presentation depended
-     * on how a digest happened to be named. Deriving it once here keeps every
-     * surface agreeing, and gives digests somewhere to declare it explicitly
-     * later without another round of guessing.
+     * What sort of digest this is. Resolution lives in FlintDigestKind so the
+     * feed, the digest endpoints and the web all agree.
      *
      * @param  array<string, mixed>  $meta
      */
     private function digestKind(Event $event, array $meta): string
     {
-        $declared = $meta['kind'] ?? null;
-        if (is_string($declared) && in_array($declared, ['briefing', 'news_roundup', 'reading_list'], true)) {
-            return $declared;
-        }
-
-        $title = Str::lower((string) ($meta['title'] ?? ''));
-
-        if (Str::contains($title, ['reading list', 'saved to read'])) {
-            return 'reading_list';
-        }
-
-        if (Str::contains($title, ['news', 'roundup'])) {
-            return 'news_roundup';
-        }
-
-        $contentBlocks = $event->blocks->filter(
-            fn (Block $block): bool => ! in_array($block->block_type, ['flint_editorial_note', 'flint_user_question'], true)
-        );
-
-        if ($contentBlocks->isNotEmpty() && $contentBlocks->every(fn (Block $block): bool => $block->block_type === 'flint_news')) {
-            return 'news_roundup';
-        }
-
-        return 'briefing';
+        return FlintDigestKind::for($event, $meta);
     }
 
     /**
