@@ -34,7 +34,14 @@ class CreateFlintDigestTool extends Tool
           `birthdays` (array of `{title}` — a birthday is not a commitment either of you is
           attending, so no `person` field; keep it out of `calendar`), and `weather`
           (`{location, condition, temp_high_c, rain_probability_pct}`). Do not put this in `content`.
-        - Any other `flint_*` type: Provide `content` (markdown) for the block body.
+        - `flint_news`: One story from the news roundup. Provide `content` (a short standalone
+          distillation, not a copy of the summary section) and `referenced_event_ids`.
+        - `flint_reading_pick` / `flint_reading_drop`: One item from the reading list. Provide
+          `content` (why this, tonight), `url`, and for a pick `minutes` (a whole number).
+        - `flint_insight`: A standalone observation. Provide `content` (markdown).
+
+        Only these registered types are accepted; an unknown `flint_*` type is rejected rather
+        than stored as an unrenderable block.
 
         Calls create a new digest. Do not retry after an unknown outcome without
         checking get-latest-flint-digest first. Routine callers must pass the
@@ -100,6 +107,10 @@ class CreateFlintDigestTool extends Tool
                         ->description('Block title.'),
                     'content' => $schema->string()
                         ->description('Markdown content — for flint_editorial_note and other content blocks.'),
+                    'url' => $schema->string()
+                        ->description('Link this block points at — for flint_reading_pick and flint_reading_drop.'),
+                    'minutes' => $schema->integer()
+                        ->description('Estimated read time in whole minutes — for flint_reading_pick. A single number, not a range.'),
                     'referenced_event_ids' => $schema->array()
                         ->items($schema->string())
                         ->description('Event UUIDs this block draws on. Surfaced to the client as tappable reference chips and linkified inline in the content.'),
