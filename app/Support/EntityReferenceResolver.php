@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -36,7 +37,7 @@ class EntityReferenceResolver
      * return another user's event title, service and domain.
      *
      * @param  array<int, mixed>  $eventIds
-     * @param  array<int, string>|\Illuminate\Support\Collection<int, string>|null  $integrationIds
+     * @param  array<int, string>|Collection<int, string>|null  $integrationIds
      * @return array<int, array{type: string, id: string, title: string, service: string, domain: string}>
      */
     public static function resolveEvents(array $eventIds, mixed $integrationIds = null): array

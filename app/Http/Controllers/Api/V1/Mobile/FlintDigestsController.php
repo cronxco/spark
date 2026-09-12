@@ -138,7 +138,6 @@ class FlintDigestsController extends Controller
         );
     }
 
-
     /**
      * The half-open UTC interval covering one local calendar day:
      * `[start of local day, start of the next local day)`.

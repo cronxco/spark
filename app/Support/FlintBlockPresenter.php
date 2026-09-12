@@ -25,7 +25,7 @@ class FlintBlockPresenter
     /**
      * @param  Collection<int, Block>  $blocks
      * @param  array<int, string>|Collection<int, string>|null  $integrationIds  the digest owner's integrations, so a
-     *                                                                          citation cannot resolve someone else's event
+     *                                                                           citation cannot resolve someone else's event
      * @return array<int, array<string, mixed>>
      */
     public static function collection(
