@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
+use App\Services\Flint\FlintQuestionAnswerer;
 use App\Services\FlintDigestService;
 use App\Support\FlintBlockPresenter;
 use App\Support\FlintDigestKind;
@@ -117,22 +118,13 @@ class FlintDigestsController extends Controller
             'answer_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $answeredAt = now()->toIso8601String();
-
-        $block->metadata = array_merge($block->metadata ?? [], [
-            'answer' => $validated['answer'],
-            'answer_note' => $validated['answer_note'] ?? null,
-            'answered_at' => $answeredAt,
-        ]);
-
-        $block->save();
-
-        return response()->json([
-            'block_id' => $block->id,
-            'answer' => $validated['answer'],
-            'answer_note' => $validated['answer_note'] ?? null,
-            'answered_at' => $answeredAt,
-        ]);
+        return response()->json(
+            app(FlintQuestionAnswerer::class)->record(
+                $block,
+                $validated['answer'],
+                $validated['answer_note'] ?? null,
+            )
+        );
     }
 
     /**
