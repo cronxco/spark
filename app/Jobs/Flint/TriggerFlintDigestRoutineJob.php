@@ -35,6 +35,19 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * How long one dispatch suppresses the next. Longer than the routine's own
+     * timeout, so a run still in flight is never dispatched twice.
+     */
+    private const RETRY_GRACE_SECONDS = 1800;
+
+    /**
+     * Total scheduled dispatches allowed per user, day and period. Enough to
+     * ride out a transient failure, few enough that a broken routine does not
+     * retry until midnight.
+     */
+    private const MAX_SCHEDULED_ATTEMPTS = 3;
+
     public int $tries = 3;
 
     public int $timeout = 660;
@@ -80,6 +93,16 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         return "flint:digest-triggered:{$userId}:{$localDate}:{$period}";
     }
 
+    /**
+     * Cache key counting how many times this digest has been dispatched today,
+     * so a routine that is simply broken is retried a few times rather than
+     * every grace window until midnight.
+     */
+    public static function attemptsKey(int|string $userId, string $localDate, string $period): string
+    {
+        return "flint:digest-attempts:{$userId}:{$localDate}:{$period}";
+    }
+
     public function handle(): void
     {
         $markerKey = self::markerKey($this->user->id, $this->localDate, $this->period);
@@ -104,6 +127,25 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             ]);
 
             return;
+        }
+
+        // The grace window has lapsed and no digest exists, so this is a retry.
+        // Cap it: a routine that is broken should not be re-triggered every half
+        // hour until midnight.
+        if ($this->isScheduled()) {
+            $attemptsKey = self::attemptsKey($this->user->id, $this->localDate, $this->period);
+            Cache::add($attemptsKey, 0, $this->attemptsTtlSeconds());
+
+            if (Cache::increment($attemptsKey) > self::MAX_SCHEDULED_ATTEMPTS) {
+                Log::warning('Flint routine trigger skipped (attempt limit reached)', [
+                    'user_id' => $this->user->id,
+                    'period' => $this->period,
+                    'local_date' => $this->localDate,
+                    'max_attempts' => self::MAX_SCHEDULED_ATTEMPTS,
+                ]);
+
+                return;
+            }
         }
 
         $integration = app(FlintDigestService::class)->resolveIntegration($this->user);
@@ -239,8 +281,18 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
     }
 
     /**
-     * Seconds remaining until the end of the effective-local day, so the marker
-     * naturally expires once the slot has passed.
+     * How long a dispatch suppresses the next one.
+     *
+     * This used to run to the end of the local day, which made the marker the
+     * de facto proof that a digest existed — and it is not. The marker only
+     * records that a webhook was *delivered*. If the routine then failed on the
+     * far side without ever calling create-flint-digest, the job still recorded
+     * success, the marker stood until midnight, and no digest was ever written:
+     * exactly the shape of the missing evening digest on 6 September 2026.
+     *
+     * A grace window instead, comfortably longer than the routine's own
+     * timeout. Once it lapses, digestAlreadyExists() — the authoritative check,
+     * already in handle() — decides whether to skip or try again.
      */
     private function markerTtlSeconds(): int
     {
@@ -248,6 +300,19 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
 
         // Carbon 3 returns a signed float here, which max() propagates into this
         // method's int return type — cast rather than rely on implicit conversion.
+        $untilEndOfDay = max(60, (int) now()->diffInSeconds($endOfDay, false));
+
+        return min(self::RETRY_GRACE_SECONDS, $untilEndOfDay);
+    }
+
+    /**
+     * Seconds until the end of the effective-local day — the life of the
+     * attempt counter, which must not reset with the grace window.
+     */
+    private function attemptsTtlSeconds(): int
+    {
+        $endOfDay = Carbon::parse($this->localDate, $this->timezone)->endOfDay();
+
         return max(60, (int) now()->diffInSeconds($endOfDay, false));
     }
 

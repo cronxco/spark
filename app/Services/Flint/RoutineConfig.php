@@ -26,6 +26,29 @@ class RoutineConfig
         'news_roundup' => 'flint-news-roundup',
     ];
 
+    /**
+     * The kind of digest each routine produces, for clients that lay out a
+     * news roundup differently from a briefing.
+     *
+     * `topics` writes no digest, so it has no kind.
+     *
+     * @var array<string, string>
+     */
+    public const DIGEST_KINDS = [
+        'digest' => 'briefing',
+        'reading_list' => 'reading_list',
+        'news_roundup' => 'news_roundup',
+    ];
+
+    /**
+     * The digest kind for a routine, or null when the routine is unknown or
+     * writes no digest.
+     */
+    public static function digestKind(?string $routine): ?string
+    {
+        return $routine === null ? null : (self::DIGEST_KINDS[$routine] ?? null);
+    }
+
     public static function isKnown(string $routine): bool
     {
         return in_array($routine, self::ROUTINES, true);

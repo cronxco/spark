@@ -4,6 +4,8 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Event;
+use App\Support\FlintBlockPresenter;
+use App\Support\FlintDigestKind;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -42,8 +44,17 @@ class GetLatestFlintDigestTool extends Tool
             return Response::error('Authentication required.');
         }
 
+        // Digests are filed at the start of the user's local day, which for
+        // anyone east or west of UTC is a different UTC calendar date — so a
+        // timezone-aware date has to be paired with a UTC range, not
+        // whereDate(). See UpToSpeedController::localDayRange().
+        $timezone = $user->getTimezone();
         $date = $request->get('date', 'today');
-        $parsedDate = $date === 'today' ? Carbon::today() : Carbon::parse($date);
+        $parsedDate = $date === 'today'
+            ? Carbon::today($timezone)
+            : Carbon::parse($date, $timezone);
+        $dayStart = $parsedDate->copy()->timezone($timezone)->startOfDay();
+        $dayEnd = $dayStart->copy()->addDay();
         $period = $request->get('period');
         $all = $request->boolean('all', false);
 
@@ -52,7 +63,8 @@ class GetLatestFlintDigestTool extends Tool
         $query = Event::whereIn('integration_id', $integrationIds)
             ->where('service', 'flint')
             ->where('action', 'had_summary')
-            ->whereDate('time', $parsedDate)
+            ->where('time', '>=', $dayStart->copy()->setTimezone('UTC'))
+            ->where('time', '<', $dayEnd->copy()->setTimezone('UTC'))
             ->with('blocks')
             ->orderBy('time', 'desc');
 
@@ -76,12 +88,12 @@ class GetLatestFlintDigestTool extends Tool
                 'date' => $parsedDate->toDateString(),
                 'count' => $formatted->count(),
                 'digests' => $formatted->values(),
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         }
 
         return Response::text(json_encode(
             $formatted->first(),
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         ));
     }
 
@@ -105,40 +117,23 @@ class GetLatestFlintDigestTool extends Tool
     {
         $eventMeta = $event->event_metadata ?? [];
 
-        $blocks = $event->blocks->map(function ($block) {
-            $base = [
-                'id' => $block->id,
-                'block_type' => $block->block_type,
-                'title' => $block->title,
-                'time' => $block->time?->toIso8601String(),
-            ];
-
-            if ($block->block_type === 'flint_user_question') {
-                $meta = $block->metadata ?? [];
-                $base['question'] = $meta['question'] ?? null;
-                $base['topic'] = $meta['topic'] ?? null;
-                $base['priority'] = $meta['priority'] ?? null;
-                $base['answer_options'] = $meta['answer_options'] ?? null;
-                $base['answer'] = $meta['answer'] ?? null;
-                $base['answer_note'] = $meta['answer_note'] ?? null;
-                $base['answered_at'] = $meta['answered_at'] ?? null;
-                $base['answered'] = ! is_null($meta['answer'] ?? null);
-            } else {
-                $base['content'] = $block->getContent();
-            }
-
-            return $base;
-        });
+        $blocks = collect(FlintBlockPresenter::collection($event->blocks));
 
         return [
             'event_id' => $event->id,
             'digest_object_id' => $eventMeta['digest_object_id'] ?? null,
             'date' => $date->toDateString(),
             'period' => $eventMeta['period'] ?? null,
+            'kind' => FlintDigestKind::for($event, $eventMeta),
             'title' => $eventMeta['title'] ?? $event->action,
             'summary' => $eventMeta['summary'] ?? null,
             'created_at' => $event->created_at->toIso8601String(),
             'block_count' => $blocks->count(),
+            'unanswered_question_count' => $blocks->filter(
+                fn (array $b) => $b['block_type'] === 'flint_user_question'
+                    && ! $b['answered']
+                    && ! $b['retired']
+            )->count(),
             'blocks' => $blocks->values(),
         ];
     }

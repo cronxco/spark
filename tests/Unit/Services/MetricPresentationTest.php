@@ -243,6 +243,107 @@ class MetricPresentationTest extends TestCase
         $this->assertFalse($this->presentation->isExcludedFromFlint($this->statistic('oura', 'had_sleep_score', 'percent')));
     }
 
+    // -------------------------------------------------------------------------
+    // Baseline comparison — ordinal metrics
+    // -------------------------------------------------------------------------
+
+    /**
+     * Resilience is a five-point band. With a mean of 3.19 and a standard
+     * deviation of 0.49, a reading of 2 ("Adequate") computes as -37% and sits
+     * below the 2.2 lower bound — so every single step down was reported as a
+     * double-digit collapse and flagged as an anomaly. It is one band.
+     */
+    #[Test]
+    public function gives_no_percentage_for_an_ordinal_metric(): void
+    {
+        $statistic = $this->resilience();
+
+        $this->assertTrue($this->presentation->isOrdinal($statistic));
+        $this->assertNull($this->presentation->baselineDeltaPct($statistic, 2.0));
+    }
+
+    #[Test]
+    public function one_band_below_usual_is_not_an_anomaly(): void
+    {
+        $this->assertFalse($this->presentation->isAnomalous($this->resilience(), 2.0));
+    }
+
+    #[Test]
+    public function two_bands_from_usual_is_an_anomaly(): void
+    {
+        $this->assertTrue($this->presentation->isAnomalous($this->resilience(), 1.0));
+        $this->assertTrue($this->presentation->isAnomalous($this->resilience(), 5.0));
+    }
+
+    #[Test]
+    public function still_gives_a_percentage_for_a_continuous_metric(): void
+    {
+        $statistic = $this->sleepScore();
+
+        $this->assertFalse($this->presentation->isOrdinal($statistic));
+        $this->assertSame(-20.0, $this->presentation->baselineDeltaPct($statistic, 64.0));
+    }
+
+    #[Test]
+    public function continuous_metrics_still_use_the_stored_bounds(): void
+    {
+        $statistic = $this->sleepScore();
+
+        $this->assertTrue($this->presentation->isAnomalous($statistic, 55.0));
+        $this->assertFalse($this->presentation->isAnomalous($statistic, 78.0));
+    }
+
+    #[Test]
+    public function nothing_is_anomalous_without_valid_statistics(): void
+    {
+        $bare = $this->statistic('oura', 'had_resilience_score', 'resilience_level');
+
+        $this->assertFalse($this->presentation->isAnomalous($bare, 1.0));
+        $this->assertNull($this->presentation->baselineDeltaPct($bare, 1.0));
+    }
+
+    /**
+     * A five-point band whose baseline sits just above its middle value.
+     *
+     * The figures matter: a fractional mean of 3.19 with a standard deviation
+     * of 0.49 puts the lower bound at 2.2, which is what made every single
+     * reading of the band below the usual one register as a double-digit fall
+     * and trip the anomaly threshold.
+     */
+    private function resilience(): MetricStatistic
+    {
+        return $this->withStats(
+            $this->statistic('oura', 'had_resilience_score', 'resilience_level'),
+            mean: 3.19, stddev: 0.49, lower: 2.2, upper: 4.17,
+        );
+    }
+
+    private function sleepScore(): MetricStatistic
+    {
+        return $this->withStats(
+            $this->statistic('oura', 'had_sleep_score', 'percent'),
+            mean: 80.0, stddev: 8.0, lower: 64.5, upper: 96.0,
+        );
+    }
+
+    private function withStats(
+        MetricStatistic $statistic,
+        float $mean,
+        float $stddev,
+        float $lower,
+        float $upper,
+    ): MetricStatistic {
+        $statistic->fill([
+            'event_count' => 90,
+            'mean_value' => $mean,
+            'stddev_value' => $stddev,
+            'normal_lower_bound' => $lower,
+            'normal_upper_bound' => $upper,
+        ]);
+
+        return $statistic;
+    }
+
     private function statistic(string $service, string $action, string $unit): MetricStatistic
     {
         return new MetricStatistic([

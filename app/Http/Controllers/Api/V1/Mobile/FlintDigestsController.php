@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
+use App\Services\Flint\FlintQuestionAnswerer;
 use App\Services\FlintDigestService;
-use App\Support\EntityReferenceResolver;
+use App\Support\FlintBlockPresenter;
+use App\Support\FlintDigestKind;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,15 +35,26 @@ class FlintDigestsController extends Controller
             'period' => ['nullable', 'string', 'in:morning,afternoon,evening'],
         ]);
 
-        $date = isset($validated['date']) ? Carbon::parse($validated['date']) : Carbon::today();
+        $timezone = $request->user()->getTimezone();
+        $date = isset($validated['date'])
+            ? Carbon::parse($validated['date'], $timezone)
+            : Carbon::today($timezone);
         $all = $request->boolean('all');
 
         $integrationIds = $request->user()->integrations()->pluck('id');
 
+        // `whereDate()` compares the stored UTC date, so a timezone-aware date
+        // alone changes nothing — see UpToSpeedController::localDayRange(),
+        // whose docblock warns about exactly this. A digest is filed at the
+        // start of the user's local day, which for anyone east or west of UTC
+        // is a different UTC calendar date.
+        [$dayStart, $dayEnd] = $this->localDayRange($date, $timezone);
+
         $query = Event::whereIn('integration_id', $integrationIds)
             ->where('service', 'flint')
             ->where('action', 'had_summary')
-            ->whereDate('time', $date)
+            ->where('time', '>=', $dayStart)
+            ->where('time', '<', $dayEnd)
             ->with('blocks')
             ->orderBy('time', 'desc');
 
@@ -59,7 +72,7 @@ class FlintDigestsController extends Controller
             ], 404);
         }
 
-        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $date));
+        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $date, $integrationIds));
 
         if ($all) {
             return response()->json([
@@ -91,7 +104,7 @@ class FlintDigestsController extends Controller
             return response()->json(['error' => 'Digest not found.'], 404);
         }
 
-        return response()->json($this->formatDigest($event, Carbon::parse($event->time)));
+        return response()->json($this->formatDigest($event, Carbon::parse($event->time), $integrationIds));
     }
 
     /**
@@ -116,97 +129,58 @@ class FlintDigestsController extends Controller
             'answer_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $answeredAt = now()->toIso8601String();
+        return response()->json(
+            app(FlintQuestionAnswerer::class)->record(
+                $block,
+                $validated['answer'],
+                $validated['answer_note'] ?? null,
+            )
+        );
+    }
 
-        $block->metadata = array_merge($block->metadata ?? [], [
-            'answer' => $validated['answer'],
-            'answer_note' => $validated['answer_note'] ?? null,
-            'answered_at' => $answeredAt,
-        ]);
+    /**
+     * The half-open UTC interval covering one local calendar day:
+     * `[start of local day, start of the next local day)`.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function localDayRange(Carbon $localDay, string $timezone): array
+    {
+        $start = $localDay->copy()->timezone($timezone)->startOfDay();
 
-        $block->save();
-
-        return response()->json([
-            'block_id' => $block->id,
-            'answer' => $validated['answer'],
-            'answer_note' => $validated['answer_note'] ?? null,
-            'answered_at' => $answeredAt,
-        ]);
+        return [
+            $start->copy()->setTimezone('UTC'),
+            $start->copy()->addDay()->setTimezone('UTC'),
+        ];
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function formatDigest(Event $event, Carbon $date): array
+    private function formatDigest(Event $event, Carbon $date, mixed $integrationIds = null): array
     {
         $eventMeta = $event->event_metadata ?? [];
 
-        // Batch-resolve every referenced event across all blocks in one query,
-        // then hand each block its own ordered slice — avoids N+1.
-        $allReferencedIds = $event->blocks
-            ->flatMap(fn (Block $block) => $block->metadata['referenced_event_ids'] ?? [])
-            ->unique()
-            ->values()
-            ->all();
-
-        $referenceLookup = collect(
-            EntityReferenceResolver::resolveEvents($allReferencedIds)
-        )->keyBy('id');
-
-        $blocks = $event->blocks->map(function (Block $block) use ($referenceLookup): array {
-            $base = [
-                'id' => $block->id,
-                'block_type' => $block->block_type,
-                'title' => $block->title,
-                'time' => $block->time?->toIso8601String(),
-            ];
-
-            if ($block->block_type === 'flint_user_question') {
-                $meta = $block->metadata ?? [];
-                $base['question'] = $meta['question'] ?? null;
-                $base['topic'] = $meta['topic'] ?? null;
-                $base['priority'] = $meta['priority'] ?? null;
-                $base['answer_options'] = $meta['answer_options'] ?? null;
-                $base['answer'] = $meta['answer'] ?? null;
-                $base['answer_note'] = $meta['answer_note'] ?? null;
-                $base['answered_at'] = $meta['answered_at'] ?? null;
-                $base['answered'] = ! is_null($meta['answer'] ?? null);
-            } elseif ($block->block_type === 'flint_day_context') {
-                // Structured JSON, not markdown prose — skip linkify() entirely so
-                // an incidental `[[event:...]]`-shaped substring in a title can't
-                // get rewritten and corrupt the payload.
-                $base['day_context'] = $block->metadata['day_context'] ?? null;
-            } else {
-                $references = collect($block->metadata['referenced_event_ids'] ?? [])
-                    ->map(fn ($id) => $referenceLookup->get($id))
-                    ->filter()
-                    ->values()
-                    ->all();
-
-                $base['content'] = EntityReferenceResolver::linkify(
-                    $block->getContent(),
-                    $references,
-                );
-
-                if (! empty($references)) {
-                    $base['references'] = $references;
-                }
-            }
-
-            return $base;
-        });
+        $blocks = collect(FlintBlockPresenter::collection(
+            $event->blocks,
+            linkify: true,
+            integrationIds: $integrationIds,
+        ));
 
         return [
             'event_id' => $event->id,
             'digest_object_id' => $eventMeta['digest_object_id'] ?? null,
             'date' => $date->toDateString(),
             'period' => $eventMeta['period'] ?? null,
+            'kind' => FlintDigestKind::for($event, $eventMeta),
             'title' => $eventMeta['title'] ?? $event->action,
             'summary' => $eventMeta['summary'] ?? null,
             'created_at' => $event->created_at->toIso8601String(),
             'block_count' => $blocks->count(),
             'unanswered_question_count' => $blocks->filter(
-                fn (array $b) => $b['block_type'] === 'flint_user_question' && ! $b['answered']
+                fn (array $b) => $b['block_type'] === 'flint_user_question'
+                    && ! $b['answered']
+                    && ! $b['retired']
             )->count(),
             'blocks' => $blocks->values(),
         ];

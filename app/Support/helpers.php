@@ -1494,3 +1494,27 @@ if (! function_exists('render_media_object_responsive')) {
         return $html;
     }
 }
+
+if (! function_exists('render_markdown')) {
+    /**
+     * Render untrusted markdown to HTML.
+     *
+     * Every string this is given originates outside Spark — newsletter bodies,
+     * fetched articles, bookmark summaries, and Flint prose written *about*
+     * them. The digest summary was already rendered with these options while
+     * block bodies two files away were not, so raw HTML and javascript: links
+     * passed straight through on one surface and not the other. There is no
+     * case where we want the permissive behaviour, so there is one function.
+     */
+    function render_markdown(?string $markdown): string
+    {
+        if ($markdown === null || trim($markdown) === '') {
+            return '';
+        }
+
+        return Str::markdown($markdown, [
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
+        ]);
+    }
+}

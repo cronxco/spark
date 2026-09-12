@@ -12,6 +12,8 @@ use Illuminate\Support\Collection;
 
 class DaySummaryService
 {
+    private ?MetricPresentation $presentation = null;
+
     /**
      * Generate a compact summary for a single date.
      *
@@ -760,14 +762,21 @@ class DaySummaryService
 
         $statistic = $metricsCache[$metricKey]['statistic'];
         $currentValue = $event->formatted_value;
-        $baseline = $statistic->mean_value;
+        $presentation = $this->presentation();
 
-        $entry['vs_baseline_pct'] = $baseline != 0
-            ? round((($currentValue - $baseline) / abs($baseline)) * 100, 1)
-            : 0;
+        $entry['is_anomaly'] = $presentation->isAnomalous($statistic, $currentValue);
 
-        $entry['is_anomaly'] = $currentValue < $statistic->normal_lower_bound
-            || $currentValue > $statistic->normal_upper_bound;
+        // Ordinal metrics get their band, not a percentage against a
+        // fractional mean — see MetricPresentation::baselineDeltaPct().
+        if ($presentation->isOrdinal($statistic)) {
+            $entry['is_ordinal'] = true;
+            $entry['band'] = $presentation->formatValue($statistic, $currentValue);
+            $entry['usual_band'] = $presentation->formatValue($statistic, round((float) $statistic->mean_value));
+
+            return;
+        }
+
+        $entry['vs_baseline_pct'] = $presentation->baselineDeltaPct($statistic, $currentValue);
     }
 
     /**
@@ -786,5 +795,14 @@ class DaySummaryService
         }
 
         return $actionTypes[$action]['exclude_from_flint'] ?? false;
+    }
+
+    /**
+     * `attachBaseline()` runs once per event, so resolve the presenter once
+     * rather than hitting the container on every row.
+     */
+    private function presentation(): MetricPresentation
+    {
+        return $this->presentation ??= app(MetricPresentation::class);
     }
 }

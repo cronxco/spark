@@ -41,6 +41,12 @@ failed.
 It does not cover health, money, calendar or tasks, and it does not tell Will
 what to do.
 
+The **Spark Briefing — Writing Styleguide**
+(`586576f8-7bc5-49db-a48f-db664710ba91`) governs finished prose across every Flint
+digest, not just the day briefing. Fetch it before writing. Where it and this file
+disagree on structure, this file wins for roundup specifics; the styleguide wins on
+voice, tense, and how a fact is phrased.
+
 **Everything comes from Will's own sources.** Spark holds the newsletters and
 fetches; that is the whole evidence base. Do not browse for material, do not
 reach for the open web, and do not supplement from memory — including for
@@ -172,7 +178,7 @@ spark__create-flint-digest(
   date: "<local_date>",
   period: "morning",
   summary: "<the three stories, as prose, one section each>",
-  blocks: [ <editorial note, plus any insight blocks> ]
+  blocks: [ <one flint_news per story>, <editorial note last> ]
 )
 ```
 
@@ -181,10 +187,47 @@ of writing a second one, and it is what attributes the digest to this routine so
 it gets its own place in the app rather than being folded into the morning
 briefing.
 
+### The story blocks — one `flint_news` per story
+
+**Emit one `flint_news` block for every story you ran.** These are not optional
+and they are not decoration: the app lays a roundup out from these blocks, one
+card per story. A run that writes only prose gets rendered as an undifferentiated
+wall of text.
+
+```text
+{
+  "block_type": "flint_news",
+  "title": "<the story's headline — the same one the summary section uses>",
+  "content": "<40–70 words: what happened, who reported it, and the single
+               most important limit on what the sources establish>",
+  "referenced_event_ids": ["<event_id>", "..."]
+}
+```
+
+Three things this block must not be, each of which has actually happened:
+
+- **Not a copy of the summary section.** If the block and the prose are the same
+  text, the digest carries every story twice and the card is unreadable at card
+  size. Distil; do not paste.
+- **Not a bare source list.** `"Sources: *The Economist* and *POLITICO*."` tells
+  Will nothing he could not see from the headline. Name the sources *inside* a
+  sentence that says something.
+- **Not a teaser.** This is the version someone reads instead of the full
+  section, not an advertisement for it. It should stand on its own.
+
+Give every block a **distinct title**. Two blocks sharing a title and type in one
+digest silently overwrite each other and you lose a story with no error.
+
+`block_type` must be exactly `flint_news`. It is a registered type and the server
+rejects anything else; the name is not yours to choose per run.
+
 Cite what you used: put the `event_id`s a story draws on in that block's
 `referenced_event_ids` so Will can open the sources.
 
-**Always include a `flint_editorial_note` block** recording, in a few lines:
+### The editorial note
+
+**Always include a `flint_editorial_note` block**, titled `"Run notes"`, and put
+it **last**. Record, in a few lines:
 
 - the source counts from Step 3 — newsletters, fetches, bookmarks;
 - any coverage gap, and the service it was in;
@@ -261,8 +304,11 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 - [ ] nothing sourced from outside Will's own feeds, including background;
 - [ ] no manufactured implication for a story that is simply worth knowing;
 - [ ] `what to watch next` on every story;
+- [ ] one `flint_news` block per story, each with a distinct title and content
+      that is neither a copy of the summary nor a bare source list;
 - [ ] `referenced_event_ids` set on the blocks that draw on sources;
-- [ ] editorial note written, with source counts and the selection reasoning;
+- [ ] editorial note written last, titled "Run notes", with source counts and the
+      selection reasoning;
 - [ ] at most two originals opened in full;
 - [ ] `run_token` passed through to `create-flint-digest`;
 - [ ] tracked stories that moved were updated and linked; ones that did not move

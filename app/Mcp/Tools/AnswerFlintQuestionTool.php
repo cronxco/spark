@@ -4,6 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Block;
+use App\Services\Flint\FlintQuestionAnswerer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -46,20 +47,9 @@ class AnswerFlintQuestionTool extends Tool
             return Response::error('answer_note must be a string no longer than 1000 characters.');
         }
 
-        $answeredAt = now()->toIso8601String();
-        $block->metadata = array_merge($block->metadata ?? [], [
-            'answer' => $answer,
-            'answer_note' => $note,
-            'answered_at' => $answeredAt,
-        ]);
-        $block->save();
-
-        return Response::json([
-            'block_id' => $block->id,
-            'answer' => $answer,
-            'answer_note' => $note,
-            'answered_at' => $answeredAt,
-        ]);
+        return Response::json(
+            app(FlintQuestionAnswerer::class)->record($block, $answer, $note)
+        );
     }
 
     public function schema(JsonSchema $schema): array

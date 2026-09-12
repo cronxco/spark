@@ -109,6 +109,51 @@ class MetricPresentation
     }
 
     /**
+     * The baseline comparison for one observed value, as a percentage.
+     *
+     * Returns null for ordinal metrics. A resilience score moving from "Solid"
+     * (3) to "Adequate" (2) is one band on a five-point scale, but against a
+     * fractional mean of 3.19 it computes as "-37%" — a number that reads like
+     * a collapse and has caused exactly that misreading downstream. There is no
+     * honest percentage to give here, so give none and let the caller show the
+     * band instead.
+     */
+    public function baselineDeltaPct(MetricStatistic $statistic, ?float $value): ?float
+    {
+        if ($value === null || ! $statistic->hasValidStatistics() || $this->isOrdinal($statistic)) {
+            return null;
+        }
+
+        $mean = (float) $statistic->mean_value;
+
+        return $mean != 0.0 ? round((($value - $mean) / abs($mean)) * 100, 1) : 0.0;
+    }
+
+    /**
+     * Whether an observed value is outside this metric's normal range.
+     *
+     * Continuous metrics use the stored 2σ bounds. Ordinal metrics cannot:
+     * with a mean of 3.19 and a standard deviation of 0.49, the lower bound
+     * lands at 2.2, so *every* reading of "Adequate" is flagged as an anomaly
+     * even though it is the band immediately below the usual one. For those,
+     * ordinary variation is one band either side of the usual band, and only a
+     * bigger move is worth raising.
+     */
+    public function isAnomalous(MetricStatistic $statistic, ?float $value): bool
+    {
+        if ($value === null || ! $statistic->hasValidStatistics()) {
+            return false;
+        }
+
+        if ($this->isOrdinal($statistic)) {
+            return abs($value - round((float) $statistic->mean_value)) > 1;
+        }
+
+        return $value < (float) $statistic->normal_lower_bound
+            || $value > (float) $statistic->normal_upper_bound;
+    }
+
+    /**
      * Whether a move in `$direction` is good, bad, or neither.
      *
      * Direction is not valence: a balance going up is good news, a

@@ -2,17 +2,20 @@
 
 namespace App\Services;
 
+use App\Integrations\Flint\FlintPlugin;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Flint\FlintRunToken;
+use App\Services\Flint\RoutineConfig;
+use App\Support\FlintQuestion;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 /** Creates the same Flint digest payload for REST and MCP callers. */
 class FlintDigestService
@@ -27,9 +30,11 @@ class FlintDigestService
             'run_token' => ['nullable', 'string', 'max:10000'],
             'summary' => ['nullable', 'string', 'max:10000'],
             'blocks' => ['nullable', 'array', 'max:50'],
-            'blocks.*.block_type' => ['required', 'string', 'starts_with:flint_', 'max:100'],
+            'blocks.*.block_type' => ['required', 'string', 'max:100', Rule::in(array_keys(FlintPlugin::getBlockTypes()))],
             'blocks.*.title' => ['required', 'string', 'max:255'],
             'blocks.*.content' => ['nullable', 'string', 'max:20000'],
+            'blocks.*.url' => ['nullable', 'url', 'max:2048'],
+            'blocks.*.minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
             'blocks.*.referenced_event_ids' => ['nullable', 'array', 'max:100'],
             'blocks.*.referenced_event_ids.*' => ['uuid'],
             'blocks.*.question' => ['nullable', 'string', 'max:1000'],
@@ -50,6 +55,13 @@ class FlintDigestService
             'blocks.*.day_context.weather.condition' => ['nullable', 'string', 'max:100'],
             'blocks.*.day_context.weather.temp_high_c' => ['nullable', 'numeric'],
             'blocks.*.day_context.weather.rain_probability_pct' => ['nullable', 'integer', 'min:0', 'max:100'],
+        ], [
+            // A block type the registry does not know renders as an unlabelled
+            // grey card with no icon on every surface, silently. Three names
+            // for the same news-story block appeared in one week before anyone
+            // noticed, so say plainly what is allowed.
+            'blocks.*.block_type.in' => 'Unknown Flint block type. Registered types are: '
+                . implode(', ', array_keys(FlintPlugin::getBlockTypes())) . '.',
         ])->validate();
 
         $date = Carbon::parse(
@@ -60,10 +72,23 @@ class FlintDigestService
         $run = isset($data['run_token'])
             ? app(FlintRunToken::class)->verify($data['run_token'], $user, $date->toDateString(), $period)
             : null;
+        // Without a run token there is no run to key on, and a fresh uuid made
+        // every retry write another digest. The natural key is what a person
+        // would call the same digest: this user's briefing for this date,
+        // period and title.
         $sourceId = $run
             ? 'flint_digest_run:' . $run['run_uuid']
-            : 'flint_digest:' . Str::uuid();
+            : 'flint_digest:' . sha1(implode('|', [
+                $user->id,
+                $date->toDateString(),
+                $period,
+                $data['title'],
+            ]));
         $integration = $this->resolveIntegration($user);
+
+        // A digest is the only thing that asks a question, so it is also the
+        // moment to close the ones that were never answered. See FlintQuestion.
+        FlintQuestion::retireStale($user);
 
         try {
             return DB::transaction(fn () => $this->createTransactionally(
@@ -76,10 +101,9 @@ class FlintDigestService
                 $run,
             ));
         } catch (UniqueConstraintViolationException $exception) {
-            if (! $run) {
-                throw $exception;
-            }
-
+            // Two concurrent writes of the same digest. Both source ids are now
+            // deterministic — from the run uuid, or from user/date/period/title
+            // — so the loser returns what the winner wrote rather than failing.
             $event = Event::query()
                 ->where('integration_id', $integration->id)
                 ->where('source_id', $sourceId)
@@ -168,6 +192,10 @@ class FlintDigestService
             'summary' => $data['summary'] ?? null,
             'run_uuid' => $run['run_uuid'] ?? null,
             'routine' => $run['routine'] ?? null,
+            // Derived from the verified run token rather than left for a
+            // client to guess from the title. Null for a conversational
+            // digest with no token, where the title sniff still applies.
+            'kind' => RoutineConfig::digestKind($run['routine'] ?? null),
             'skill' => $run['skill'] ?? null,
             'trigger_source' => $run['trigger_source'] ?? null,
             'local_date' => $date->toDateString(),
@@ -213,12 +241,18 @@ class FlintDigestService
                     'referenced_event_ids' => $block['referenced_event_ids'] ?? [],
                 ],
             };
-            $event->createBlock([
+            // `url` and `minutes` belong on the block's own columns, not in
+            // metadata — a reading pick's link is a link, and its length is a
+            // value with a unit, so both render and sort without unpacking JSON.
+            $event->createBlock(array_filter([
                 'block_type' => $block['block_type'],
                 'title' => $block['title'],
                 'time' => $date,
+                'url' => $block['url'] ?? null,
+                'value' => $block['minutes'] ?? null,
+                'value_unit' => isset($block['minutes']) ? 'minutes' : null,
                 'metadata' => $blockMetadata,
-            ]);
+            ], fn (mixed $value) => $value !== null));
         }
 
         return $this->result($event->load('blocks'), $period, false);
@@ -228,8 +262,8 @@ class FlintDigestService
     private function result(Event $event, string $period, bool $deduplicated): array
     {
         return [
-            'event_id' => $event->id,
-            'digest_object_id' => $event->target_id,
+            'event_id' => (string) $event->id,
+            'digest_object_id' => (string) $event->target_id,
             'date' => data_get($event->event_metadata, 'local_date', $event->time->toDateString()),
             'period' => $period,
             'title' => data_get($event->event_metadata, 'title'),
