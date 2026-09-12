@@ -197,7 +197,7 @@ Route::post('notifications/{id}/unread', [NotificationsController::class, 'markU
     ->name('notifications.unread');
 
 Route::post('notifications/{id}/archive', [NotificationsController::class, 'archive'])
-    ->middleware('ability:ios:write')
+    ->middleware(['ability:ios:write', 'if-match:notification'])
     ->name('notifications.archive');
 
 Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])

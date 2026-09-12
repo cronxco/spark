@@ -119,6 +119,7 @@ class IconValidationTest extends TestCase
             "icon" => "not-an-icon"
             class="icon invalid"
             <div class="tabs tabs-box"></div>
+            <div class="tabs_s-box"></div>
             <x-icon name="fas.invalid-icon" />
             <x-icon name="fab.not-real" />
         ';
@@ -279,7 +280,7 @@ class IconValidationTest extends TestCase
             '/[\'"`]((?:fas|fab|far)\.[a-zA-Z0-9-]+)[\'"`]/i',
 
             // CSS classes: class="icon o-heart" (but not CSS-like classes)
-            '/class\s*=\s*["\'][^"\']*?(?:icon\s+)?(?<![a-zA-Z0-9-])([mso]-[a-zA-Z0-9-]{2,})(?![a-zA-Z0-9-])[^"\']*["\']/i',
+            '/class\s*=\s*["\'][^"\']*?(?:icon\s+)?(?<![a-zA-Z0-9_-])([mso]-[a-zA-Z0-9-]{2,})(?![a-zA-Z0-9_-])[^"\']*["\']/i',
         ];
 
         foreach ($patterns as $pattern) {

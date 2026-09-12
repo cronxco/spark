@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Notifications\NotificationArchiver;
 use App\Services\Notifications\NotificationFeedService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Url;
@@ -84,11 +85,7 @@ new class extends Component
             return;
         }
 
-        $data = is_array($notification->data) ? $notification->data : [];
-        $notification->forceFill([
-            'archived_at' => now(),
-            'data' => [...$data, 'archive_reason' => 'manual'],
-        ])->save();
+        app(NotificationArchiver::class)->archive($notification, 'manual');
     }
 
     public function markAllAsRead(): void
@@ -117,9 +114,9 @@ new class extends Component
     </x-header>
 
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div role="tablist" aria-label="Notification history" class="tabs tabs-box w-fit bg-base-200">
-            <button type="button" role="tab" wire:click="$set('scope', 'active')" @class(['tab', 'tab-active' => $scope === 'active'])>Inbox</button>
-            <button type="button" role="tab" wire:click="$set('scope', 'history')" @class(['tab', 'tab-active' => $scope === 'history'])>History</button>
+        <div role="tablist" aria-label="Notification scope" class="tabs tabs-box w-fit bg-base-200">
+            <button type="button" role="tab" aria-selected="{{ $scope === 'active' ? 'true' : 'false' }}" wire:click="$set('scope', 'active')" @class(['tab', 'tab-active' => $scope === 'active'])>Inbox</button>
+            <button type="button" role="tab" aria-selected="{{ $scope === 'history' ? 'true' : 'false' }}" wire:click="$set('scope', 'history')" @class(['tab', 'tab-active' => $scope === 'history'])>History</button>
         </div>
 
         <label class="input input-bordered flex w-full items-center gap-2 sm:max-w-xs">

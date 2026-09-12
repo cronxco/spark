@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Mobile\ListNotificationFeedRequest;
 use App\Http\Resources\Compact\CompactNotificationResource;
 use App\Services\Api\ResourceVersion;
+use App\Services\Notifications\NotificationArchiver;
 use App\Services\Notifications\NotificationFeedService;
 use App\Support\CursorPaginator;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,7 @@ class NotificationsController extends Controller
     public function __construct(
         private ResourceVersion $versions,
         private NotificationFeedService $feed,
+        private NotificationArchiver $archiver,
     ) {}
 
     public function feed(ListNotificationFeedRequest $request): JsonResponse
@@ -27,16 +29,18 @@ class NotificationsController extends Controller
             search: $request->validated('search'),
             cursor: $request->validated('cursor'),
             limit: (int) $request->validated('limit', 25),
-        ));
+        ))->header('Cache-Control', 'no-store');
     }
 
     public function show(Request $request, string $id): JsonResponse
     {
         $item = $this->feed->detail($request->user(), $id);
 
-        return $item === null
+        $response = $item === null
             ? response()->json(['message' => 'Notification not found.'], 404)
             : response()->json(['data' => $item]);
+
+        return $response->header('Cache-Control', 'no-store');
     }
 
     /**
@@ -106,13 +110,9 @@ class NotificationsController extends Controller
             return response()->json(['message' => 'Notification not found.'], 404);
         }
 
-        $data = is_array($notification->data) ? $notification->data : [];
-        $notification->forceFill([
-            'archived_at' => now(),
-            'data' => [...$data, 'archive_reason' => 'manual'],
-        ])->save();
+        $notification = $this->archiver->archive($notification, 'manual');
 
-        return response()->json(null, 204)->header('ETag', $this->versions->etag($notification->fresh()));
+        return response()->json(null, 204)->header('ETag', $this->versions->etag($notification));
     }
 
     /**

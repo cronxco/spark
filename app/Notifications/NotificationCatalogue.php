@@ -112,7 +112,7 @@ class NotificationCatalogue
             'stream' => 'attention',
             'severity' => 'error',
             'active_hours' => null,
-            'forced_delivery' => false,
+            'forced_delivery' => true,
         ],
         'data_export_ready' => [
             'label' => 'Data Export Ready',
@@ -233,7 +233,9 @@ class NotificationCatalogue
 
     public static function activeHoursFor(string $type): ?int
     {
-        return self::definition($type)['active_hours'] ?? 168;
+        $definition = self::definition($type);
+
+        return $definition === null ? 168 : $definition['active_hours'];
     }
 
     public static function forcesDelivery(string $type): bool

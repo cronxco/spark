@@ -49,7 +49,9 @@ class DailyDigestReady extends SparkNotification
 
     public function getGroupKey(): ?string
     {
-        return "daily_digest:{$this->period}";
+        return $this->digestObject === null
+            ? null
+            : "daily_digest:{$this->digestObject->id}";
     }
 
     public function toMail($notifiable): MailMessage

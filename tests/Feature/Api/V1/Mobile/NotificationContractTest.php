@@ -317,6 +317,31 @@ class NotificationContractTest extends TestCase
         }
     }
 
+    #[Test]
+    public function migration_failed_is_configured_for_forced_delivery(): void
+    {
+        $this->assertTrue(
+            NotificationCatalogue::forcesDelivery('migration_failed'),
+            'migration_failed is documented as always sent immediately.',
+        );
+    }
+
+    #[Test]
+    public function active_hours_for_preserves_an_explicit_null_definition(): void
+    {
+        $this->assertNull(
+            NotificationCatalogue::definition('integration_failed')['active_hours'],
+            'Precondition: integration_failed must be catalogued with a null active_hours.',
+        );
+
+        $this->assertNull(
+            NotificationCatalogue::activeHoursFor('integration_failed'),
+            'A catalogued null active_hours means never auto-expire, not the 168h default.',
+        );
+
+        $this->assertSame(168, NotificationCatalogue::activeHoursFor('not_a_real_type'));
+    }
+
     private function notifyUser(): string
     {
         $this->user->notify(new SystemMaintenance('Scheduled maintenance', 'Back shortly.'));

@@ -103,6 +103,21 @@ class NotificationsControllerTest extends TestCase
     }
 
     #[Test]
+    public function feed_and_show_responses_are_never_cached(): void
+    {
+        $notification = $this->notification(['title' => 'Not cacheable'], Carbon::now());
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/notifications/feed')
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store');
+
+        $this->getJson("/api/v1/mobile/notifications/feed/{$notification->id}")
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store');
+    }
+
+    #[Test]
     public function supports_unread_archive_and_history_without_deleting_the_record(): void
     {
         $notification = $this->notification([
@@ -117,7 +132,7 @@ class NotificationsControllerTest extends TestCase
             ->assertNoContent();
         $this->assertNull($notification->fresh()->read_at);
 
-        $this->postJson("/api/v1/mobile/notifications/{$notification->id}/archive")
+        $this->postJson("/api/v1/mobile/notifications/{$notification->id}/archive", [], $this->ifMatch($notification))
             ->assertNoContent();
 
         $this->assertNotNull($notification->fresh()->archived_at);

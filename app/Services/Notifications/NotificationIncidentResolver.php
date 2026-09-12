@@ -3,11 +3,11 @@
 namespace App\Services\Notifications;
 
 use App\Models\User;
-use Illuminate\Notifications\DatabaseNotification;
-use Illuminate\Support\Facades\DB;
 
 class NotificationIncidentResolver
 {
+    public function __construct(private NotificationArchiver $archiver) {}
+
     /** @param array<int, string> $groupKeys */
     public function resolve(User $user, array $groupKeys): int
     {
@@ -16,19 +16,9 @@ class NotificationIncidentResolver
             ->whereIn('group_key', $groupKeys)
             ->get();
 
-        if ($notifications->isEmpty()) {
-            return 0;
+        foreach ($notifications as $notification) {
+            $this->archiver->archive($notification, 'resolved');
         }
-
-        DB::transaction(function () use ($notifications) {
-            $notifications->each(function (DatabaseNotification $notification) {
-                $data = is_array($notification->data) ? $notification->data : [];
-                $notification->forceFill([
-                    'archived_at' => now(),
-                    'data' => [...$data, 'archive_reason' => 'resolved'],
-                ])->save();
-            });
-        });
 
         return $notifications->count();
     }

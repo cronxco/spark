@@ -65,9 +65,6 @@ class CompleteMigration implements ShouldQueue
             $this->integration->user->notify(
                 new MigrationCompleted($this->integration, $statistics)
             );
-            app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
-                "migration_failed:{$this->integration->id}",
-            ]);
 
             Log::info('Migration completion notification sent', [
                 'integration_id' => $this->integration->id,
@@ -81,6 +78,14 @@ class CompleteMigration implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
         }
+
+        // Left outside the notification's error boundary: a failure here must
+        // not be logged away as a delivery failure. Letting it throw allows
+        // the queue to retry, so `migration_failed:{id}` doesn't stay active
+        // forever after a recovery this job failed to record.
+        app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
+            "migration_failed:{$this->integration->id}",
+        ]);
     }
 
     /**

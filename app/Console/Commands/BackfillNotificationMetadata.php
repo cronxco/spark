@@ -126,12 +126,17 @@ class BackfillNotificationMetadata extends Command
                         }
                     }
 
+                    $current->timestamps = false;
                     $current->forceFill([
                         'type' => $type,
                         'group_key' => $groupKey,
                         'data' => $payload,
-                    ])->save();
-                    $updated++;
+                    ]);
+
+                    if ($current->isDirty()) {
+                        $current->save();
+                        $updated++;
+                    }
                 });
             }
         }, 'id');

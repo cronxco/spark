@@ -52,11 +52,20 @@ class MaintainNotificationHistory extends Command
                 continue;
             }
 
-            $query->chunkById(250, function ($notifications) use (&$archived) {
-                DB::transaction(function () use ($notifications, &$archived) {
+            $query->chunkById(250, function ($notifications) use ($activeHours, &$archived) {
+                DB::transaction(function () use ($notifications, $activeHours, &$archived) {
+                    $cutoff = now()->subHours($activeHours);
+
                     foreach ($notifications as $notification) {
-                        $data = is_array($notification->data) ? $notification->data : [];
-                        $notification->forceFill([
+                        $current = DatabaseNotification::query()->lockForUpdate()->find($notification->id);
+                        if ($current === null
+                            || $current->archived_at !== null
+                            || $current->updated_at->gt($cutoff)) {
+                            continue;
+                        }
+
+                        $data = is_array($current->data) ? $current->data : [];
+                        $current->forceFill([
                             'archived_at' => now(),
                             'data' => [...$data, 'archive_reason' => 'expired'],
                         ])->save();

@@ -3,9 +3,12 @@
 namespace Tests\Feature\Notifications;
 
 use App\Models\ActionProgress;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
+use App\Notifications\DailyDigestReady;
 use App\Notifications\IntegrationFailed;
+use App\Services\Notifications\NotificationFeedService;
 use App\Services\Notifications\NotificationIncidentResolver;
 use DateTimeInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,6 +39,51 @@ class NotificationFeedLifecycleTest extends TestCase
         $this->assertCount(1, $active);
         $this->assertSame(2, $active->first()->data['occurrence_count']);
         $this->assertSame("integration_failed:{$integration->id}", $active->first()->group_key);
+    }
+
+    #[Test]
+    public function technical_detail_redacts_colon_and_json_style_credentials(): void
+    {
+        $integration = Integration::factory()->create();
+        $notification = new IntegrationFailed(
+            $integration,
+            'POST https://example.test failed: {"api_key": "super-secret"} with X-Api-Key: another-secret',
+        );
+
+        $detail = $notification->getTechnicalDetail();
+
+        $this->assertStringNotContainsString('super-secret', $detail);
+        $this->assertStringNotContainsString('another-secret', $detail);
+        $this->assertStringContainsString('[REDACTED]', $detail);
+    }
+
+    #[Test]
+    public function feed_service_detail_redacts_colon_and_json_style_credentials(): void
+    {
+        $user = User::factory()->create();
+        $notification = $this->notification($user, 'integration_failed', now(), [
+            'technical_detail' => '{"api_key": "super-secret"} X-Api-Key: another-secret',
+        ]);
+
+        $detail = app(NotificationFeedService::class)->detail($user, $notification->id);
+
+        $this->assertStringNotContainsString('super-secret', $detail['technical_detail']);
+        $this->assertStringNotContainsString('another-secret', $detail['technical_detail']);
+        $this->assertStringContainsString('[REDACTED]', $detail['technical_detail']);
+    }
+
+    #[Test]
+    public function daily_digest_group_key_is_scoped_to_the_digest_object_not_the_recurring_period(): void
+    {
+        $user = User::factory()->create();
+        $today = EventObject::factory()->create(['user_id' => $user->id, 'concept' => 'digest', 'type' => 'morning_digest']);
+        $tomorrow = EventObject::factory()->create(['user_id' => $user->id, 'concept' => 'digest', 'type' => 'morning_digest']);
+
+        $todayDigest = new DailyDigestReady($today, 'morning');
+        $tomorrowDigest = new DailyDigestReady($tomorrow, 'morning');
+
+        $this->assertSame("daily_digest:{$today->id}", $todayDigest->getGroupKey());
+        $this->assertNotSame($todayDigest->getGroupKey(), $tomorrowDigest->getGroupKey());
     }
 
     #[Test]

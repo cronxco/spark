@@ -381,7 +381,7 @@ class NotificationFeedService
 
         $redacted = redact_sensitive_urls(strip_tags($detail));
         $redacted = preg_replace(
-            '/(?i)(token|access_token|refresh_token|api_key|key|password|secret)=([^&\s"\'<>]+)/',
+            '/(?i)"?(token|access_token|refresh_token|api_key|key|password|secret)"?\s*[:=]\s*"?([^&\s"\'<>]+)"?/',
             '$1=[REDACTED]',
             $redacted,
         ) ?? $redacted;

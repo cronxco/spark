@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\Flint\FlintRunDispatcher;
+use App\Services\Notifications\NotificationArchiver;
 use App\Services\Notifications\NotificationFeedService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -48,11 +49,7 @@ new class extends Component
     {
         $notification = Auth::user()->notifications()->whereNull('archived_at')->find($notificationId);
         if ($notification) {
-            $data = is_array($notification->data) ? $notification->data : [];
-            $notification->forceFill([
-                'archived_at' => now(),
-                'data' => [...$data, 'archive_reason' => 'manual'],
-            ])->save();
+            app(NotificationArchiver::class)->archive($notification, 'manual');
         }
         $this->refreshFeed();
     }
@@ -68,7 +65,7 @@ new class extends Component
     x-data="{ open: false }"
     @click.outside="open = false"
     class="relative"
-    @if ($counts['active_activity'] > 0) wire:poll.3s="refreshFeed" @elseif ($counts['unread'] > 0) wire:poll.30s="refreshFeed" @endif
+    @if ($counts['active_activity'] > 0) wire:poll.3s="refreshFeed" @else wire:poll.30s="refreshFeed" @endif
 >
     <a href="{{ route('notifications.index') }}" class="btn btn-ghost btn-sm sm:hidden" aria-label="Open notifications">
         <div class="indicator">

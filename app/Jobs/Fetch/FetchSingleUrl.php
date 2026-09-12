@@ -530,6 +530,9 @@ class FetchSingleUrl implements ShouldQueue
             $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
             $metadata['last_error'] = null;
             $webpage->update(['metadata' => $metadata]);
+            app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
+                "fetch_multiple_failures:{$webpage->id}",
+            ]);
         } catch (Exception $e) {
             Log::error('Fetch: PDF download failed', [
                 'url' => $this->url,
