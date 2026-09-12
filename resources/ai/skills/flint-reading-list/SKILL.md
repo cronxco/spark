@@ -29,6 +29,12 @@ Runs once a day in the evening. The backlog is large and mostly inert; the job
 is to pull two to four things out of it that are worth Will's evening, and to be
 honest when nothing is.
 
+The **Spark Briefing — Writing Styleguide**
+(`586576f8-7bc5-49db-a48f-db664710ba91`) governs finished prose across every Flint
+digest, not just the day briefing. Fetch it before writing. Where it and this file
+disagree on structure, this file wins for reading-list specifics; the styleguide wins on
+voice, tense, and how a fact is phrased.
+
 This is a **curation** job, not an inventory job. Listing what is in the backlog
 is useless — Will can see the backlog. The value is entirely in the choosing and
 in the sentence explaining why.

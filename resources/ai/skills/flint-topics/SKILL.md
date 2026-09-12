@@ -36,9 +36,14 @@ writing unless a person would recognise it as something they have going on.
 
 | Kind | Horizon | Example | Ends when |
 |---|---|---|---|
-| `strategic` | Months to years | A 2027 Canada trip; moving house | It happens, or Will drops it |
-| `thematic` | Ongoing, no end date | Getting back to running; managing sleep debt | It stops being live for months |
-| `tactical` | Days to weeks | A boiler replacement; an unfolding news story | It resolves |
+| `strategic` | Months to years | A 2027 Canada trip; a three-week work trip to Australia in November; moving house | It happens, or Will drops it |
+| `thematic` | Ongoing, no end date | Getting back to running; how much weight readiness should carry; managing sleep debt | It stops being live for months |
+| `tactical` | Days to weeks | A boiler replacement; a long weekend away; an unfolding news story | It resolves |
+
+**All three kinds are meant to be used.** A topics list that is entirely `tactical` is
+not a sign of restraint — it means the job is only noticing things already in motion
+and missing the longer threads underneath them. If every live topic resolves inside a
+fortnight, Step 6 is being applied too narrowly; re-read it.
 
 ## Statuses
 
@@ -101,6 +106,29 @@ outranks anything inferred from the data.
 If the day has no digest, do not invent evidence. Do Step 4 (reviews and
 expiries, which are calendar-driven) and stop.
 
+### Walk the answered questions deliberately
+
+Do not just read past them. **Take each answered `flint_user_question` from the window
+in turn and ask: does this answer name a thing with a horizon?** A trip, a decision, a
+commitment, a stance Will has taken. If it does, it is a topic candidate and it has
+already cleared bar 2 in Step 6 — Will said it directly.
+
+This is where the job has been weakest. On 9 September Will answered that a £6,977.79
+flight was a work trip to Perth, Adelaide and Canberra plus holiday in Sydney, 27
+November to 16 December. Three weeks, two countries' worth of logistics, stated in his
+own words — and no topic was created, while a four-day weekend became one. The bar was
+met; nobody looked.
+
+### Watch for dated commitments
+
+When the evidence names **a future date on which Will has to do something**, that is a
+topic with a built-in review date, whichever kind it is. "The return leg gets added on
+24 September" is a commitment; so is a renewal, a deadline, a booking window opening.
+
+Create or update the topic with `next_review_at` set to that date. Nothing else in the
+system will remember it, and a commitment mentioned once in a digest and never again is
+a commitment that gets missed.
+
 ## Step 4: Wake, retire, and expire
 
 Before considering anything new, deal with what already exists.
@@ -124,6 +152,11 @@ correct.
 
 **Anything the evidence says has concluded** → `resolved`. An answered question
 that closes a thread, a booking made, a decision taken.
+
+**A topic whose `next_review_at` is today or tomorrow** stays `active` and must be
+visible to the next briefing — that is the whole point of setting the date. Make sure
+its `content` says plainly what is due and when, in the first sentence, so the digest
+routine reading the topics list cannot miss it.
 
 ## Step 5: Touch the topics today's digest actually discussed
 
@@ -224,6 +257,9 @@ correct run.
 - [ ] concluded topics marked `resolved`;
 - [ ] every topic today's digest genuinely advanced was updated and linked;
 - [ ] `content` rewritten as current understanding, not appended to as a log;
+- [ ] every answered question in the window was checked for a thing with a horizon;
+- [ ] any dated commitment in the evidence has a topic with `next_review_at` on that date;
+- [ ] topics due for review lead with what is due, so the briefing can see it;
 - [ ] any new topic clears all four bars in Step 6, and no new topic restates an
       existing one;
 - [ ] zero new topics was considered and is an acceptable outcome;

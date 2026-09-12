@@ -12,6 +12,7 @@ allowed_tools:
   - spark__get-service-status-tool
   - spark__get-metric-trend-tool
   - spark__get-baselines-tool
+  - spark__acknowledge-anomaly-tool
   - spark__get-events-by-filter-tool
   - spark__get-event-tool
   - spark__get-block-tool
@@ -428,6 +429,17 @@ Apply before drafting and again immediately before creating question blocks:
   unanswered.
 - Do not evade fatigue rules by paraphrasing essentially the same question.
 
+**Retire a question that has gone unanswered for seven days.** Silence is an answer:
+it means the question was not worth Will's time. Note it once in the editorial note's
+**Suppressed** line as retired, stop counting it against the fatigue budget for its
+subject, and do not carry it forward again. A subject can be raised afresh later if
+genuinely new evidence appears — but it starts clean rather than inheriting a stale
+open thread.
+
+Without this, an ignored question suppresses its whole subject indefinitely while
+appearing nowhere Will can see it. One question from 8 September sat open for five
+days doing exactly that.
+
 Do not persist this short-term editorial register. The durable memory already lives in
 Topics; recent digest history is intentionally transient.
 
@@ -522,6 +534,30 @@ Examples:
   reading.
 - No workout on a fully synced completed day can be factual; the same absence during
   partial sync cannot.
+
+### Media — the domain this routine kept forgetting
+
+`get-day-summary-tool` returns a `media` section alongside health, money and
+knowledge, and it is the highest-volume data Spark holds: Spotify alone posts well over
+a hundred events on an ordinary day. This routine went a full week without mentioning
+it once, while the conversational `spark-day-briefing` skill covered it throughout —
+so read `sections.media` on every run.
+
+From `listening_sessions[]`: the time range, track count, top artist, and the session
+description. For individual tracks, `spark__get-events-by-filter-tool(service:
+"spotify")` — but only when a session summary is genuinely too vague to say anything,
+not as routine enrichment. Untappd check-ins live in the same section; surface beer
+names and ratings when present.
+
+**Restraint, because listening data is abundant and mostly meaningless.** Media earns a
+line when it is *unusual* — a new artist on repeat, a long block on an otherwise quiet
+day, a return to something not played in months, listening that contradicts the day's
+apparent shape. It never earns a line as a statistic: "You played 124 tracks" is a
+database fact, not an observation. On most days the right amount of media in the
+briefing is none, and that is a judgement made after reading the section rather than
+by ignoring it.
+
+Do not infer mood from listening. A sad album is not evidence of a sad day.
 
 ### Morning Oura confidence
 
@@ -740,6 +776,40 @@ Not:
 - Nothing today relates to it
 - Search all mail for Canada just to find something to say
 
+### Acknowledging a settled anomaly, so it stops arriving
+
+Suppression in the editorial note stops a thing being *written*. It does not stop it
+being *raised*, so the same explained anomaly arrives every morning and has to be
+dismissed again by hand. GoCardless's elevated balance was suppressed on fifteen
+consecutive days, the note counting them off — "day 11… day 13… day 15 of the same
+already-explained month-start pattern". That is a loop, not a decision.
+
+When an anomaly is **genuinely explained and expected to persist**, close it:
+
+```text
+spark__acknowledge-anomaly-tool(
+  metric: "<identifier>",
+  date: "<the date it was raised>",
+  note: "<why — one clause, the explanation Will gave or the evidence that settled it>",
+  suppress_until: "<the date it plausibly becomes interesting again>"
+)
+```
+
+Use it when all of these hold:
+
+- the cause is known — Will answered it, or the evidence settles it beyond doubt;
+- it is expected to keep reading anomalous for a while;
+- nothing about it would change Flint's advice if it were raised again tomorrow.
+
+`suppress_until` should be the date the situation genuinely changes: month end for a
+month-start balance pattern, the end of a trip for travel-shaped activity data. Do not
+suppress indefinitely, and do not suppress something merely because it is inconvenient
+or because Will has not answered a question about it. An unexplained anomaly stays
+unacknowledged however many days it runs — silence is not an explanation.
+
+This is a write, and the only one in the escalation set. One per run at most; if two
+things both qualify, take the one that has been recurring longest.
+
 ### Home Assistant presence — mainly evening, corroborative
 
 When location/movement would materially clarify plan-vs-actual context, use
@@ -901,6 +971,26 @@ Look deliberately for a candidate in this order:
 
 Do not default to health simply because health produces convenient numbers.
 
+#### Try to answer it yourself first
+
+**Before a candidate question takes the slot, spend one targeted call trying to resolve
+it from evidence.** A mail search, a calendar search a few days wider, the full text of
+an event already in hand. Most ambiguities Flint notices are already answered somewhere
+in Will's own data, and an answer he does not have to type is worth more than one he
+does.
+
+If it resolves, say so in the prose and move to the next candidate — the slot is now
+free for something the data genuinely cannot settle.
+
+The worked example: on 12 September the calendar carried an unresolved "Clementine and
+Fabian's Wedding" marker in the middle of a weekend away. Rather than re-ask, a mail
+search found an £80 wedding-list gift payment, which settled it as a gift sent rather
+than an appearance made. That is the standard: one call, a real resolution, the
+question budget spent elsewhere.
+
+This does not license open-ended research. One or two calls against a specific
+hypothesis; if that does not settle it, ask.
+
 #### Quality gate
 
 Before approving a question, check:
@@ -1044,7 +1134,30 @@ For each approved question:
 }
 ```
 
-No `answer_options`; answers are free text.
+#### `answer_options` — offer them whenever the answer is a small set
+
+Will answers these on a phone. A question whose honest answer is one of two or three
+things should not require typing, and the server has supported up to twenty options
+since this was built.
+
+Use them when the answer space is genuinely small and you can enumerate it without
+leading:
+
+- "Is tomorrow's wedding marker something you're attending, or an FYI note?" →
+  `["Attending", "FYI only", "Not sure yet"]`
+- "Office or the Newquay train tomorrow?" → `["Office", "Newquay", "Something else"]`
+
+Rules:
+
+- Include an escape hatch — "Something else", "Not sure yet" — so the options never
+  force a wrong answer. The free-text field stays available regardless.
+- Never use options for a question whose value is the explanation. "What would help
+  Flint understand the readiness dip?" wants prose; a menu of guesses would put Flint's
+  hypotheses in Will's mouth and violate the non-leading rule.
+- Four options is a lot. Two or three is normal.
+
+Omit `answer_options` entirely when the question is open. Most health questions are;
+most planning and money questions are not.
 
 Before emitting each question:
 
@@ -1216,6 +1329,11 @@ Before writing today's digest verify:
 - [ ] Spark service status checked before interpreting absence/totals;
 - [ ] fallback morning data treated as unavailable rather than absent;
 - [ ] weather summary fetched for relevant location;
+- [ ] `sections.media` read, and mentioned only if genuinely unusual;
+- [ ] one targeted call spent trying to resolve the question before asking it;
+- [ ] `answer_options` offered where the answer space is small, with an escape hatch;
+- [ ] any question unanswered for seven days retired in the editorial note;
+- [ ] a settled, persisting anomaly acknowledged rather than suppressed by hand again;
 - [ ] `flint_day_context` block attached with today's calendar + birthdays + weather,
       every `calendar` entry carrying a `person` decided by the title-attribution rule,
       birthdays kept out of `calendar` and left person-free;

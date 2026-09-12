@@ -41,6 +41,12 @@ failed.
 It does not cover health, money, calendar or tasks, and it does not tell Will
 what to do.
 
+The **Spark Briefing — Writing Styleguide**
+(`586576f8-7bc5-49db-a48f-db664710ba91`) governs finished prose across every Flint
+digest, not just the day briefing. Fetch it before writing. Where it and this file
+disagree on structure, this file wins for roundup specifics; the styleguide wins on
+voice, tense, and how a fact is phrased.
+
 **Everything comes from Will's own sources.** Spark holds the newsletters and
 fetches; that is the whole evidence base. Do not browse for material, do not
 reach for the open web, and do not supplement from memory — including for
