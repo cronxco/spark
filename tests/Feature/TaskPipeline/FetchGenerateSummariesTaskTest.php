@@ -97,6 +97,38 @@ class FetchGenerateSummariesTaskTest extends TestCase
         $this->assertSame(['Editorial pick'], $webpage->fresh()->tagsWithType('manual-tag')->pluck('name')->values()->all());
     }
 
+    #[Test]
+    public function it_rolls_back_all_enrichment_writes_when_a_later_write_fails(): void
+    {
+        OpenAI::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
+        [$event, $webpage] = $this->fetchEvent(content: 'Clean article text');
+        $event->attachTags(['Original topic'], 'topic-tag');
+        EventObject::updating(function (EventObject $object): void {
+            if (($object->metadata['pipeline_status'] ?? null) === 'complete') {
+                throw new Exception('Simulated latest webpage persistence failure');
+            }
+        });
+
+        try {
+            (new FetchGenerateSummariesTask($event, $this->task()))->handle();
+            $this->fail('Expected summary persistence to fail.');
+        } catch (Exception $e) {
+            $this->assertSame('Simulated latest webpage persistence failure', $e->getMessage());
+        }
+
+        $this->assertSame(0, $event->blocks()->whereIn('block_type', [
+            'fetch_summary_tweet',
+            'fetch_summary_short',
+            'fetch_summary_paragraph',
+            'fetch_key_takeaways',
+            'fetch_tldr',
+        ])->count());
+        $this->assertSame(['Original topic'], $event->fresh()->tagsWithType('topic-tag')->pluck('name')->values()->all());
+        $this->assertNull($event->fresh()->event_metadata['enrichment_status'] ?? null);
+        $this->assertSame('failed', $event->fresh()->event_metadata['task_executions']['fetch_generate_summaries']['last_attempt']['status']);
+        $this->assertArrayNotHasKey('extracted_at', $webpage->fresh()->metadata);
+    }
+
     private function fetchEvent(?string $content): array
     {
         Queue::fake([ProcessTaskPipelineJob::class]);

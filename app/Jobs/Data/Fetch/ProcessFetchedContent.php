@@ -128,8 +128,9 @@ class ProcessFetchedContent implements ShouldQueue
         $fetchedAt = CarbonImmutable::now();
         $timezone = $this->integration->configuration['schedule_timezone'] ?? 'UTC';
         $fetchDay = $fetchedAt->setTimezone($timezone)->toDateString();
-        $dayStart = CarbonImmutable::parse($fetchDay, $timezone)->startOfDay()->utc();
-        $dayEnd = $dayStart->addDay();
+        $localDayStart = CarbonImmutable::parse($fetchDay, $timezone)->startOfDay();
+        $dayStart = $localDayStart->utc();
+        $dayEnd = $localDayStart->addDay()->utc();
 
         $actorObject = EventObject::firstOrCreate(
             [

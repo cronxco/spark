@@ -127,6 +127,43 @@ class GetDaySummaryToolTest extends TestCase
     }
 
     #[Test]
+    public function fetch_bookmarks_use_the_once_revision_title_and_url(): void
+    {
+        $fetchGroup = IntegrationGroup::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'fetch',
+        ]);
+        $fetchIntegration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $fetchGroup->id,
+            'service' => 'fetch',
+        ]);
+        $webpage = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'Later mutable title',
+            'url' => 'https://example.com/live',
+        ]);
+        Event::factory()->create([
+            'integration_id' => $fetchIntegration->id,
+            'service' => 'fetch',
+            'domain' => 'knowledge',
+            'action' => 'bookmarked',
+            'time' => Carbon::today()->setHour(12),
+            'target_id' => $webpage->id,
+            'target_metadata' => [
+                'title' => 'Saved revision title',
+                'url' => 'https://example.com/saved-revision',
+            ],
+        ]);
+
+        $summary = app(DaySummaryService::class)->generateSummary($this->user, Carbon::today());
+        $bookmark = $summary['sections']['knowledge']['bookmarks'][0];
+
+        $this->assertSame('Saved revision title', $bookmark['title']);
+        $this->assertSame('https://example.com/saved-revision', $bookmark['url']);
+    }
+
+    #[Test]
     public function generates_summary_with_activity_section(): void
     {
         $ahGroup = IntegrationGroup::factory()->create([

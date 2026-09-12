@@ -6,7 +6,9 @@ use App\Jobs\Fetch\FetchSingleUrl;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class RepairFetchSubscriptionRevisions extends Command
 {
@@ -72,11 +74,15 @@ class RepairFetchSubscriptionRevisions extends Command
                 continue;
             }
 
-            FetchSingleUrl::dispatch($integration, $webpage->id, $webpage->url, true);
+            $claimStatus = $this->claimRepair($webpage);
+            if ($claimStatus !== 'claimed') {
+                $rows[array_key_last($rows)][4] = $claimStatus;
+                $skipped++;
 
-            $metadata['revision_repair_queued_for_hash'] = $metadata['content_hash'] ?? null;
-            $metadata['revision_repair_queued_at'] = now()->toIso8601String();
-            $webpage->update(['metadata' => $metadata]);
+                continue;
+            }
+
+            FetchSingleUrl::dispatch($integration, $webpage->id, $webpage->url, true);
             $queued++;
         }
 
@@ -90,7 +96,15 @@ class RepairFetchSubscriptionRevisions extends Command
 
     private function latestEvent(EventObject $webpage, ?string $latestEventId): ?Event
     {
-        if ($latestEventId && $event = Event::find($latestEventId)) {
+        $event = $latestEventId
+            ? Event::query()
+                ->whereKey($latestEventId)
+                ->where('target_id', $webpage->id)
+                ->where('service', 'fetch')
+                ->first()
+            : null;
+
+        if ($event) {
             return $event;
         }
 
@@ -99,5 +113,36 @@ class RepairFetchSubscriptionRevisions extends Command
             ->where('service', 'fetch')
             ->latest('time')
             ->first();
+    }
+
+    private function claimRepair(EventObject $webpage): string
+    {
+        return DB::transaction(function () use ($webpage): string {
+            $lockedWebpage = EventObject::query()->lockForUpdate()->findOrFail($webpage->id);
+            $metadata = $lockedWebpage->metadata ?? [];
+            $latestEvent = $this->latestEvent($lockedWebpage, $metadata['latest_event_id'] ?? null);
+
+            if (($latestEvent?->event_metadata['revision_model_version'] ?? null) === 1) {
+                return 'versioned';
+            }
+
+            $claimedHash = $metadata['revision_repair_queued_for_hash'] ?? null;
+            $currentHash = $metadata['content_hash'] ?? null;
+            $claimedAt = isset($metadata['revision_repair_queued_at'])
+                ? CarbonImmutable::parse($metadata['revision_repair_queued_at'])
+                : null;
+            $claimIsActive = $claimedHash === $currentHash
+                && $claimedAt?->isAfter(now()->subMinutes(15));
+
+            if ($claimedHash === $currentHash && (! $this->option('force') || $claimIsActive)) {
+                return 'queued';
+            }
+
+            $metadata['revision_repair_queued_for_hash'] = $currentHash;
+            $metadata['revision_repair_queued_at'] = now()->toIso8601String();
+            $lockedWebpage->update(['metadata' => $metadata]);
+
+            return 'claimed';
+        }, 3);
     }
 }

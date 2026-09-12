@@ -72,7 +72,10 @@ class ProcessFetchedContentTest extends TestCase
 
         $this->assertDatabaseCount('events', 0);
         $this->assertSame(5, $webpage->fresh()->metadata['fetch_count']);
-        Queue::assertNothingPushed();
+        Queue::assertNotPushed(
+            ProcessTaskPipelineJob::class,
+            fn (ProcessTaskPipelineJob $job) => $job->model instanceof Event,
+        );
     }
 
     #[Test]
@@ -102,11 +105,51 @@ class ProcessFetchedContentTest extends TestCase
         $this->assertDatabaseCount('blocks', 1);
     }
 
-    private function subscription(array $metadata = []): array
+    #[Test]
+    public function spring_forward_uses_the_next_local_midnight_as_the_day_boundary(): void
+    {
+        Queue::fake([ProcessTaskPipelineJob::class]);
+        [$integration, $webpage] = $this->subscription([], ['schedule_timezone' => 'America/New_York']);
+        $nextLocalDay = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'target_id' => $webpage->id,
+            'service' => 'fetch',
+            'domain' => 'knowledge',
+            'action' => 'fetched',
+            'time' => Carbon::parse('2026-03-09 04:30:00 UTC'),
+        ]);
+        Carbon::setTestNow('2026-03-08 16:00:00 UTC');
+
+        $this->process($integration, $webpage, 'spring-hash', 'Spring update', 'spring-run');
+
+        $this->assertSame('fetched', $nextLocalDay->fresh()->action);
+    }
+
+    #[Test]
+    public function autumn_fallback_includes_the_final_hour_of_the_local_day(): void
+    {
+        Queue::fake([ProcessTaskPipelineJob::class]);
+        [$integration, $webpage] = $this->subscription([], ['schedule_timezone' => 'America/New_York']);
+        $lateCurrentDay = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'target_id' => $webpage->id,
+            'service' => 'fetch',
+            'domain' => 'knowledge',
+            'action' => 'fetched',
+            'time' => Carbon::parse('2026-11-02 04:30:00 UTC'),
+        ]);
+        Carbon::setTestNow('2026-11-01 17:00:00 UTC');
+
+        $this->process($integration, $webpage, 'autumn-hash', 'Autumn update', 'autumn-run');
+
+        $this->assertSame('updated', $lateCurrentDay->fresh()->action);
+    }
+
+    private function subscription(array $metadata = [], array $configuration = []): array
     {
         $integration = Integration::factory()->create([
             'service' => 'fetch',
-            'configuration' => ['schedule_timezone' => 'UTC'],
+            'configuration' => array_merge(['schedule_timezone' => 'UTC'], $configuration),
         ]);
         $webpage = EventObject::factory()->create([
             'user_id' => $integration->user_id,

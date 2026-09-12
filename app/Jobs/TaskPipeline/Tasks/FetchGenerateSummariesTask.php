@@ -49,36 +49,17 @@ class FetchGenerateSummariesTask extends BaseTaskJob
 
         try {
             $summaries = $this->generateSummaries($extracted['title'], $articleText);
-
-            $this->createSummaryBlocks($event, $summaries);
-
-            $this->attachTags($event, $summaries);
-
-            $event->refresh();
-            $event->update([
-                'event_metadata' => array_merge($event->event_metadata ?? [], [
-                    'enrichment_status' => 'complete',
-                    'enriched_content_hash' => $event->event_metadata['content_hash'] ?? null,
-                    'enriched_at' => now()->toIso8601String(),
-                ]),
-            ]);
-
-            $this->withLatestRevision($event, function (EventObject $webpage) use ($event, $extracted): void {
-                $metadata = $webpage->metadata ?? [];
-                $metadata['author'] = $extracted['author'];
-                $metadata['image_url'] = $extracted['image'];
-                $metadata['direction'] = $extracted['direction'];
-                $metadata['pipeline_status'] = 'complete';
-                $metadata['enriched_content_hash'] = $event->event_metadata['content_hash'] ?? null;
-                $metadata['extracted_at'] = now()->toIso8601String();
-                $webpage->update(['metadata' => $metadata]);
-            });
+            $this->persistSummaries($event, $extracted, $summaries);
 
             Log::info('Fetch: Summaries generated via TaskPipeline', [
                 'event_id' => $event->id,
                 'webpage_id' => $webpage->id,
             ]);
         } catch (Exception $e) {
+            // Discard attributes mutated inside a rolled-back transaction before
+            // BaseTaskJob records the failed task attempt on this model instance.
+            $event->refresh();
+
             $this->withLatestRevision($event, function (EventObject $webpage) use ($e): void {
                 $metadata = $webpage->metadata ?? [];
                 $metadata['last_summary_error'] = $e->getMessage();
@@ -189,20 +170,45 @@ class FetchGenerateSummariesTask extends BaseTaskJob
         ]);
     }
 
-    private function attachTags(Event $event, array $summaries): void
+    private function persistSummaries(Event $event, array $extracted, array $summaries): void
     {
-        $eventTagSets = $this->tagSets($summaries);
-        $this->replaceAiTags($event, $eventTagSets);
+        DB::transaction(function () use ($event, $extracted, $summaries): void {
+            $webpage = EventObject::query()->lockForUpdate()->findOrFail($event->target_id);
+            $isLatestRevision = ($webpage->metadata['latest_event_id'] ?? null) === $event->id;
+            $eventTagSets = $this->tagSets($summaries);
 
-        $this->withLatestRevision($event, function (EventObject $webpage) use ($eventTagSets): void {
+            $this->createSummaryBlocks($event, $summaries);
+            $this->replaceAiTags($event, $eventTagSets);
+
+            $event->refresh();
+            $event->update([
+                'event_metadata' => array_merge($event->event_metadata ?? [], [
+                    'enrichment_status' => 'complete',
+                    'enriched_content_hash' => $event->event_metadata['content_hash'] ?? null,
+                    'enriched_at' => now()->toIso8601String(),
+                ]),
+            ]);
+
+            if (! $isLatestRevision) {
+                return;
+            }
+
             $this->replaceAiTags($webpage, $eventTagSets);
 
             $metadata = $webpage->metadata ?? [];
+            $metadata['author'] = $extracted['author'];
+            $metadata['image_url'] = $extracted['image'];
+            $metadata['direction'] = $extracted['direction'];
+            $metadata['pipeline_status'] = 'complete';
+            $metadata['enriched_content_hash'] = $event->event_metadata['content_hash'] ?? null;
+            $metadata['extracted_at'] = now()->toIso8601String();
+
             if (($metadata['fetch_mode'] ?? 'recurring') === 'once') {
                 $metadata['discovery_status'] = 'completed';
-                $webpage->update(['metadata' => $metadata]);
             }
-        });
+
+            $webpage->update(['metadata' => $metadata]);
+        }, 3);
     }
 
     private function tagSets(array $summaries): array
