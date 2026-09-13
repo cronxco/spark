@@ -64,10 +64,10 @@ class UpToSpeedController extends Controller
     private const FETCH_MONITORED_ACTIONS = ['fetched', 'updated'];
 
     /**
-     * How many candidate rows to pull per requested item before collapsing
-     * re-fetches. A monitored page can produce a handful of events inside the
-     * window — four for World in Brief on a normal day — so the query has to
-     * look past `limit` rows to still return `limit` distinct articles.
+     * How many candidate rows to retrieve at a time while collapsing re-fetches.
+     * A monitored page can produce a handful of events inside the window — four
+     * for World in Brief on a normal day — so loading in batches avoids pulling
+     * every candidate when the requested number of distinct articles is small.
      */
     private const NEWS_DEDUPE_FACTOR = 5;
 
@@ -370,11 +370,10 @@ class UpToSpeedController extends Controller
             ->whereHas('blocks', fn ($q) => $q->whereIn('block_type', $summaryBlockTypes))
             ->with(['blocks', 'target', 'actor'])
             ->orderBy('time', 'desc')
-            // Over-fetch, then collapse re-fetches of the same page, then trim.
-            // Limiting first would let one monitored page fill the whole queue.
-            // `$limit` is validated against MAX_NEWS_LIMIT, so this stays bounded.
-            ->limit($limit * self::NEWS_DEDUPE_FACTOR)
-            ->get()
+            // Collapse re-fetches before trimming. `lazy()` continues into the
+            // next batch when one page fills the current batch, until enough
+            // distinct articles have been found.
+            ->lazy($limit * self::NEWS_DEDUPE_FACTOR)
             ->unique(fn (Event $event): string => $event->target_id ?? $event->id)
             ->take($limit)
             ->values();
@@ -382,9 +381,9 @@ class UpToSpeedController extends Controller
         return $events->map(function (Event $event) use ($summaryBlockTypes): array {
             $blocks = $event->blocks->keyBy('block_type');
             $payload = [
-                'title' => $event->target?->title ?? $event->actor?->title ?? 'Untitled',
+                'title' => $event->displayTargetTitle() ?? $event->actor?->title ?? 'Untitled',
                 'source' => $event->service,
-                'url' => $event->url ?? $event->target?->url,
+                'url' => $event->displayTargetUrl(),
                 'time' => $event->time->toIso8601String(),
                 'tldr' => null,
                 'summary' => null,

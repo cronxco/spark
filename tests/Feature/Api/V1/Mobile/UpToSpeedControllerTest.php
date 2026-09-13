@@ -373,6 +373,10 @@ class UpToSpeedControllerTest extends TestCase
             'service' => 'fetch',
             'action' => 'fetched',
             'target_id' => $target->id,
+            'target_metadata' => [
+                'title' => 'World in Brief: snapshot',
+                'url' => 'https://example.test/world-in-brief-snapshot',
+            ],
             'time' => now()->subHours(2),
         ]);
 
@@ -389,8 +393,55 @@ class UpToSpeedControllerTest extends TestCase
 
         $this->assertNotNull($newsItem);
         $this->assertEquals($event->id, $newsItem['id']);
-        $this->assertEquals('World in Brief', $newsItem['payload']['title']);
+        $this->assertEquals('World in Brief: snapshot', $newsItem['payload']['title']);
+        $this->assertEquals('https://example.test/world-in-brief-snapshot', $newsItem['payload']['url']);
         $this->assertEquals('Oil disruption dominates the headlines.', $newsItem['payload']['tldr']);
+    }
+
+    /**
+     * A busy monitored page must not prevent older, distinct reading from
+     * filling the requested queue just because its repeated events span more
+     * than one candidate batch.
+     */
+    #[Test]
+    public function fills_the_news_limit_after_duplicate_fetches_exceed_a_candidate_batch(): void
+    {
+        $repeatedTarget = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $otherTarget = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        foreach (range(1, 11) as $minutesAgo) {
+            $event = Event::factory()->create([
+                'integration_id' => $this->knowledgeIntegration->id,
+                'domain' => 'knowledge',
+                'service' => 'fetch',
+                'action' => 'fetched',
+                'target_id' => $repeatedTarget->id,
+                'time' => now()->subMinutes($minutesAgo),
+            ]);
+
+            Block::factory()->create(['event_id' => $event->id, 'block_type' => 'fetch_tldr']);
+        }
+
+        $otherEvent = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'fetch',
+            'action' => 'fetched',
+            'target_id' => $otherTarget->id,
+            'time' => now()->subHours(1),
+        ]);
+        Block::factory()->create(['event_id' => $otherEvent->id, 'block_type' => 'fetch_tldr']);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $newsItems = collect($this->getJson('/api/v1/mobile/up-to-speed?news_limit=2')
+            ->assertOk()
+            ->json('items'))
+            ->where('type', 'news_summary')
+            ->values();
+
+        $this->assertCount(2, $newsItems);
+        $this->assertEquals($otherEvent->id, $newsItems[1]['id']);
     }
 
     /**
