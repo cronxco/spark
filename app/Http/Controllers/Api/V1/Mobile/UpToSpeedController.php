@@ -48,6 +48,30 @@ class UpToSpeedController extends Controller
     private const MAX_NEWS_LIMIT = 100;
 
     /**
+     * Fetch actions for a page the user monitors rather than bookmarks.
+     *
+     * Only "bookmarked" used to qualify, which quietly excluded every monitored
+     * page: The Economist's World in Brief is re-fetched through the day and so
+     * arrives as "fetched"/"updated". It had therefore never once appeared in
+     * Up to Speed, despite carrying a full set of summary blocks. A page the
+     * user asked Spark to watch is at least as much catch-up reading as one
+     * they bookmarked.
+     *
+     * Kept separate from "bookmarked", which stays service-agnostic: Karakeep
+     * bookmarks are knowledge-domain "bookmarked" events too, and scoping the
+     * whole clause to `service = fetch` would have dropped them.
+     */
+    private const FETCH_MONITORED_ACTIONS = ['fetched', 'updated'];
+
+    /**
+     * How many candidate rows to retrieve at a time while collapsing re-fetches.
+     * A monitored page can produce a handful of events inside the window — four
+     * for World in Brief on a normal day — so loading in batches avoids pulling
+     * every candidate when the requested number of distinct articles is small.
+     */
+    private const NEWS_DEDUPE_FACTOR = 5;
+
+    /**
      * GET /api/v1/mobile/up-to-speed
      *
      * Returns an ordered, typed queue of catch-up items for the mobile
@@ -307,6 +331,14 @@ class UpToSpeedController extends Controller
     }
 
     /**
+     * Reading material from the last 48 hours: bookmarks, monitored pages and
+     * newsletters, one card per article.
+     *
+     * Deduplicated by target, keeping the newest. A monitored page is re-fetched
+     * on a schedule and each fetch is its own event with its own summary, so
+     * without this The Economist's World in Brief alone would contribute four
+     * near-identical cards — and the freshest fetch is the one worth reading.
+     *
      * @param  Collection<int, mixed>  $integrationIds
      * @return array<int, array<string, mixed>>
      */
@@ -326,6 +358,10 @@ class UpToSpeedController extends Controller
             ->where(function ($q): void {
                 $q->where('action', 'bookmarked')
                     ->orWhere(function ($q): void {
+                        $q->where('service', 'fetch')
+                            ->whereIn('action', self::FETCH_MONITORED_ACTIONS);
+                    })
+                    ->orWhere(function ($q): void {
                         $q->where('service', 'newsletter')
                             ->where('action', 'received_post');
                     });
@@ -334,15 +370,20 @@ class UpToSpeedController extends Controller
             ->whereHas('blocks', fn ($q) => $q->whereIn('block_type', $summaryBlockTypes))
             ->with(['blocks', 'target', 'actor'])
             ->orderBy('time', 'desc')
-            ->limit($limit)
-            ->get();
+            // Collapse re-fetches before trimming. `lazy()` continues into the
+            // next batch when one page fills the current batch, until enough
+            // distinct articles have been found.
+            ->lazy($limit * self::NEWS_DEDUPE_FACTOR)
+            ->unique(fn (Event $event): string => $event->target_id ?? $event->id)
+            ->take($limit)
+            ->values();
 
         return $events->map(function (Event $event) use ($summaryBlockTypes): array {
             $blocks = $event->blocks->keyBy('block_type');
             $payload = [
-                'title' => $event->target?->title ?? $event->actor?->title ?? 'Untitled',
+                'title' => $event->displayTargetTitle() ?? $event->actor?->title ?? 'Untitled',
                 'source' => $event->service,
-                'url' => $event->url ?? $event->target?->url,
+                'url' => $event->displayTargetUrl(),
                 'time' => $event->time->toIso8601String(),
                 'tldr' => null,
                 'summary' => null,

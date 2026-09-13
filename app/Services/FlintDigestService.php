@@ -43,6 +43,7 @@ class FlintDigestService
             'blocks.*.answer_options' => ['nullable', 'array', 'max:20'],
             'blocks.*.answer_options.*' => ['string', 'max:255'],
             'blocks.*.day_context' => ['nullable', 'array'],
+            'blocks.*.day_context.date' => ['nullable', 'date_format:Y-m-d'],
             'blocks.*.day_context.calendar' => ['nullable', 'array', 'max:20'],
             'blocks.*.day_context.calendar.*.title' => ['required_with:blocks.*.day_context.calendar', 'string', 'max:255'],
             'blocks.*.day_context.calendar.*.all_day' => ['nullable', 'boolean'],
@@ -287,6 +288,11 @@ class FlintDigestService
      * rather than rejecting the whole digest write over one field the skill got
      * wrong — a validation failure here fails the entire routine run.
      *
+     * `date` is the local day the context describes: today for morning and
+     * afternoon editions, tomorrow for the evening one, whose reader has already
+     * had today. Null on anything written before the field existed, which the
+     * clients read as today.
+     *
      * @param  array<string, mixed>  $dayContext
      * @return array<string, mixed>
      */
@@ -308,6 +314,7 @@ class FlintDigestService
             ->all();
 
         return [
+            'date' => $dayContext['date'] ?? null,
             'calendar' => $calendar,
             'birthdays' => $birthdays,
             'weather' => $dayContext['weather'] ?? null,

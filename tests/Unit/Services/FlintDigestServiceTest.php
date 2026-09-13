@@ -165,6 +165,76 @@ class FlintDigestServiceTest extends TestCase
         $this->assertArrayNotHasKey('content', $block->metadata);
     }
 
+    /**
+     * The evening digest describes tomorrow — by the time it is read, today is
+     * over and what the reader needs from the opener is what happens next.
+     */
+    #[Test]
+    public function stores_the_day_a_context_block_describes(): void
+    {
+        $result = $this->service->create($this->user, [
+            'title' => 'Evening Digest',
+            'period' => 'evening',
+            'blocks' => [
+                [
+                    'block_type' => 'flint_day_context',
+                    'title' => 'Tomorrow at a glance',
+                    'day_context' => [
+                        'date' => '2026-05-11',
+                        'calendar' => [
+                            ['title' => 'Train to Penryn', 'all_day' => false, 'person' => 'will'],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $block = $this->firstBlock($result);
+
+        $this->assertSame('2026-05-11', $block->metadata['day_context']['date']);
+    }
+
+    /**
+     * Every digest written before the field existed described the day it was
+     * written on, so a null date has to survive rather than being invented.
+     */
+    #[Test]
+    public function day_context_date_is_null_when_the_skill_omits_it(): void
+    {
+        $result = $this->service->create($this->user, [
+            'title' => 'Morning Digest',
+            'blocks' => [
+                [
+                    'block_type' => 'flint_day_context',
+                    'title' => 'Today at a glance',
+                    'day_context' => ['calendar' => []],
+                ],
+            ],
+        ]);
+
+        $block = $this->firstBlock($result);
+
+        $this->assertArrayHasKey('date', $block->metadata['day_context']);
+        $this->assertNull($block->metadata['day_context']['date']);
+    }
+
+    #[Test]
+    public function rejects_a_malformed_day_context_date(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        $this->service->create($this->user, [
+            'title' => 'Morning Digest',
+            'blocks' => [
+                [
+                    'block_type' => 'flint_day_context',
+                    'title' => 'Today at a glance',
+                    'day_context' => ['date' => '11-05-2026', 'calendar' => []],
+                ],
+            ],
+        ]);
+    }
+
     #[Test]
     public function defaults_a_missing_person_to_will_rather_than_failing_the_whole_write(): void
     {

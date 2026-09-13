@@ -611,14 +611,32 @@ High readiness + an empty calendar is not a reason to hunt for a running window.
 Alongside the prose briefing, attach one `flint_day_context` block **on every run**
 (every period, not morning only) built from the same calendar (Step 4b) and weather
 (Step 6) grounding above — this is packaging the data already gathered, not a new
-research step. Spark's mobile client renders it directly as its own "Your day" screen,
-so it needs to be structured, not additional prose.
+research step. Spark's mobile client leads its catch-up flow with this block, so it
+needs to be structured, not additional prose.
+
+### Which day the block describes
+
+Set `date` explicitly, as `Y-m-d`, derived from the payload's `local_date` and never
+from the runtime clock:
+
+| Period | `date` | Why |
+|---|---|---|
+| morning | `local_date` | The day ahead. |
+| afternoon | `local_date` | Still the day ahead. |
+| evening | `local_date` **+ 1 day** | Today is over. What the reader needs next is tomorrow. |
+
+So the evening edition's `calendar`, `birthdays` and `weather` are **tomorrow's**, and
+its `title` should say so ("Tomorrow at a glance"). This is the one place the evening
+digest looks forward rather than back: the prose stays retrospective, the block does
+not. A client reading a block with no `date` treats it as today, which is what every
+digest written before this field meant.
 
 ```json
 {
   "block_type": "flint_day_context",
   "title": "Today at a glance",
   "day_context": {
+    "date": "2026-09-10",
     "calendar": [
       { "title": "Will · Office", "all_day": false, "start": "2026-09-10T09:00:00+01:00", "person": "will" },
       { "title": "Dan · Office", "all_day": false, "start": "2026-09-10T09:00:00+01:00", "person": "dan" }
@@ -631,10 +649,12 @@ so it needs to be structured, not additional prose.
 }
 ```
 
-`calendar` and `birthdays` are **today's** rows only (the wider plan-vs-actual window
-from Step 4b is for the prose, not this block). `weather` is a compact subset of the
-summary tool's output — today's headline condition/high/rain-chance for the
-contextually correct location, not the full forecast payload.
+`calendar` and `birthdays` are the rows for the day named in `date` only — today's for
+morning and afternoon, tomorrow's for evening (the wider plan-vs-actual window from Step
+4b is for the prose, not this block). `weather` is a compact subset of the summary tool's
+output — that same day's headline condition/high/rain-chance for the contextually correct
+location, not the full forecast payload. On a travel day that location is where the
+reader will actually be.
 
 A birthday is a fact about the day, not a commitment either of you is attending — put it
 in `birthdays` (title only) instead of `calendar`, and do not attempt to attribute it to
@@ -1345,7 +1365,8 @@ Before writing today's digest verify:
 - [ ] `answer_options` offered where the answer space is small, with an escape hatch;
 - [ ] any question unanswered for seven days retired in the editorial note;
 - [ ] a settled, persisting anomaly acknowledged rather than suppressed by hand again;
-- [ ] `flint_day_context` block attached with today's calendar + birthdays + weather,
+- [ ] `flint_day_context` block attached with `date` set from the payload's `local_date`
+      (evening: `local_date` + 1 day), and the calendar + birthdays + weather for that day,
       every `calendar` entry carrying a `person` decided by the title-attribution rule,
       birthdays kept out of `calendar` and left person-free;
 - [ ] any hourly weather / HA / Karakeep / Trek / refresh usage passed its relevance

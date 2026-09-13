@@ -128,6 +128,8 @@ class CreateFlintDigestTool extends Tool
                         ->items($schema->string())
                         ->description('For flint_user_question: optional multiple-choice answers. Omit for freeform.'),
                     'day_context' => $schema->object([
+                        'date' => $schema->string()
+                            ->description('The local day this context describes (Y-m-d): the payload\'s local_date for morning and afternoon, tomorrow for evening. Omit only if it is today.'),
                         'calendar' => $schema->array()
                             ->items($schema->object([
                                 'title' => $schema->string()->required(),
@@ -139,12 +141,12 @@ class CreateFlintDigestTool extends Tool
                                     ->required()
                                     ->description('"dan" only when the title names Dan/Daniel without also naming Will; "will" otherwise.'),
                             ]))
-                            ->description('Today\'s calendar rows for the Day screen — actual commitments, not birthdays.'),
+                            ->description('Calendar rows for the day named in `date` — actual commitments, not birthdays.'),
                         'birthdays' => $schema->array()
                             ->items($schema->object([
                                 'title' => $schema->string()->required(),
                             ]))
-                            ->description('Today\'s birthdays — title only, no person attribution.'),
+                            ->description('Birthdays on the day named in `date` — title only, no person attribution.'),
                         'weather' => $schema->object([
                             'location' => $schema->string(),
                             'condition' => $schema->string(),

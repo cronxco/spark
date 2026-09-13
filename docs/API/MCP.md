@@ -320,9 +320,12 @@ reference chips and linkified inline), and for `flint_user_question`:
 
 For `flint_day_context` — structured calendar + weather for the mobile "Your
 day" screen, built from the same grounding calls as the prose briefing —
-supply `day_context: { calendar: [{title, all_day, start, person}],
+supply `day_context: { date, calendar: [{title, all_day, start, person}],
 birthdays: [{title}], weather: {location, condition, temp_high_c,
-rain_probability_pct} }` instead of `content`. `person` is `"will"` or
+rain_probability_pct} }` instead of `content`. `date` (`Y-m-d`) is the day
+being described — the payload's `local_date` for morning and afternoon,
+`local_date` + 1 day for evening, whose reader has already had today. Omitted
+means today. `person` is `"will"` or
 `"dan"`, required on every `calendar` entry: `"dan"` only when the title
 names Dan/Daniel without also naming Will, `"will"` otherwise (including an
 unspecified title). A missing/invalid `person` is defaulted to `"will"`
