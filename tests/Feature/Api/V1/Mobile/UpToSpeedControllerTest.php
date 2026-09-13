@@ -354,6 +354,117 @@ class UpToSpeedControllerTest extends TestCase
         $this->assertEquals('fetch', $newsItem['payload']['source']);
     }
 
+    /**
+     * The Economist's World in Brief is a monitored page, not a bookmark, so it
+     * arrives as "fetched". Only "bookmarked" used to qualify, and it had
+     * therefore never once reached Up to Speed.
+     */
+    #[Test]
+    public function includes_monitored_fetch_pages(): void
+    {
+        $target = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'World in Brief',
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'fetch',
+            'action' => 'fetched',
+            'target_id' => $target->id,
+            'time' => now()->subHours(2),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_tldr',
+            'metadata' => ['content' => 'Oil disruption dominates the headlines.'],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $newsItem = $items->firstWhere('type', 'news_summary');
+
+        $this->assertNotNull($newsItem);
+        $this->assertEquals($event->id, $newsItem['id']);
+        $this->assertEquals('World in Brief', $newsItem['payload']['title']);
+        $this->assertEquals('Oil disruption dominates the headlines.', $newsItem['payload']['tldr']);
+    }
+
+    /**
+     * A monitored page is re-fetched through the day, each fetch its own event
+     * with its own summary. Without collapsing them the 48h window puts four
+     * near-identical World in Brief cards in the queue.
+     */
+    #[Test]
+    public function collapses_repeated_fetches_of_the_same_page_keeping_the_newest(): void
+    {
+        $target = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'World in Brief',
+        ]);
+
+        $newest = null;
+        foreach ([26, 14, 6, 1] as $index => $hoursAgo) {
+            $event = Event::factory()->create([
+                'integration_id' => $this->knowledgeIntegration->id,
+                'domain' => 'knowledge',
+                'service' => 'fetch',
+                'action' => $index === 1 ? 'updated' : 'fetched',
+                'target_id' => $target->id,
+                'time' => now()->subHours($hoursAgo),
+            ]);
+
+            Block::factory()->create([
+                'event_id' => $event->id,
+                'block_type' => 'fetch_tldr',
+                'metadata' => ['content' => "Summary from {$hoursAgo}h ago."],
+            ]);
+
+            $newest = $event;
+        }
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $newsItems = $items->where('type', 'news_summary')->values();
+
+        $this->assertCount(1, $newsItems);
+        $this->assertEquals($newest->id, $newsItems[0]['id']);
+        $this->assertEquals('Summary from 1h ago.', $newsItems[0]['payload']['tldr']);
+    }
+
+    /**
+     * Karakeep bookmarks are knowledge-domain "bookmarked" events on a different
+     * service, so the monitored-page clause must not be scoped in a way that
+     * drops them.
+     */
+    #[Test]
+    public function still_includes_bookmarks_from_other_services(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'karakeep',
+            'action' => 'bookmarked',
+            'time' => now()->subHours(3),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_tldr',
+            'metadata' => ['content' => 'A saved article.'],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+
+        $this->assertNotNull($items->firstWhere('id', $event->id));
+    }
+
     #[Test]
     public function excludes_bookmarks_without_summary_blocks(): void
     {

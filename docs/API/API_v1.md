@@ -768,6 +768,7 @@ references linkified) and an optional `references` array — except
     "title": "Today at a glance",
     "time": "2026-05-10T06:00:00+00:00",
     "day_context": {
+        "date": "2026-05-10",
         "calendar": [
             {
                 "title": "Will · Office",
@@ -792,6 +793,10 @@ references linkified) and an optional `references` array — except
     }
 }
 ```
+
+`date` is the local day (`Y-m-d`) the context describes: today for morning and afternoon
+digests, **tomorrow** for the evening one, whose reader has already had today. It may be
+absent on digests written before the field existed; clients read that as today.
 
 `person` on a `calendar` entry is always `"will"` or `"dan"` — never null or another
 value. `birthdays` entries carry no `person` — a birthday isn't a commitment either of
