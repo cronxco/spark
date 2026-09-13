@@ -34,14 +34,12 @@ timeout_seconds: 600
 
 # Spark Day Briefing — Async (Routine) Skill
 
-This is the scheduled/asynchronous counterpart to `spark-day-briefing`.
-
-It has two jobs on every run:
+This skill has two jobs on every run:
 
 1. **Pass One — close yesterday.** Read yesterday's Flint digest(s), collect answered
    questions, and write a durable Reflections section to yesterday's Outline day note.
 2. **Pass Two — brief today.** Build a grounded morning/afternoon/evening situational
-   awareness briefing and write it to Spark with optional insight blocks and normally
+   awareness briefing and write it to Spark with optional insight blocks and at least
    **one high-quality question**.
 
 Flint is an **editor**, not a dashboard and not an accountability bot. The job is to
@@ -87,9 +85,9 @@ structure. Fetch it fresh before writing.
    a particular question about it becomes stale.
 
 7. **Ask one useful question by default.** The normal digest contains **one** carefully
-   chosen `flint_user_question`. Two are allowed when they address genuinely independent,
-   consequential uncertainties. Zero is exceptional and should mean there truly was no
-   useful question that survived the quality and fatigue gates.
+   chosen `flint_user_question`. Two or three are allowed when they address genuinely 
+   independent, consequential uncertainties. Zero is exceptional and should mean there 
+   truly was no useful question that survived the quality and fatigue gates.
 
 8. **Absence is evidence only when coverage is adequate.** Partial or missing sync
    means “unknown”, not “didn't happen”.
@@ -172,10 +170,6 @@ Spark already owns the sleep-data release gate.
 
 A fallback is **not an error**. Proceed with the digest, lower confidence in missing
 morning Oura data, and let service status determine what can safely be said.
-
-Do not routinely trigger another Oura refresh just because the digest has started.
-If a specific material discrepancy later justifies an integration refresh and the tool
-is available, it may be used as an escalation source, but never poll waiting for it.
 
 There is no synchronous user in this Routine. Never call `ask_user_input_v0`.
 
@@ -429,27 +423,12 @@ Apply before drafting and again immediately before creating question blocks:
   unanswered.
 - Do not evade fatigue rules by paraphrasing essentially the same question.
 
-**Retire a question that has gone unanswered for seven days.** Silence is an answer:
-it means the question was not worth Will's time. Note it once in the editorial note's
-**Suppressed** line as retired, stop counting it against the fatigue budget for its
-subject, and do not carry it forward again. A subject can be raised afresh later if
-genuinely new evidence appears — but it starts clean rather than inheriting a stale
-open thread.
-
-Without this, an ignored question suppresses its whole subject indefinitely while
-appearing nowhere Will can see it. One question from 8 September sat open for five
-days doing exactly that.
-
-Spark retires the question itself. Seven days after it was asked, if it is still
+Spark retires the question itself; Seven days after it was asked, if it is still
 unanswered, the server stamps `retired_at` on the block and it stops counting toward
 the unanswered badge on every surface. Retirement is **not** deletion: the block stays
 in its digest, still renders — marked stale — and still accepts an answer. If Will
 answers a retired question, treat that answer as current: it outranks anything
 inferred, the same as any other answer.
-
-So do not ask Spark to retire anything; there is no tool for it and none is needed.
-Your part is editorial: note the retirement once so the digest says out loud that
-Flint has stopped waiting, and stop carrying the question forward.
 
 Do not persist this short-term editorial register. The durable memory already lives in
 Topics; recent digest history is intentionally transient.
@@ -478,7 +457,7 @@ Use `fastmail__search_events`.
 Classify mentally:
 
 - **Commitment:** appointment, meeting, meal, flight, event, booking.
-- **Day context:** office/WFH/on-call/leave/travel marker.
+- **Day context:** office/WFH/on-call/leave/travel marker. (these may be outdated, especially the office/home routines)
 - **Background marker:** birthday, multi-day exhibition, broad reminder.
 
 Use interval overlap, not start-date equality: multi-day events can begin before the
@@ -502,7 +481,7 @@ Will's plan.
 
 ### 4c. Fastmail email — targeted only
 
-Search only for email likely to change the briefing: travel disruption, booking
+Search for email likely to change the briefing: travel disruption, booking
 changes, reservation reminders, urgent/important logistics.
 
 Prefer specific entities from calendar/day notes/active relevant Topics — flight
@@ -546,16 +525,11 @@ Examples:
 - No workout on a fully synced completed day can be factual; the same absence during
   partial sync cannot.
 
-### Media — the domain this routine kept forgetting
+### Media
 
 `get-day-summary-tool` returns a `media` section alongside health, money and
-knowledge, and it is the highest-volume data Spark holds: Spotify alone posts well over
-a hundred events on an ordinary day. This routine went a full week without mentioning
-it once, while the conversational `spark-day-briefing` skill covered it throughout —
-so read `sections.media` on every run.
-
-From `listening_sessions[]`: the time range, track count, top artist, and the session
-description. For individual tracks, `spark__get-events-by-filter-tool(service:
+knowledge. From `listening_sessions[]`: the time range, track count, top artist, and the 
+session description. For individual tracks, `spark__get-events-by-filter-tool(service:
 "spotify")` — but only when a session summary is genuinely too vague to say anything,
 not as routine enrichment. Untappd check-ins live in the same section; surface beer
 names and ratings when present.
@@ -567,8 +541,6 @@ apparent shape. It never earns a line as a statistic: "You played 124 tracks" is
 database fact, not an observation. On most days the right amount of media in the
 briefing is none, and that is a judgement made after reading the section rather than
 by ignoring it.
-
-Do not infer mood from listening. A sad album is not evidence of a sad day.
 
 ### Morning Oura confidence
 
@@ -866,18 +838,6 @@ If travel is materially relevant, attempt Trek for itinerary/reservation context
 If unavailable/disabled, continue with calendar + day note + mail. Do not turn the
 tool failure into briefing content.
 
-### Integration refresh — exceptional
-
-Do not routinely refresh integrations at the start of the run.
-
-A targeted refresh is allowed only when:
-
-- a source appears materially stale;
-- the missing/revised value could change the briefing;
-- the refresh tool is available.
-
-Fire once. Do not poll or delay the digest waiting for it.
-
 ## Step 9: Editorial planning
 
 This happens before prose.
@@ -933,9 +893,9 @@ Standard grounding calls do **not** count:
 - service status;
 - normal weather summary.
 
-After grounding, allow **2 editorial drill-down calls** by default.
+After grounding, allow **2-3 editorial drill-down calls** by default.
 
-A third is allowed only to verify/correct a potentially misleading material claim.
+An extra one is allowed to verify/correct a potentially misleading material claim.
 
 Research should answer a question raised by the evidence. The fact that Flint spent a
 tool call investigating something does not make that thing important.
@@ -948,7 +908,7 @@ There is no synchronous pause. A worthwhile ambiguity becomes a
 **Default outcome: exactly 1 question.**
 
 - **1 question** → normal and preferred.
-- **2 questions** → only when both are independently useful and neither dilutes the
+- **2-3 questions** → only when each are independently useful and neither dilutes the
   other.
 - **0 questions** → exceptional. Use only when every plausible question is repetitive,
   low-value, already answered by available evidence, or pure curiosity.
@@ -1063,9 +1023,9 @@ When choosing zero, record a brief reason in the editorial note, e.g.:
 
 That makes zero an editorial decision rather than the default.
 
-#### Second-question bar
+#### Second/third-question bar
 
-A second question must:
+A second or third question must:
 
 - concern a different substantive issue;
 - independently pass the full quality gate;
@@ -1151,7 +1111,7 @@ Do not create generic blocks such as:
 Advice is appropriate only when there is a real decision, explicit goal/plan, or
 sufficiently strong evidence.
 
-## 10d. Question blocks — normally 1
+## 10d. Question blocks — normally 1, up to 3
 
 For each approved question:
 
@@ -1355,7 +1315,7 @@ Before writing today's digest verify:
 - [ ] Topic memory and recent digest history kept conceptually separate;
 - [ ] relevant day notes checked;
 - [ ] Fastmail calendar checked for today/tomorrow;
-- [ ] targeted mail checked only where useful;
+- [ ] targeted mail checked where useful;
 - [ ] Spark day summary fetched;
 - [ ] Spark service status checked before interpreting absence/totals;
 - [ ] fallback morning data treated as unavailable rather than absent;
@@ -1379,7 +1339,7 @@ Before writing today's digest verify:
 - [ ] repeated unanswered questions are suppressed;
 - [ ] one high-quality question was actively sought;
 - [ ] zero questions, if chosen, has an explicit editorial reason;
-- [ ] a second question, if used, independently clears the quality bar;
+- [ ] a second/third question, if used, independently clears the quality bar;
 - [ ] insights are useful but not forced into actionability;
 - [ ] corrections are explicit if source data changed;
 - [ ] no Topic writes were made;
