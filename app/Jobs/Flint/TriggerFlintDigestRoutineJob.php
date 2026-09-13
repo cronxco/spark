@@ -46,16 +46,16 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
      * ride out a transient failure, few enough that a broken routine does not
      * retry until midnight.
      */
-    private const MAX_SCHEDULED_ATTEMPTS = 3;
+    private const MAX_SCHEDULED_ATTEMPTS = 2;
 
-    public int $tries = 3;
+    public int $tries = 2;
 
     public int $timeout = 660;
 
     public bool $failOnTimeout = true;
 
     /** @var array<int, int> */
-    public array $backoff = [30, 120, 300];
+    public array $backoff = [30];
 
     public string $runUuid;
 
@@ -71,6 +71,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         public bool $force = false,
         ?string $runUuid = null,
         public ?int $progressId = null,
+        public ?string $driverOverride = null,
     ) {
         $this->runUuid = $runUuid ?? (string) Str::uuid();
         $this->runToken = app(FlintRunToken::class)->issue([
@@ -129,20 +130,20 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             return;
         }
 
-        // The grace window has lapsed and no digest exists, so this is a retry.
-        // Cap it: a routine that is broken should not be re-triggered every half
-        // hour until midnight.
         if ($this->isScheduled()) {
             $attemptsKey = self::attemptsKey($this->user->id, $this->localDate, $this->period);
             Cache::add($attemptsKey, 0, $this->attemptsTtlSeconds());
 
-            if (Cache::increment($attemptsKey) > self::MAX_SCHEDULED_ATTEMPTS) {
+            if ((int) Cache::get($attemptsKey, 0) >= self::MAX_SCHEDULED_ATTEMPTS) {
                 Log::warning('Flint routine trigger skipped (attempt limit reached)', [
                     'user_id' => $this->user->id,
                     'period' => $this->period,
                     'local_date' => $this->localDate,
                     'max_attempts' => self::MAX_SCHEDULED_ATTEMPTS,
                 ]);
+
+                Cache::put($markerKey, 'terminal-failure', $this->attemptsTtlSeconds());
+                $this->recordTerminalFailure('Flint routine produced no digest after two attempts.');
 
                 return;
             }
@@ -152,6 +153,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         $task = $this->taskDefinition();
         $store = app(TaskExecutionStore::class);
         $progress = $this->progress();
+        $selectedDriver = app(RoutineDriverManager::class)->driverName('digest', $this->driverOverride);
 
         $store->recordStatus($integration, $task, 'pending', [
             'triggered_by' => $this->triggerReason,
@@ -159,6 +161,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             'run_uuid' => $this->runUuid,
             'local_date' => $this->localDate,
             'period' => $this->period,
+            'driver' => $selectedDriver,
             'error' => null,
         ]);
 
@@ -175,8 +178,12 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
 
         $driver = app(RoutineDriverManager::class);
 
+        if ($this->isScheduled()) {
+            Cache::increment(self::attemptsKey($this->user->id, $this->localDate, $this->period));
+        }
+
         try {
-            $result = $driver->for('digest')->run($this->user, 'digest', $payload, $progress);
+            $result = $driver->for('digest', $this->driverOverride)->run($this->user, 'digest', $payload, $progress);
         } catch (Throwable $exception) {
             $store->recordStatus($integration, $task, 'retrying', [
                 'triggered_by' => $this->triggerReason,
@@ -184,6 +191,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
                 'run_uuid' => $this->runUuid,
                 'local_date' => $this->localDate,
                 'period' => $this->period,
+                'driver' => $selectedDriver,
                 'attempts' => $this->attempts(),
                 'error' => redact_sensitive_urls($exception->getMessage()),
             ]);
@@ -202,6 +210,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
                 'run_uuid' => $this->runUuid,
                 'local_date' => $this->localDate,
                 'period' => $this->period,
+                'driver' => $selectedDriver,
                 'error' => null,
             ] + $result->details);
             $progress?->markFailed((string) ($result->details['reason'] ?? 'Routine is not configured.'));
@@ -215,6 +224,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             'run_uuid' => $this->runUuid,
             'local_date' => $this->localDate,
             'period' => $this->period,
+            'driver' => $selectedDriver,
         ] + $result->details, promoteSuccess: $this->isScheduled());
         $progress?->markCompleted($result->details);
 
@@ -230,8 +240,11 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
     public function failed(?Throwable $exception): void
     {
         $markerKey = self::markerKey($this->user->id, $this->localDate, $this->period);
-        if ($this->isScheduled() && Cache::get($markerKey) === $this->runUuid) {
-            Cache::forget($markerKey);
+        if ($this->isScheduled()) {
+            $attempts = (int) Cache::get(self::attemptsKey($this->user->id, $this->localDate, $this->period), 0);
+            $attempts >= self::MAX_SCHEDULED_ATTEMPTS
+                ? Cache::put($markerKey, 'terminal-failure', $this->attemptsTtlSeconds())
+                : Cache::forget($markerKey);
         }
 
         $integration = app(FlintDigestService::class)->resolveIntegration($this->user);
@@ -241,6 +254,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             'run_uuid' => $this->runUuid,
             'local_date' => $this->localDate,
             'period' => $this->period,
+            'driver' => app(RoutineDriverManager::class)->driverName('digest', $this->driverOverride),
             'attempts' => $this->attempts(),
             'completed_at' => now()->toIso8601String(),
             'error' => redact_sensitive_urls($exception?->getMessage() ?? 'Flint routine failed.'),
@@ -324,5 +338,22 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
     private function progress(): ?ActionProgress
     {
         return $this->progressId ? ActionProgress::find($this->progressId) : null;
+    }
+
+    private function recordTerminalFailure(string $message): void
+    {
+        $integration = app(FlintDigestService::class)->resolveIntegration($this->user);
+        app(TaskExecutionStore::class)->recordStatus($integration, $this->taskDefinition(), 'failed', [
+            'triggered_by' => $this->triggerReason,
+            'trigger_source' => 'scheduled',
+            'run_uuid' => $this->runUuid,
+            'local_date' => $this->localDate,
+            'period' => $this->period,
+            'driver' => app(RoutineDriverManager::class)->driverName('digest', $this->driverOverride),
+            'attempts' => self::MAX_SCHEDULED_ATTEMPTS,
+            'completed_at' => now()->toIso8601String(),
+            'error' => $message,
+        ], promoteSuccess: false);
+        $this->progress()?->markFailed($message);
     }
 }

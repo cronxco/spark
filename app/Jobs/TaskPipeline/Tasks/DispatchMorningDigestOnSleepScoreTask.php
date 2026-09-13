@@ -5,6 +5,7 @@ namespace App\Jobs\TaskPipeline\Tasks;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Services\EffectiveTimezoneResolver;
+use App\Services\Flint\FlintScheduleSettings;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -30,7 +31,7 @@ class DispatchMorningDigestOnSleepScoreTask extends BaseTaskJob
         }
 
         $settings = $user->settings['flint'] ?? [];
-        if (! ($settings['digests_enabled'] ?? false)) {
+        if (! FlintScheduleSettings::enabled($settings, 'morning_digest_enabled')) {
             return;
         }
 

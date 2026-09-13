@@ -12,6 +12,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 class TriggerFlintRoutineJobTest extends TestCase
@@ -201,6 +202,36 @@ class TriggerFlintRoutineJobTest extends TestCase
         $this->assertSame('manual', collect($execution->history)->last()['trigger_source']);
         $this->assertCount(2, $execution->history);
         Http::assertSentCount(2);
+    }
+
+    #[Test]
+    public function scheduled_driver_invocations_stop_after_two_failures_but_manual_runs_remain_available(): void
+    {
+        Http::fakeSequence()
+            ->push(['error' => 'first'], 500)
+            ->push(['error' => 'second'], 500)
+            ->push(['ok' => true], 200);
+
+        $job = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York');
+        foreach ([1, 2] as $attempt) {
+            try {
+                $job->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+            } catch (RequestException) {
+                // Simulate the queue's one retry.
+            }
+        }
+        $job->failed(new RuntimeException('terminal'));
+
+        (new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York'))
+            ->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+
+        $manual = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York', true);
+        $manual->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+
+        Http::assertSentCount(3);
+        $this->assertSame('manual', collect(
+            TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail()->history
+        )->last()['trigger_source']);
     }
 
     private function runJob(string $routine = 'topics'): void

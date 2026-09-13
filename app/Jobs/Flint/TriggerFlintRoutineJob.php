@@ -4,6 +4,7 @@ namespace App\Jobs\Flint;
 
 use App\Models\ActionProgress;
 use App\Models\Event;
+use App\Models\Integration;
 use App\Models\User;
 use App\Services\Flint\FlintRunToken;
 use App\Services\Flint\RoutineConfig;
@@ -40,14 +41,16 @@ class TriggerFlintRoutineJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    private const MAX_SCHEDULED_ATTEMPTS = 2;
+
+    public int $tries = 2;
 
     public int $timeout = 660;
 
     public bool $failOnTimeout = true;
 
     /** @var array<int, int> */
-    public array $backoff = [30, 120, 300];
+    public array $backoff = [30];
 
     public string $runUuid;
 
@@ -62,6 +65,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
         ?string $runUuid = null,
         public ?int $progressId = null,
         public ?string $requestedPeriod = null,
+        public ?string $driverOverride = null,
     ) {
         $this->runUuid = $runUuid ?? (string) Str::uuid();
         $this->runToken = app(FlintRunToken::class)->issue([
@@ -84,6 +88,11 @@ class TriggerFlintRoutineJob implements ShouldQueue
         return "flint:routine-triggered:{$routine}:{$userId}:{$localDate}";
     }
 
+    public static function attemptsKey(int|string $userId, string $localDate, string $routine): string
+    {
+        return "flint:routine-attempts:{$routine}:{$userId}:{$localDate}";
+    }
+
     public function handle(FlintDigestService $digests, TaskExecutionStore $store): void
     {
         if ($this->routine === 'digest' || ! RoutineConfig::isKnown($this->routine)) {
@@ -98,6 +107,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
         $integration = $digests->resolveIntegration($this->user);
         $task = $this->taskDefinition();
         $driver = app(RoutineDriverManager::class);
+        $selectedDriver = $driver->driverName($this->routine, $this->driverOverride);
         $markerKey = self::markerKey($this->user->id, $this->localDate, $this->routine);
 
         if ($this->isScheduled()
@@ -126,6 +136,17 @@ class TriggerFlintRoutineJob implements ShouldQueue
             return;
         }
 
+        if ($this->isScheduled()) {
+            $attemptsKey = self::attemptsKey($this->user->id, $this->localDate, $this->routine);
+            Cache::add($attemptsKey, 0, $this->markerTtlSeconds());
+            if ((int) Cache::get($attemptsKey, 0) >= self::MAX_SCHEDULED_ATTEMPTS) {
+                Cache::put($markerKey, 'terminal-failure', $this->markerTtlSeconds());
+                $this->recordTerminalFailure($store, $integration, 'Flint routine failed after two attempts.');
+
+                return;
+            }
+        }
+
         $lastSuccess = $store->getTaskExecutions($integration)[$task->key]['last_success'] ?? null;
 
         if ($this->isScheduled()
@@ -147,6 +168,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'run_uuid' => $this->runUuid,
             'triggered_by' => $this->isScheduled() ? 'scheduled' : 'manual',
             'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
+            'driver' => $selectedDriver,
             'error' => null,
         ]);
 
@@ -162,14 +184,19 @@ class TriggerFlintRoutineJob implements ShouldQueue
 
         $progress = $this->progress();
 
+        if ($this->isScheduled()) {
+            Cache::increment(self::attemptsKey($this->user->id, $this->localDate, $this->routine));
+        }
+
         try {
-            $result = $driver->for($this->routine)->run($this->user, $this->routine, $payload, $progress);
+            $result = $driver->for($this->routine, $this->driverOverride)->run($this->user, $this->routine, $payload, $progress);
         } catch (Throwable $exception) {
             $store->recordStatus($integration, $task, 'retrying', [
                 'local_date' => $this->localDate,
                 'period' => $this->period(),
                 'run_uuid' => $this->runUuid,
                 'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
+                'driver' => $selectedDriver,
                 'attempts' => $this->attempts(),
                 'error' => redact_sensitive_urls($exception->getMessage()),
             ]);
@@ -187,6 +214,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
                 'period' => $this->period(),
                 'run_uuid' => $this->runUuid,
                 'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
+                'driver' => $selectedDriver,
                 'error' => null,
             ] + $result->details);
             $progress?->markFailed((string) ($result->details['reason'] ?? 'Routine is not configured.'));
@@ -200,6 +228,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'run_uuid' => $this->runUuid,
             'triggered_by' => $this->isScheduled() ? 'scheduled' : 'manual',
             'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
+            'driver' => $selectedDriver,
         ] + $result->details, promoteSuccess: $this->isScheduled());
         $progress?->markCompleted($result->details);
 
@@ -208,15 +237,18 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'routine' => $this->routine,
             'local_date' => $this->localDate,
             'timezone' => $this->timezone,
-            'driver' => $driver->driverName($this->routine),
+            'driver' => $selectedDriver,
         ]);
     }
 
     public function failed(?Throwable $exception): void
     {
         $markerKey = self::markerKey($this->user->id, $this->localDate, $this->routine);
-        if ($this->isScheduled() && Cache::get($markerKey) === $this->runUuid) {
-            Cache::forget($markerKey);
+        if ($this->isScheduled()) {
+            $attempts = (int) Cache::get(self::attemptsKey($this->user->id, $this->localDate, $this->routine), 0);
+            $attempts >= self::MAX_SCHEDULED_ATTEMPTS
+                ? Cache::put($markerKey, 'terminal-failure', $this->markerTtlSeconds())
+                : Cache::forget($markerKey);
         }
 
         $integration = app(FlintDigestService::class)->resolveIntegration($this->user);
@@ -226,6 +258,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'run_uuid' => $this->runUuid,
             'triggered_by' => $this->isScheduled() ? 'scheduled' : 'manual',
             'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
+            'driver' => app(RoutineDriverManager::class)->driverName($this->routine, $this->driverOverride),
             'attempts' => $this->attempts(),
             'completed_at' => now()->toIso8601String(),
             'error' => redact_sensitive_urls($exception?->getMessage() ?? 'Flint routine failed.'),
@@ -299,5 +332,21 @@ class TriggerFlintRoutineJob implements ShouldQueue
             ->where('event_metadata->local_date', $this->localDate)
             ->where('event_metadata->period', $this->period())
             ->exists();
+    }
+
+    private function recordTerminalFailure(TaskExecutionStore $store, Integration $integration, string $message): void
+    {
+        $store->recordStatus($integration, $this->taskDefinition(), 'failed', [
+            'local_date' => $this->localDate,
+            'period' => $this->period(),
+            'run_uuid' => $this->runUuid,
+            'triggered_by' => 'scheduled',
+            'trigger_source' => 'scheduled',
+            'driver' => app(RoutineDriverManager::class)->driverName($this->routine, $this->driverOverride),
+            'attempts' => self::MAX_SCHEDULED_ATTEMPTS,
+            'completed_at' => now()->toIso8601String(),
+            'error' => $message,
+        ], promoteSuccess: false);
+        $this->progress()?->markFailed($message);
     }
 }

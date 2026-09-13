@@ -10,6 +10,7 @@ use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\EffectiveTimezoneResolver;
+use App\Services\Flint\FlintScheduleSettings;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -96,9 +97,12 @@ Schedule::call(function () {
         ->where('event_metadata->day', $localDate)
         ->value('id');
 
-    $users = User::whereNotNull('settings->flint->digests_enabled')
-        ->where('settings->flint->digests_enabled', '!=', false)
-        ->get();
+    $users = User::query()->where(function ($query) {
+        $query->whereNotNull('settings->flint->digests_enabled');
+        foreach (FlintScheduleSettings::ENABLED_KEYS as $key) {
+            $query->orWhereNotNull("settings->flint->{$key}");
+        }
+    })->get();
 
     foreach ($users as $user) {
         $settings = $user->settings['flint'] ?? [];
@@ -117,7 +121,8 @@ Schedule::call(function () {
 
         // Evening digest: pure time gate at the configured evening slot.
         $eveningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'evening');
-        if ($now->gte(Carbon::parse($eveningTime, $tz)) && ! Cache::has($eveningMarker)) {
+        if (FlintScheduleSettings::enabled($settings, 'evening_digest_enabled')
+            && $now->gte(Carbon::parse($eveningTime, $tz)) && ! Cache::has($eveningMarker)) {
             dispatch(new TriggerFlintDigestRoutineJob($user, 'evening', $today, $tz, 'scheduled'))
                 ->onQueue('flint');
         }
@@ -127,7 +132,8 @@ Schedule::call(function () {
         // (Low-latency firing when sleep lands after the slot is handled by
         // DispatchMorningDigestOnSleepScoreTask; this is the backstop.)
         $morningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'morning');
-        if ($now->gte(Carbon::parse($morningTime, $tz)) && ! Cache::has($morningMarker)) {
+        if (FlintScheduleSettings::enabled($settings, 'morning_digest_enabled')
+            && $now->gte(Carbon::parse($morningTime, $tz)) && ! Cache::has($morningMarker)) {
             $sleepEventId = $sleepScoreEventIdFor($user, $today);
 
             if ($sleepEventId !== null) {
@@ -153,9 +159,12 @@ Schedule::call(function () {
 Schedule::call(function () {
     $resolver = app(EffectiveTimezoneResolver::class);
 
-    $users = User::whereNotNull('settings->flint->digests_enabled')
-        ->where('settings->flint->digests_enabled', '!=', false)
-        ->get();
+    $users = User::query()->where(function ($query) {
+        $query->whereNotNull('settings->flint->digests_enabled');
+        foreach (FlintScheduleSettings::ENABLED_KEYS as $key) {
+            $query->orWhereNotNull("settings->flint->{$key}");
+        }
+    })->get();
 
     foreach ($users as $user) {
         $settings = $user->settings['flint'] ?? [];
@@ -164,6 +173,9 @@ Schedule::call(function () {
         $today = $resolver->today($user)->toDateString();
 
         foreach (['topics' => 'topics_time', 'reading_list' => 'reading_list_time', 'news_roundup' => 'news_roundup_time'] as $routine => $settingKey) {
+            if (! FlintScheduleSettings::enabled($settings, "{$routine}_enabled")) {
+                continue;
+            }
             $slot = $settings[$settingKey] ?? config("services.flint_routine.{$settingKey}");
             $marker = TriggerFlintRoutineJob::markerKey($user->id, $today, $routine);
 

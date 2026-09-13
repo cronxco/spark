@@ -266,7 +266,11 @@ class FlintPageTest extends TestCase
     public function saving_settings_writes_the_keys_the_dispatcher_reads(): void
     {
         Volt::test('flint.index')
-            ->set('digestsEnabled', true)
+            ->set('morningDigestEnabled', true)
+            ->set('eveningDigestEnabled', true)
+            ->set('topicsEnabled', true)
+            ->set('readingListEnabled', true)
+            ->set('newsRoundupEnabled', true)
             ->set('morningTimeWeekday', '06:45')
             ->set('morningTimeWeekend', '09:00')
             ->set('morningFallback', '11:30')
@@ -295,6 +299,45 @@ class FlintPageTest extends TestCase
         Volt::test('flint.index')->call('save');
 
         $this->assertSame('keep me', $this->user->refresh()->settings['flint']['some_other_key']);
+    }
+
+    #[Test]
+    public function legacy_digest_setting_hydrates_all_independent_switches(): void
+    {
+        $this->user->update(['settings' => ['flint' => ['digests_enabled' => false]]]);
+
+        Volt::test('flint.index')
+            ->assertSet('morningDigestEnabled', false)
+            ->assertSet('eveningDigestEnabled', false)
+            ->assertSet('topicsEnabled', false)
+            ->assertSet('readingListEnabled', false)
+            ->assertSet('newsRoundupEnabled', false);
+    }
+
+    #[Test]
+    public function explicit_switches_override_legacy_and_save_a_derived_compatibility_flag(): void
+    {
+        $this->user->update(['settings' => ['flint' => [
+            'digests_enabled' => false,
+            'morning_digest_enabled' => true,
+            'some_other_key' => 'keep me',
+        ]]]);
+
+        Volt::test('flint.index')
+            ->assertSet('morningDigestEnabled', true)
+            ->assertSet('eveningDigestEnabled', false)
+            ->set('morningDigestEnabled', false)
+            ->set('newsRoundupEnabled', true)
+            ->call('save');
+
+        $settings = $this->user->refresh()->settings['flint'];
+        $this->assertFalse($settings['morning_digest_enabled']);
+        $this->assertFalse($settings['evening_digest_enabled']);
+        $this->assertFalse($settings['topics_enabled']);
+        $this->assertFalse($settings['reading_list_enabled']);
+        $this->assertTrue($settings['news_roundup_enabled']);
+        $this->assertTrue($settings['digests_enabled']);
+        $this->assertSame('keep me', $settings['some_other_key']);
     }
 
     private function createDigest(array $metadata = [], ?Carbon $time = null): Event
