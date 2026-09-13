@@ -4,6 +4,7 @@ namespace Tests\Feature\Flint;
 
 use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
+use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Jobs\TaskPipeline\Tasks\DispatchMorningDigestOnSleepScoreTask;
 use App\Jobs\TaskPipeline\Tasks\NotifyOnDigestReadyTask;
 use App\Models\Event;
@@ -129,6 +130,24 @@ class FlintDigestSchedulingTest extends TestCase
 
         // 06:00 NY: before the 07:30 weekday slot.
         Carbon::setTestNow('2026-06-15 10:00:00');
+
+        $task = TaskRegistry::getTask('dispatch_morning_digest_on_sleep_score');
+        (new DispatchMorningDigestOnSleepScoreTask($sleep, $task))->handle();
+
+        Bus::assertNotDispatched(TriggerFlintDigestRoutineJob::class);
+    }
+
+    #[Test]
+    public function sleep_task_respects_only_the_morning_briefing_switch(): void
+    {
+        Bus::fake();
+        $user = $this->newYorkUser();
+        $settings = $user->settings;
+        $settings['flint']['morning_digest_enabled'] = false;
+        $settings['flint']['evening_digest_enabled'] = true;
+        $user->update(['settings' => $settings]);
+        $sleep = $this->seedSleepScore($user, '2026-06-15');
+        Carbon::setTestNow('2026-06-15 12:00:00');
 
         $task = TaskRegistry::getTask('dispatch_morning_digest_on_sleep_score');
         (new DispatchMorningDigestOnSleepScoreTask($sleep, $task))->handle();
@@ -266,6 +285,46 @@ class FlintDigestSchedulingTest extends TestCase
         });
     }
 
+    #[Test]
+    public function morning_and_evening_briefing_switches_are_independent(): void
+    {
+        Bus::fake();
+        $user = $this->newYorkUser();
+        $settings = $user->settings;
+        $settings['flint']['morning_digest_enabled'] = false;
+        $settings['flint']['evening_digest_enabled'] = true;
+        $user->update(['settings' => $settings]);
+        $this->seedSleepScore($user, '2026-06-15');
+        Carbon::setTestNow('2026-06-15 23:30:00');
+
+        $this->runDispatcher();
+
+        Bus::assertNotDispatched(TriggerFlintDigestRoutineJob::class, fn ($job) => $job->period === 'morning');
+        Bus::assertDispatched(TriggerFlintDigestRoutineJob::class, fn ($job) => $job->period === 'evening');
+    }
+
+    #[Test]
+    public function each_non_digest_scheduler_uses_its_own_switch(): void
+    {
+        Bus::fake();
+        $user = $this->newYorkUser();
+        $settings = $user->settings;
+        $settings['flint'] = array_merge($settings['flint'], [
+            'digests_enabled' => true,
+            'topics_enabled' => true,
+            'reading_list_enabled' => false,
+            'news_roundup_enabled' => false,
+        ]);
+        $user->update(['settings' => $settings]);
+        Carbon::setTestNow('2026-06-16 02:00:00'); // 22:00 on the 15th in New York
+
+        $this->runRoutineDispatcher();
+
+        Bus::assertDispatched(TriggerFlintRoutineJob::class, fn ($job) => $job->routine === 'topics');
+        Bus::assertNotDispatched(TriggerFlintRoutineJob::class, fn ($job) => $job->routine === 'reading_list');
+        Bus::assertNotDispatched(TriggerFlintRoutineJob::class, fn ($job) => $job->routine === 'news_roundup');
+    }
+
     /**
      * Create a user with digests enabled whose effective timezone is New York.
      */
@@ -318,6 +377,17 @@ class FlintDigestSchedulingTest extends TestCase
 
         $this->assertNotNull($event, 'flint-digest-dispatcher schedule not found');
 
+        $property = new ReflectionProperty($event, 'callback');
+        $property->setAccessible(true);
+        app()->call($property->getValue($event));
+    }
+
+    private function runRoutineDispatcher(): void
+    {
+        $event = collect(app(Schedule::class)->events())
+            ->first(fn ($event) => ($event->description ?? null) === 'flint-routine-dispatcher');
+
+        $this->assertNotNull($event, 'flint-routine-dispatcher schedule not found');
         $property = new ReflectionProperty($event, 'callback');
         $property->setAccessible(true);
         app()->call($property->getValue($event));

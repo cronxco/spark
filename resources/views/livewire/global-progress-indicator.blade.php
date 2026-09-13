@@ -22,10 +22,10 @@ new class extends Component
     }
 
     #[On('run-flint-routine')]
-    public function runFlintRoutine(?string $skill = null, ?string $routine = null, string $period = 'morning'): void
+    public function runFlintRoutine(?string $skill = null, ?string $routine = null, string $period = 'morning', ?string $driverOverride = null, ?string $driver = null): void
     {
         try {
-            app(FlintRunDispatcher::class)->dispatch(Auth::user(), skill: $skill, routine: $routine, period: $period);
+            app(FlintRunDispatcher::class)->dispatch(Auth::user(), skill: $skill, routine: $routine, period: $period, driverOverride: $driverOverride, driver: $driver);
         } catch (InvalidArgumentException) {
             return;
         }

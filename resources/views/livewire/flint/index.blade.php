@@ -3,21 +3,29 @@
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Services\AgentWorkingMemoryService;
+use App\Services\Ai\AiUsageSummary;
+use App\Services\Flint\FlintScheduleSettings;
 use App\Services\FlintTopicService;
 use App\Support\FlintDigestKind;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
-new class extends Component {
+new class extends Component
+{
     use Toast;
 
     public string $activeTab = 'today';
 
     // --- Settings (mirrors the keys the flint-digest-dispatcher actually reads) ---
-    public bool $digestsEnabled = true;
+    public bool $morningDigestEnabled = true;
+    public bool $eveningDigestEnabled = true;
+    public bool $topicsEnabled = true;
+    public bool $readingListEnabled = true;
+    public bool $newsRoundupEnabled = true;
     public string $morningTimeWeekday = '07:30';
     public string $morningTimeWeekend = '09:30';
     public string $morningFallback = '11:00';
@@ -25,6 +33,8 @@ new class extends Component {
     public string $topicsTime = '21:00';
     public string $readingListTime = '20:00';
     public string $newsRoundupTime = '07:00';
+    public int $usageDays = 7;
+    public string $usageScope = 'all';
 
     // --- Today ---
     public ?string $selectedDigestId = null;
@@ -54,7 +64,12 @@ new class extends Component {
     {
         $settings = Auth::user()->settings['flint'] ?? [];
 
-        $this->digestsEnabled = $settings['digests_enabled'] ?? true;
+        $legacyEnabled = (bool) ($settings['digests_enabled'] ?? true);
+        $this->morningDigestEnabled = FlintScheduleSettings::enabled($settings, 'morning_digest_enabled', $legacyEnabled);
+        $this->eveningDigestEnabled = FlintScheduleSettings::enabled($settings, 'evening_digest_enabled', $legacyEnabled);
+        $this->topicsEnabled = FlintScheduleSettings::enabled($settings, 'topics_enabled', $legacyEnabled);
+        $this->readingListEnabled = FlintScheduleSettings::enabled($settings, 'reading_list_enabled', $legacyEnabled);
+        $this->newsRoundupEnabled = FlintScheduleSettings::enabled($settings, 'news_roundup_enabled', $legacyEnabled);
         $this->morningTimeWeekday = $settings['morning_time_weekday'] ?? config('services.flint_routine.morning_time_weekday');
         $this->morningTimeWeekend = $settings['morning_time_weekend'] ?? config('services.flint_routine.morning_time_weekend');
         $this->morningFallback = $settings['morning_fallback'] ?? config('services.flint_routine.morning_fallback');
@@ -125,7 +140,7 @@ new class extends Component {
      * four times a day — and showing them expanded alongside the content made
      * the debugging artefact the loudest thing on the page.
      *
-     * @return array{questions: \Illuminate\Support\Collection, notes: \Illuminate\Support\Collection, editorial: \Illuminate\Support\Collection}
+     * @return array{questions: Collection, notes: Collection, editorial: Collection}
      */
     public function digestBlocks(?Event $digest): array
     {
@@ -287,6 +302,16 @@ new class extends Component {
         return app(AgentWorkingMemoryService::class)->getFeedbackStatistics(Auth::id());
     }
 
+    #[Computed]
+    public function usage(): array
+    {
+        return app(AiUsageSummary::class)->for(
+            Auth::user(),
+            in_array($this->usageDays, [1, 7, 30], true) ? $this->usageDays : 7,
+            $this->usageScope === 'flint',
+        );
+    }
+
     public function save(): void
     {
         $this->validate([
@@ -304,8 +329,20 @@ new class extends Component {
 
         // Merge rather than replace: the scheduler and the routine both read out
         // of this bag, and a blind overwrite would drop keys set elsewhere.
+        $enabled = [
+            $this->morningDigestEnabled,
+            $this->eveningDigestEnabled,
+            $this->topicsEnabled,
+            $this->readingListEnabled,
+            $this->newsRoundupEnabled,
+        ];
         $settings['flint'] = array_merge($settings['flint'] ?? [], [
-            'digests_enabled' => $this->digestsEnabled,
+            'morning_digest_enabled' => $this->morningDigestEnabled,
+            'evening_digest_enabled' => $this->eveningDigestEnabled,
+            'topics_enabled' => $this->topicsEnabled,
+            'reading_list_enabled' => $this->readingListEnabled,
+            'news_roundup_enabled' => $this->newsRoundupEnabled,
+            'digests_enabled' => in_array(true, $enabled, true),
             'morning_time_weekday' => $this->morningTimeWeekday,
             'morning_time_weekend' => $this->morningTimeWeekend,
             'morning_fallback' => $this->morningFallback,
@@ -823,22 +860,28 @@ new class extends Component {
             <div class="space-y-4 lg:space-y-6">
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-4">{{ __('Digests') }}</h3>
+                        <h3 class="text-lg font-semibold mb-4">{{ __('Scheduled Flint items') }}</h3>
                         <p class="text-sm text-base-content/70 mb-4">
                             {{ __('Spark owns the timing and asks the Flint routine to write the digest. Times are read in your effective timezone and checked every fifteen minutes.') }}
                         </p>
 
-                        <div class="flex items-center justify-between p-3 bg-base-100 rounded-lg">
-                            <div>
-                                <div class="font-medium text-sm">{{ __('Enable digests') }}</div>
-                                <div class="text-xs text-base-content/60">{{ __('Turn off to stop Flint being asked for digests entirely') }}</div>
-                            </div>
-                            <input type="checkbox" class="toggle toggle-primary" wire:model.live="digestsEnabled" />
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            @foreach ([
+                                'morningDigestEnabled' => __('Morning briefing'),
+                                'eveningDigestEnabled' => __('Evening briefing'),
+                                'topicsEnabled' => __('Topic review'),
+                                'readingListEnabled' => __('Reading list'),
+                                'newsRoundupEnabled' => __('News roundup'),
+                            ] as $setting => $label)
+                                <label class="flex items-center justify-between gap-3 p-3 bg-base-100 rounded-lg">
+                                    <span class="font-medium text-sm">{{ $label }}</span>
+                                    <input type="checkbox" class="toggle toggle-primary" wire:model="{{ $setting }}" />
+                                </label>
+                            @endforeach
                         </div>
                     </div>
                 </div>
 
-                @if ($digestsEnabled)
                     <div class="card bg-base-200 shadow">
                         <div class="card-body">
                             <h3 class="text-lg font-semibold mb-1">{{ __('Digest schedule') }}</h3>
@@ -882,8 +925,6 @@ new class extends Component {
                             </div>
                         </div>
                     </div>
-                @endif
-
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
                         <h3 class="text-lg font-semibold mb-1">{{ __('Other Flint routines') }}</h3>
@@ -921,6 +962,48 @@ new class extends Component {
                     </div>
                 </div>
 
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold">{{ __('OpenAI usage') }}</h3>
+                                <p class="text-sm text-base-content/70">{{ __('Token usage recorded for your account, grouped by model.') }}</p>
+                            </div>
+                            <div class="join">
+                                @foreach ([1 => __('Today'), 7 => __('7 days'), 30 => __('30 days')] as $days => $label)
+                                    <button type="button" wire:click="$set('usageDays', {{ $days }})" @class(['btn btn-sm join-item', 'btn-active' => $usageDays === $days])>{{ $label }}</button>
+                                @endforeach
+                            </div>
+                            <div class="join">
+                                <button type="button" wire:click="$set('usageScope', 'all')" @class(['btn btn-sm join-item', 'btn-active' => $usageScope === 'all'])>{{ __('All OpenAI') }}</button>
+                                <button type="button" wire:click="$set('usageScope', 'flint')" @class(['btn btn-sm join-item', 'btn-active' => $usageScope === 'flint'])>{{ __('Flint only') }}</button>
+                            </div>
+                        </div>
+
+                        @if (empty($this->usage))
+                            <div class="rounded-lg bg-base-100 p-6 text-center text-sm text-base-content/60">
+                                {{ __('No OpenAI usage was recorded for this period and scope.') }}
+                            </div>
+                        @else
+                            <div class="overflow-x-auto">
+                                <table class="table table-sm">
+                                    <thead><tr><th>{{ __('Model') }}</th><th>{{ __('Requests') }}</th><th>{{ __('Input') }}</th><th>{{ __('Output') }}</th><th>{{ __('Total') }}</th><th>{{ __('Cached') }}</th><th>{{ __('Reasoning') }}</th><th>{{ __('Failures') }}</th></tr></thead>
+                                    <tbody>
+                                        @foreach ($this->usage as $row)
+                                            <tr wire:key="usage-{{ $row['model'] }}">
+                                                <td class="font-medium">{{ $row['model'] }}</td>
+                                                @foreach (['request_count', 'input_tokens', 'output_tokens', 'total_tokens', 'cached_tokens', 'reasoning_tokens', 'failure_count'] as $field)
+                                                    <td class="tabular-nums">{{ number_format($row[$field]) }}</td>
+                                                @endforeach
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
                 @if (($feedback['total_feedback_count'] ?? 0) > 0)
                     <div class="card bg-base-200 shadow">
                         <div class="card-body">
@@ -951,19 +1034,21 @@ new class extends Component {
                         <p class="text-sm opacity-70 mb-4">
                             {{ __('Runs a routine immediately instead of waiting for its slot. It goes through the same path as a scheduled run, so results appear exactly as they normally would.') }}
                         </p>
-                        <div class="flex flex-wrap gap-2">
+                        <div class="divide-y divide-base-300">
                             @foreach ([
-                                'spark-day-briefing-async' => __('Digest'),
-                                'flint-topics' => __('Topics'),
-                                'flint-reading-list' => __('Reading list'),
-                                'flint-news-roundup' => __('News roundup'),
-                            ] as $skillName => $skillLabel)
-                                <x-button
-                                    wire:key="run-{{ $skillName }}"
-                                    wire:click="$dispatch('run-flint-routine', { skill: '{{ $skillName }}' })"
-                                    class="btn-outline btn-sm"
-                                    icon="fas.play"
-                                    label="{{ $skillLabel }}" />
+                                ['spark-day-briefing-async', 'morning', __('Morning briefing')],
+                                ['spark-day-briefing-async', 'evening', __('Evening briefing')],
+                                ['flint-topics', 'evening', __('Topic review')],
+                                ['flint-reading-list', 'evening', __('Reading list')],
+                                ['flint-news-roundup', 'morning', __('News roundup')],
+                            ] as [$skillName, $period, $skillLabel])
+                                <div class="flex flex-wrap items-center justify-between gap-3 py-3" wire:key="run-{{ $skillName }}-{{ $period }}">
+                                    <span class="font-medium text-sm">{{ $skillLabel }}</span>
+                                    <div class="flex flex-wrap gap-2">
+                                        <x-button wire:click="$dispatch('run-flint-routine', { skill: '{{ $skillName }}', period: '{{ $period }}' })" class="btn-outline btn-sm" icon="fas.play" label="{{ __('Run now') }}" />
+                                        <x-button wire:click="$dispatch('run-flint-routine', { skill: '{{ $skillName }}', period: '{{ $period }}', driverOverride: 'openai' })" class="btn-primary btn-sm" icon="fas.bolt" label="{{ __('Run with OpenAI') }}" />
+                                    </div>
+                                </div>
                             @endforeach
                         </div>
                     </div>

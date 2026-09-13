@@ -4,8 +4,11 @@ namespace Tests\Feature\Volt;
 
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\Flint\TriggerFlintRoutineJob;
+use App\Models\ActionProgress;
 use App\Models\User;
+use App\Services\Flint\FlintRunDispatcher;
 use Illuminate\Support\Facades\Queue;
+use InvalidArgumentException;
 use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -65,5 +68,35 @@ class FlintRunNowTest extends TestCase
             ->dispatch('run-flint-routine', routine: 'topics');
 
         Queue::assertPushed(TriggerFlintRoutineJob::class, fn ($job) => $job->routine === 'topics');
+    }
+
+    #[Test]
+    public function run_with_openai_persists_the_driver_override_on_the_job_and_progress(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+
+        Volt::actingAs($user)
+            ->test('global-progress-indicator')
+            ->dispatch('run-flint-routine', skill: 'spark-day-briefing-async', period: 'evening', driverOverride: 'openai');
+
+        Queue::assertPushed(TriggerFlintDigestRoutineJob::class, fn ($job) => $job->driverOverride === 'openai');
+        $this->assertDatabaseHas('action_progress', [
+            'user_id' => $user->id,
+            'action_type' => 'flint_skill',
+        ]);
+        $this->assertSame('openai', ActionProgress::where('user_id', $user->id)->latest()->first()->details['driver']);
+    }
+
+    #[Test]
+    public function invalid_driver_overrides_are_rejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        app(FlintRunDispatcher::class)->dispatch(
+            User::factory()->create(),
+            skill: 'flint-topics',
+            driverOverride: 'invalid',
+        );
     }
 }

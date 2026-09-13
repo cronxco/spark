@@ -2,6 +2,7 @@
 
 namespace App\Services\Flint\Routines;
 
+use InvalidArgumentException;
 use RuntimeException;
 
 /**
@@ -15,17 +16,25 @@ class RoutineDriverManager
 {
     public const DRIVERS = ['webhook' => WebhookRoutineDriver::class, 'openai' => OpenAiRoutineDriver::class];
 
-    public function driverName(string $routine): string
+    public function driverName(string $routine, ?string $override = null): string
     {
+        if ($override !== null) {
+            if (! isset(self::DRIVERS[$override])) {
+                throw new InvalidArgumentException("Unknown Flint routine driver: {$override}");
+            }
+
+            return $override;
+        }
+
         $configured = config("services.flint_routine.routines.{$routine}.driver")
             ?: config('services.flint_routine.driver', 'webhook');
 
         return is_string($configured) && $configured !== '' ? $configured : 'webhook';
     }
 
-    public function for(string $routine): RoutineDriver
+    public function for(string $routine, ?string $override = null): RoutineDriver
     {
-        $name = $this->driverName($routine);
+        $name = $this->driverName($routine, $override);
 
         if (! isset(self::DRIVERS[$name])) {
             throw new RuntimeException("Unknown Flint routine driver: {$name}");

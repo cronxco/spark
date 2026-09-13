@@ -27,6 +27,8 @@ class FlintRunDispatcher
         mixed $date = null,
         mixed $period = 'morning',
         bool $sync = false,
+        mixed $driverOverride = null,
+        mixed $driver = null,
     ): FlintDispatchResult {
         if (($skill !== null && ! is_string($skill)) || ($routine !== null && ! is_string($routine))) {
             throw new InvalidArgumentException('Skill and routine must be strings.');
@@ -37,6 +39,13 @@ class FlintRunDispatcher
         if (! is_string($period)) {
             throw new InvalidArgumentException('Period must be morning, afternoon, or evening.');
         }
+        if (($driverOverride !== null && ! is_string($driverOverride)) || ($driver !== null && ! is_string($driver))) {
+            throw new InvalidArgumentException('Driver override must be webhook or openai.');
+        }
+        if ($driverOverride !== null && $driver !== null && $driverOverride !== $driver) {
+            throw new InvalidArgumentException('Driver and driver override values conflict.');
+        }
+        $driverOverride ??= $driver;
 
         if ($skill !== null && $routine !== null
             && RoutineConfig::canonicalSkill($skill) !== RoutineConfig::canonicalSkill($routine)) {
@@ -52,6 +61,7 @@ class FlintRunDispatcher
         if (! in_array($period, ['morning', 'afternoon', 'evening'], true)) {
             throw new InvalidArgumentException('Period must be morning, afternoon, or evening.');
         }
+        $selectedDriver = $this->drivers->driverName($resolvedRoutine, $driverOverride);
 
         $timezone = $this->timezones->timezoneFor($user);
         $localDate = $date ?: $this->timezones->today($user)->toDateString();
@@ -75,15 +85,15 @@ class FlintRunDispatcher
                 'run_uuid' => $runUuid,
                 'skill' => $canonical,
                 'routine' => $resolvedRoutine,
-                'driver' => $this->drivers->driverName($resolvedRoutine),
+                'driver' => $selectedDriver,
                 'local_date' => $localDate,
                 'period' => $period,
             ],
         );
 
         $job = $resolvedRoutine === 'digest'
-            ? new TriggerFlintDigestRoutineJob($user, $period, $localDate, $timezone, 'manual', null, true, $runUuid, $progress->id)
-            : new TriggerFlintRoutineJob($user, $resolvedRoutine, $localDate, $timezone, true, $runUuid, $progress->id, $period);
+            ? new TriggerFlintDigestRoutineJob($user, $period, $localDate, $timezone, 'manual', null, true, $runUuid, $progress->id, $driverOverride)
+            : new TriggerFlintRoutineJob($user, $resolvedRoutine, $localDate, $timezone, true, $runUuid, $progress->id, $period, $driverOverride);
 
         $sync ? dispatch_sync($job) : dispatch($job)->onQueue('flint');
 
@@ -92,7 +102,7 @@ class FlintRunDispatcher
             $progress,
             $canonical,
             $resolvedRoutine,
-            $this->drivers->driverName($resolvedRoutine),
+            $selectedDriver,
             $localDate,
             $period,
         );

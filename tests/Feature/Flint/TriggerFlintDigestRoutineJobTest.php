@@ -5,6 +5,7 @@ namespace Tests\Feature\Flint;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Models\Event;
 use App\Models\Integration;
+use App\Models\TaskExecution;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\RequestException;
@@ -148,6 +149,25 @@ class TriggerFlintDigestRoutineJobTest extends TestCase
         $this->assertFalse(Cache::has(
             TriggerFlintDigestRoutineJob::markerKey($this->user->id, '2026-06-14', 'morning')
         ));
+    }
+
+    #[Test]
+    public function a_missing_webhook_digest_gets_two_handoffs_then_becomes_terminal(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true], 200)]);
+        $marker = TriggerFlintDigestRoutineJob::markerKey($this->user->id, '2026-06-14', 'evening');
+
+        $this->runJob('evening');
+        Cache::forget($marker); // the first result grace window elapsed
+        $this->runJob('evening');
+        Cache::forget($marker); // the second result grace window elapsed
+        $this->runJob('evening');
+
+        Http::assertSentCount(2);
+        $this->assertTrue(Cache::has($marker));
+        $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
+        $this->assertSame('failed', $execution->status);
+        $this->assertSame(2, $execution->attempts);
     }
 
     private function runJob(string $period = 'evening', string $reason = 'scheduled'): void
