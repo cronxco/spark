@@ -43,7 +43,8 @@ class FlintDigestTaskExecutionTest extends TestCase
             ->where('task_key', 'flint_routine_digest')
             ->firstOrFail();
 
-        $this->assertSame('success', $execution->status);
+        $this->assertSame('accepted', $execution->status);
+        $this->assertNull($execution->last_success);
         $this->assertSame('scheduled', $execution->triggered_by);
         $this->assertSame($user->id, $execution->user_id);
     }
@@ -115,7 +116,8 @@ class FlintDigestTaskExecutionTest extends TestCase
 
         $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
 
-        $this->assertSame('success', $execution->status);
+        $this->assertSame('accepted', $execution->status);
+        $this->assertNull($execution->last_success);
         $this->assertNull($execution->error);
     }
 
@@ -137,5 +139,26 @@ class FlintDigestTaskExecutionTest extends TestCase
 
         $this->assertSame(1, EventObject::where('user_id', $user->id)->where('concept', 'digest')->count());
         $this->assertNotNull($result['digest_object_id']);
+    }
+
+    #[Test]
+    public function persisting_a_run_bound_digest_completes_the_accepted_attempt(): void
+    {
+        Http::fake(['routine.test/*' => Http::response(['ok' => true], 200)]);
+        $user = User::factory()->create();
+        $job = new TriggerFlintDigestRoutineJob($user, 'morning', '2026-06-15', 'America/New_York', 'scheduled');
+        $job->handle();
+
+        $result = app(FlintDigestService::class)->create($user, [
+            'title' => 'Morning Digest',
+            'period' => 'morning',
+            'date' => '2026-06-15',
+            'run_token' => $job->runToken,
+        ]);
+
+        $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
+        $this->assertSame('success', $execution->status);
+        $this->assertSame($job->runUuid, $execution->last_success['run_uuid']);
+        $this->assertSame($result['event_id'], $execution->last_success['event_id']);
     }
 }

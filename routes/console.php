@@ -10,6 +10,7 @@ use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\EffectiveTimezoneResolver;
+use App\Services\Flint\FlintScheduleService;
 use App\Services\Flint\FlintScheduleSettings;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
@@ -87,6 +88,7 @@ Schedule::job(new RefreshExpiringCookies)
 // and NotifyOnDigestReadyTask sends the notification once that event lands.
 Schedule::call(function () {
     $resolver = app(EffectiveTimezoneResolver::class);
+    $flintSchedule = app(FlintScheduleService::class);
 
     // The id of the user's Oura sleep-score event for a local wake date, or null
     // if it hasn't been ingested yet. Used to gate the morning digest.
@@ -111,13 +113,9 @@ Schedule::call(function () {
         $tz = $resolver->timezoneFor($user);
         $now = $resolver->now($user);
         $today = $resolver->today($user)->toDateString();
-        $isWeekend = $now->isWeekend();
-
-        $morningTime = $isWeekend
-            ? ($settings['morning_time_weekend'] ?? config('services.flint_routine.morning_time_weekend'))
-            : ($settings['morning_time_weekday'] ?? config('services.flint_routine.morning_time_weekday'));
-        $eveningTime = $settings['evening_time'] ?? config('services.flint_routine.evening_time');
-        $fallbackTime = $settings['morning_fallback'] ?? config('services.flint_routine.morning_fallback');
+        $morningTime = $flintSchedule->slot($user, 'morning_digest', $now);
+        $eveningTime = $flintSchedule->slot($user, 'evening_digest', $now);
+        $fallbackTime = $flintSchedule->morningFallback($user);
 
         // Evening digest: pure time gate at the configured evening slot.
         $eveningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'evening');
@@ -158,6 +156,7 @@ Schedule::call(function () {
 // A routine whose webhook URL is unset is a no-op (the job logs and returns).
 Schedule::call(function () {
     $resolver = app(EffectiveTimezoneResolver::class);
+    $flintSchedule = app(FlintScheduleService::class);
 
     $users = User::query()->where(function ($query) {
         $query->whereNotNull('settings->flint->digests_enabled');
@@ -172,11 +171,11 @@ Schedule::call(function () {
         $now = $resolver->now($user);
         $today = $resolver->today($user)->toDateString();
 
-        foreach (['topics' => 'topics_time', 'reading_list' => 'reading_list_time', 'news_roundup' => 'news_roundup_time'] as $routine => $settingKey) {
+        foreach (['topics', 'reading_list', 'news_roundup'] as $routine) {
             if (! FlintScheduleSettings::enabled($settings, "{$routine}_enabled")) {
                 continue;
             }
-            $slot = $settings[$settingKey] ?? config("services.flint_routine.{$settingKey}");
+            $slot = $flintSchedule->slot($user, $routine, $now);
             $marker = TriggerFlintRoutineJob::markerKey($user->id, $today, $routine);
 
             if ($now->gte(Carbon::parse($slot, $tz)) && ! Cache::has($marker)) {

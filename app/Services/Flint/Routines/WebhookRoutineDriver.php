@@ -85,6 +85,6 @@ class WebhookRoutineDriver implements RoutineDriver
             $response->throw();
         }
 
-        return RoutineResult::success(['driver' => 'webhook']);
+        return RoutineResult::accepted(['driver' => 'webhook', 'accepted_at' => now()->toIso8601String()]);
     }
 }

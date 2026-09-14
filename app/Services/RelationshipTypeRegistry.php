@@ -142,6 +142,13 @@ class RelationshipTypeRegistry
                 'description' => 'A digest event or block that touched this topic',
                 'supports_value' => false,
             ],
+            'references' => [
+                'display_name' => 'References',
+                'icon' => 'fas.link',
+                'is_directional' => true,
+                'description' => 'A user-authored document references another owned entity',
+                'supports_value' => false,
+            ],
         ];
     }
 

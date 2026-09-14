@@ -37,9 +37,19 @@ class TaskExecutionStore
         }
 
         $fromTable = $rows
-            ->mapWithKeys(fn (TaskExecution $execution) => [
-                $execution->task_key => $this->legacyShapeFromRow($execution),
-            ])
+            ->mapWithKeys(function (TaskExecution $execution) use ($legacy): array {
+                $taskKey = $execution->task_key;
+                $legacyShape = $legacy[$taskKey] ?? [];
+                $rowShape = $this->legacyShapeFromRow($execution);
+                $rowShape['last_attempt'] = array_replace(
+                    $legacyShape['last_attempt'] ?? [],
+                    $rowShape['last_attempt'],
+                );
+
+                return [
+                    $taskKey => array_replace($legacyShape, $rowShape),
+                ];
+            })
             ->all();
 
         return array_replace($legacy, $fromTable);

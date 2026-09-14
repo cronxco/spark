@@ -265,7 +265,7 @@ class FlintDigestsControllerTest extends TestCase
             ->assertJsonPath('period', 'morning')
             ->assertJsonPath('blocks.0.block_type', 'flint_user_question')
             ->assertJsonPath('blocks.0.question', 'Did you sleep well?')
-            ->assertJsonPath('blocks.0.priority', 'high')
+            ->assertJsonMissingPath('blocks.0.priority')
             ->assertJsonPath('blocks.0.answered', false);
     }
 

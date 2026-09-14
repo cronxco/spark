@@ -47,6 +47,6 @@ class OpenAiRoutineDriver implements RoutineDriver
             'routine' => $routine,
         ] + $result->toArray());
 
-        return RoutineResult::success(['driver' => 'openai'] + $result->toArray());
+        return RoutineResult::accepted(['driver' => 'openai', 'accepted_at' => now()->toIso8601String()] + $result->toArray());
     }
 }

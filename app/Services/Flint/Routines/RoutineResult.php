@@ -25,6 +25,12 @@ class RoutineResult
         return new self('success', null, $details);
     }
 
+    /** Provider accepted the run; Spark has not yet observed its output. */
+    public static function accepted(array $details = []): self
+    {
+        return new self('accepted', null, $details);
+    }
+
     /**
      * Nothing to do — the routine has no driver or no endpoint configured.
      */

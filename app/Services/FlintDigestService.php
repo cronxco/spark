@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Relationship;
 use App\Models\User;
+use App\Services\Flint\FlintRunCompletionService;
 use App\Services\Flint\FlintRunToken;
 use App\Services\Flint\RoutineConfig;
 use App\Support\FlintQuestion;
@@ -92,7 +93,7 @@ class FlintDigestService
         FlintQuestion::retireStale($user);
 
         try {
-            return DB::transaction(fn () => $this->createTransactionally(
+            $result = DB::transaction(fn () => $this->createTransactionally(
                 $user,
                 $data,
                 $date,
@@ -111,8 +112,14 @@ class FlintDigestService
                 ->with('blocks')
                 ->firstOrFail();
 
-            return $this->result($event, $period, true);
+            $result = $this->result($event, $period, true);
         }
+
+        if ($run !== null) {
+            app(FlintRunCompletionService::class)->complete($user, $run, $result['event_id'], requireAccepted: false);
+        }
+
+        return $result;
     }
 
     public function resolveIntegration(User $user): Integration

@@ -218,15 +218,22 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             return;
         }
 
-        $store->recordStatus($integration, $task, 'success', [
+        $completed = $store->getTaskExecutions($integration)[$task->key]['last_success'] ?? null;
+        if (($completed['run_uuid'] ?? null) === $this->runUuid) {
+            $progress?->markCompleted($completed);
+
+            return;
+        }
+
+        $store->recordStatus($integration, $task, $result->status, [
             'triggered_by' => $this->triggerReason,
             'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
             'run_uuid' => $this->runUuid,
             'local_date' => $this->localDate,
             'period' => $this->period,
             'driver' => $selectedDriver,
-        ] + $result->details, promoteSuccess: $this->isScheduled());
-        $progress?->markCompleted($result->details);
+        ] + $result->details, promoteSuccess: false);
+        $progress?->updateProgress('accepted', 'Flint accepted the routine run', 50, $result->details);
 
         Log::info('Flint routine webhook triggered', [
             'user_id' => $this->user->id,

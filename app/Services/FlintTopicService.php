@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Api\EntityMutationService;
+use App\Services\Api\ResourceVersion;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
@@ -15,7 +18,10 @@ use Illuminate\Validation\Rule;
 
 class FlintTopicService
 {
-    public function __construct(private EntityMutationService $mutations) {}
+    public function __construct(
+        private EntityMutationService $mutations,
+        private ResourceVersion $versions,
+    ) {}
 
     /** @return array<string, mixed> */
     public function create(User $user, array $input): array
@@ -115,6 +121,20 @@ class FlintTopicService
             ->when($kind, fn (Builder $query) => $query->where('metadata->kind', $kind));
     }
 
+    /** @return array<string, mixed>|null */
+    public function detail(User $user, string $id): ?array
+    {
+        $topic = $this->query($user)->find($id);
+        if (! $topic) {
+            return null;
+        }
+
+        return $this->payload($topic) + [
+            'version' => $this->versions->etag($topic),
+            'mentions' => $this->mentions($topic)->all(),
+        ];
+    }
+
     /**
      * How many topics the user has in each status, for the filter chips.
      *
@@ -135,32 +155,76 @@ class FlintTopicService
      */
     public function mentions(EventObject $topic, int $limit = 20): Collection
     {
-        $events = $topic->relatedEvents('discussed_in')
-            ->latest('time')
-            ->limit($limit)
-            ->get()
-            ->map(fn (Event $event) => [
-                'kind' => 'event',
-                'id' => $event->id,
-                'time' => $event->time,
-                'title' => $event->event_metadata['title'] ?? $event->action,
-                'detail' => $event->event_metadata['period'] ?? null,
-            ]);
+        $relationships = Relationship::query()
+            ->where('user_id', $topic->user_id)
+            ->where('type', 'discussed_in')
+            ->where(function ($query) use ($topic): void {
+                $query->where(fn ($q) => $q->where('from_type', EventObject::class)->where('from_id', $topic->id))
+                    ->orWhere(fn ($q) => $q->where('to_type', EventObject::class)->where('to_id', $topic->id));
+            })
+            ->get();
 
-        $blocks = $topic->relatedBlocks('discussed_in')
-            ->latest('time')
-            ->limit($limit)
-            ->get()
-            ->map(fn ($block) => [
-                'kind' => 'block',
-                'id' => $block->id,
-                'time' => $block->time,
-                'title' => $block->title,
-                'detail' => $block->block_type,
-            ]);
+        return $relationships->map(function (Relationship $relationship) use ($topic): ?array {
+            $sourceType = $relationship->from_type === EventObject::class && $relationship->from_id === $topic->id
+                ? $relationship->to_type
+                : $relationship->from_type;
+            $sourceId = $relationship->from_type === EventObject::class && $relationship->from_id === $topic->id
+                ? $relationship->to_id
+                : $relationship->from_id;
 
-        return $events->concat($blocks)
-            ->sortByDesc(fn (array $mention) => $mention['time'])
+            if ($sourceType === Event::class) {
+                $event = Event::withTrashed()->whereHas('integration', fn ($query) => $query->where('user_id', $topic->user_id))->find($sourceId);
+                if (! $event) {
+                    return null;
+                }
+
+                return [
+                    'id' => (string) $relationship->id,
+                    'kind' => 'event',
+                    'source_type' => 'digest',
+                    'digest_id' => (string) $event->id,
+                    'block_id' => null,
+                    'title' => data_get($event->event_metadata, 'title', $event->action),
+                    'detail' => data_get($event->event_metadata, 'period'),
+                    'excerpt' => data_get($event->event_metadata, 'summary'),
+                    'local_date' => data_get($event->event_metadata, 'local_date', $event->time?->toDateString()),
+                    'period' => data_get($event->event_metadata, 'period'),
+                    'occurred_at' => $event->time?->toIso8601String(),
+                    'deep_link' => 'spark://digest/' . $event->id,
+                    'source_deleted' => $event->trashed(),
+                ];
+            }
+
+            if ($sourceType === Block::class) {
+                $block = Block::withTrashed()
+                    ->whereHas('event.integration', fn ($query) => $query->where('user_id', $topic->user_id))
+                    ->with('event')
+                    ->find($sourceId);
+                if (! $block) {
+                    return null;
+                }
+
+                return [
+                    'id' => (string) $relationship->id,
+                    'kind' => 'block',
+                    'source_type' => 'digest_block',
+                    'digest_id' => (string) $block->event_id,
+                    'block_id' => (string) $block->id,
+                    'title' => $block->title ?: 'Deleted digest evidence',
+                    'detail' => $block->block_type,
+                    'excerpt' => $block->getContent(),
+                    'local_date' => data_get($block->event?->event_metadata, 'local_date', $block->time?->toDateString()),
+                    'period' => data_get($block->event?->event_metadata, 'period'),
+                    'occurred_at' => $block->time?->toIso8601String(),
+                    'deep_link' => 'spark://block/' . $block->id,
+                    'source_deleted' => $block->trashed(),
+                ];
+            }
+
+            return null;
+        })->filter()
+            ->sortByDesc(fn (array $mention) => ($mention['occurred_at'] ?? '') . ':' . $mention['id'])
+            ->unique(fn (array $mention) => $mention['source_type'] . ':' . ($mention['block_id'] ?: $mention['digest_id']))
             ->take($limit)
             ->values();
     }

@@ -12,6 +12,9 @@ use App\Http\Controllers\Api\V1\Mobile\EntityMutationsController;
 use App\Http\Controllers\Api\V1\Mobile\EventsController;
 use App\Http\Controllers\Api\V1\Mobile\FeedController;
 use App\Http\Controllers\Api\V1\Mobile\FlintDigestsController;
+use App\Http\Controllers\Api\V1\Mobile\FlintNotesController;
+use App\Http\Controllers\Api\V1\Mobile\FlintQuestionsController;
+use App\Http\Controllers\Api\V1\Mobile\FlintRoutineHealthController;
 use App\Http\Controllers\Api\V1\Mobile\FlintTopicsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\InsightDiscoveryController;
@@ -311,8 +314,25 @@ Route::post('flint/questions/{block}/answer', [FlintDigestsController::class, 'a
     ->middleware('ability:ios:write')
     ->name('flint.questions.answer');
 
+Route::get('flint/questions', [FlintQuestionsController::class, 'index'])
+    ->name('flint.questions.index');
+
+Route::post('flint/questions/{block}/actions', [FlintQuestionsController::class, 'storeAction'])
+    ->middleware('ability:ios:write')
+    ->name('flint.questions.actions.store');
+
 Route::get('flint/topics', [FlintTopicsController::class, 'index'])
     ->name('flint.topics.index');
+
+Route::get('flint/topics/{id}', [FlintTopicsController::class, 'show'])
+    ->name('flint.topics.show');
+
+Route::get('flint/notes', [FlintNotesController::class, 'index'])->name('flint.notes.index');
+Route::post('flint/notes', [FlintNotesController::class, 'store'])->middleware('ability:ios:write')->name('flint.notes.store');
+Route::delete('flint/notes/{id}', [FlintNotesController::class, 'destroy'])->middleware('ability:ios:write')->name('flint.notes.destroy');
+
+Route::get('flint/routines/health', FlintRoutineHealthController::class)
+    ->name('flint.routines.health');
 
 /*
 |--------------------------------------------------------------------------

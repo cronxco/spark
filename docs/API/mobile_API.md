@@ -184,9 +184,13 @@ Pass the `next_cursor` value as the `cursor` query parameter on the next request
 | `GET`  | `/check-ins/history`            | Check-in history for a date range (max 90 days)                                 |
 | `GET`  | `/check-ins/timezone`           | Effective timezone state (profile or time-travel override)                      |
 | `GET`  | `/up-to-speed`                  | Ordered catch-up queue (Flint digests, check-ins, anomalies, news)              |
-| `GET`  | `/flint/digests`                | Flint digest(s) for a date                                                      |
+| `GET`  | `/flint/digests`                | Flint digest(s) for a date or cursor-paginated 30-day range                     |
 | `GET`  | `/flint/digests/{id}`           | A single Flint digest                                                           |
+| `GET`  | `/flint/questions`              | Cursor-paginated open questions across digests                                  |
 | `GET`  | `/flint/topics`                 | Flint's long-lived strategic/thematic/tactical threads                          |
+| `GET`  | `/flint/topics/{id}`            | A Thread with versioned digest/block evidence                                   |
+| `GET`  | `/flint/notes`                  | Cursor-paginated user-authored Flint notes                                      |
+| `GET`  | `/flint/routines/health`        | Configuration, attempt, output, and scheduling health for Flint routines        |
 | `GET`  | `/money/accounts`               | All non-archived manual/synced finance accounts                                 |
 | `GET`  | `/money/accounts/{id}`          | A single finance account                                                        |
 | `GET`  | `/money/accounts/{id}/balances` | Cursor-paginated balance history                                                |
@@ -1235,15 +1239,102 @@ returns every digest created that day.
 
 **Query Parameters**: `date` (default today), `period` (`morning`/`afternoon`/`evening`), `all` (boolean).
 
-**Response `200`**: [FlintDigest](API_v1.md#flintdigest) — see API_v1.md for the full shape (identical on both surfaces).
+**Response `200`**: the mobile [FlintDigest](API_v1.md#flintdigest)
+representation. Its base fields match API v1, with the mobile-only
+reader/version additions described below.
 
 **Response `404`** — No digest found for that date/period.
+
+For History, provide both `from` and `to` instead of the date-only parameters.
+Bounds are inclusive local calendar dates in the user's effective timezone and
+may cover at most 30 days. Results are ordered by event time and ID descending.
+List items deliberately omit blocks; use the detail route to open a digest.
+
+**History Query Parameters**: `from`, `to` (`YYYY-MM-DD`, both required);
+`limit` (1–50, default 20); `cursor` (opaque).
+
+**History Response `200`**
+
+```json
+{
+    "data": [
+        {
+            "id": "event-uuid",
+            "local_date": "2026-09-14",
+            "period": "morning",
+            "kind": "briefing",
+            "title": "Morning Digest",
+            "summary": "A short list-safe summary.",
+            "generated_at": "2026-09-14T07:12:03+01:00",
+            "updated_at": "2026-09-14T07:12:03+01:00",
+            "unanswered_question_count": 1,
+            "version": "W/\"opaque-version\"",
+            "freshness": { "state": "fresh", "age_seconds": 8280 }
+        }
+    ],
+    "meta": {
+        "from": "2026-08-16",
+        "to": "2026-09-14",
+        "effective_timezone": "Europe/London",
+        "account_id": "user-uuid",
+        "next_cursor": null
+    }
+}
+```
+
+An empty range returns `200` with `data: []`. Invalid, future-only, or
+greater-than-30-day ranges return `422`.
 
 ---
 
 ### `GET /flint/digests/{id}`
 
-A single digest by event UUID. Same [FlintDigest](API_v1.md#flintdigest) shape.
+A single digest by event UUID. It uses the same mobile FlintDigest shape.
+Reader-facing question blocks omit the internal `priority` field and include
+canonical `status`, `answer_history`, and the digest's strong `version`.
+
+---
+
+### `GET /flint/questions`
+
+Returns open questions across the user's recent digests, rather than deriving
+them from a selected date. Questions retire after the existing seven-day
+horizon. Answered, skipped, and retired questions are excluded.
+
+**Query Parameters**: `status` (currently only `open`); `limit` (1–50,
+default 20); `cursor` (opaque).
+
+**Response `200`**
+
+```json
+{
+    "data": [
+        {
+            "id": "question-block-uuid",
+            "digest_id": "digest-event-uuid",
+            "source_digest": {
+                "local_date": "2026-09-14",
+                "period": "morning"
+            },
+            "status": "open",
+            "question": "Should the review move to Friday?",
+            "topic": "Quarterly planning",
+            "answer_options": ["Yes", "No", "Choose another day"],
+            "asked_at": "2026-09-14T07:12:03+01:00",
+            "effective_answer": null,
+            "answer_history": [],
+            "version": "\"strong-question-version\""
+        }
+    ],
+    "meta": {
+        "next_cursor": null,
+        "effective_timezone": "Europe/London",
+        "account_id": "user-uuid"
+    }
+}
+```
+
+The mobile representation never includes question priority.
 
 ---
 
@@ -1278,6 +1369,84 @@ include every value.
 ```
 
 Ordered newest-touched first (`updated_at desc`).
+
+---
+
+### `GET /flint/topics/{id}`
+
+Returns one owned Thread and the digest or block evidence linked through its
+existing `discussed_in` relationships. Evidence is tenant-scoped, newest first,
+deduplicated by stable source, and includes deep links back into the reader.
+Deleted source content degrades to a marked evidence entry where the source row
+still exists.
+
+**Response `200`**
+
+```json
+{
+    "data": {
+        "id": "topic-uuid",
+        "title": "Quarterly planning",
+        "content": "The canonical read-only Thread summary.",
+        "kind": "strategic",
+        "status": "active",
+        "first_seen_at": "2026-08-01T08:00:00Z",
+        "last_touched_at": "2026-09-14T07:12:03Z",
+        "next_review_at": "2026-09-20",
+        "origin": "digest_inference",
+        "version": "\"strong-topic-version\"",
+        "mentions": [
+            {
+                "id": "relationship-uuid",
+                "source_type": "digest_block",
+                "digest_id": "digest-event-uuid",
+                "block_id": "block-uuid",
+                "title": "Planning pressure",
+                "excerpt": "The review date now overlaps travel.",
+                "local_date": "2026-09-14",
+                "period": "morning",
+                "occurred_at": "2026-09-14T07:12:03+01:00",
+                "deep_link": "spark://block/block-uuid",
+                "source_deleted": false
+            }
+        ]
+    }
+}
+```
+
+**Response `404`** — Thread is missing or belongs to another account. Topic
+editing remains web/MCP-owned.
+
+---
+
+### `GET /flint/notes`
+
+Returns user-authored Flint notes newest first. Notes reuse the existing
+searchable object store and are always scoped to the authenticated account.
+
+**Query Parameters**: `limit` (1–50, default 20); `cursor` (opaque).
+
+Each note includes `id`, derived `title`, `body`, `authored_at`, `created_at`,
+`deleted_at`, validated `context_links`, consent metadata, and a strong
+`version`. The envelope metadata includes `next_cursor`,
+`effective_timezone`, and `account_id`.
+
+---
+
+### `GET /flint/routines/health`
+
+Returns the morning/evening digest, topics, reading-list, and news-roundup
+routines. Each item reports `state` (`configured`, `unconfigured`, `disabled`,
+or `unavailable`), `enabled`, effective `driver`, `next_eligible_run`,
+`last_attempt`, `last_persisted_output`, and a redacted `failure`.
+
+A provider `2xx` is reported as `accepted`, not completed. Success is recorded
+only after Spark observes run-bound persisted output or the topics routine uses
+its authenticated completion action. Raw provider responses, webhook URLs,
+secrets, and exception messages are never returned.
+
+Response metadata includes `effective_timezone`, `account_id`, and the web
+`management_url`.
 
 ---
 
@@ -1347,7 +1516,10 @@ All write endpoints require `ios:write` ability.
 | `POST`   | `/up-to-speed/read`                | Mark Up to Speed items as caught up                                                        |
 | `POST`   | `/up-to-speed/unmark`              | Return Up to Speed items to the unread queue                                               |
 | `POST`   | `/flint/digests`                   | Create a Flint digest                                                                      |
-| `POST`   | `/flint/questions/{block}/answer`  | Answer a Flint user-question block                                                         |
+| `POST`   | `/flint/questions/{block}/actions` | Versioned, idempotent answer/correct/skip action                                           |
+| `POST`   | `/flint/questions/{block}/answer`  | Legacy answer adapter (deprecated)                                                         |
+| `POST`   | `/flint/notes`                     | Create an idempotent user-authored Flint note                                              |
+| `DELETE` | `/flint/notes/{id}`                | Idempotently delete an owned Flint note                                                    |
 | `POST`   | `/bookmarks`                       | Bookmark a URL                                                                             |
 | `POST`   | `/money/accounts`                  | Create a manual finance account                                                            |
 | `PATCH`  | `/money/accounts/{id}`             | Update a manual finance account                                                            |
@@ -1583,14 +1755,89 @@ not blindly retry after an unknown outcome. Same request shape as MCP's
 
 ### `POST /flint/questions/{block}/answer`
 
-Records the user's answer to a `flint_user_question` block.
+Deprecated compatibility adapter for one released client version. It writes
+through the same canonical action service as the versioned endpoint.
 
 **Request Body**: `{"answer": "Yes", "answer_note": "optional"}` (`answer` required, max 1000 chars; `answer_note` optional, max 1000 chars).
 
 **Response `200`**: `{"block_id": "uuid", "answer": "Yes", "answer_note": null, "answered_at": "..."}`
 
+Successful responses include `Deprecation: true` and a `Sunset` header.
 **Response `403`** — Block's digest doesn't belong to the caller.
 **Response `422`** — Block is not a `flint_user_question`.
+
+---
+
+### `POST /flint/questions/{block}/actions`
+
+Appends a canonical question action. `answer` is valid for open or retired
+questions; `correct` requires an effective answer and retains prior history;
+`skip` is valid only while open. The block metadata holds the complete ordered
+history and compatibility snapshot—no separate model or table is used.
+
+**Headers**: `If-Match` with the strong question version; `Idempotency-Key`
+with a UUID. Replay of the same key and body returns the original logical
+result even if its original ETag is now stale.
+
+**Request Body**
+
+```json
+{
+    "action": "answer",
+    "answer": "Move it to Friday.",
+    "context": "Thursday clashes."
+}
+```
+
+For a correction use `action: "correct"`. A skip body is only
+`{"action": "skip"}`.
+
+**Response `201`** for a newly appended action; **`200`** for an idempotent
+replay. The body is `{"data": FlintQuestion}` and the fresh strong version is
+returned both in `data.version` and the `ETag` header.
+
+**Response `403`** — Question is not owned by the caller. **`409`** —
+idempotency key reused with different content. **`412`** — stale `If-Match`.
+**`422`** — invalid action or transition. **`428`** — missing `If-Match`.
+Precondition failures include the current ETag.
+
+---
+
+### `POST /flint/notes`
+
+Creates a searchable Flint note using the existing object and relationship
+stores. The server derives the title from `authored_at` in the effective
+timezone: `Note to Flint 14/09/26 13:17`. Same-minute collisions become
+`(2)`, `(3)`, and so on.
+
+**Request Body**
+
+```json
+{
+    "client_mutation_id": "uuid",
+    "authored_at": "2026-09-14T13:17:00+01:00",
+    "body": "Keep Friday evening free after the train.",
+    "context_links": [{ "type": "event", "id": "event-uuid" }],
+    "consent_version": "flint-note-v1"
+}
+```
+
+`context_links` may contain owned `event`, `digest`, `block`, or `topic`
+identifiers (maximum 20). The body is limited to 10,000 characters and is
+excluded from telemetry and activity-log properties.
+
+**Response `201`** when created; **`200`** for an identical mutation replay.
+Both return `{"data": FlintNote}` and its strong `ETag`. **Response `409`** —
+mutation ID reused with different content. **Response `422`** — invalid,
+cross-tenant context, consent, or authored time.
+
+---
+
+### `DELETE /flint/notes/{id}`
+
+Soft-deletes an owned Flint note and its context relationships. Deletion is
+tenant-scoped and idempotent: missing, already-deleted, and other-account IDs
+all return **`204`** without revealing ownership.
 
 ---
 

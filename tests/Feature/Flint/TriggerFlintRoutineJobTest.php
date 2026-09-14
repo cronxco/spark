@@ -5,6 +5,8 @@ namespace Tests\Feature\Flint;
 use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Models\TaskExecution;
 use App\Models\User;
+use App\Services\Flint\FlintRunCompletionService;
+use App\Services\Flint\FlintRunToken;
 use App\Services\FlintDigestService;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -109,7 +111,7 @@ class TriggerFlintRoutineJobTest extends TestCase
     }
 
     #[Test]
-    public function a_successful_dispatch_records_a_task_execution_against_the_flint_integration(): void
+    public function an_accepted_dispatch_records_a_task_execution_without_claiming_completion(): void
     {
         Http::fake(['*' => Http::response(['ok' => true], 200)]);
 
@@ -122,8 +124,25 @@ class TriggerFlintRoutineJobTest extends TestCase
             ->where('task_key', 'flint_routine_topics')
             ->firstOrFail();
 
-        $this->assertSame('success', $execution->status);
+        $this->assertSame('accepted', $execution->status);
+        $this->assertNull($execution->last_success);
         $this->assertSame($this->user->id, $execution->user_id);
+    }
+
+    #[Test]
+    public function a_verified_completion_promotes_the_accepted_run_to_success(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true], 200)]);
+        $job = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York');
+        $job->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+
+        $claims = app(FlintRunToken::class)->verifyCompletion($job->runToken, $this->user);
+        app(FlintRunCompletionService::class)->complete($this->user, $claims);
+
+        $execution = TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail();
+        $this->assertSame('success', $execution->status);
+        $this->assertSame($job->runUuid, $execution->last_success['run_uuid']);
+        $this->assertNotNull($execution->last_success['completed_at']);
     }
 
     #[Test]
@@ -185,7 +204,7 @@ class TriggerFlintRoutineJobTest extends TestCase
     }
 
     #[Test]
-    public function manual_runs_leave_scheduled_markers_and_last_success_untouched(): void
+    public function manual_runs_leave_scheduled_markers_untouched_and_do_not_claim_success(): void
     {
         Http::fake(['*' => Http::response(['ok' => true], 200)]);
         $scheduled = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York');
@@ -198,9 +217,10 @@ class TriggerFlintRoutineJobTest extends TestCase
 
         $execution = TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail();
         $this->assertSame($scheduledMarker, Cache::get($marker));
-        $this->assertSame('scheduled', $execution->last_success['trigger_source']);
-        $this->assertSame('manual', collect($execution->history)->last()['trigger_source']);
-        $this->assertCount(2, $execution->history);
+        $this->assertNull($execution->last_success);
+        $this->assertSame('accepted', $execution->status);
+        $this->assertSame('manual', $execution->triggered_by);
+        $this->assertCount(0, $execution->history);
         Http::assertSentCount(2);
     }
 
@@ -229,9 +249,9 @@ class TriggerFlintRoutineJobTest extends TestCase
         $manual->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
 
         Http::assertSentCount(3);
-        $this->assertSame('manual', collect(
-            TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail()->history
-        )->last()['trigger_source']);
+        $execution = TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail();
+        $this->assertSame('accepted', $execution->status);
+        $this->assertSame('manual', $execution->triggered_by);
     }
 
     private function runJob(string $routine = 'topics'): void
