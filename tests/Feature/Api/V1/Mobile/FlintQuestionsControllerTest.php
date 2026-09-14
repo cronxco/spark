@@ -41,6 +41,8 @@ class FlintQuestionsControllerTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $open->id)
+            ->assertJsonPath('next_cursor', null)
+            ->assertJsonPath('has_more', false)
             ->assertJsonMissingPath('data.0.priority');
     }
 
@@ -82,6 +84,40 @@ class FlintQuestionsControllerTest extends TestCase
         $version = app(ResourceVersion::class)->etag($question);
         $this->postJson($url, ['action' => 'skip'], ['If-Match' => $version, 'Idempotency-Key' => $mutation])->assertCreated();
         $this->postJson($url, ['action' => 'answer', 'answer' => 'Different'], ['If-Match' => $version, 'Idempotency-Key' => $mutation])->assertConflict();
+    }
+
+    #[Test]
+    public function malformed_history_entries_are_ignored_and_missing_ids_are_stable(): void
+    {
+        $question = $this->question(now(), [
+            'answer' => 'Friday',
+            'answered_at' => now()->toIso8601String(),
+            'action_history' => [
+                ['answer' => 'Missing action'],
+                ['action' => 'unknown'],
+                ['action' => 'answer', 'answer' => 'Friday', 'created_at' => now()->toIso8601String()],
+            ],
+        ]);
+
+        $response = $this->getJson("/api/v1/mobile/flint/digests/{$question->event_id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'blocks.0.answer_history')
+            ->assertJsonPath('blocks.0.answer_history.0.action', 'answer');
+
+        $this->assertNotEmpty($response->json('blocks.0.answer_history.0.id'));
+    }
+
+    #[Test]
+    public function the_legacy_mobile_adapter_preserves_transition_errors(): void
+    {
+        $question = $this->question(now(), [
+            'question_status' => 'skipped',
+            'skipped_at' => now()->toIso8601String(),
+        ]);
+
+        $this->postJson("/api/v1/mobile/flint/questions/{$question->id}/answer", ['answer' => 'Friday'])
+            ->assertUnprocessable()
+            ->assertJsonPath('error', 'Only open or retired questions can be answered.');
     }
 
     private function question(mixed $time, array $metadata = []): Block

@@ -150,7 +150,7 @@ class FlintDigestsController extends Controller
         );
 
         if ($result['status'] >= 400) {
-            return response()->json(['error' => 'Forbidden.'], $result['status']);
+            return response()->json(['error' => $result['message'] ?? 'Forbidden.'], $result['status']);
         }
 
         $answer = $result['data']['effective_answer'];
@@ -219,12 +219,13 @@ class FlintDigestsController extends Controller
                     'freshness' => FlintDigestFreshness::for($generatedAt),
                 ];
             })->all(),
+            'next_cursor' => $paginator->nextCursor()?->encode(),
+            'has_more' => $paginator->hasMorePages(),
             'meta' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),
                 'effective_timezone' => $timezone,
                 'account_id' => (string) $request->user()->id,
-                'next_cursor' => $paginator->nextCursor()?->encode(),
             ],
         ]);
     }

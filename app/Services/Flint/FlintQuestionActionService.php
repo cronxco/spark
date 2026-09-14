@@ -106,7 +106,7 @@ class FlintQuestionActionService
         }, attempts: 3);
     }
 
-    /** @return array{status:int, data:array<string,mixed>, etag:string} */
+    /** @return array{status:int, data?:array<string,mixed>, message?:string, etag?:string} */
     public function recordLegacy(User $user, string $blockId, string $answer, ?string $context): array
     {
         $block = $this->ownedBlock($user, $blockId);

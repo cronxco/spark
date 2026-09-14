@@ -42,6 +42,9 @@ class FlintNoteService
         ];
         $requestHash = hash('sha256', json_encode($normalized, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
         $id = (string) Uuid::uuid5(Uuid::NAMESPACE_URL, 'spark:flint-note:' . $user->id . ':' . strtolower($input['client_mutation_id']));
+        $timezone = $this->timezones->timezoneFor($user);
+        $authoredAt = CarbonImmutable::parse($normalized['authored_at']);
+        $renderedMinute = $authoredAt->setTimezone($timezone)->format('Y-m-d H:i');
         $existing = EventObject::withTrashed()->where('user_id', $user->id)->find($id);
 
         if ($existing) {
@@ -59,10 +62,12 @@ class FlintNoteService
             $targets[] = [$link['type'], $target];
         }
 
-        $result = DB::transaction(function () use ($user, $input, $normalized, $requestHash, $id, $targets): array {
+        $result = DB::transaction(function () use ($user, $input, $normalized, $requestHash, $id, $targets, $timezone, $authoredAt, $renderedMinute): array {
             if (DB::getDriverName() === 'pgsql') {
                 DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['flint-note-mutation:' . $id]);
-                DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['flint-note-title:' . $user->id . ':' . $normalized['authored_at']]);
+                DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [
+                    'flint-note-title:' . $user->id . ':' . $timezone . ':' . $renderedMinute,
+                ]);
             }
 
             $existing = EventObject::withTrashed()->where('user_id', $user->id)->find($id);
@@ -72,8 +77,7 @@ class FlintNoteService
                     : ['status' => 409, 'message' => 'The client mutation ID has already been used with different content.'];
             }
 
-            $authoredAt = CarbonImmutable::parse($normalized['authored_at']);
-            $title = $this->availableTitle($user, $authoredAt);
+            $title = $this->availableTitle($user, $authoredAt, $timezone);
             $note = new EventObject;
             $note->id = $id;
             $note->fill([
@@ -88,7 +92,7 @@ class FlintNoteService
                     'request_hash' => $requestHash,
                     'consent_version' => $normalized['consent_version'],
                     'consented_at' => now()->toIso8601String(),
-                    'effective_timezone' => $this->timezones->timezoneFor($user),
+                    'effective_timezone' => $timezone,
                 ],
             ]);
             $note->save();
@@ -157,9 +161,9 @@ class FlintNoteService
         ];
     }
 
-    private function availableTitle(User $user, CarbonImmutable $authoredAt): string
+    private function availableTitle(User $user, CarbonImmutable $authoredAt, string $timezone): string
     {
-        $base = 'Note to Flint ' . $authoredAt->setTimezone($this->timezones->timezoneFor($user))->format('d/m/y H:i');
+        $base = 'Note to Flint ' . $authoredAt->setTimezone($timezone)->format('d/m/y H:i');
         $titles = EventObject::query()
             ->where('user_id', $user->id)
             ->where('concept', 'document')

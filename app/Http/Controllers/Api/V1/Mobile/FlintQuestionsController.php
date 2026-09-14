@@ -26,6 +26,7 @@ class FlintQuestionsController extends Controller
         $cutoff = $timezones->now($request->user())->subDays(FlintQuestion::RETIREMENT_DAYS);
 
         $questions = Block::query()
+            ->select(['blocks.*', 'xmin'])
             ->where('block_type', FlintQuestion::BLOCK_TYPE)
             ->where('time', '>=', $cutoff)
             ->whereNull('metadata->answer')
@@ -39,8 +40,9 @@ class FlintQuestionsController extends Controller
 
         return response()->json([
             'data' => collect($questions->items())->map(fn (Block $block) => FlintQuestionPresenter::present($block))->all(),
+            'next_cursor' => $questions->nextCursor()?->encode(),
+            'has_more' => $questions->hasMorePages(),
             'meta' => [
-                'next_cursor' => $questions->nextCursor()?->encode(),
                 'effective_timezone' => $timezones->timezoneFor($request->user()),
                 'account_id' => (string) $request->user()->id,
             ],

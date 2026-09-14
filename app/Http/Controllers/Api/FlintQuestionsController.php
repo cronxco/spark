@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Block;
+use App\Services\Flint\FlintQuestionActionException;
 use App\Services\Flint\FlintQuestionAnswerer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,12 +28,16 @@ class FlintQuestionsController extends Controller
             'answer_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        return response()->json(
-            app(FlintQuestionAnswerer::class)->record(
+        try {
+            $answer = app(FlintQuestionAnswerer::class)->record(
                 $block,
                 $validated['answer'],
                 $validated['answer_note'] ?? null,
-            )
-        );
+            );
+        } catch (FlintQuestionActionException $exception) {
+            return response()->json(['error' => $exception->getMessage()], $exception->status);
+        }
+
+        return response()->json($answer);
     }
 }

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Flint\FlintRunCompletionService;
 use App\Services\Flint\FlintRunToken;
 use App\Services\FlintDigestService;
+use App\Services\FlintTopicService;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\RequestException;
@@ -137,7 +138,11 @@ class TriggerFlintRoutineJobTest extends TestCase
         $job->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
 
         $claims = app(FlintRunToken::class)->verifyCompletion($job->runToken, $this->user);
-        app(FlintRunCompletionService::class)->complete($this->user, $claims);
+        $topic = app(FlintTopicService::class)->create($this->user, [
+            'title' => 'Run-bound topic',
+            'kind' => 'tactical',
+        ], $job->runUuid);
+        app(FlintRunCompletionService::class)->complete($this->user, $claims, $topic['id']);
 
         $execution = TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail();
         $this->assertSame('success', $execution->status);
@@ -220,8 +225,46 @@ class TriggerFlintRoutineJobTest extends TestCase
         $this->assertNull($execution->last_success);
         $this->assertSame('accepted', $execution->status);
         $this->assertSame('manual', $execution->triggered_by);
-        $this->assertCount(0, $execution->history);
+        $this->assertCount(2, $execution->history);
         Http::assertSentCount(2);
+    }
+
+    #[Test]
+    public function an_older_accepted_run_can_complete_after_a_newer_manual_run_starts(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true], 200)]);
+        $scheduled = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York');
+        $scheduled->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+        $manual = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York', true);
+        $manual->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+
+        $topic = app(FlintTopicService::class)->create($this->user, [
+            'title' => 'Scheduled output',
+            'kind' => 'tactical',
+        ], $scheduled->runUuid);
+        $claims = app(FlintRunToken::class)->verifyCompletion($scheduled->runToken, $this->user);
+        app(FlintRunCompletionService::class)->complete($this->user, $claims, $topic['id']);
+
+        $execution = TaskExecution::where('task_key', 'flint_routine_topics')->firstOrFail();
+        $this->assertSame('success', $execution->status);
+        $this->assertSame($scheduled->runUuid, $execution->last_success['run_uuid']);
+    }
+
+    #[Test]
+    public function completion_rejects_a_topic_not_written_by_the_run(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true], 200)]);
+        $job = new TriggerFlintRoutineJob($this->user, 'topics', '2026-06-14', 'America/New_York');
+        $job->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
+        $topic = app(FlintTopicService::class)->create($this->user, [
+            'title' => 'Unrelated topic',
+            'kind' => 'tactical',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('not associated');
+        $claims = app(FlintRunToken::class)->verifyCompletion($job->runToken, $this->user);
+        app(FlintRunCompletionService::class)->complete($this->user, $claims, $topic['id']);
     }
 
     #[Test]

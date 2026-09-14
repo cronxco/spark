@@ -15,6 +15,7 @@ allowed_tools:
   - spark__get-events-by-filter-tool
   - spark__get-latest-flint-digest
   - spark__manage-flint-topic
+  - spark__complete-flint-run
 required_success_tools: []
 max_tool_calls: 40
 timeout_seconds: 300
@@ -67,7 +68,7 @@ grows is a broken topic list.
 The Routine fires with:
 
 ```json
-{ "user_id": "...", "routine": "topics", "local_date": "YYYY-MM-DD", "timezone": "Europe/London" }
+{ "user_id": "...", "routine": "topics", "local_date": "YYYY-MM-DD", "timezone": "Europe/London", "run_token": "<opaque>" }
 ```
 
 Work in `local_date`, in `timezone`.
@@ -170,7 +171,8 @@ spark__manage-flint-topic(
   operation: "update",
   id: "<topic id>",
   content: "<rewritten summary>",
-  related_event_id: "<the digest event id>"
+  related_event_id: "<the digest event id>",
+  run_token: "<run_token from the trigger payload>"
 )
 ```
 
@@ -224,7 +226,8 @@ spark__manage-flint-topic(
   kind: "strategic|thematic|tactical",
   content: "<what this is and where it stands>",
   origin: "digest_inference",
-  related_event_id: "<the digest that prompted it>"
+  related_event_id: "<the digest that prompted it>",
+  run_token: "<run_token from the trigger payload>"
 )
 ```
 
@@ -239,7 +242,21 @@ Spark UI keys on them, and renaming a topic breaks the thread visually. Rewrite
 Set `next_review_at` on creation for anything you already know is a
 wake-me-later topic.
 
-## Step 7: Stop
+## Step 7: Confirm persisted output, then stop
+
+If this run created or updated at least one topic, complete it with the ID from
+the final successful write:
+
+```text
+spark__complete-flint-run(
+  run_token: "<run_token from the trigger payload>",
+  output_id: "<persisted topic id>"
+)
+```
+
+Do not call completion with an unchanged topic merely to make the run appear
+successful. A run with no durable topic change remains accepted, which
+accurately records that the routine ran without claiming persisted output.
 
 There is no digest to write and no notification to send. The Topics tab in Spark
 is the output. Do not create a `flint_editorial_note`, do not write to Outline,
@@ -263,4 +280,5 @@ correct run.
 - [ ] any new topic clears all four bars in Step 6, and no new topic restates an
       existing one;
 - [ ] zero new topics was considered and is an acceptable outcome;
+- [ ] a run that wrote a topic passed that topic's ID to `complete-flint-run`;
 - [ ] nothing was written outside Topics.

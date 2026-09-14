@@ -62,7 +62,24 @@ class FlintQuestion
         $history = $metadata['action_history'] ?? [];
 
         if (is_array($history) && $history !== []) {
-            return array_values(array_filter($history, 'is_array'));
+            return collect($history)
+                ->filter(fn (mixed $action): bool => is_array($action))
+                ->values()
+                ->map(function (array $action, int $index) use ($block): ?array {
+                    if (! isset($action['action']) || ! in_array($action['action'], ['answer', 'correct', 'skip'], true)) {
+                        return null;
+                    }
+
+                    return $action + [
+                        'id' => (string) Uuid::uuid5(
+                            Uuid::NAMESPACE_URL,
+                            'unkeyed-action:' . $block->id . ':' . $index,
+                        ),
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all();
         }
 
         if (! self::isAnswered($block)) {

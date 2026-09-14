@@ -29,8 +29,9 @@ class FlintNotesController extends Controller
 
         return response()->json([
             'data' => collect($paginator->items())->map(fn (EventObject $note) => $notes->payload($note))->all(),
+            'next_cursor' => $paginator->nextCursor()?->encode(),
+            'has_more' => $paginator->hasMorePages(),
             'meta' => [
-                'next_cursor' => $paginator->nextCursor()?->encode(),
                 'effective_timezone' => $timezones->timezoneFor($request->user()),
                 'account_id' => (string) $request->user()->id,
             ],

@@ -144,6 +144,7 @@ class RoutineDriverTest extends TestCase
                 'spark__get-events-by-filter-tool',
                 'spark__get-latest-flint-digest',
                 'spark__manage-flint-topic',
+                'spark__complete-flint-run',
             ], $tool['allowed_tools']);
 
             return true;

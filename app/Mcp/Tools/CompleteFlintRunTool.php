@@ -28,6 +28,10 @@ class CompleteFlintRunTool extends Tool
         if (! is_string($token) || $token === '') {
             return Response::error('run_token is required.');
         }
+        $outputId = $request->get('output_id');
+        if (! is_string($outputId) || $outputId === '') {
+            return Response::error('output_id is required.');
+        }
 
         try {
             $claims = app(FlintRunToken::class)->verifyCompletion($token, $request->user());
@@ -35,7 +39,7 @@ class CompleteFlintRunTool extends Tool
                 return Response::error('Only the topics routine requires explicit completion.');
             }
 
-            return Response::json(app(FlintRunCompletionService::class)->complete($request->user(), $claims));
+            return Response::json(app(FlintRunCompletionService::class)->complete($request->user(), $claims, $outputId));
         } catch (RuntimeException $exception) {
             return Response::error($exception->getMessage());
         }
@@ -45,6 +49,7 @@ class CompleteFlintRunTool extends Tool
     {
         return [
             'run_token' => $schema->string()->description('Opaque run token from the Flint trigger payload.')->required(),
+            'output_id' => $schema->string()->description('UUID of a persisted topic written by this run.')->required(),
         ];
     }
 }

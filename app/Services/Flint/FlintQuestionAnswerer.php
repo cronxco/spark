@@ -3,7 +3,6 @@
 namespace App\Services\Flint;
 
 use App\Models\Block;
-use RuntimeException;
 
 /**
  * Records Will's answer to a `flint_user_question` block.
@@ -24,12 +23,15 @@ class FlintQuestionAnswerer
         $block->loadMissing('event.integration');
         $user = $block->event?->integration?->user;
         if (! $user) {
-            throw new RuntimeException('The Flint question has no owning user.');
+            throw new FlintQuestionActionException(422, 'The Flint question has no owning user.');
         }
 
         $result = app(FlintQuestionActionService::class)->recordLegacy($user, (string) $block->id, $answer, $note);
         if ($result['status'] >= 400) {
-            throw new RuntimeException('The Flint question could not be answered.');
+            throw new FlintQuestionActionException(
+                $result['status'],
+                $result['message'] ?? 'The Flint question could not be answered.',
+            );
         }
         $effective = $result['data']['effective_answer'];
 

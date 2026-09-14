@@ -1272,12 +1272,13 @@ List items deliberately omit blocks; use the detail route to open a digest.
             "freshness": { "state": "fresh", "age_seconds": 8280 }
         }
     ],
+    "next_cursor": null,
+    "has_more": false,
     "meta": {
         "from": "2026-08-16",
         "to": "2026-09-14",
         "effective_timezone": "Europe/London",
-        "account_id": "user-uuid",
-        "next_cursor": null
+        "account_id": "user-uuid"
     }
 }
 ```
@@ -1326,8 +1327,9 @@ default 20); `cursor` (opaque).
             "version": "\"strong-question-version\""
         }
     ],
+    "next_cursor": null,
+    "has_more": false,
     "meta": {
-        "next_cursor": null,
         "effective_timezone": "Europe/London",
         "account_id": "user-uuid"
     }
@@ -1399,6 +1401,8 @@ still exists.
             {
                 "id": "relationship-uuid",
                 "source_type": "digest_block",
+                "source_id": "block-uuid",
+                "event_id": "digest-event-uuid",
                 "digest_id": "digest-event-uuid",
                 "block_id": "block-uuid",
                 "title": "Planning pressure",
@@ -1428,8 +1432,8 @@ searchable object store and are always scoped to the authenticated account.
 
 Each note includes `id`, derived `title`, `body`, `authored_at`, `created_at`,
 `deleted_at`, validated `context_links`, consent metadata, and a strong
-`version`. The envelope metadata includes `next_cursor`,
-`effective_timezone`, and `account_id`.
+`version`. The envelope includes top-level `next_cursor` and `has_more`; its
+`meta` object contains `effective_timezone` and `account_id`.
 
 ---
 

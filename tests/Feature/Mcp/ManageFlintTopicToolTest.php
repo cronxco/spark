@@ -9,7 +9,9 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\Flint\FlintRunToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -138,5 +140,26 @@ class ManageFlintTopicToolTest extends TestCase
         $response = SparkServer::tool(ManageFlintTopicTool::class, ['operation' => 'list']);
 
         $response->assertHasErrors(['Authentication required']);
+    }
+
+    #[Test]
+    public function a_verified_topics_run_is_associated_with_its_persisted_output(): void
+    {
+        $runUuid = (string) Str::uuid();
+        $token = app(FlintRunToken::class)->issue([
+            'run_uuid' => $runUuid,
+            'user_id' => (string) $this->user->id,
+            'routine' => 'topics',
+        ]);
+
+        SparkServer::actingAs($this->user)->tool(ManageFlintTopicTool::class, [
+            'operation' => 'create',
+            'title' => 'Routine output',
+            'kind' => 'tactical',
+            'run_token' => $token,
+        ])->assertOk();
+
+        $topic = EventObject::where('title', 'Routine output')->firstOrFail();
+        $this->assertContains($runUuid, $topic->metadata['run_uuids']);
     }
 }

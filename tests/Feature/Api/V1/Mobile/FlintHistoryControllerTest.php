@@ -52,11 +52,13 @@ class FlintHistoryControllerTest extends TestCase
             ->assertOk()
             ->assertJsonCount(2, 'data')
             ->assertJsonMissingPath('data.0.blocks');
-        $this->assertNotNull($first->json('meta.next_cursor'));
+        $this->assertNotNull($first->json('next_cursor'));
+        $first->assertJsonPath('has_more', true);
 
-        $this->getJson('/api/v1/mobile/flint/digests?from=2026-09-12&to=2026-09-14&limit=2&cursor=' . urlencode($first->json('meta.next_cursor')))
+        $this->getJson('/api/v1/mobile/flint/digests?from=2026-09-12&to=2026-09-14&limit=2&cursor=' . urlencode($first->json('next_cursor')))
             ->assertOk()
-            ->assertJsonCount(1, 'data');
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('has_more', false);
     }
 
     #[Test]
@@ -68,12 +70,13 @@ class FlintHistoryControllerTest extends TestCase
             ->assertOk()
             ->assertExactJson([
                 'data' => [],
+                'next_cursor' => null,
+                'has_more' => false,
                 'meta' => [
                     'from' => '2026-09-01',
                     'to' => '2026-09-02',
                     'effective_timezone' => 'Europe/London',
                     'account_id' => (string) $this->user->id,
-                    'next_cursor' => null,
                 ],
             ]);
     }

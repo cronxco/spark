@@ -35,7 +35,7 @@ class FlintRoutineHealthController extends Controller
                 $driver = $drivers->driverName($driverRoutine);
                 $enabled = $schedule->enabled($user, $routine);
                 $configured = $driver === 'webhook'
-                    ? RoutineConfig::url($driverRoutine) !== null
+                    ? filled(RoutineConfig::url($driverRoutine))
                     : filled(config('services.flint_routine.cronxtools_url'));
                 $attempt = $executionState["flint_routine_{$driverRoutine}"]['last_attempt'] ?? null;
                 $success = $executionState["flint_routine_{$driverRoutine}"]['last_success'] ?? null;

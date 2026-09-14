@@ -161,4 +161,27 @@ class FlintDigestTaskExecutionTest extends TestCase
         $this->assertSame($job->runUuid, $execution->last_success['run_uuid']);
         $this->assertSame($result['event_id'], $execution->last_success['event_id']);
     }
+
+    #[Test]
+    public function a_completion_racing_the_provider_response_is_not_downgraded_to_accepted(): void
+    {
+        $user = User::factory()->create();
+        $job = new TriggerFlintDigestRoutineJob($user, 'morning', '2026-06-15', 'America/New_York', 'scheduled');
+        Http::fake(function () use ($user, $job) {
+            app(FlintDigestService::class)->create($user, [
+                'title' => 'Morning Digest',
+                'period' => 'morning',
+                'date' => '2026-06-15',
+                'run_token' => $job->runToken,
+            ]);
+
+            return Http::response(['ok' => true], 200);
+        });
+
+        $job->handle();
+
+        $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
+        $this->assertSame('success', $execution->status);
+        $this->assertSame($job->runUuid, $execution->last_success['run_uuid']);
+    }
 }

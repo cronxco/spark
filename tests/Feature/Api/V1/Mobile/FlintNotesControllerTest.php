@@ -33,7 +33,9 @@ class FlintNotesControllerTest extends TestCase
     public function notes_use_authored_time_titles_and_disambiguate_same_minute(): void
     {
         $first = $this->postJson('/api/v1/mobile/flint/notes', $this->payload())->assertCreated();
-        $second = $this->postJson('/api/v1/mobile/flint/notes', $this->payload())->assertCreated();
+        $second = $this->postJson('/api/v1/mobile/flint/notes', $this->payload([
+            'authored_at' => '2026-09-14T13:17:59+01:00',
+        ]))->assertCreated();
 
         $first->assertJsonPath('data.title', 'Note to Flint 14/09/26 13:17');
         $second->assertJsonPath('data.title', 'Note to Flint 14/09/26 13:17 (2)');
@@ -77,7 +79,11 @@ class FlintNotesControllerTest extends TestCase
     public function list_and_delete_are_tenant_scoped_and_idempotent(): void
     {
         $id = $this->postJson('/api/v1/mobile/flint/notes', $this->payload())->json('data.id');
-        $this->getJson('/api/v1/mobile/flint/notes')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/v1/mobile/flint/notes')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('next_cursor', null)
+            ->assertJsonPath('has_more', false);
         $this->deleteJson("/api/v1/mobile/flint/notes/{$id}")->assertNoContent();
         $this->deleteJson("/api/v1/mobile/flint/notes/{$id}")->assertNoContent();
         $this->getJson('/api/v1/mobile/flint/notes')->assertOk()->assertJsonCount(0, 'data');
