@@ -23,4 +23,13 @@ class FlintTopicsController extends Controller
             $this->topics->list($request->user(), $request->only(['status', 'kind']))
         );
     }
+
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $topic = $this->topics->detail($request->user(), $id);
+
+        return $topic
+            ? response()->json(['data' => $topic])
+            : response()->json(['message' => 'Thread not found.'], 404);
+    }
 }

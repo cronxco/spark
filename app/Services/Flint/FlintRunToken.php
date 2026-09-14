@@ -39,4 +39,24 @@ class FlintRunToken
 
         return $claims;
     }
+
+    /** @return array<string, mixed> */
+    public function verifyCompletion(string $token, User $user): array
+    {
+        try {
+            $claims = json_decode(Crypt::decryptString($token), true, flags: JSON_THROW_ON_ERROR);
+        } catch (DecryptException|JsonException $exception) {
+            throw new RuntimeException('The Flint run token is invalid.', previous: $exception);
+        }
+
+        if (! is_array($claims)
+            || ($claims['user_id'] ?? null) !== (string) $user->id
+            || (int) ($claims['expires_at'] ?? 0) < now()->timestamp
+            || ! is_string($claims['run_uuid'] ?? null)
+        ) {
+            throw new RuntimeException('The Flint run token does not match this account.');
+        }
+
+        return $claims;
+    }
 }

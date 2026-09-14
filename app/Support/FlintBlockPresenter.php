@@ -32,6 +32,7 @@ class FlintBlockPresenter
         Collection $blocks,
         bool $linkify = false,
         mixed $integrationIds = null,
+        FlintAudience $audience = FlintAudience::Internal,
     ): array {
         $referenceLookup = $linkify
             ? collect(EntityReferenceResolver::resolveEvents(
@@ -41,7 +42,7 @@ class FlintBlockPresenter
             : collect();
 
         return $blocks
-            ->map(fn (Block $block): array => self::present($block, $linkify, $referenceLookup))
+            ->map(fn (Block $block): array => self::present($block, $linkify, $referenceLookup, $audience))
             ->values()
             ->all();
     }
@@ -66,7 +67,7 @@ class FlintBlockPresenter
      * @param  Collection<string, array<string, mixed>>  $referenceLookup
      * @return array<string, mixed>
      */
-    private static function present(Block $block, bool $linkify, Collection $referenceLookup): array
+    private static function present(Block $block, bool $linkify, Collection $referenceLookup, FlintAudience $audience): array
     {
         $base = [
             'id' => $block->id,
@@ -78,10 +79,9 @@ class FlintBlockPresenter
         $meta = $block->metadata ?? [];
 
         if ($block->block_type === 'flint_user_question') {
-            return $base + [
+            $question = $base + [
                 'question' => $meta['question'] ?? null,
                 'topic' => $meta['topic'] ?? null,
-                'priority' => $meta['priority'] ?? null,
                 'answer_options' => $meta['answer_options'] ?? null,
                 'answer' => $meta['answer'] ?? null,
                 'answer_note' => $meta['answer_note'] ?? null,
@@ -92,7 +92,22 @@ class FlintBlockPresenter
                 // FlintQuestion.
                 'retired_at' => $meta['retired_at'] ?? null,
                 'retired' => FlintQuestion::isRetired($block),
+                'status' => FlintQuestion::status($block),
+                'skipped_at' => $meta['skipped_at'] ?? null,
+                'answer_history' => collect(FlintQuestion::history($block))->map(fn (array $action) => [
+                    'id' => $action['id'],
+                    'action' => $action['action'],
+                    'answer' => $action['answer'] ?? null,
+                    'context' => $action['context'] ?? null,
+                    'created_at' => $action['created_at'] ?? null,
+                ])->all(),
             ];
+
+            if ($audience !== FlintAudience::MobileReader) {
+                $question['priority'] = $meta['priority'] ?? null;
+            }
+
+            return $question;
         }
 
         if ($block->block_type === 'flint_day_context') {

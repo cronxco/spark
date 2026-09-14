@@ -5,10 +5,15 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
-use App\Services\Flint\FlintQuestionAnswerer;
+use App\Services\Api\ResourceVersion;
+use App\Services\EffectiveTimezoneResolver;
+use App\Services\Flint\FlintQuestionActionService;
 use App\Services\FlintDigestService;
+use App\Support\FlintAudience;
 use App\Support\FlintBlockPresenter;
+use App\Support\FlintDigestFreshness;
 use App\Support\FlintDigestKind;
+use App\Support\FlintQuestion;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,7 +38,15 @@ class FlintDigestsController extends Controller
         $validated = $request->validate([
             'date' => ['nullable', 'date_format:Y-m-d'],
             'period' => ['nullable', 'string', 'in:morning,afternoon,evening'],
+            'from' => ['nullable', 'date_format:Y-m-d', 'required_with:to'],
+            'to' => ['nullable', 'date_format:Y-m-d', 'required_with:from'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'cursor' => ['nullable', 'string'],
         ]);
+
+        if (isset($validated['from'], $validated['to'])) {
+            return $this->history($request, $validated);
+        }
 
         $timezone = $request->user()->getTimezone();
         $date = isset($validated['date'])
@@ -129,13 +142,92 @@ class FlintDigestsController extends Controller
             'answer_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        return response()->json(
-            app(FlintQuestionAnswerer::class)->record(
-                $block,
-                $validated['answer'],
-                $validated['answer_note'] ?? null,
-            )
+        $result = app(FlintQuestionActionService::class)->recordLegacy(
+            $request->user(),
+            (string) $block->id,
+            $validated['answer'],
+            $validated['answer_note'] ?? null,
         );
+
+        if ($result['status'] >= 400) {
+            return response()->json(['error' => $result['message'] ?? 'Forbidden.'], $result['status']);
+        }
+
+        $answer = $result['data']['effective_answer'];
+
+        return response()->json([
+            'block_id' => $block->id,
+            'answer' => $answer['answer'],
+            'answer_note' => $answer['context'],
+            'answered_at' => $answer['answered_at'],
+        ])->header('Deprecation', 'true')->header('Sunset', now()->addMonths(3)->toRfc7231String());
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function history(Request $request, array $validated): JsonResponse
+    {
+        $timezones = app(EffectiveTimezoneResolver::class);
+        $timezone = $timezones->timezoneFor($request->user());
+        $from = Carbon::parse($validated['from'], $timezone)->startOfDay();
+        $to = Carbon::parse($validated['to'], $timezone)->startOfDay();
+        $today = $timezones->today($request->user())->startOfDay();
+
+        if ($from->gt($to)) {
+            return response()->json(['message' => 'The from date must be on or before the to date.'], 422);
+        }
+        if ($from->diffInDays($to) + 1 > 30) {
+            return response()->json(['message' => 'Digest history is limited to 30 local calendar days.'], 422);
+        }
+        if ($from->gt($today)) {
+            return response()->json(['message' => 'A future-only digest range is not valid.'], 422);
+        }
+
+        $integrationIds = $request->user()->integrations()->pluck('id');
+        $paginator = Event::query()
+            ->whereIn('integration_id', $integrationIds)
+            ->where('service', 'flint')
+            ->where('action', 'had_summary')
+            ->where('time', '>=', $from->copy()->utc())
+            ->where('time', '<', $to->copy()->addDay()->utc())
+            ->withCount(['blocks as unanswered_question_count' => fn ($query) => $query
+                ->whereNull('deleted_at')
+                ->where('block_type', FlintQuestion::BLOCK_TYPE)
+                ->whereNull('metadata->answer')
+                ->whereNull('metadata->retired_at')
+                ->whereNull('metadata->skipped_at')])
+            ->orderByDesc('time')
+            ->orderByDesc('id')
+            ->cursorPaginate((int) ($validated['limit'] ?? 20), ['*'], 'cursor');
+        $versions = app(ResourceVersion::class);
+
+        return response()->json([
+            'data' => collect($paginator->items())->map(function (Event $event) use ($timezone, $versions): array {
+                $metadata = $event->event_metadata ?? [];
+                $generatedAt = Carbon::parse($metadata['generated_at'] ?? $event->created_at);
+
+                return [
+                    'id' => (string) $event->id,
+                    'local_date' => $metadata['local_date'] ?? $event->time->copy()->setTimezone($timezone)->toDateString(),
+                    'period' => $metadata['period'] ?? null,
+                    'kind' => FlintDigestKind::for($event, $metadata),
+                    'title' => $metadata['title'] ?? $event->action,
+                    'summary' => $metadata['summary'] ?? null,
+                    'generated_at' => $generatedAt->setTimezone($timezone)->toIso8601String(),
+                    'updated_at' => $event->updated_at?->setTimezone($timezone)->toIso8601String(),
+                    'unanswered_question_count' => (int) $event->unanswered_question_count,
+                    'version' => 'W/' . $versions->etag($event),
+                    'freshness' => FlintDigestFreshness::for($generatedAt),
+                ];
+            })->all(),
+            'next_cursor' => $paginator->nextCursor()?->encode(),
+            'has_more' => $paginator->hasMorePages(),
+            'meta' => [
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+                'effective_timezone' => $timezone,
+                'account_id' => (string) $request->user()->id,
+            ],
+        ]);
     }
 
     /**
@@ -165,6 +257,7 @@ class FlintDigestsController extends Controller
             $event->blocks,
             linkify: true,
             integrationIds: $integrationIds,
+            audience: FlintAudience::MobileReader,
         ));
 
         return [
@@ -176,11 +269,11 @@ class FlintDigestsController extends Controller
             'title' => $eventMeta['title'] ?? $event->action,
             'summary' => $eventMeta['summary'] ?? null,
             'created_at' => $event->created_at->toIso8601String(),
+            'version' => app(ResourceVersion::class)->etag($event),
             'block_count' => $blocks->count(),
             'unanswered_question_count' => $blocks->filter(
                 fn (array $b) => $b['block_type'] === 'flint_user_question'
-                    && ! $b['answered']
-                    && ! $b['retired']
+                    && $b['status'] === 'open'
             )->count(),
             'blocks' => $blocks->values(),
         ];

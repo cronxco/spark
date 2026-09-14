@@ -60,7 +60,7 @@ class RoutineDriverTest extends TestCase
         $payload = ['routine' => 'news_roundup', 'local_date' => '2026-06-14', 'run_token' => 'tok'];
         $result = (new WebhookRoutineDriver)->run(User::factory()->create(), 'news_roundup', $payload);
 
-        $this->assertSame('success', $result->status);
+        $this->assertSame('accepted', $result->status);
 
         Http::assertSent(function ($request) use ($payload) {
             // A Routine runs its own configured prompt and ignores the request
@@ -123,7 +123,7 @@ class RoutineDriverTest extends TestCase
 
         $result = app(OpenAiRoutineDriver::class)->run(User::factory()->create(), 'topics', ['routine' => 'topics']);
 
-        $this->assertSame('success', $result->status);
+        $this->assertSame('accepted', $result->status);
         $this->assertSame('openai', $result->details['driver']);
         $this->assertSame(1, $result->details['tool_calls']);
         $this->assertSame(120, $result->details['input_tokens']);
@@ -144,6 +144,7 @@ class RoutineDriverTest extends TestCase
                 'spark__get-events-by-filter-tool',
                 'spark__get-latest-flint-digest',
                 'spark__manage-flint-topic',
+                'spark__complete-flint-run',
             ], $tool['allowed_tools']);
 
             return true;

@@ -5,6 +5,7 @@ namespace App\Mcp\Servers;
 use App\Mcp\Resources\DayContextResource;
 use App\Mcp\Tools\AcknowledgeAnomalyTool;
 use App\Mcp\Tools\AnswerFlintQuestionTool;
+use App\Mcp\Tools\CompleteFlintRunTool;
 use App\Mcp\Tools\CreateFlintDigestTool;
 use App\Mcp\Tools\FetchWebpageHtmlTool;
 use App\Mcp\Tools\GetBaselinesTool;
@@ -101,6 +102,7 @@ class SparkServer extends Server
         - `get-latest-flint-digest`: Retrieve the latest Flint digest for a date (default: today). Returns all blocks with full metadata — for `flint_user_question` blocks, includes the user's answer, answer_note, and answered_at.
         - `answer-flint-question`: Record the user's answer to a Flint question.
         - `manage-flint-topic`: Create, update, or list persistent Flint Topics. Topics track strategic, thematic, and tactical threads, and may link digest events or blocks that discussed them.
+        - `complete-flint-run`: Confirm that a topic routine produced its expected persisted output using its verified run token.
         - `run-flint-skill`: Run a Flint routine now rather than waiting for its daily slot (digest, topics, reading_list, news_roundup). Queued; results are written back the usual way. Requires `flint:run`.
 
         ### Web Fetching
@@ -144,6 +146,7 @@ class SparkServer extends Server
         TriggerIntegrationUpdateTool::class,
         ListIntegrationsTool::class,
         CreateFlintDigestTool::class,
+        CompleteFlintRunTool::class,
         GetLatestFlintDigestTool::class,
         AnswerFlintQuestionTool::class,
         ManageFlintTopicTool::class,

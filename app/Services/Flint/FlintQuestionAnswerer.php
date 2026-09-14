@@ -20,21 +20,26 @@ class FlintQuestionAnswerer
      */
     public function record(Block $block, string $answer, ?string $note = null): array
     {
-        $answeredAt = now()->toIso8601String();
+        $block->loadMissing('event.integration');
+        $user = $block->event?->integration?->user;
+        if (! $user) {
+            throw new FlintQuestionActionException(422, 'The Flint question has no owning user.');
+        }
 
-        $block->metadata = array_merge($block->metadata ?? [], [
-            'answer' => $answer,
-            'answer_note' => $note ?: null,
-            'answered_at' => $answeredAt,
-        ]);
-
-        $block->save();
+        $result = app(FlintQuestionActionService::class)->recordLegacy($user, (string) $block->id, $answer, $note);
+        if ($result['status'] >= 400) {
+            throw new FlintQuestionActionException(
+                $result['status'],
+                $result['message'] ?? 'The Flint question could not be answered.',
+            );
+        }
+        $effective = $result['data']['effective_answer'];
 
         return [
             'block_id' => $block->id,
-            'answer' => $answer,
-            'answer_note' => $note ?: null,
-            'answered_at' => $answeredAt,
+            'answer' => $effective['answer'],
+            'answer_note' => $effective['context'],
+            'answered_at' => $effective['answered_at'],
         ];
     }
 

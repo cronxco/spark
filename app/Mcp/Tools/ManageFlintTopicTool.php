@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\RequiresSparkAbility;
+use App\Services\Flint\FlintRunToken;
 use App\Services\FlintTopicService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\ValidationException;
@@ -10,6 +11,7 @@ use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
+use RuntimeException;
 
 #[Name('manage-flint-topic')]
 class ManageFlintTopicTool extends Tool
@@ -33,14 +35,20 @@ class ManageFlintTopicTool extends Tool
         }
 
         try {
+            $runUuid = $this->runUuid($request);
+
             return match ($operation) {
-                'create' => Response::json($this->topics->create($user, $request->all())),
-                'update' => $this->update($request),
+                'create' => Response::json($this->topics->create($user, $request->all(), $runUuid)),
+                'update' => $this->update($request, $runUuid),
                 'list' => Response::json($this->topics->list($user, $request->all())),
                 default => Response::error('operation must be create, update, or list.'),
             };
-        } catch (ValidationException $exception) {
-            return Response::error($exception->validator->errors()->first());
+        } catch (ValidationException|RuntimeException $exception) {
+            if ($exception instanceof ValidationException) {
+                return Response::error($exception->validator->errors()->first());
+            }
+
+            return Response::error($exception->getMessage());
         }
     }
 
@@ -57,18 +65,37 @@ class ManageFlintTopicTool extends Tool
             'origin' => $schema->string()->description('conversation or digest_inference.'),
             'related_event_id' => $schema->string()->description('Optional owned digest event UUID that discussed this topic.'),
             'related_block_id' => $schema->string()->description('Optional owned digest block UUID that discussed this topic.'),
+            'run_token' => $schema->string()->description('Opaque topics run token. Supply it on routine-owned creates and updates.'),
         ];
     }
 
-    private function update(Request $request): Response
+    private function update(Request $request, ?string $runUuid): Response
     {
         $id = $request->get('id');
         if (! is_string($id)) {
             return Response::error('id is required for update.');
         }
 
-        $topic = $this->topics->update($request->user(), $id, $request->all());
+        $topic = $this->topics->update($request->user(), $id, $request->all(), $runUuid);
 
         return $topic ? Response::json($topic) : Response::error('Topic not found or access denied.');
+    }
+
+    private function runUuid(Request $request): ?string
+    {
+        $token = $request->get('run_token');
+        if ($token === null) {
+            return null;
+        }
+        if (! is_string($token) || $token === '') {
+            throw new RuntimeException('run_token must be a non-empty string.');
+        }
+
+        $claims = app(FlintRunToken::class)->verifyCompletion($token, $request->user());
+        if (($claims['routine'] ?? null) !== 'topics') {
+            throw new RuntimeException('The run token is not for the topics routine.');
+        }
+
+        return $claims['run_uuid'];
     }
 }

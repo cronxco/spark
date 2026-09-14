@@ -1489,22 +1489,40 @@ paths:
     get:
       operationId: listFlintDigests
       tags: [flint]
-      summary: Flint digest(s) for a date
+      summary: Flint digest(s) for a date or bounded local-day history range
+      description: >-
+        Preserve the date/period/all contract when from and to are absent.
+        Supplying both from and to selects the cursor-paginated History
+        contract. The inclusive range is interpreted in the account's
+        effective timezone and may contain at most 30 local calendar days.
       parameters:
-        - {
-            name: date,
-            in: query,
-            schema: { type: string, format: date, default: today },
-          }
-        - {
-            name: period,
-            in: query,
-            schema: { type: string, enum: [morning, afternoon, evening] },
-          }
+        - name: date
+          in: query
+          schema: { type: string, format: date, default: today }
+        - name: period
+          in: query
+          schema: { type: string, enum: [morning, afternoon, evening] }
         - { name: all, in: query, schema: { type: boolean, default: false } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 50, default: 20 },
+          }
+        - { name: cursor, in: query, schema: { type: string } }
       responses:
-        "200": { description: OK }
+        "200":
+          description: Date-oriented digest response or History page
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/FlintDigest" }
+                  - { $ref: "#/components/schemas/FlintDigestDay" }
+                  - { $ref: "#/components/schemas/FlintDigestHistoryPage" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
     post:
       operationId: createFlintDigest
       tags: [flint]
@@ -1527,6 +1545,7 @@ paths:
               }
       responses:
         "201": { description: Created }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /flint/digests/{id}:
     get:
@@ -1535,38 +1554,253 @@ paths:
       summary: A single Flint digest
       parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK }
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlintDigest" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /flint/questions:
+    get:
+      operationId: listOpenFlintQuestions
+      tags: [flint]
+      summary: Cursor-paginated open questions across recent digests
+      description: >-
+        Answered, skipped, and retired questions are excluded. Reader-facing
+        representations omit internal question priority.
+      parameters:
+        - {
+            name: status,
+            in: query,
+            schema: { type: string, enum: [open], default: open },
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 50, default: 20 },
+          }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: OK, including an empty data array
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlintQuestionPage" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /flint/questions/{block}/actions:
+    post:
+      operationId: appendFlintQuestionAction
+      tags: [flint]
+      summary: Append a versioned answer, correction, or skip
+      description: >-
+        Idempotent by account and Idempotency-Key. An identical replay returns
+        200 even when the original If-Match value is now stale. Reusing the key
+        with different content returns 409.
+      parameters:
+        - $ref: "#/components/parameters/FlintQuestionBlockId"
+        - $ref: "#/components/parameters/IfMatch"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FlintQuestionActionInput" }
+      responses:
+        "200":
+          description: Idempotent replay
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlintQuestionResponse" }
+        "201":
+          description: Action appended
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlintQuestionResponse" }
+        "403": { description: Question does not belong to the caller }
+        "409":
+          description: Idempotency key reused with different content
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
 
   /flint/questions/{block}/answer:
     post:
-      operationId: answerFlintQuestion
+      operationId: answerFlintQuestionLegacy
       tags: [flint]
-      summary: Record the user's answer to a flint_user_question block
+      deprecated: true
+      summary: Legacy compatibility adapter for answering a question
+      description: Writes through the canonical question-action service.
       parameters:
-        - {
-            name: block,
-            in: path,
-            required: true,
-            schema: { type: string, format: uuid },
-          }
+        - $ref: "#/components/parameters/FlintQuestionBlockId"
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              {
-                type: object,
-                required: [answer],
-                properties:
-                  {
-                    answer: { type: string, maxLength: 1000 },
-                    answer_note: { type: string, maxLength: 1000 },
-                  },
-              }
+            schema: { $ref: "#/components/schemas/LegacyFlintAnswerInput" }
       responses:
-        "200": { description: OK }
+        "200":
+          description: OK
+          headers:
+            Deprecation:
+              schema: { type: string, const: "true" }
+            Sunset:
+              schema: { type: string }
+              description: HTTP-date after which the adapter may be removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [block_id, answer, answer_note, answered_at]
+                properties:
+                  block_id: { type: string, format: uuid }
+                  answer: { type: string }
+                  answer_note: { type: [string, "null"] }
+                  answered_at: { type: string, format: date-time }
         "403": { description: Block does not belong to the caller }
-        "422": { description: Block is not a flint_user_question }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /flint/topics:
+    get:
+      operationId: listFlintTopics
+      tags: [flint]
+      summary: List the account's long-lived Flint Threads
+      parameters:
+        - {
+            name: status,
+            in: query,
+            schema:
+              { type: string, enum: [active, dormant, resolved, expired] },
+          }
+        - {
+            name: kind,
+            in: query,
+            schema: { type: string, enum: [strategic, thematic, tactical] },
+          }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/FlintTopic" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /flint/topics/{id}:
+    get:
+      operationId: getFlintTopic
+      tags: [flint]
+      summary: Get a versioned Thread and its digest/block evidence
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/FlintTopicDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /flint/notes:
+    get:
+      operationId: listFlintNotes
+      tags: [flint]
+      summary: Cursor-paginated user-authored Flint notes
+      parameters:
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 50, default: 20 },
+          }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlintNotePage" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    post:
+      operationId: createFlintNote
+      tags: [flint]
+      summary: Create an idempotent, searchable Flint note
+      description: >-
+        The title is derived from authored_at in the effective timezone using
+        "Note to Flint dd/mm/yy HH:mm". Same-minute collisions receive (2),
+        (3), and so on. Note prose is excluded from telemetry and audit
+        properties.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FlintNoteInput" }
+      responses:
+        "200":
+          description: Identical client mutation replay
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlintNoteResponse" }
+        "201":
+          description: Created
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlintNoteResponse" }
+        "409":
+          description: Client mutation ID reused with different content
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /flint/notes/{id}:
+    delete:
+      operationId: deleteFlintNote
+      tags: [flint]
+      summary: Idempotently soft-delete an owned Flint note
+      description: >-
+        Missing, already-deleted, and other-account IDs all return 204 so the
+        route does not disclose ownership.
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
+      responses:
+        "204": { description: Deleted or already absent from this account }
+
+  /flint/routines/health:
+    get:
+      operationId: getFlintRoutineHealth
+      tags: [flint]
+      summary: Flint routine configuration, scheduling, attempt, and output health
+      description: >-
+        Provider acceptance is reported as accepted, never success. Success
+        requires observed run-bound persisted output or an authenticated
+        completion action. Secrets, endpoint URLs, raw provider responses, and
+        exception messages are omitted.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                { $ref: "#/components/schemas/FlintRoutineHealthResponse" }
 
   /money/accounts:
     get:
@@ -1791,6 +2025,17 @@ components:
       required: true
       schema: { type: string }
       description: "The entity's current ETag. Missing returns 428; stale returns 412 — both surfacing the current ETag."
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+      description: Account-scoped UUID identifying one client mutation.
+    FlintQuestionBlockId:
+      name: block
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
 
   responses:
     NotFound:
@@ -1805,11 +2050,19 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     PreconditionRequired:
       description: Missing If-Match header
+      headers:
+        ETag:
+          description: Current strong resource version.
+          schema: { type: string }
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     PreconditionFailed:
       description: Stale If-Match value
+      headers:
+        ETag:
+          description: Current strong resource version.
+          schema: { type: string }
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -1820,6 +2073,9 @@ components:
       properties:
         message: { type: string }
         hint: { type: string }
+        etag:
+          type: string
+          description: Current strong ETag on question precondition failures.
         errors: { type: object }
 
     UserProfile:
@@ -2001,6 +2257,443 @@ components:
         starts_at: { type: string, format: date-time }
         ends_at: { type: [string, "null"], format: date-time }
         last_pushed_at: { type: [string, "null"], format: date-time }
+
+    FlintDigest:
+      type: object
+      required:
+        [
+          event_id,
+          date,
+          title,
+          version,
+          block_count,
+          unanswered_question_count,
+          blocks,
+        ]
+      properties:
+        event_id: { type: string, format: uuid }
+        digest_object_id: { type: [string, "null"], format: uuid }
+        date: { type: string, format: date }
+        period:
+          { type: [string, "null"], enum: [morning, afternoon, evening, null] }
+        kind: { type: [string, "null"] }
+        title: { type: string }
+        summary: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+        version:
+          type: string
+          description: Strong opaque version of the digest event.
+        block_count: { type: integer, minimum: 0 }
+        unanswered_question_count: { type: integer, minimum: 0 }
+        blocks:
+          type: array
+          description: >-
+            Full reader-facing blocks. Question blocks omit priority and
+            include status and ordered answer_history.
+          items: { type: object, additionalProperties: true }
+
+    FlintDigestDay:
+      type: object
+      required: [date, count, digests]
+      properties:
+        date: { type: string, format: date }
+        count: { type: integer, minimum: 0 }
+        digests:
+          type: array
+          items: { $ref: "#/components/schemas/FlintDigest" }
+
+    FlintDigestHistoryItem:
+      type: object
+      required:
+        [
+          id,
+          local_date,
+          title,
+          generated_at,
+          unanswered_question_count,
+          version,
+          freshness,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        local_date: { type: string, format: date }
+        period:
+          { type: [string, "null"], enum: [morning, afternoon, evening, null] }
+        kind: { type: [string, "null"] }
+        title: { type: string }
+        summary: { type: [string, "null"] }
+        generated_at: { type: string, format: date-time }
+        updated_at: { type: [string, "null"], format: date-time }
+        unanswered_question_count: { type: integer, minimum: 0 }
+        version:
+          type: string
+          description: Weak representation version suitable for list caching.
+        freshness:
+          type: object
+          required: [state, age_seconds]
+          properties:
+            state: { type: string, enum: [fresh, stale] }
+            age_seconds: { type: integer, minimum: 0 }
+
+    FlintDigestHistoryPage:
+      type: object
+      required: [data, next_cursor, has_more, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/FlintDigestHistoryItem" }
+        next_cursor: { type: [string, "null"] }
+        has_more: { type: boolean }
+        meta:
+          type: object
+          required: [from, to, effective_timezone, account_id]
+          properties:
+            from: { type: string, format: date }
+            to: { type: string, format: date }
+            effective_timezone: { type: string }
+            account_id: { type: string, format: uuid }
+
+    FlintQuestionAction:
+      type: object
+      required: [id, action, answer, context, created_at]
+      properties:
+        id: { type: string }
+        action: { type: string, enum: [answer, correct, skip] }
+        answer: { type: [string, "null"] }
+        context: { type: [string, "null"] }
+        created_at: { type: [string, "null"], format: date-time }
+
+    FlintQuestion:
+      type: object
+      required:
+        [
+          id,
+          digest_id,
+          source_digest,
+          status,
+          question,
+          answer_options,
+          asked_at,
+          effective_answer,
+          answer_history,
+          version,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        digest_id: { type: string, format: uuid }
+        source_digest:
+          type: object
+          required: [local_date, period]
+          properties:
+            local_date: { type: [string, "null"], format: date }
+            period:
+              {
+                type: [string, "null"],
+                enum: [morning, afternoon, evening, null],
+              }
+        status: { type: string, enum: [open, answered, skipped, retired] }
+        question: { type: string }
+        topic: { type: [string, "null"] }
+        answer_options:
+          type: [array, "null"]
+          items: { type: string }
+        asked_at: { type: [string, "null"], format: date-time }
+        effective_answer:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [answer, context, answered_at]
+              properties:
+                answer: { type: [string, "null"] }
+                context: { type: [string, "null"] }
+                answered_at: { type: [string, "null"], format: date-time }
+        answer_history:
+          type: array
+          items: { $ref: "#/components/schemas/FlintQuestionAction" }
+        version:
+          type: string
+          description: Strong opaque Block version for If-Match.
+
+    FlintQuestionPage:
+      type: object
+      required: [data, next_cursor, has_more, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/FlintQuestion" }
+        next_cursor: { type: [string, "null"] }
+        has_more: { type: boolean }
+        meta:
+          type: object
+          required: [effective_timezone, account_id]
+          properties:
+            effective_timezone: { type: string }
+            account_id: { type: string, format: uuid }
+
+    FlintQuestionResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/FlintQuestion" }
+
+    FlintQuestionActionInput:
+      oneOf:
+        - type: object
+          required: [action, answer]
+          properties:
+            action: { type: string, const: answer }
+            answer: { type: string, maxLength: 1000 }
+            context: { type: [string, "null"], maxLength: 1000 }
+        - type: object
+          required: [action, answer]
+          properties:
+            action: { type: string, const: correct }
+            answer: { type: string, maxLength: 1000 }
+            context: { type: [string, "null"], maxLength: 1000 }
+        - type: object
+          required: [action]
+          properties:
+            action: { type: string, const: skip }
+
+    LegacyFlintAnswerInput:
+      type: object
+      required: [answer]
+      properties:
+        answer: { type: string, maxLength: 1000 }
+        answer_note: { type: [string, "null"], maxLength: 1000 }
+
+    FlintTopic:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        content: { type: [string, "null"] }
+        kind:
+          {
+            type: [string, "null"],
+            enum: [strategic, thematic, tactical, null],
+          }
+        status:
+          {
+            type: [string, "null"],
+            enum: [active, dormant, resolved, expired, null],
+          }
+        first_seen_at: { type: [string, "null"], format: date-time }
+        last_touched_at: { type: [string, "null"], format: date-time }
+        next_review_at: { type: [string, "null"], format: date }
+        origin: { type: [string, "null"] }
+
+    FlintTopicMention:
+      type: object
+      required:
+        [
+          id,
+          source_type,
+          source_id,
+          event_id,
+          digest_id,
+          block_id,
+          title,
+          local_date,
+          period,
+          occurred_at,
+          deep_link,
+          source_deleted,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [event, block] }
+        source_type:
+          { type: string, enum: [digest, digest_block, event, block] }
+        source_id: { type: string, format: uuid }
+        event_id: { type: string, format: uuid }
+        digest_id: { type: [string, "null"], format: uuid }
+        block_id: { type: [string, "null"], format: uuid }
+        title: { type: string }
+        detail: { type: [string, "null"] }
+        excerpt: { type: [string, "null"] }
+        local_date: { type: [string, "null"], format: date }
+        period:
+          { type: [string, "null"], enum: [morning, afternoon, evening, null] }
+        occurred_at: { type: [string, "null"], format: date-time }
+        deep_link: { type: string }
+        source_deleted: { type: boolean }
+
+    FlintTopicDetail:
+      allOf:
+        - { $ref: "#/components/schemas/FlintTopic" }
+        - type: object
+          required: [version, mentions]
+          properties:
+            version:
+              type: string
+              description: Strong opaque EventObject version.
+            mentions:
+              type: array
+              items: { $ref: "#/components/schemas/FlintTopicMention" }
+
+    FlintContextLink:
+      type: object
+      required: [type, id]
+      properties:
+        type: { type: string, enum: [event, digest, block, topic] }
+        id: { type: string, format: uuid }
+
+    FlintNote:
+      type: object
+      required:
+        [
+          id,
+          title,
+          body,
+          authored_at,
+          created_at,
+          deleted_at,
+          context_links,
+          consent_version,
+          consented_at,
+          version,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        title:
+          type: string
+          example: Note to Flint 14/09/26 13:17
+        body: { type: string }
+        authored_at: { type: [string, "null"], format: date-time }
+        created_at: { type: [string, "null"], format: date-time }
+        deleted_at: { type: [string, "null"], format: date-time }
+        context_links:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/FlintContextLink" }
+        consent_version: { type: string, const: flint-note-v1 }
+        consented_at: { type: [string, "null"], format: date-time }
+        version:
+          type: string
+          description: Strong opaque EventObject version.
+
+    FlintNoteInput:
+      type: object
+      required: [client_mutation_id, authored_at, body, consent_version]
+      properties:
+        client_mutation_id: { type: string, format: uuid }
+        authored_at:
+          type: string
+          format: date-time
+          description: May be at most five minutes in the future.
+        body: { type: string, maxLength: 10000 }
+        context_links:
+          type: [array, "null"]
+          maxItems: 20
+          items: { $ref: "#/components/schemas/FlintContextLink" }
+        consent_version: { type: string, const: flint-note-v1 }
+
+    FlintNoteResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/FlintNote" }
+
+    FlintNotePage:
+      type: object
+      required: [data, next_cursor, has_more, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/FlintNote" }
+        next_cursor: { type: [string, "null"] }
+        has_more: { type: boolean }
+        meta:
+          type: object
+          required: [effective_timezone, account_id]
+          properties:
+            effective_timezone: { type: string }
+            account_id: { type: string, format: uuid }
+
+    FlintRoutineAttempt:
+      type: object
+      properties:
+        status:
+          {
+            type: string,
+            enum:
+              [accepted, success, failed, retrying, not_applicable, blocked],
+          }
+        accepted_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        run_uuid: { type: string, format: uuid }
+
+    FlintRoutineHealth:
+      type: object
+      required:
+        [
+          routine,
+          state,
+          enabled,
+          driver,
+          next_eligible_run,
+          last_attempt,
+          last_persisted_output,
+          failure,
+        ]
+      properties:
+        routine:
+          {
+            type: string,
+            enum:
+              [
+                morning_digest,
+                evening_digest,
+                topics,
+                reading_list,
+                news_roundup,
+              ],
+          }
+        state:
+          {
+            type: string,
+            enum: [configured, unconfigured, disabled, unavailable],
+          }
+        enabled: { type: boolean }
+        driver: { type: string, enum: [webhook, openai] }
+        next_eligible_run: { type: [string, "null"], format: date-time }
+        last_attempt:
+          oneOf:
+            - type: "null"
+            - { $ref: "#/components/schemas/FlintRoutineAttempt" }
+        last_persisted_output:
+          oneOf:
+            - type: "null"
+            - type: object
+              properties:
+                digest_id: { type: string, format: uuid }
+                persisted_at: { type: [string, "null"], format: date-time }
+        failure:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [failed, retrying] }
+                occurred_at: { type: [string, "null"], format: date-time }
+
+    FlintRoutineHealthResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/FlintRoutineHealth" }
+        meta:
+          type: object
+          required: [effective_timezone, account_id, management_url]
+          properties:
+            effective_timezone: { type: string }
+            account_id: { type: string, format: uuid }
+            management_url: { type: string, format: uri }
 
     MoneyAccount:
       type: object

@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Api\EntityMutationService;
+use App\Services\Api\ResourceVersion;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
@@ -15,10 +18,13 @@ use Illuminate\Validation\Rule;
 
 class FlintTopicService
 {
-    public function __construct(private EntityMutationService $mutations) {}
+    public function __construct(
+        private EntityMutationService $mutations,
+        private ResourceVersion $versions,
+    ) {}
 
     /** @return array<string, mixed> */
-    public function create(User $user, array $input): array
+    public function create(User $user, array $input, ?string $runUuid = null): array
     {
         $data = Validator::make($input, $this->rules(true))->validate();
         $now = now();
@@ -40,12 +46,13 @@ class FlintTopicService
                     'last_touched_at' => $now->toIso8601String(),
                     'next_review_at' => $data['next_review_at'] ?? null,
                     'origin' => $data['origin'] ?? 'digest_inference',
+                    'run_uuids' => $runUuid ? [$runUuid] : [],
                 ],
             ],
         );
 
         if (! $topic->wasRecentlyCreated) {
-            $topic = $this->updateTopic($topic, $data, $now);
+            $topic = $this->updateTopic($topic, $data, $now, $runUuid);
         }
 
         $this->linkRelatedEntities($user, $topic, $data);
@@ -54,7 +61,7 @@ class FlintTopicService
     }
 
     /** @return array<string, mixed>|null */
-    public function update(User $user, string $id, array $input): ?array
+    public function update(User $user, string $id, array $input, ?string $runUuid = null): ?array
     {
         $data = Validator::make($input, $this->rules())->validate();
         $topic = $this->topics($user)->find($id);
@@ -63,7 +70,7 @@ class FlintTopicService
             return null;
         }
 
-        $topic = $this->updateTopic($topic, $data, now());
+        $topic = $this->updateTopic($topic, $data, now(), $runUuid);
         $this->linkRelatedEntities($user, $topic, $data);
 
         return $this->payload($topic->fresh());
@@ -115,6 +122,20 @@ class FlintTopicService
             ->when($kind, fn (Builder $query) => $query->where('metadata->kind', $kind));
     }
 
+    /** @return array<string, mixed>|null */
+    public function detail(User $user, string $id): ?array
+    {
+        $topic = $this->query($user)->find($id);
+        if (! $topic) {
+            return null;
+        }
+
+        return $this->payload($topic) + [
+            'version' => $this->versions->etag($topic),
+            'mentions' => $this->mentions($topic)->all(),
+        ];
+    }
+
     /**
      * How many topics the user has in each status, for the filter chips.
      *
@@ -135,32 +156,85 @@ class FlintTopicService
      */
     public function mentions(EventObject $topic, int $limit = 20): Collection
     {
-        $events = $topic->relatedEvents('discussed_in')
-            ->latest('time')
-            ->limit($limit)
-            ->get()
-            ->map(fn (Event $event) => [
-                'kind' => 'event',
-                'id' => $event->id,
-                'time' => $event->time,
-                'title' => $event->event_metadata['title'] ?? $event->action,
-                'detail' => $event->event_metadata['period'] ?? null,
-            ]);
+        $relationships = Relationship::query()
+            ->where('user_id', $topic->user_id)
+            ->where('type', 'discussed_in')
+            ->where(function ($query) use ($topic): void {
+                $query->where(fn ($q) => $q->where('from_type', EventObject::class)->where('from_id', $topic->id))
+                    ->orWhere(fn ($q) => $q->where('to_type', EventObject::class)->where('to_id', $topic->id));
+            })
+            ->get();
 
-        $blocks = $topic->relatedBlocks('discussed_in')
-            ->latest('time')
-            ->limit($limit)
-            ->get()
-            ->map(fn ($block) => [
-                'kind' => 'block',
-                'id' => $block->id,
-                'time' => $block->time,
-                'title' => $block->title,
-                'detail' => $block->block_type,
-            ]);
+        return $relationships->map(function (Relationship $relationship) use ($topic): ?array {
+            $sourceType = $relationship->from_type === EventObject::class && $relationship->from_id === $topic->id
+                ? $relationship->to_type
+                : $relationship->from_type;
+            $sourceId = $relationship->from_type === EventObject::class && $relationship->from_id === $topic->id
+                ? $relationship->to_id
+                : $relationship->from_id;
 
-        return $events->concat($blocks)
-            ->sortByDesc(fn (array $mention) => $mention['time'])
+            if ($sourceType === Event::class) {
+                $event = Event::withTrashed()->whereHas('integration', fn ($query) => $query->where('user_id', $topic->user_id))->find($sourceId);
+                if (! $event) {
+                    return null;
+                }
+
+                $isDigest = $event->service === 'flint' && $event->action === 'had_summary';
+
+                return [
+                    'id' => (string) $relationship->id,
+                    'kind' => 'event',
+                    'source_type' => $isDigest ? 'digest' : 'event',
+                    'source_id' => (string) $event->id,
+                    'event_id' => (string) $event->id,
+                    'digest_id' => $isDigest ? (string) $event->id : null,
+                    'block_id' => null,
+                    'title' => data_get($event->event_metadata, 'title', $event->action),
+                    'detail' => data_get($event->event_metadata, 'period'),
+                    'excerpt' => data_get($event->event_metadata, 'summary'),
+                    'local_date' => data_get($event->event_metadata, 'local_date', $event->time?->toDateString()),
+                    'period' => data_get($event->event_metadata, 'period'),
+                    'occurred_at' => $event->time?->toIso8601String(),
+                    'deep_link' => ($isDigest ? 'spark://digest/' : 'spark://event/') . $event->id,
+                    'source_deleted' => $event->trashed(),
+                ];
+            }
+
+            if ($sourceType === Block::class) {
+                $block = Block::withTrashed()
+                    ->whereHas('event.integration', fn ($query) => $query->where('user_id', $topic->user_id))
+                    ->with('event')
+                    ->find($sourceId);
+                if (! $block) {
+                    return null;
+                }
+
+                $occurredAt = $block->time ?? $block->event?->time;
+                $isDigest = $block->event?->service === 'flint' && $block->event?->action === 'had_summary';
+
+                return [
+                    'id' => (string) $relationship->id,
+                    'kind' => 'block',
+                    'source_type' => $isDigest ? 'digest_block' : 'block',
+                    'source_id' => (string) $block->id,
+                    'event_id' => (string) $block->event_id,
+                    'digest_id' => $isDigest ? (string) $block->event_id : null,
+                    'block_id' => (string) $block->id,
+                    'title' => $block->title ?: 'Deleted digest evidence',
+                    'detail' => $block->block_type,
+                    'excerpt' => $block->getContent(),
+                    'local_date' => data_get($block->event?->event_metadata, 'local_date', $occurredAt?->toDateString()),
+                    'period' => data_get($block->event?->event_metadata, 'period'),
+                    'occurred_at' => $occurredAt?->toIso8601String(),
+                    'deep_link' => 'spark://block/' . $block->id,
+                    'source_deleted' => $block->trashed(),
+                ];
+            }
+
+            return null;
+        })->filter()
+            ->sortByDesc(fn (array $mention) => ($mention['occurred_at'] ?? '') . ':' . $mention['id'])
+            ->unique(fn (array $mention) => $mention['source_type'] . ':' . $mention['source_id'])
             ->take($limit)
             ->values();
     }
@@ -174,7 +248,7 @@ class FlintTopicService
             ->where('type', 'topic');
     }
 
-    private function updateTopic(EventObject $topic, array $data, DateTimeInterface $now): EventObject
+    private function updateTopic(EventObject $topic, array $data, DateTimeInterface $now, ?string $runUuid = null): EventObject
     {
         $attributes = Arr::only($data, ['title', 'content']);
         $metadata = $topic->metadata ?? [];
@@ -187,6 +261,15 @@ class FlintTopicService
 
         $metadata['first_seen_at'] ??= $now->format(DATE_ATOM);
         $metadata['last_touched_at'] = $now->format(DATE_ATOM);
+        if ($runUuid !== null) {
+            $metadata['run_uuids'] = collect($metadata['run_uuids'] ?? [])
+                ->filter(fn (mixed $run): bool => is_string($run))
+                ->push($runUuid)
+                ->unique()
+                ->take(-20)
+                ->values()
+                ->all();
+        }
         $attributes['metadata'] = $metadata;
         $attributes['time'] = $now;
 

@@ -222,15 +222,20 @@ class TriggerFlintRoutineJob implements ShouldQueue
             return;
         }
 
-        $store->recordStatus($integration, $task, 'success', [
+        $transition = $store->recordAcceptedUnlessSucceeded($integration, $task, $this->runUuid, [
             'local_date' => $this->localDate,
             'period' => $this->period(),
-            'run_uuid' => $this->runUuid,
             'triggered_by' => $this->isScheduled() ? 'scheduled' : 'manual',
             'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
             'driver' => $selectedDriver,
-        ] + $result->details, promoteSuccess: $this->isScheduled());
-        $progress?->markCompleted($result->details);
+        ] + $result->details);
+        if ($transition['completed']) {
+            $progress?->markCompleted($transition['execution']);
+
+            return;
+        }
+
+        $progress?->updateProgress('accepted', 'Flint accepted the routine run', 50, $result->details);
 
         Log::info('Flint routine triggered', [
             'user_id' => $this->user->id,

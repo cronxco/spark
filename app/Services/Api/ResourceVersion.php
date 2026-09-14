@@ -38,7 +38,7 @@ class ResourceVersion
             return (string) $xmin;
         }
 
-        return (string) $model->newQuery()
+        return (string) $model->newQueryWithoutScopes()
             ->whereKey($model->getKey())
             ->value($model->qualifyColumn('xmin'));
     }

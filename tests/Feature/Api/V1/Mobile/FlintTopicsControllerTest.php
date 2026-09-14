@@ -2,8 +2,12 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
+use App\Models\Block;
+use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Integration;
 use App\Models\User;
+use App\Services\FlintTopicService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -77,6 +81,72 @@ class FlintTopicsControllerTest extends TestCase
         $this->getJson('/api/v1/mobile/flint/topics')
             ->assertOk()
             ->assertJsonCount(0, 'data');
+    }
+
+    #[Test]
+    public function detail_returns_versioned_owned_evidence(): void
+    {
+        $topic = $this->topic('Quarterly planning', kind: 'strategic');
+        $integration = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'flint']);
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'event_metadata' => ['title' => 'Morning Digest', 'local_date' => '2026-09-14', 'period' => 'morning'],
+        ]);
+        app(FlintTopicService::class)->update($this->user, $topic->id, ['related_event_id' => $event->id]);
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', (string) $topic->id)
+            ->assertJsonPath('data.mentions.0.digest_id', (string) $event->id)
+            ->assertJsonPath('data.mentions.0.deep_link', 'spark://digest/' . $event->id)
+            ->assertJsonStructure(['data' => ['version']]);
+    }
+
+    #[Test]
+    public function detail_does_not_reveal_another_users_topic(): void
+    {
+        $other = User::factory()->create();
+        $topic = EventObject::factory()->create([
+            'user_id' => $other->id,
+            'concept' => 'flint',
+            'type' => 'topic',
+            'title' => 'Private thread',
+        ]);
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->assertNotFound();
+    }
+
+    #[Test]
+    public function generic_evidence_keeps_its_source_type_and_block_time_falls_back_to_its_event(): void
+    {
+        $topic = $this->topic('Generic evidence');
+        $integration = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'calendar']);
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'calendar',
+            'action' => 'had_event',
+            'time' => '2026-09-13 18:30:00',
+        ]);
+        $block = Block::factory()->create(['event_id' => $event->id, 'time' => null]);
+        app(FlintTopicService::class)->update($this->user, $topic->id, [
+            'related_event_id' => $event->id,
+            'related_block_id' => $block->id,
+        ]);
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $response = $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->assertOk();
+        $mentions = collect($response->json('data.mentions'));
+        $eventMention = $mentions->firstWhere('source_type', 'event');
+        $blockMention = $mentions->firstWhere('source_type', 'block');
+
+        $this->assertSame('spark://event/' . $event->id, $eventMention['deep_link']);
+        $this->assertNull($eventMention['digest_id']);
+        $this->assertSame($event->time->toIso8601String(), $blockMention['occurred_at']);
+        $this->assertSame($event->time->toDateString(), $blockMention['local_date']);
     }
 
     #[Test]

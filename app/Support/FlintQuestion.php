@@ -5,14 +5,13 @@ namespace App\Support;
 use App\Models\Block;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Ramsey\Uuid\Uuid;
 
 /**
  * Whether a Flint question is still open, and when it stops being one.
  *
- * One question per digest is Flint's scarcest resource, and the fatigue rules
- * in the briefing prompt stop it re-asking something already outstanding. That
- * left a question unanswered for a week as permanent dead weight: never
- * re-asked, never closed, and still counted in every unanswered badge.
+ * A question can become permanent dead weight when it is never answered:
+ * never closed, and still counted in every unanswered badge.
  *
  * Retirement is that closure, and it is deliberately not a deletion. The block
  * stays in its digest, stays visible and stays answerable — a late answer is
@@ -41,6 +40,63 @@ class FlintQuestion
         return ! is_null(($block->metadata ?? [])['answer'] ?? null);
     }
 
+    public static function status(Block $block): string
+    {
+        $metadata = $block->metadata ?? [];
+
+        if (self::isAnswered($block)) {
+            return 'answered';
+        }
+
+        if (($metadata['question_status'] ?? null) === 'skipped' || ! empty($metadata['skipped_at'])) {
+            return 'skipped';
+        }
+
+        return self::isRetired($block) ? 'retired' : 'open';
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public static function history(Block $block): array
+    {
+        $metadata = $block->metadata ?? [];
+        $history = $metadata['action_history'] ?? [];
+
+        if (is_array($history) && $history !== []) {
+            return collect($history)
+                ->filter(fn (mixed $action): bool => is_array($action))
+                ->values()
+                ->map(function (array $action, int $index) use ($block): ?array {
+                    if (! isset($action['action']) || ! in_array($action['action'], ['answer', 'correct', 'skip'], true)) {
+                        return null;
+                    }
+
+                    return $action + [
+                        'id' => (string) Uuid::uuid5(
+                            Uuid::NAMESPACE_URL,
+                            'unkeyed-action:' . $block->id . ':' . $index,
+                        ),
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all();
+        }
+
+        if (! self::isAnswered($block)) {
+            return [];
+        }
+
+        return [[
+            'id' => (string) Uuid::uuid5(Uuid::NAMESPACE_URL, 'legacy-answer:' . $block->id),
+            'client_mutation_id' => 'legacy-answer:' . $block->id,
+            'action' => 'answer',
+            'answer' => $metadata['answer'],
+            'context' => $metadata['answer_note'] ?? null,
+            'created_at' => $metadata['answered_at'] ?? $block->updated_at?->toIso8601String(),
+            'legacy' => true,
+        ]];
+    }
+
     public static function retiredAt(Block $block): ?CarbonImmutable
     {
         $stamp = ($block->metadata ?? [])['retired_at'] ?? null;
@@ -65,8 +121,7 @@ class FlintQuestion
     public static function isOpen(Block $block): bool
     {
         return self::isQuestion($block)
-            && ! self::isAnswered($block)
-            && self::retiredAt($block) === null;
+            && self::status($block) === 'open';
     }
 
     /**
@@ -102,8 +157,10 @@ class FlintQuestion
 
             $block->metadata = array_merge($block->metadata ?? [], [
                 'retired_at' => $now->toIso8601String(),
+                'question_status' => 'retired',
             ]);
             $block->save();
+            $block->event?->touch();
             $retired++;
         }
 

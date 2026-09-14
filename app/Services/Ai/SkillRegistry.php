@@ -42,6 +42,7 @@ class SkillRegistry
         'karakeep__get-lists',
         'karakeep__search-bookmarks',
         'spark__acknowledge-anomaly-tool',
+        'spark__complete-flint-run',
         'spark__create-flint-digest',
         'spark__get-baselines-tool',
         'spark__get-block-tool',
