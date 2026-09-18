@@ -21,7 +21,7 @@
     --color-base-100: #fcfcfc;
     --color-base-200: #f5f5f5;
     --color-base-300: #ebebeb;
-    --color-base-content: #00060a;
+    --color-base-content: #011627;
     --color-primary: #ffbf00;
     --color-primary-content: #011627;
     --color-secondary: #f79129;
@@ -586,7 +586,7 @@ pretty-json {
 /* Force light mode in map popups */
 .spark-map-popup .card {
     background: #fcfcfc !important;
-    color: #00060a !important;
+    color: #011627 !important;
 }
 
 .spark-map-popup .bg-base-100 {
@@ -602,23 +602,23 @@ pretty-json {
 }
 
 .spark-map-popup .text-base-content {
-    color: #00060a !important;
+    color: #011627 !important;
 }
 
 .spark-map-popup .text-base-content\/60 {
-    color: rgba(0, 6, 10, 0.6) !important;
+    color: rgba(1, 22, 39, 0.6) !important;
 }
 
 .spark-map-popup .text-base-content\/70 {
-    color: rgba(0, 6, 10, 0.7) !important;
+    color: rgba(1, 22, 39, 0.7) !important;
 }
 
 .spark-map-popup .text-base-content\/80 {
-    color: rgba(0, 6, 10, 0.8) !important;
+    color: rgba(1, 22, 39, 0.8) !important;
 }
 
 .spark-map-popup .text-base-content\/50 {
-    color: rgba(0, 6, 10, 0.5) !important;
+    color: rgba(1, 22, 39, 0.5) !important;
 }
 
 .spark-map-popup .border-base-300 {
