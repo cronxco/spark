@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\CapturedBookmarksController;
 use App\Http\Controllers\Api\V1\Mobile\AnomaliesController;
 use App\Http\Controllers\Api\V1\Mobile\ApiTokensController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController;
@@ -254,6 +255,10 @@ Route::post('knowledge/events/{id}/reprocess', [KnowledgeReprocessingController:
 Route::post('bookmarks', [BookmarksController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('bookmarks.store');
+
+Route::post('bookmarks/capture', [CapturedBookmarksController::class, 'store'])
+    ->middleware('ability:ios:write')
+    ->name('bookmarks.capture');
 
 /*
 |--------------------------------------------------------------------------

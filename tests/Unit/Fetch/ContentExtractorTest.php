@@ -114,6 +114,29 @@ class ContentExtractorTest extends TestCase
         $this->assertStringContainsString('paywall', strtolower($result['reason']));
     }
 
+    #[Test]
+    public function it_can_skip_access_barrier_detection_for_authenticated_browser_captures(): void
+    {
+        $body = str_repeat('This is the full article content from an authenticated browser session. ', 10);
+        $html = <<<HTML
+            <!doctype html>
+            <html>
+                <head><title>Authenticated Article Capture</title></head>
+                <body>
+                    <article><p>{$body}</p></article>
+                    <div class="paywall">Already a subscriber? Sign in to read.</div>
+                </body>
+            </html>
+            HTML;
+
+        $normalFetch = ContentExtractor::extract($html, 'https://example.com/private');
+        $browserCapture = ContentExtractor::extractCaptured($html, 'https://example.com/private');
+
+        $this->assertFalse($normalFetch['success']);
+        $this->assertTrue($browserCapture['success']);
+        $this->assertStringContainsString('full article content', $browserCapture['data']['text_content']);
+    }
+
     /** @test */
     public function it_generates_consistent_content_hash()
     {

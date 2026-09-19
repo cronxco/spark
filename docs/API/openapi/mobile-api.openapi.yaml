@@ -1449,6 +1449,29 @@ paths:
         "200": { description: Already bookmarked }
         "422": { $ref: "#/components/responses/ValidationError" }
 
+  /bookmarks/capture:
+    post:
+      operationId: captureBookmark
+      tags: [entities]
+      x-spark-ability: ios:write
+      summary: Save HTML rendered in Safari as a bookmark
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, html]
+              properties:
+                url: { type: string, format: uri, maxLength: 2048 }
+                title: { type: [string, "null"], maxLength: 1000 }
+                html: { type: string, maxLength: 5242880 }
+      responses:
+        "201": { description: Captured as a new bookmark }
+        "200": { description: Existing bookmark recaptured }
+        "403": { description: Token lacks ios:write }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /up-to-speed:
     get:
       operationId: upToSpeed

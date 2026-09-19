@@ -1858,6 +1858,24 @@ service as the legacy `POST /api/fetch/bookmarks` endpoint.
 
 ---
 
+### `POST /bookmarks/capture`
+
+Captures content rendered in Safari and supplied by the iOS Share extension.
+Uses the same capture service as `POST /api/v1/bookmarks/capture`, but accepts
+the iOS session's `ios:write` ability.
+
+**Request Body**:
+`{"url": "https://example.com/article", "title": "Article title", "html": "<!doctype html>..."}`.
+`url` and `html` are required; `title` is optional. HTML is limited to 5 MB.
+
+**Response `201`/`200`**:
+`{"state": "captured|recaptured", "bookmark": {"id": "uuid", "url": "...", "title": "..."}}`.
+
+**Response `422`** — URL fails the safety validator or readable content cannot
+be extracted.
+
+---
+
 ### `POST /money/accounts`
 
 Creates a manual finance account.

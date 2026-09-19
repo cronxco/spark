@@ -127,6 +127,19 @@ sail artisan tinker
 >>> App\Jobs\Fetch\FetchSingleUrl::dispatch($integration, $webpage->id, $webpage->url, true);
 ```
 
+### Authenticated browser capture
+
+The Manifest V3 extension in `browser-extension/` captures the rendered DOM
+from the active Chrome tab and submits it to
+`POST /api/v1/bookmarks/capture`. This is intended for content that Spark
+cannot fetch directly because the user is already authenticated in their main
+browser.
+
+The extension uses a personal access token limited to `bookmark:write`. It
+does not export site cookies. Spark applies Readability to the supplied HTML
+and dispatches the normal `ProcessFetchedContent` revision and enrichment
+pipeline without requesting the source URL.
+
 ## Fetch Engine
 
 ### Engine Selection

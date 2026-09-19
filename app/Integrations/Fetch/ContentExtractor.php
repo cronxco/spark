@@ -17,80 +17,21 @@ class ContentExtractor
      */
     public static function extract(string $html, string $url, ?string $userId = null): array
     {
-        // Create Readability configuration
-        $config = new Configuration([
-            'FixRelativeURLs' => true,
-            'SubstituteEntities' => true,
-            'SummonCthulhu' => false, // Disable aggressive mode
-        ]);
+        return self::extractDocument($html, $url, $userId, true);
+    }
 
-        try {
-            $readability = new Readability($config);
-            $readability->parse($html, $url);
-
-            // Extract data
-            $extracted = [
-                'title' => $readability->getTitle(),
-                'content' => $readability->getContent(), // HTML
-                'text_content' => strip_tags($readability->getContent(), '<br>'),
-                'excerpt' => $readability->getExcerpt(),
-                'author' => $readability->getAuthor(),
-                'image' => $readability->getImage(),
-                'direction' => $readability->getDirection(), // ltr/rtl
-            ];
-
-            // Validate extracted content
-            $validation = self::validate($extracted, $html, $url);
-
-            // Write debug file with extracted content
-            self::writeDebugExtraction($url, $extracted, $validation, $userId);
-
-            if (! $validation['success']) {
-                Log::warning('Fetch: Content extraction validation failed', [
-                    'url' => $url,
-                    'reason' => $validation['reason'],
-                    'title' => $extracted['title'],
-                    'content_length' => strlen($extracted['text_content'] ?? ''),
-                ]);
-
-                return $validation;
-            }
-
-            Log::debug('Fetch: Content extracted successfully', [
-                'url' => $url,
-                'title' => $extracted['title'],
-                'author' => $extracted['author'],
-                'content_length' => strlen($extracted['text_content']),
-            ]);
-
-            return [
-                'success' => true,
-                'reason' => null,
-                'data' => $extracted,
-            ];
-        } catch (ParseException $e) {
-            Log::error('Fetch: Readability parse error', [
-                'url' => $url,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [
-                'success' => false,
-                'reason' => 'Parse error: ' . $e->getMessage(),
-                'data' => null,
-            ];
-        } catch (Exception $e) {
-            Log::error('Fetch: Extraction error', [
-                'url' => $url,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [
-                'success' => false,
-                'reason' => 'Extraction error: ' . $e->getMessage(),
-                'data' => null,
-            ];
-        }
+    /**
+     * Extract content supplied by the user's authenticated browser session.
+     *
+     * The rendered page may retain hidden paywall or login markup alongside
+     * the full article, so access-barrier detection is intentionally skipped.
+     * Structural content validation still applies.
+     *
+     * @return array ['success' => bool, 'reason' => string|null, 'data' => array|null]
+     */
+    public static function extractCaptured(string $html, string $url, ?string $userId = null): array
+    {
+        return self::extractDocument($html, $url, $userId, false);
     }
 
     /**
@@ -330,6 +271,88 @@ class ContentExtractor
         return hash('sha256', $normalized);
     }
 
+    private static function extractDocument(
+        string $html,
+        string $url,
+        ?string $userId,
+        bool $detectAccessBarriers,
+    ): array {
+        // Create Readability configuration
+        $config = new Configuration([
+            'FixRelativeURLs' => true,
+            'SubstituteEntities' => true,
+            'SummonCthulhu' => false, // Disable aggressive mode
+        ]);
+
+        try {
+            $readability = new Readability($config);
+            $readability->parse($html, $url);
+
+            // Extract data
+            $extracted = [
+                'title' => $readability->getTitle(),
+                'content' => $readability->getContent(), // HTML
+                'text_content' => strip_tags($readability->getContent(), '<br>'),
+                'excerpt' => $readability->getExcerpt(),
+                'author' => $readability->getAuthor(),
+                'image' => $readability->getImage(),
+                'direction' => $readability->getDirection(), // ltr/rtl
+            ];
+
+            // Validate extracted content
+            $validation = self::validate($extracted, $html, $url, $detectAccessBarriers);
+
+            // Write debug file with extracted content
+            self::writeDebugExtraction($url, $extracted, $validation, $userId);
+
+            if (! $validation['success']) {
+                Log::warning('Fetch: Content extraction validation failed', [
+                    'url' => $url,
+                    'reason' => $validation['reason'],
+                    'title' => $extracted['title'],
+                    'content_length' => strlen($extracted['text_content'] ?? ''),
+                ]);
+
+                return $validation;
+            }
+
+            Log::debug('Fetch: Content extracted successfully', [
+                'url' => $url,
+                'title' => $extracted['title'],
+                'author' => $extracted['author'],
+                'content_length' => strlen($extracted['text_content']),
+            ]);
+
+            return [
+                'success' => true,
+                'reason' => null,
+                'data' => $extracted,
+            ];
+        } catch (ParseException $e) {
+            Log::error('Fetch: Readability parse error', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'reason' => 'Parse error: ' . $e->getMessage(),
+                'data' => null,
+            ];
+        } catch (Exception $e) {
+            Log::error('Fetch: Extraction error', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'reason' => 'Extraction error: ' . $e->getMessage(),
+                'data' => null,
+            ];
+        }
+    }
+
     /**
      * Whether paywall detection is disabled for this URL's domain.
      */
@@ -400,8 +423,12 @@ class ContentExtractor
      *
      * @return array ['success' => bool, 'reason' => string|null, 'data' => array|null]
      */
-    private static function validate(array $extracted, string $html, ?string $url = null): array
-    {
+    private static function validate(
+        array $extracted,
+        string $html,
+        ?string $url = null,
+        bool $detectAccessBarriers = true,
+    ): array {
         $title = $extracted['title'] ?? '';
         $textContent = $extracted['text_content'] ?? '';
 
@@ -423,27 +450,29 @@ class ContentExtractor
             ];
         }
 
-        // Check for robot detection (pass extracted content for context-aware detection)
-        if (self::detectRobotCheck($title, $html, $textContent)) {
-            return [
-                'success' => false,
-                'reason' => 'Robot check detected',
-                'data' => null,
-            ];
-        }
+        if ($detectAccessBarriers) {
+            // Check for robot detection (pass extracted content for context-aware detection)
+            if (self::detectRobotCheck($title, $html, $textContent)) {
+                return [
+                    'success' => false,
+                    'reason' => 'Robot check detected',
+                    'data' => null,
+                ];
+            }
 
-        // Check for paywall BEFORE checking content length
-        // This ensures paywall indicators are detected even with short content
-        $paywallCheck = self::detectPaywall($html, $textContent, true, $url);
-        if ($paywallCheck['detected']) {
-            $paywallType = $paywallCheck['type'] ?? 'unknown';
+            // Check for paywall BEFORE checking content length
+            // This ensures paywall indicators are detected even with short content
+            $paywallCheck = self::detectPaywall($html, $textContent, true, $url);
+            if ($paywallCheck['detected']) {
+                $paywallType = $paywallCheck['type'] ?? 'unknown';
 
-            return [
-                'success' => false,
-                'reason' => "Paywall detected ({$paywallType})",
-                'data' => null,
-                'paywall_details' => $paywallCheck,
-            ];
+                return [
+                    'success' => false,
+                    'reason' => "Paywall detected ({$paywallType})",
+                    'data' => null,
+                    'paywall_details' => $paywallCheck,
+                ];
+            }
         }
 
         // Check for insufficient content
