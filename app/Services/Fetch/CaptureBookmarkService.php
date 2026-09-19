@@ -29,8 +29,7 @@ class CaptureBookmarkService
         ?string $capturedTitle = null,
         string $source = 'browser_extension',
         string $captureMethod = 'rendered_dom',
-    ): array
-    {
+    ): array {
         $this->urlSafety->validate($url);
 
         // The caller has already crossed any login/paywall and supplied the page.
