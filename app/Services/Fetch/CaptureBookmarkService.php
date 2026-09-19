@@ -17,16 +17,22 @@ class CaptureBookmarkService
     ) {}
 
     /**
-     * Store HTML captured from the user's authenticated browser session and
-     * hand it to the same revision and enrichment pipeline as a normal fetch.
+     * Store HTML supplied by a trusted caller and hand it to the same revision
+     * and enrichment pipeline as a normal fetch.
      *
      * @return array{state: string, bookmark: EventObject, created: bool}
      */
-    public function capture(User $user, string $url, string $html, ?string $capturedTitle = null): array
-    {
+    public function capture(
+        User $user,
+        string $url,
+        string $html,
+        ?string $capturedTitle = null,
+        string $source = 'browser_extension',
+        string $captureMethod = 'rendered_dom',
+    ): array {
         $this->urlSafety->validate($url);
 
-        // The user has already crossed any login/paywall in their browser.
+        // The caller has already crossed any login/paywall and supplied the page.
         // Keep structural validation, but do not reject hidden access-control
         // markup that remains in the rendered DOM alongside the full article.
         $extraction = ContentExtractor::extractCaptured($html, $url, $user->id);
@@ -52,9 +58,9 @@ class CaptureBookmarkService
         $bookmark->update([
             'title' => $extracted['title'],
             'metadata' => array_merge($metadata, [
-                'subscription_source' => 'browser_extension',
+                'subscription_source' => $source,
                 'last_capture_at' => now()->toISOString(),
-                'last_capture_method' => 'rendered_dom',
+                'last_capture_method' => $captureMethod,
             ]),
         ]);
 

@@ -89,7 +89,8 @@ and manual finance account/balance management, including archival.
 | Entity edits, relationships and locations                        | Yes where listed           | Yes                           | Entity/relationship MCP tools | Owned resources only            |
 | Device/APNs, HealthKit ingestion, Live Activities, OAuth handoff | No                         | Yes                           | No                            | iOS lifecycle transport only    |
 | API-token administration                                         | No                         | List/revoke only              | No                            | Creation requires `tokens:manage`, which no iOS session holds |
-| Authenticated browser DOM capture                                | Yes, `bookmark:write`      | No                            | No                            | Caller supplies rendered HTML; no site cookies leave the browser |
+| URL-only bookmark creation                                      | Yes, `data:write`          | Yes, `ios:write`             | Yes, `bookmark:write`         | Shared dedupe and fetch pipeline |
+| Supplied webpage-content capture                                | Yes, `bookmark:write`      | Yes, `ios:write`             | Yes, `bookmark:write`         | Caller supplies HTML; no site cookies leave the caller |
 | Browser HTML fetch with saved cookies                            | No                         | No                            | Yes, `web:fetch`              | MCP-only                        |
 | Admin and task-pipeline operations                               | No                         | No                            | No                            | Internal/web administration     |
 
@@ -110,6 +111,7 @@ compatibility alias while clients migrate.
 | `insights:write`    | `acknowledge-anomaly-tool`                                                                |
 | `integrations:sync` | `trigger-integration-update-tool`                                                        |
 | `flint:write`       | `create-flint-digest`, `answer-flint-question`                                          |
+| `bookmark:write`    | `create-bookmark`, `capture-bookmark`                                                     |
 | `data:write`        | `set-event-note`, `update-entity`, `manage-relationship` (read-only `list` operation needs `data:read` instead) |
 | `web:fetch`         | `fetch-webpage-html` (MCP only)                                                          |
 

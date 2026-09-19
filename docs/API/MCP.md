@@ -57,7 +57,7 @@ Authorization: Bearer <token>
 
 `tools/list` returns every registered tool in a single page —
 `SparkServer::$defaultPaginationLength = 50`, comfortably above the current
-23 tools, so clients that don't implement cursor-following still see the
+28 tools, so clients that don't implement cursor-following still see the
 full tool set. The server's own `$instructions` block (returned during
 `initialize`) gives the LLM client a curated tour of the tools grouped by
 task — briefing/summary, metrics/trends, precise filtering, search/detail,
@@ -66,7 +66,7 @@ below.
 
 ## Tool naming caveat
 
-Only 9 of the 23 tool classes carry an explicit `#[Laravel\Mcp\Server\Attributes\Name]`
+Only 14 of the 28 tool classes carry an explicit `#[Laravel\Mcp\Server\Attributes\Name]`
 attribute. A tool without one gets its registered MCP name from the
 framework default — `Str::kebab(class_basename($this))` — which does
 **not** strip a trailing `Tool` suffix. So, for example, `GetDaySummaryTool`
@@ -82,7 +82,7 @@ names when you need the exact string a client must send.
 
 ## Tool reference
 
-All 23 tools use `RequiresSparkAbility` and return a `Response::error(...)`
+All 28 tools use `RequiresSparkAbility` and return a `Response::error(...)`
 immediately if the caller's token lacks the required ability. Every "Yes"
 in **Read-only** below corresponds to the compiled `readOnlyHint: true`
 annotation; **Idempotent** likewise reflects the compiled
@@ -234,6 +234,33 @@ Lists the user's integrations — service, status, and identifying details. No
 parameters.
 
 ### Actions
+
+#### `create-bookmark`
+
+_Class_: `CreateBookmarkTool` · _Ability_: `bookmark:write`
+
+Saves a URL as a bookmark. New URLs enter Spark's normal fetch and enrichment
+pipeline; an existing URL returns the existing bookmark without creating or
+fetching a duplicate.
+
+| Parameter | Type   | Required | Notes                                      |
+| --------- | ------ | -------- | ------------------------------------------ |
+| `url`     | string | **Yes**  | Public HTTP(S) URL, maximum 2,048 characters |
+
+#### `capture-bookmark`
+
+_Class_: `CaptureBookmarkTool` · _Ability_: `bookmark:write`
+
+Saves HTML already available to the calling agent and sends its extracted
+content through Spark's normal enrichment pipeline without fetching the URL.
+Use this for content behind a login or paywall. Calls for an existing URL
+recapture that bookmark rather than creating a duplicate.
+
+| Parameter | Type   | Required | Notes                                                 |
+| --------- | ------ | -------- | ----------------------------------------------------- |
+| `url`     | string | **Yes**  | Canonical public HTTP(S) URL, maximum 2,048 characters |
+| `html`    | string | **Yes**  | Complete page HTML, maximum 5 MB                      |
+| `title`   | string | No       | Overrides the extracted title, maximum 1,000 characters |
 
 #### `set-event-note`
 

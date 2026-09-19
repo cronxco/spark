@@ -5,7 +5,9 @@ namespace App\Mcp\Servers;
 use App\Mcp\Resources\DayContextResource;
 use App\Mcp\Tools\AcknowledgeAnomalyTool;
 use App\Mcp\Tools\AnswerFlintQuestionTool;
+use App\Mcp\Tools\CaptureBookmarkTool;
 use App\Mcp\Tools\CompleteFlintRunTool;
+use App\Mcp\Tools\CreateBookmarkTool;
 use App\Mcp\Tools\CreateFlintDigestTool;
 use App\Mcp\Tools\FetchWebpageHtmlTool;
 use App\Mcp\Tools\GetBaselinesTool;
@@ -92,6 +94,8 @@ class SparkServer extends Server
         - `list-integrations`: List connected integrations and their sync state.
 
         ## Actions
+        - `create-bookmark`: Save a URL as a bookmark and queue Spark's normal fetch/enrichment flow. Requires `bookmark:write`.
+        - `capture-bookmark`: Save supplied rendered HTML as a bookmark without fetching the URL again. Use for logged-in or paywalled content. Requires `bookmark:write`.
         - `trigger-integration-update`: Trigger an immediate on-demand fetch for a specific integration or all instances of a service (e.g. `service: "oura"`). Requires `integrations:sync` and does not affect the scheduled pull cycle.
         - `set-event-note`: Set or clear a user-authored event note.
         - `update-entity`: Safely make non-destructive edits to an owned event, object, or block.
@@ -143,6 +147,8 @@ class SparkServer extends Server
         SetEventNoteTool::class,
         UpdateEntityTool::class,
         ManageRelationshipTool::class,
+        CreateBookmarkTool::class,
+        CaptureBookmarkTool::class,
         TriggerIntegrationUpdateTool::class,
         ListIntegrationsTool::class,
         CreateFlintDigestTool::class,
