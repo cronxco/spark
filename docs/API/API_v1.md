@@ -16,6 +16,7 @@ matrix before diving into individual endpoints.
 - [`integrations:read` and `integrations:sync`](#integrationsread-and-integrationssync)
 - [`flint:read` and `flint:write`](#flintread-and-flintwrite)
 - [`finance:read` and `finance:write`](#financeread-and-financewrite)
+- [`bookmark:write`](#bookmarkwrite)
 - [`data:write`](#datawrite)
 - [Shared response schemas](#shared-response-schemas)
 - [Legacy `/api` reference](#legacy-api-reference)
@@ -37,8 +38,8 @@ Abilities are checked by the `spark.ability:<name>` middleware
 the same class MCP tools use via `RequiresSparkAbility`. Available abilities:
 `data:read`, `data:write`, `insights:read`, `insights:write`,
 `integrations:read`, `integrations:sync`, `flint:read`, `flint:write`,
-`finance:read`, `finance:write`. There is no Policy or Gate involved — it is
-this one middleware everywhere. Tokens carrying only the legacy `mcp:read`
+`finance:read`, `finance:write`, `bookmark:write`. There is no Policy or Gate
+involved — it is this one middleware everywhere. Tokens carrying only the legacy `mcp:read`
 ability still satisfy `data:read`, `insights:read`, `integrations:read`, and
 `flint:read` (never a `:write` ability, and never `finance:read`).
 
@@ -587,6 +588,39 @@ Adds a balance entry and touches the account (advancing its ETag). Requires
 **Request body**: `{"balance": 1500.00, "date": "2026-05-10", "notes": "optional, max 1000 chars"}`
 
 **Response `201`**: `{"data": BalanceEntry}`
+
+---
+
+## `bookmark:write`
+
+### `POST /api/v1/bookmarks/capture`
+
+Captures content already rendered in an authenticated browser and saves it as
+a one-time Fetch bookmark without requesting the source URL from Spark.
+
+**Request body**:
+
+```json
+{
+    "url": "https://example.com/private-article",
+    "title": "Article title",
+    "html": "<!doctype html><html>...</html>"
+}
+```
+
+`url` and `html` are required; `title` is optional. HTML is limited to 5 MB.
+Spark applies its existing Readability extraction and content validation, then
+dispatches `ProcessFetchedContent`. Paywall and robot markers are ignored for
+this endpoint because the caller is explicitly supplying content rendered in
+their authenticated browser; insufficient or unreadable content is still
+rejected.
+
+**Response `201`/`200`**:
+`{"state": "captured|recaptured", "bookmark": {"id": "uuid", "url": "...", "title": "..."}}`
+(`201` when newly created, `200` when the URL already existed).
+
+**Response `422`** — URL fails the safety validator, HTML exceeds 5 MB, or
+readable content cannot be extracted.
 
 ---
 

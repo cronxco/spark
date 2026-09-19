@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\IntegrationApiController;
 use App\Http\Controllers\Api\SearchApiController;
 use App\Http\Controllers\Api\SemanticSearchController;
 use App\Http\Controllers\Api\TaskExecutionController;
+use App\Http\Controllers\Api\V1\CapturedBookmarksController as V1CapturedBookmarksController;
 use App\Http\Controllers\Api\V1\Mobile\AnomaliesController as V1AnomaliesController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController as V1BlocksController;
 use App\Http\Controllers\Api\V1\Mobile\BookmarksController as V1BookmarksController;
@@ -233,6 +234,9 @@ Route::prefix('v1')
             Route::post('{kind}/{id}/relationships', [V1EntityMutationsController::class, 'storeRelationship'])->whereIn('kind', ['events', 'objects', 'blocks'])->middleware('if-match:entity')->name('relationships.store');
             Route::delete('relationships/{relationship}', [V1EntityMutationsController::class, 'destroyRelationship'])->middleware('if-match:relationship')->name('relationships.destroy');
         });
+        Route::post('bookmarks/capture', [V1CapturedBookmarksController::class, 'store'])
+            ->middleware('spark.ability:bookmark:write')
+            ->name('bookmarks.capture');
         Route::post('integrations/sync', [V1IntegrationsController::class, 'syncService'])->middleware('spark.ability:integrations:sync')->name('integrations.sync-service');
         Route::post('integrations/{id}/sync', [V1IntegrationsController::class, 'sync'])->middleware('spark.ability:integrations:sync')->name('integrations.sync');
         Route::post('check-ins', [V1CheckInsController::class, 'store'])->middleware('spark.ability:insights:write')->name('check-ins.store');

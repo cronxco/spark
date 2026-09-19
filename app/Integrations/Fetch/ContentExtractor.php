@@ -17,6 +17,30 @@ class ContentExtractor
      */
     public static function extract(string $html, string $url, ?string $userId = null): array
     {
+        return self::extractDocument($html, $url, $userId, true);
+    }
+
+    /**
+     * Extract content supplied by the user's authenticated browser session.
+     *
+     * The rendered page may retain hidden paywall or login markup alongside
+     * the full article, so access-barrier detection is intentionally skipped.
+     * Structural content validation still applies.
+     *
+     * @return array ['success' => bool, 'reason' => string|null, 'data' => array|null]
+     */
+    public static function extractCaptured(string $html, string $url, ?string $userId = null): array
+    {
+        return self::extractDocument($html, $url, $userId, false);
+    }
+
+    private static function extractDocument(
+        string $html,
+        string $url,
+        ?string $userId,
+        bool $detectAccessBarriers,
+    ): array
+    {
         // Create Readability configuration
         $config = new Configuration([
             'FixRelativeURLs' => true,
@@ -40,7 +64,7 @@ class ContentExtractor
             ];
 
             // Validate extracted content
-            $validation = self::validate($extracted, $html, $url);
+            $validation = self::validate($extracted, $html, $url, $detectAccessBarriers);
 
             // Write debug file with extracted content
             self::writeDebugExtraction($url, $extracted, $validation, $userId);
@@ -400,7 +424,12 @@ class ContentExtractor
      *
      * @return array ['success' => bool, 'reason' => string|null, 'data' => array|null]
      */
-    private static function validate(array $extracted, string $html, ?string $url = null): array
+    private static function validate(
+        array $extracted,
+        string $html,
+        ?string $url = null,
+        bool $detectAccessBarriers = true,
+    ): array
     {
         $title = $extracted['title'] ?? '';
         $textContent = $extracted['text_content'] ?? '';
@@ -423,27 +452,29 @@ class ContentExtractor
             ];
         }
 
-        // Check for robot detection (pass extracted content for context-aware detection)
-        if (self::detectRobotCheck($title, $html, $textContent)) {
-            return [
-                'success' => false,
-                'reason' => 'Robot check detected',
-                'data' => null,
-            ];
-        }
+        if ($detectAccessBarriers) {
+            // Check for robot detection (pass extracted content for context-aware detection)
+            if (self::detectRobotCheck($title, $html, $textContent)) {
+                return [
+                    'success' => false,
+                    'reason' => 'Robot check detected',
+                    'data' => null,
+                ];
+            }
 
-        // Check for paywall BEFORE checking content length
-        // This ensures paywall indicators are detected even with short content
-        $paywallCheck = self::detectPaywall($html, $textContent, true, $url);
-        if ($paywallCheck['detected']) {
-            $paywallType = $paywallCheck['type'] ?? 'unknown';
+            // Check for paywall BEFORE checking content length
+            // This ensures paywall indicators are detected even with short content
+            $paywallCheck = self::detectPaywall($html, $textContent, true, $url);
+            if ($paywallCheck['detected']) {
+                $paywallType = $paywallCheck['type'] ?? 'unknown';
 
-            return [
-                'success' => false,
-                'reason' => "Paywall detected ({$paywallType})",
-                'data' => null,
-                'paywall_details' => $paywallCheck,
-            ];
+                return [
+                    'success' => false,
+                    'reason' => "Paywall detected ({$paywallType})",
+                    'data' => null,
+                    'paywall_details' => $paywallCheck,
+                ];
+            }
         }
 
         // Check for insufficient content

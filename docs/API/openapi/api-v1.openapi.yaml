@@ -26,6 +26,8 @@ tags:
     description: flint:read / flint:write
   - name: finance
     description: finance:read / finance:write
+  - name: bookmarks
+    description: bookmark:write
 
 paths:
   /events:
@@ -363,6 +365,29 @@ paths:
       responses:
         "201": { description: Created }
         "200": { description: Already bookmarked }
+        "422": { $ref: '#/components/responses/ValidationError' }
+
+  /bookmarks/capture:
+    post:
+      operationId: captureBookmark
+      tags: [bookmarks]
+      x-spark-ability: bookmark:write
+      summary: Save HTML rendered in an authenticated browser as a bookmark
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, html]
+              properties:
+                url: { type: string, format: uri, maxLength: 2048 }
+                title: { type: [string, "null"], maxLength: 1000 }
+                html: { type: string, maxLength: 5242880 }
+      responses:
+        "201": { description: Captured as a new bookmark }
+        "200": { description: Existing bookmark recaptured }
+        "403": { description: Token lacks bookmark:write }
         "422": { $ref: '#/components/responses/ValidationError' }
 
   /knowledge/events/{id}/reprocess:

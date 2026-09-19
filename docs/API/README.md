@@ -89,6 +89,7 @@ and manual finance account/balance management, including archival.
 | Entity edits, relationships and locations                        | Yes where listed           | Yes                           | Entity/relationship MCP tools | Owned resources only            |
 | Device/APNs, HealthKit ingestion, Live Activities, OAuth handoff | No                         | Yes                           | No                            | iOS lifecycle transport only    |
 | API-token administration                                         | No                         | List/revoke only              | No                            | Creation requires `tokens:manage`, which no iOS session holds |
+| Authenticated browser DOM capture                                | Yes, `bookmark:write`      | No                            | No                            | Caller supplies rendered HTML; no site cookies leave the browser |
 | Browser HTML fetch with saved cookies                            | No                         | No                            | Yes, `web:fetch`              | MCP-only                        |
 | Admin and task-pipeline operations                               | No                         | No                            | No                            | Internal/web administration     |
 

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Save to Spark settings</title>
+        <link rel="stylesheet" href="styles.css">
+    </head>
+    <body class="options">
+        <main>
+            <div class="brand">
+                <span class="spark" aria-hidden="true">✦</span>
+                <div>
+                    <h1>Save to Spark</h1>
+                    <p>Connect the extension to your Spark installation.</p>
+                </div>
+            </div>
+
+            <form id="settings-form">
+                <label for="spark-url">Spark URL</label>
+                <input
+                    id="spark-url"
+                    name="spark-url"
+                    type="url"
+                    placeholder="https://spark.example.com"
+                    autocomplete="url"
+                    required
+                >
+                <p class="hint">Use the origin only, without <code>/api</code> or a trailing slash.</p>
+
+                <label for="spark-token">API token</label>
+                <input
+                    id="spark-token"
+                    name="spark-token"
+                    type="password"
+                    autocomplete="off"
+                    required
+                >
+                <p class="hint">Create a personal access token with only <code>bookmark:write</code>.</p>
+
+                <button type="submit">Save and test connection</button>
+            </form>
+
+            <p id="status" class="status" role="status" aria-live="polite"></p>
+        </main>
+
+        <script src="options.js"></script>
+    </body>
+</html>
