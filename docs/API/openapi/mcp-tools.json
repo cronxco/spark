@@ -723,6 +723,51 @@
             "annotations": []
         },
         {
+            "name": "create-bookmark",
+            "ability": "bookmark:write",
+            "description": "Save a public HTTP or HTTPS URL as a Spark bookmark.\n\nSpark deduplicates bookmarks by URL. New bookmarks are queued for normal webpage\nfetching and enrichment when the user's Fetch integration is available.",
+            "inputSchema": {
+                "properties": {
+                    "url": {
+                        "description": "Public HTTP or HTTPS URL to bookmark (maximum 2,048 characters).",
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "url"
+                ]
+            },
+            "annotations": []
+        },
+        {
+            "name": "capture-bookmark",
+            "ability": "bookmark:write",
+            "description": "Save a webpage as a Spark bookmark using HTML already available to the calling agent.\n\nUse this when the agent has page content that Spark may not be able to fetch itself,\nsuch as a logged-in or paywalled page. Spark extracts and enriches the supplied HTML\nwithout fetching the URL again. Repeated calls for the same URL update the existing\nbookmark rather than creating duplicates.",
+            "inputSchema": {
+                "properties": {
+                    "url": {
+                        "description": "Public HTTP or HTTPS canonical URL for the page (maximum 2,048 characters).",
+                        "type": "string"
+                    },
+                    "html": {
+                        "description": "Complete rendered page HTML to extract and archive (maximum 5 MB).",
+                        "type": "string"
+                    },
+                    "title": {
+                        "description": "Optional page title. When present, it overrides the title extracted from the HTML.",
+                        "type": "string"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "url",
+                    "html"
+                ]
+            },
+            "annotations": []
+        },
+        {
             "name": "fetch-webpage-html",
             "ability": "web:fetch",
             "description": "Render a website in Spark's Playwright browser and return its current raw HTML.\n\n    Saved Fetch cookies for the target domain are used automatically when available, and\n    any refreshed cookies from the page are saved back to the caller's Fetch cookie store.\n    The response is limited to 1 MB of HTML and says explicitly if it was truncated.",
