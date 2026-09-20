@@ -21,6 +21,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 class GetLatestFlintDigestTool extends Tool
 {
     use RequiresSparkAbility;
+
     protected string $description = <<<'MARKDOWN'
         Retrieve Flint digest(s) for a given date, including all attached blocks.
         Defaults to today's most recent digest.
