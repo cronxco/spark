@@ -18,6 +18,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /** Creates the same Flint digest payload for REST and MCP callers. */
 class FlintDigestService
@@ -36,6 +37,12 @@ class FlintDigestService
             // recover it by parsing prose. Optional: FlintDigestOpener derives
             // a best-effort fallback when a caller doesn't send one yet.
             'opener' => ['nullable', 'string', 'max:1000'],
+            'note_ids_used' => ['nullable', 'array', 'max:50'],
+            'note_ids_used.*' => ['uuid'],
+            'question_omission' => ['nullable', 'array'],
+            'question_omission.reason' => ['required_with:question_omission', 'string', 'max:1000'],
+            'question_omission.candidates' => ['required_with:question_omission', 'array', 'min:3', 'max:10'],
+            'question_omission.candidates.*' => ['string', 'max:500'],
             'blocks' => ['nullable', 'array', 'max:50'],
             'blocks.*.block_type' => ['required', 'string', 'max:100', Rule::in(array_keys(FlintPlugin::getBlockTypes()))],
             'blocks.*.title' => ['required', 'string', 'max:255'],
@@ -49,6 +56,13 @@ class FlintDigestService
             'blocks.*.priority' => ['nullable', 'in:low,medium,high'],
             'blocks.*.answer_options' => ['nullable', 'array', 'max:20'],
             'blocks.*.answer_options.*' => ['string', 'max:255'],
+            'blocks.*.news' => ['nullable', 'array'],
+            'blocks.*.news.summary' => ['required_with:blocks.*.news', 'string', 'max:2000'],
+            'blocks.*.news.sources' => ['required_with:blocks.*.news', 'array', 'min:1', 'max:20'],
+            'blocks.*.news.sources.*.publication' => ['required', 'string', 'max:255'],
+            'blocks.*.news.sources.*.position' => ['required', 'string', 'max:1000'],
+            'blocks.*.news.why_it_matters' => ['nullable', 'string', 'max:2000'],
+            'blocks.*.news.what_to_watch' => ['required_with:blocks.*.news', 'string', 'max:2000'],
             'blocks.*.day_context' => ['nullable', 'array'],
             'blocks.*.day_context.date' => ['nullable', 'date_format:Y-m-d'],
             'blocks.*.day_context.calendar' => ['nullable', 'array', 'max:20'],
@@ -80,6 +94,7 @@ class FlintDigestService
         $run = isset($data['run_token'])
             ? app(FlintRunToken::class)->verify($data['run_token'], $user, $date->toDateString(), $period)
             : null;
+        $this->validateRoutineContract($data, $run);
         // Without a run token there is no run to key on, and a fresh uuid made
         // every retry write another digest. The natural key is what a person
         // would call the same digest: this user's briefing for this date,
@@ -214,6 +229,8 @@ class FlintDigestService
             'skill' => $run['skill'] ?? null,
             'trigger_source' => $run['trigger_source'] ?? null,
             'local_date' => $date->toDateString(),
+            'note_ids_used' => $data['note_ids_used'] ?? null,
+            'question_omission' => $data['question_omission'] ?? null,
         ], fn (mixed $value) => $value !== null);
 
         $event = Event::create([
@@ -250,6 +267,11 @@ class FlintDigestService
                 ],
                 $block['block_type'] === 'flint_day_context' => [
                     'day_context' => $this->normalizeDayContext($block['day_context'] ?? []),
+                ],
+                $block['block_type'] === 'flint_news' => [
+                    'content' => $block['content'] ?? data_get($block, 'news.summary', ''),
+                    'news' => $block['news'] ?? null,
+                    'referenced_event_ids' => $block['referenced_event_ids'] ?? [],
                 ],
                 default => [
                     'content' => $block['content'] ?? '',
@@ -297,6 +319,84 @@ class FlintDigestService
             now()->hour <= 16 => 'afternoon',
             default => 'evening',
         };
+    }
+
+    /** @param array<string, mixed> $data @param array<string, mixed>|null $run */
+    private function validateRoutineContract(array $data, ?array $run): void
+    {
+        if ($run === null) {
+            return;
+        }
+
+        $routine = $run['routine'] ?? null;
+        $blocks = collect($data['blocks'] ?? []);
+        $types = $blocks->pluck('block_type');
+        $identities = $blocks->map(fn (array $block) => $block['block_type'] . ':' . mb_strtolower($block['title']));
+        if ($identities->unique()->count() !== $identities->count()) {
+            throw ValidationException::withMessages([
+                'blocks' => 'Routine block type/title pairs must be unique so one block cannot overwrite another.',
+            ]);
+        }
+
+        if ($routine === 'digest') {
+            if ($types->filter(fn (string $type) => $type === 'flint_day_context')->count() !== 1) {
+                throw ValidationException::withMessages([
+                    'blocks' => 'A digest routine must include exactly one flint_day_context block.',
+                ]);
+            }
+
+            $questions = $types->filter(fn (string $type) => $type === 'flint_user_question')->count();
+            if ($questions === 0 && ! isset($data['question_omission'])) {
+                throw ValidationException::withMessages([
+                    'question_omission' => 'A questionless digest must explain the omission and list at least three rejected candidates.',
+                ]);
+            }
+            if ($questions > 0 && isset($data['question_omission'])) {
+                throw ValidationException::withMessages([
+                    'question_omission' => 'question_omission must be omitted when the digest contains a question.',
+                ]);
+            }
+        }
+
+        if (in_array($routine, ['digest', 'news_roundup'], true)) {
+            if ($types->filter(fn (string $type) => $type === 'flint_editorial_note')->count() !== 1
+                || $blocks->last()['block_type'] !== 'flint_editorial_note') {
+                throw ValidationException::withMessages([
+                    'blocks' => 'This routine requires exactly one flint_editorial_note block, placed last.',
+                ]);
+            }
+        }
+
+        if ($routine === 'news_roundup') {
+            $incomplete = $blocks->where('block_type', 'flint_news')
+                ->contains(fn (array $block) => ! is_array($block['news'] ?? null));
+            if ($incomplete) {
+                throw ValidationException::withMessages([
+                    'blocks' => 'Every flint_news block must include structured news data.',
+                ]);
+            }
+        }
+
+        if ($routine === 'reading_list') {
+            $incomplete = $blocks->contains(function (array $block): bool {
+                return match ($block['block_type']) {
+                    'flint_reading_pick' => empty($block['content']) || empty($block['url']) || ! isset($block['minutes']),
+                    'flint_reading_drop' => empty($block['content']) || empty($block['url']),
+                    default => false,
+                };
+            });
+            if ($incomplete) {
+                throw ValidationException::withMessages([
+                    'blocks' => 'Reading picks require content, url, and minutes; reading drops require content and url.',
+                ]);
+            }
+        }
+
+        if ($routine !== 'digest' && $types->contains('flint_user_question')) {
+            throw ValidationException::withMessages([
+                'blocks' => 'Only the day briefing routine may create Flint user questions.',
+            ]);
+        }
     }
 
     /**

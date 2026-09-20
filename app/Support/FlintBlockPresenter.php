@@ -130,6 +130,10 @@ class FlintBlockPresenter
             ? EntityReferenceResolver::linkify($block->getContent(), $references)
             : $block->getContent();
 
+        if ($block->block_type === 'flint_news' && is_array($meta['news'] ?? null)) {
+            $base['news'] = $meta['news'];
+        }
+
         if (! empty($references)) {
             $base['references'] = $references;
         }

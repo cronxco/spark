@@ -35,7 +35,8 @@ class CreateFlintDigestTool extends Tool
           attending, so no `person` field; keep it out of `calendar`), and `weather`
           (`{location, condition, temp_high_c, rain_probability_pct}`). Do not put this in `content`.
         - `flint_news`: One story from the news roundup. Provide `content` (a short standalone
-          distillation, not a copy of the summary section) and `referenced_event_ids`.
+          distillation, not a copy of the summary section), structured `news`, and
+          `referenced_event_ids`.
         - `flint_reading_pick` / `flint_reading_drop`: One item from the reading list. Provide
           `content` (why this, tonight), `url`, and for a pick `minutes` (a whole number).
         - `flint_insight`: A standalone observation. Provide `content` (markdown).
@@ -104,6 +105,17 @@ class CreateFlintDigestTool extends Tool
             'run_token' => $schema->string()
                 ->description('Opaque run token from a scheduled or manual Flint trigger. Pass through unchanged.'),
 
+            'note_ids_used' => $schema->array()
+                ->items($schema->string())
+                ->description('Flint Note UUIDs that materially informed this digest.'),
+
+            'question_omission' => $schema->object([
+                'reason' => $schema->string()->required()
+                    ->description('Why no useful question survived the evidence, quality, and fatigue gates.'),
+                'candidates' => $schema->array()->items($schema->string())->required()
+                    ->description('At least three candidate questions considered and why each was rejected.'),
+            ])->description('Required for a routine briefing that emits no flint_user_question block.'),
+
             'blocks' => $schema->array()
                 ->items($schema->object([
                     'block_type' => $schema->string()
@@ -130,6 +142,15 @@ class CreateFlintDigestTool extends Tool
                     'answer_options' => $schema->array()
                         ->items($schema->string())
                         ->description('For flint_user_question: optional multiple-choice answers. Omit for freeform.'),
+                    'news' => $schema->object([
+                        'summary' => $schema->string()->required(),
+                        'sources' => $schema->array()->items($schema->object([
+                            'publication' => $schema->string()->required(),
+                            'position' => $schema->string()->required(),
+                        ]))->required(),
+                        'why_it_matters' => $schema->string(),
+                        'what_to_watch' => $schema->string()->required(),
+                    ])->description('For flint_news: structured story content used by web and mobile clients.'),
                     'day_context' => $schema->object([
                         'date' => $schema->string()
                             ->description('The local day this context describes (Y-m-d): the payload\'s local_date for morning and afternoon, tomorrow for evening. Omit only if it is today.'),

@@ -17,6 +17,8 @@ class DaySummaryService
 {
     private ?MetricPresentation $presentation = null;
 
+    private bool $summaryDateIsToday = false;
+
     /**
      * Generate a compact summary for a single date.
      *
@@ -24,8 +26,16 @@ class DaySummaryService
      */
     public function generateSummary(User $user, Carbon $date, ?array $domains = null): array
     {
-        $startOfDay = $date->copy()->startOfDay();
-        $endOfDay = $date->copy()->endOfDay();
+        // MR-16: every day-scoped endpoint resolves and names the day's
+        // timezone the same way — the user's effective (acknowledged
+        // time-travel) timezone, not just the profile default — and that
+        // same value decides which calendar day's events this summary
+        // covers.
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($user);
+        $localDate = Carbon::parse($date->toDateString(), $timezone)->startOfDay();
+        $this->summaryDateIsToday = $localDate->isToday();
+        $startOfDay = $localDate->copy()->utc();
+        $endOfDay = $localDate->copy()->endOfDay()->utc();
 
         // Query all events for this date
         $events = $this->queryEvents($user, $startOfDay, $endOfDay, $domains);
@@ -57,22 +67,17 @@ class DaySummaryService
         }
 
         // Build sync status
-        $syncStatus = $this->buildSyncStatus($user, $events);
+        $syncStatus = $this->buildSyncStatus($user, $events, $localDate);
 
         // Build anomalies
-        $anomalies = $this->buildAnomalies($user, $date);
-
-        // MR-16: every day-scoped endpoint resolves and names the day's
-        // timezone the same way. `timezone` is kept for existing clients;
-        // `effective_timezone` is the name the rest of the mobile API (Flint
-        // digests, check-ins) already uses, and now resolves identically —
-        // through the user's acknowledged time-travel zone, not just the
-        // profile default.
-        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($user);
+        $anomalies = $this->buildAnomalies($user, $localDate);
 
         return [
-            'date' => $date->toDateString(),
+            'date' => $localDate->toDateString(),
             'timezone' => $timezone,
+            // `effective_timezone` is the name the rest of the mobile API
+            // (Flint digests, check-ins) already uses; `timezone` is kept
+            // for existing clients. Both are the same resolved value.
             'effective_timezone' => $timezone,
             'sync_status' => $syncStatus,
             'sections' => $sections,
@@ -713,7 +718,7 @@ class DaySummaryService
      *   `apple_health`, which syncs opportunistically through the day rather
      *   than in one daily batch); absent everywhere else.
      */
-    protected function buildSyncStatus(User $user, Collection $events): array
+    protected function buildSyncStatus(User $user, Collection $events, Carbon $localDate): array
     {
         $realTimeServices = ['apple_health'];
 
@@ -721,17 +726,26 @@ class DaySummaryService
             ->get(['id', 'service', 'last_successful_update_at', 'configuration'])
             ->groupBy('service');
 
-        $servicesWithEvents = $events->groupBy('service')->map(function ($serviceEvents, $service) use ($realTimeServices, $integrationsByService) {
+        $servicesWithEvents = $events->groupBy('service')->map(function ($serviceEvents, $service) use ($realTimeServices, $integrationsByService, $localDate) {
             $lastEvent = $serviceEvents->sortByDesc('time')->first();
+            $lastUpdated = $serviceEvents->sortByDesc('updated_at')->first();
             $status = [
                 'event_count' => $serviceEvents->count(),
                 'last_event_time' => $lastEvent->time->toISOString(),
+                'last_updated_at' => $lastUpdated->updated_at->toISOString(),
+                'freshness_basis' => 'updated_at',
                 'actions' => $serviceEvents->pluck('action')->unique()->values()->all(),
             ];
 
             if (in_array($service, $realTimeServices)) {
-                $hoursSinceLastEvent = $lastEvent->time->diffInHours(now());
-                $status['coverage'] = $hoursSinceLastEvent > 2 ? 'partial' : 'complete';
+                $referenceTime = $localDate->isToday() ? now() : $localDate->copy()->endOfDay();
+                $hoursSinceLastUpdate = $lastUpdated->updated_at->lessThan($referenceTime)
+                    ? $lastUpdated->updated_at->diffInHours($referenceTime)
+                    : 0;
+                $status['coverage'] = $hoursSinceLastUpdate > 2 ? 'partial' : 'complete';
+                if ($hoursSinceLastUpdate > 2) {
+                    $status['coverage_note'] = "Last updated {$hoursSinceLastUpdate}h ago — data may be incomplete.";
+                }
             }
 
             [$asOf, $stale] = $this->serviceFreshness($integrationsByService->get($service));
@@ -830,6 +844,10 @@ class DaySummaryService
      */
     protected function attachBaseline(array &$entry, Event $event, array $metricsCache): void
     {
+        $entry['observed_at'] = $event->time?->toIso8601String();
+        $entry['updated_at'] = $event->updated_at?->toIso8601String();
+        $entry['state'] = $this->summaryDateIsToday ? 'provisional' : 'settled';
+
         if ($event->value === null || $event->value_unit === null) {
             return;
         }

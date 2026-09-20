@@ -26,7 +26,7 @@ class BriefingController extends Controller
             return response()->json(['message' => 'Invalid date.'], 422);
         }
 
-        $date = $this->resolveDate($rawDate);
+        $date = $this->resolveDate($rawDate, $request->user()->getTimezone());
 
         if ($date === null) {
             return response()->json(['message' => 'Invalid date.'], 422);
@@ -51,26 +51,26 @@ class BriefingController extends Controller
             ->header('Last-Modified', $date->copy()->endOfDay()->min(Carbon::now())->toRfc7231String());
     }
 
-    protected function resolveDate(?string $input): ?Carbon
+    protected function resolveDate(?string $input, string $timezone = 'UTC'): ?Carbon
     {
         if ($input === null || $input === '') {
-            return Carbon::today();
+            return Carbon::today($timezone);
         }
 
         $input = strtolower(trim($input));
 
         return match ($input) {
-            'today' => Carbon::today(),
-            'yesterday' => Carbon::yesterday(),
-            'tomorrow' => Carbon::tomorrow(),
-            default => $this->parseIso($input),
+            'today' => Carbon::today($timezone),
+            'yesterday' => Carbon::yesterday($timezone),
+            'tomorrow' => Carbon::tomorrow($timezone),
+            default => $this->parseIso($input, $timezone),
         };
     }
 
-    protected function parseIso(string $input): ?Carbon
+    protected function parseIso(string $input, string $timezone = 'UTC'): ?Carbon
     {
         try {
-            $date = Carbon::createFromFormat('Y-m-d', $input);
+            $date = Carbon::createFromFormat('Y-m-d', $input, $timezone);
         } catch (Exception) {
             return null;
         }

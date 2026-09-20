@@ -79,6 +79,8 @@ class GetDaySummaryToolTest extends TestCase
         $this->assertArrayHasKey('sleep_score', $summary['sections']['health']);
         $this->assertEquals($sleepEvent->id, $summary['sections']['health']['sleep_score']['event_id']);
         $this->assertEquals(85, $summary['sections']['health']['sleep_score']['score']);
+        $this->assertSame('provisional', $summary['sections']['health']['sleep_score']['state']);
+        $this->assertSame($sleepEvent->updated_at->toIso8601String(), $summary['sections']['health']['sleep_score']['updated_at']);
         $this->assertArrayHasKey('contributors', $summary['sections']['health']['sleep_score']);
     }
 
@@ -472,6 +474,29 @@ class GetDaySummaryToolTest extends TestCase
         $this->assertNull($summary['sync_status']['oura']['as_of']);
         $this->assertEmpty($summary['sections']['health']);
         $this->assertEmpty($summary['anomalies']);
+    }
+
+    #[Test]
+    public function summary_queries_the_users_local_day_across_utc_boundaries(): void
+    {
+        $this->user->settings = array_merge($this->user->settings ?? [], ['timezone' => 'Europe/London']);
+        $this->user->save();
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'oura',
+            'domain' => 'health',
+            'action' => 'had_sleep_score',
+            'value' => 80,
+            'value_multiplier' => 1,
+            'value_unit' => 'percent',
+            'time' => Carbon::parse('2026-07-01 00:30:00', 'Europe/London')->utc(),
+        ]);
+
+        $summary = app(DaySummaryService::class)->generateSummary($this->user, Carbon::parse('2026-07-01'));
+
+        $this->assertSame('2026-07-01', $summary['date']);
+        $this->assertSame('Europe/London', $summary['timezone']);
+        $this->assertArrayHasKey('sleep_score', $summary['sections']['health']);
     }
 
     #[Test]
