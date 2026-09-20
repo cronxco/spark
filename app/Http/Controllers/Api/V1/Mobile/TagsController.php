@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Mobile;
 
+use App\Http\Controllers\Api\V1\Mobile\Concerns\HandlesIdempotency;
 use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
@@ -19,6 +20,8 @@ use Spatie\Tags\Tag;
 
 class TagsController extends Controller
 {
+    use HandlesIdempotency;
+
     private const DEFAULT_LIMIT = 30;
 
     private const MAX_LIMIT = 100;
@@ -34,7 +37,7 @@ class TagsController extends Controller
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'cursor' => ['nullable', 'string'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_LIMIT],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_LIMIT],
         ]);
 
         $tags = $this->withTotals(
@@ -58,7 +61,7 @@ class TagsController extends Controller
     {
         $validated = $request->validate([
             'cursor' => ['nullable', 'string'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_LIMIT],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_LIMIT],
         ]);
 
         $tag = $this->tagQuery($request->user())
@@ -162,40 +165,44 @@ class TagsController extends Controller
 
     private function attach(Request $request, Event|EventObject $entity): JsonResponse
     {
-        $validated = $request->validate([
-            'tag_id' => ['nullable', 'integer'],
-            'name' => ['required_without:tag_id', 'nullable', 'string', 'max:255'],
-            'type' => ['nullable', 'string', 'max:100'],
-        ]);
+        // MR-17: a phone retrying a tag-add on a bad connection replays the
+        // first response instead of attaching (or creating) the tag twice.
+        return $this->idempotent($request, 'tags.attach', function () use ($request, $entity) {
+            $validated = $request->validate([
+                'tag_id' => ['nullable', 'integer'],
+                'name' => ['required_without:tag_id', 'nullable', 'string', 'max:255'],
+                'type' => ['nullable', 'string', 'max:100'],
+            ]);
 
-        if (isset($validated['tag_id'])) {
-            $tag = $this->tagQuery($request->user())
-                ->whereKey($validated['tag_id'])
-                ->first();
+            if (isset($validated['tag_id'])) {
+                $tag = $this->tagQuery($request->user())
+                    ->whereKey($validated['tag_id'])
+                    ->first();
 
-            if (! $tag) {
-                return response()->json(['message' => 'Tag not found.'], 404);
+                if (! $tag) {
+                    return response()->json(['message' => 'Tag not found.'], 404);
+                }
+            } else {
+                [$name, $type] = $this->normaliseTag(
+                    (string) $validated['name'],
+                    $validated['type'] ?? null,
+                );
+                if ($name === '') {
+                    return response()->json(['message' => 'The tag name field is required.'], 422);
+                }
+
+                $tag = Tag::findOrCreate($name, $type);
             }
-        } else {
-            [$name, $type] = $this->normaliseTag(
-                (string) $validated['name'],
-                $validated['type'] ?? null,
-            );
-            if ($name === '') {
-                return response()->json(['message' => 'The tag name field is required.'], 422);
-            }
 
-            $tag = Tag::findOrCreate($name, $type);
-        }
+            $entity->attachTags([$tag]);
+            $entity->touch();
+            $entity->load('tags');
 
-        $entity->attachTags([$tag]);
-        $entity->touch();
-        $entity->load('tags');
-
-        return response()->json([
-            'tag' => $this->tagPayload($tag),
-            'tags' => $entity->tags->map(fn (Tag $item) => $this->tagPayload($item))->values(),
-        ], 201)->header('ETag', $this->versions->etag($entity->fresh()));
+            return response()->json([
+                'tag' => $this->tagPayload($tag),
+                'tags' => $entity->tags->map(fn (Tag $item) => $this->tagPayload($item))->values(),
+            ], 201)->header('ETag', $this->versions->etag($entity->fresh()));
+        });
     }
 
     private function detach(Event|EventObject $entity, string $tagId): JsonResponse
@@ -318,7 +325,7 @@ class TagsController extends Controller
             $detectedType = strtolower($matches[1]);
             $name = trim($matches[2]);
         } elseif ($detectedType !== null
-            && preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $matches) === 1) {
+            && preg_match('/^'.preg_quote($detectedType, '/').'[_:](.+)$/i', $name, $matches) === 1) {
             $name = trim($matches[1]);
         }
 

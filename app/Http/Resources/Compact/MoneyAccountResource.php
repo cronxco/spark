@@ -41,6 +41,10 @@ class MoneyAccountResource extends JsonResource
             'interest_rate' => isset($meta['interest_rate']) ? (float) $meta['interest_rate'] : null,
             'start_date' => $meta['start_date'] ?? null,
             'integration_id' => $meta['integration_id'] ?? null,
+            // MR-6: the account the user has chosen to see first — stored in
+            // metadata rather than a dedicated column so any account type
+            // (manual, Monzo, GoCardless) can be pinned, not just editable ones.
+            'is_pinned' => (bool) ($meta['is_pinned'] ?? false),
             'latest_balance' => $this->latestBalance
                 ? $this->formatBalance($this->latestBalance, $meta['currency'] ?? 'GBP')
                 : null,

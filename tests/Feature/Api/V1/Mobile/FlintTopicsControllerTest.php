@@ -51,6 +51,30 @@ class FlintTopicsControllerTest extends TestCase
     }
 
     #[Test]
+    public function paginates_with_the_shared_cursor_envelope(): void
+    {
+        $this->topic('First');
+        $this->topic('Second');
+        $this->topic('Third');
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $first = $this->getJson('/api/v1/mobile/flint/topics?limit=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('has_more', true);
+
+        $cursor = $first->json('next_cursor');
+        $this->assertNotNull($cursor);
+
+        $this->getJson('/api/v1/mobile/flint/topics?limit=2&cursor='.urlencode($cursor))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('has_more', false)
+            ->assertJsonPath('next_cursor', null);
+    }
+
+    #[Test]
     public function filters_by_status(): void
     {
         $this->topic('Active thread', status: 'active');
@@ -101,7 +125,7 @@ class FlintTopicsControllerTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.id', (string) $topic->id)
             ->assertJsonPath('data.mentions.0.digest_id', (string) $event->id)
-            ->assertJsonPath('data.mentions.0.deep_link', 'spark://digest/' . $event->id)
+            ->assertJsonPath('data.mentions.0.deep_link', 'spark://digest/'.$event->id)
             ->assertJsonStructure(['data' => ['version']]);
     }
 
@@ -143,7 +167,7 @@ class FlintTopicsControllerTest extends TestCase
         $eventMention = $mentions->firstWhere('source_type', 'event');
         $blockMention = $mentions->firstWhere('source_type', 'block');
 
-        $this->assertSame('spark://event/' . $event->id, $eventMention['deep_link']);
+        $this->assertSame('spark://event/'.$event->id, $eventMention['deep_link']);
         $this->assertNull($eventMention['digest_id']);
         $this->assertSame($event->time->toIso8601String(), $blockMention['occurred_at']);
         $this->assertSame($event->time->toDateString(), $blockMention['local_date']);

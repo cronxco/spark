@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Flint\FlintRunCompletionService;
 use App\Services\Flint\FlintRunToken;
 use App\Services\Flint\RoutineConfig;
+use App\Support\FlintDigestOpener;
 use App\Support\FlintQuestion;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -30,6 +31,11 @@ class FlintDigestService
             'date' => ['nullable', 'date_format:Y-m-d'],
             'run_token' => ['nullable', 'string', 'max:10000'],
             'summary' => ['nullable', 'string', 'max:10000'],
+            // MR-7: the skill already knows which sentence of `summary` is the
+            // lede — publishing it explicitly means the client never has to
+            // recover it by parsing prose. Optional: FlintDigestOpener derives
+            // a best-effort fallback when a caller doesn't send one yet.
+            'opener' => ['nullable', 'string', 'max:1000'],
             'blocks' => ['nullable', 'array', 'max:50'],
             'blocks.*.block_type' => ['required', 'string', 'max:100', Rule::in(array_keys(FlintPlugin::getBlockTypes()))],
             'blocks.*.title' => ['required', 'string', 'max:255'],
@@ -63,7 +69,7 @@ class FlintDigestService
             // for the same news-story block appeared in one week before anyone
             // noticed, so say plainly what is allowed.
             'blocks.*.block_type.in' => 'Unknown Flint block type. Registered types are: '
-                . implode(', ', array_keys(FlintPlugin::getBlockTypes())) . '.',
+                .implode(', ', array_keys(FlintPlugin::getBlockTypes())).'.',
         ])->validate();
 
         $date = Carbon::parse(
@@ -79,8 +85,8 @@ class FlintDigestService
         // would call the same digest: this user's briefing for this date,
         // period and title.
         $sourceId = $run
-            ? 'flint_digest_run:' . $run['run_uuid']
-            : 'flint_digest:' . sha1(implode('|', [
+            ? 'flint_digest_run:'.$run['run_uuid']
+            : 'flint_digest:'.sha1(implode('|', [
                 $user->id,
                 $date->toDateString(),
                 $period,
@@ -149,8 +155,8 @@ class FlintDigestService
             [
                 'user_id' => $user->id,
                 'concept' => 'digest',
-                'type' => ($ownObject ? $routine : $period) . '_digest',
-                'title' => $date->format('Y-m-d') . ' ' . ($ownObject
+                'type' => ($ownObject ? $routine : $period).'_digest',
+                'title' => $date->format('Y-m-d').' '.($ownObject
                     ? strtoupper(str_replace('_', ' ', $routine))
                     : match ($period) {
                         'morning' => 'AM',
@@ -198,6 +204,7 @@ class FlintDigestService
             'digest_object_id' => $digest->id,
             'title' => $data['title'],
             'summary' => $data['summary'] ?? null,
+            'opener' => $data['opener'] ?? null,
             'run_uuid' => $run['run_uuid'] ?? null,
             'routine' => $run['routine'] ?? null,
             // Derived from the verified run token rather than left for a
@@ -275,6 +282,8 @@ class FlintDigestService
             'date' => data_get($event->event_metadata, 'local_date', $event->time->toDateString()),
             'period' => $period,
             'title' => data_get($event->event_metadata, 'title'),
+            'opener' => data_get($event->event_metadata, 'opener')
+                ?? FlintDigestOpener::extract(data_get($event->event_metadata, 'summary')),
             'block_count' => $event->blocks->count(),
             'block_ids' => $event->blocks->pluck('id')->values()->all(),
             'deduplicated' => $deduplicated,

@@ -9,6 +9,7 @@ use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Api\EntityMutationService;
 use App\Services\Api\ResourceVersion;
+use App\Support\FlintTopicWatchingFor;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
@@ -46,6 +47,7 @@ class FlintTopicService
                     'last_touched_at' => $now->toIso8601String(),
                     'next_review_at' => $data['next_review_at'] ?? null,
                     'origin' => $data['origin'] ?? 'digest_inference',
+                    'watching_for' => $data['watching_for'] ?? null,
                     'run_uuids' => $runUuid ? [$runUuid] : [],
                 ],
             ],
@@ -195,7 +197,7 @@ class FlintTopicService
                     'local_date' => data_get($event->event_metadata, 'local_date', $event->time?->toDateString()),
                     'period' => data_get($event->event_metadata, 'period'),
                     'occurred_at' => $event->time?->toIso8601String(),
-                    'deep_link' => ($isDigest ? 'spark://digest/' : 'spark://event/') . $event->id,
+                    'deep_link' => ($isDigest ? 'spark://digest/' : 'spark://event/').$event->id,
                     'source_deleted' => $event->trashed(),
                 ];
             }
@@ -226,15 +228,15 @@ class FlintTopicService
                     'local_date' => data_get($block->event?->event_metadata, 'local_date', $occurredAt?->toDateString()),
                     'period' => data_get($block->event?->event_metadata, 'period'),
                     'occurred_at' => $occurredAt?->toIso8601String(),
-                    'deep_link' => 'spark://block/' . $block->id,
+                    'deep_link' => 'spark://block/'.$block->id,
                     'source_deleted' => $block->trashed(),
                 ];
             }
 
             return null;
         })->filter()
-            ->sortByDesc(fn (array $mention) => ($mention['occurred_at'] ?? '') . ':' . $mention['id'])
-            ->unique(fn (array $mention) => $mention['source_type'] . ':' . $mention['source_id'])
+            ->sortByDesc(fn (array $mention) => ($mention['occurred_at'] ?? '').':'.$mention['id'])
+            ->unique(fn (array $mention) => $mention['source_type'].':'.$mention['source_id'])
             ->take($limit)
             ->values();
     }
@@ -253,7 +255,7 @@ class FlintTopicService
         $attributes = Arr::only($data, ['title', 'content']);
         $metadata = $topic->metadata ?? [];
 
-        foreach (['kind', 'status', 'next_review_at', 'origin'] as $key) {
+        foreach (['kind', 'status', 'next_review_at', 'origin', 'watching_for'] as $key) {
             if (array_key_exists($key, $data)) {
                 $metadata[$key] = $data[$key];
             }
@@ -304,6 +306,10 @@ class FlintTopicService
             'last_touched_at' => $topic->metadata['last_touched_at'] ?? null,
             'next_review_at' => $topic->metadata['next_review_at'] ?? null,
             'origin' => $topic->metadata['origin'] ?? null,
+            // MR-10: what would move this thread on, published explicitly so
+            // the client owns no sentence-splitting of `content`.
+            'watching_for' => $topic->metadata['watching_for']
+                ?? FlintTopicWatchingFor::extract($topic->content),
         ];
     }
 
@@ -319,6 +325,7 @@ class FlintTopicService
             'status' => ['sometimes', Rule::in(['active', 'dormant', 'resolved', 'expired'])],
             'next_review_at' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'origin' => ['sometimes', Rule::in(['conversation', 'digest_inference'])],
+            'watching_for' => ['sometimes', 'nullable', 'string', 'max:500'],
             'related_event_id' => ['sometimes', 'nullable', 'uuid'],
             'related_block_id' => ['sometimes', 'nullable', 'uuid'],
         ];

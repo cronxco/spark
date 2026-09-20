@@ -4,11 +4,14 @@ namespace App\Services;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
+use App\Models\Integration;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Support\MoneyDirection;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class DaySummaryService
 {
@@ -42,7 +45,7 @@ class DaySummaryService
         }
 
         if (! $domains || in_array('money', $domains)) {
-            $sections['money'] = $this->buildMoneySection($events);
+            $sections['money'] = $this->buildMoneySection($events, $user);
         }
 
         if (! $domains || in_array('media', $domains)) {
@@ -54,14 +57,23 @@ class DaySummaryService
         }
 
         // Build sync status
-        $syncStatus = $this->buildSyncStatus($events);
+        $syncStatus = $this->buildSyncStatus($user, $events);
 
         // Build anomalies
         $anomalies = $this->buildAnomalies($user, $date);
 
+        // MR-16: every day-scoped endpoint resolves and names the day's
+        // timezone the same way. `timezone` is kept for existing clients;
+        // `effective_timezone` is the name the rest of the mobile API (Flint
+        // digests, check-ins) already uses, and now resolves identically —
+        // through the user's acknowledged time-travel zone, not just the
+        // profile default.
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($user);
+
         return [
             'date' => $date->toDateString(),
-            'timezone' => $user->timezone ?? 'UTC',
+            'timezone' => $timezone,
+            'effective_timezone' => $timezone,
             'sync_status' => $syncStatus,
             'sections' => $sections,
             'anomalies' => $anomalies,
@@ -353,7 +365,7 @@ class DaySummaryService
     /**
      * Build the money section (transactions, receipts).
      */
-    protected function buildMoneySection(Collection $events): array
+    protected function buildMoneySection(Collection $events, User $user): array
     {
         $section = [];
         $transactionActions = ['payment_to', 'payment_from', 'made_transaction', 'card_payment_to',
@@ -372,6 +384,10 @@ class DaySummaryService
                     'action' => $event->action,
                     'service' => $event->service,
                     'time' => $event->time->toISOString(),
+                    // MR-13: the client no longer infers in/out/internal from the
+                    // action-name suffix — an open vocabulary that grows with
+                    // every integration.
+                    'direction' => MoneyDirection::for($event),
                 ];
 
                 if ($event->actor?->title) {
@@ -393,13 +409,35 @@ class DaySummaryService
                 return $tx;
             })->values()->all();
 
-            // Calculate total spend (outgoing transactions)
-            $outgoingActions = ['payment_to', 'card_payment_to', 'bank_transfer_to', 'direct_debit_to', 'pot_transfer_to'];
+            // MR-4: split spend from internal transfers. Moving money between the
+            // user's own accounts/pots is not spending and must not be counted
+            // as such — see MoneyDirection.
             $totalSpend = $transactions
-                ->filter(fn ($e) => in_array($e->action, $outgoingActions))
+                ->filter(fn ($e) => MoneyDirection::for($e) === MoneyDirection::OUT)
+                ->sum(fn ($e) => abs($e->formatted_value));
+            $internalTransfers = $transactions
+                ->filter(fn ($e) => MoneyDirection::for($e) === MoneyDirection::INTERNAL)
+                ->sum(fn ($e) => abs($e->formatted_value));
+            $totalIn = $transactions
+                ->filter(fn ($e) => MoneyDirection::for($e) === MoneyDirection::IN)
                 ->sum(fn ($e) => abs($e->formatted_value));
 
             $section['total_spend'] = round($totalSpend, 2);
+            $section['internal_transfers'] = round($internalTransfers, 2);
+            $section['total_in'] = round($totalIn, 2);
+
+            // MR-3: a day-level baseline for the one day-total figure that
+            // didn't have one — vs_baseline_pct on `total_spend`, computed
+            // over the user's own daily spend history, or an explicit reason
+            // there is none yet.
+            $baseline = $this->dailySpendBaseline($user);
+            if ($baseline !== null) {
+                $section['total_spend_vs_baseline_pct'] = $baseline['mean'] != 0.0
+                    ? round((($totalSpend - $baseline['mean']) / abs($baseline['mean'])) * 100, 1)
+                    : 0.0;
+            } else {
+                $section['total_spend_baseline_unavailable_reason'] = 'insufficient_history';
+            }
         }
 
         // Receipts
@@ -562,7 +600,7 @@ class DaySummaryService
                 if ($summary) {
                     $content = $summary->getContent();
                     $bookmark['summary'] = mb_strlen($content, 'UTF-8') > 300
-                        ? mb_substr($content, 0, 300, 'UTF-8') . '...'
+                        ? mb_substr($content, 0, 300, 'UTF-8').'...'
                         : $content;
                 }
 
@@ -660,12 +698,30 @@ class DaySummaryService
 
     /**
      * Build sync status per service.
+     *
+     * MR-1: alongside the event-derived fields, every service now carries the
+     * server's own judgement of freshness so a client never has to infer it
+     * from a timestamp and a hard-coded threshold:
+     *
+     * - `stale` (bool) — behind for this day, using the cadence the server
+     *   knows the integration runs at ({@see Integration::getUpdateFrequencyMinutes()}).
+     * - `as_of` (ISO8601|null) — when the server last successfully reached the
+     *   service, which is not the same as `last_event_time` (a service can be
+     *   perfectly in sync and simply have nothing to report for this day).
+     * - `coverage` (`'complete'|'partial'`, optional) — only set for services
+     *   whose data can arrive partially within a day (currently just
+     *   `apple_health`, which syncs opportunistically through the day rather
+     *   than in one daily batch); absent everywhere else.
      */
-    protected function buildSyncStatus(Collection $events): array
+    protected function buildSyncStatus(User $user, Collection $events): array
     {
         $realTimeServices = ['apple_health'];
 
-        return $events->groupBy('service')->map(function ($serviceEvents, $service) use ($realTimeServices) {
+        $integrationsByService = $user->integrations()
+            ->get(['id', 'service', 'last_successful_update_at', 'configuration'])
+            ->groupBy('service');
+
+        $servicesWithEvents = $events->groupBy('service')->map(function ($serviceEvents, $service) use ($realTimeServices, $integrationsByService) {
             $lastEvent = $serviceEvents->sortByDesc('time')->first();
             $status = [
                 'event_count' => $serviceEvents->count(),
@@ -678,8 +734,62 @@ class DaySummaryService
                 $status['coverage'] = $hoursSinceLastEvent > 2 ? 'partial' : 'complete';
             }
 
+            [$asOf, $stale] = $this->serviceFreshness($integrationsByService->get($service));
+            $status['as_of'] = $asOf?->toISOString();
+            $status['stale'] = $stale;
+
             return $status;
-        })->all();
+        });
+
+        // A service can be fully in sync and simply have nothing to report for
+        // this particular day — that is not the same as being behind, and a
+        // client can't tell the difference unless the service still appears
+        // with its own stale/as_of judgement.
+        $servicesWithoutEvents = $integrationsByService
+            ->reject(fn ($integrations, $service) => $servicesWithEvents->has($service))
+            ->map(function ($integrations) {
+                [$asOf, $stale] = $this->serviceFreshness($integrations);
+
+                return [
+                    'event_count' => 0,
+                    'last_event_time' => null,
+                    'actions' => [],
+                    'as_of' => $asOf?->toISOString(),
+                    'stale' => $stale,
+                ];
+            });
+
+        return $servicesWithEvents->union($servicesWithoutEvents)->all();
+    }
+
+    /**
+     * The server's own freshness judgement for a service: when it last
+     * reached it successfully, and whether that is behind the cadence it
+     * knows that integration runs at. A service with no successful sync yet
+     * is stale by definition.
+     *
+     * @param  Collection<int, Integration>|null  $integrations
+     * @return array{0: Carbon|null, 1: bool}
+     */
+    private function serviceFreshness(?Collection $integrations): array
+    {
+        if ($integrations === null || $integrations->isEmpty()) {
+            return [null, true];
+        }
+
+        $asOf = $integrations->max('last_successful_update_at');
+
+        if ($asOf === null) {
+            return [null, true];
+        }
+
+        // A generous multiple of the integration's own polling cadence, so
+        // ordinary scheduling jitter never reads as staleness, floored at an
+        // hour for integrations configured with a very tight cadence.
+        $cadenceMinutes = max($integrations->max(fn (Integration $i) => $i->getUpdateFrequencyMinutes()), 15);
+        $staleAfterMinutes = max($cadenceMinutes * 4, 60);
+
+        return [$asOf, $asOf->diffInMinutes(now()) > $staleAfterMinutes];
     }
 
     /**
@@ -743,6 +853,58 @@ class DaySummaryService
                 'detected_at' => $trend->detected_at->toISOString(),
             ];
         })->values()->all();
+    }
+
+    /**
+     * A day-level baseline for the user's total daily spend (MR-3), computed
+     * dynamically over their own history rather than stored — `MetricStatistic`
+     * is computed per event value, which is the same thing as a day baseline
+     * only for metrics that emit once a day; `money.total_spend` emits many
+     * times a day and needs its own aggregate.
+     *
+     * Cached briefly since it scans up to 60 days of money events; the day
+     * that just changed the baseline can lag by that long without materially
+     * changing the mean.
+     *
+     * @return array{mean: float, count: int}|null null when there isn't
+     *                                             enough history yet for a
+     *                                             meaningful baseline.
+     */
+    private function dailySpendBaseline(User $user): ?array
+    {
+        $daily = Cache::remember(
+            "day_summary.money_baseline.{$user->id}",
+            now()->addHours(6),
+            function () use ($user): Collection {
+                $windowStart = now()->subDays(60)->startOfDay();
+                $windowEnd = now()->startOfDay();
+
+                $events = Event::query()
+                    ->withoutInternal()
+                    ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
+                    ->where('domain', 'money')
+                    ->whereNotNull('value')
+                    ->whereBetween('time', [$windowStart, $windowEnd])
+                    ->with(['actor', 'target'])
+                    ->get();
+
+                return $events
+                    ->filter(fn (Event $e) => MoneyDirection::for($e) === MoneyDirection::OUT)
+                    ->groupBy(fn (Event $e) => $e->time->toDateString())
+                    ->map(fn (Collection $dayEvents) => $dayEvents->sum(fn (Event $e) => abs($e->formatted_value)));
+            }
+        );
+
+        // Fewer than a week of days with any spend isn't enough to call a mean
+        // meaningful yet — report the reason rather than a noisy percentage.
+        if ($daily->count() < 5) {
+            return null;
+        }
+
+        return [
+            'mean' => round((float) $daily->avg(), 2),
+            'count' => $daily->count(),
+        ];
     }
 
     /**

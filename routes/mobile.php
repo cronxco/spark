@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
 use App\Http\Controllers\Api\V1\Mobile\MoneyAccountsController;
+use App\Http\Controllers\Api\V1\Mobile\NetWorthController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationPreferencesController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationsController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationSettingsController;
@@ -308,6 +309,11 @@ Route::post('up-to-speed/unmark', UpToSpeedUnmarkController::class)
 Route::get('flint/digests', [FlintDigestsController::class, 'index'])
     ->name('flint.digests.index');
 
+// Must be registered before the {id} wildcard route below, or "latest" would
+// be captured as an id and routed to show() instead.
+Route::get('flint/digests/latest', [FlintDigestsController::class, 'latest'])
+    ->name('flint.digests.latest');
+
 Route::get('flint/digests/{id}', [FlintDigestsController::class, 'show'])
     ->name('flint.digests.show');
 
@@ -369,3 +375,6 @@ Route::delete('money/accounts/{id}', [MoneyAccountsController::class, 'destroy']
 Route::post('money/accounts/{id}/balances', [MoneyAccountsController::class, 'addBalance'])
     ->middleware(['ability:ios:write', 'if-match:object'])
     ->name('money.accounts.balances.store');
+
+Route::get('money/net-worth', [NetWorthController::class, 'index'])
+    ->name('money.net-worth');

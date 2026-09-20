@@ -75,7 +75,7 @@ class FeedControllerTest extends TestCase
         $first = $this->getJson('/api/v1/mobile/feed?limit=2')->assertOk();
         $cursor = $first->json('next_cursor');
 
-        $second = $this->getJson('/api/v1/mobile/feed?limit=2&cursor=' . urlencode($cursor))
+        $second = $this->getJson('/api/v1/mobile/feed?limit=2&cursor='.urlencode($cursor))
             ->assertOk()
             ->assertJsonPath('has_more', false);
 
@@ -286,7 +286,7 @@ class FeedControllerTest extends TestCase
         $this->seedEvents(2);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $response = $this->getJson('/api/v1/mobile/feed?date=' . $targetDate->format('Y-m-d'))->assertOk();
+        $response = $this->getJson('/api/v1/mobile/feed?date='.$targetDate->format('Y-m-d'))->assertOk();
 
         $this->assertCount(2, $response->json('data'));
         foreach ($response->json('data') as $event) {
@@ -302,7 +302,7 @@ class FeedControllerTest extends TestCase
         $this->seedEvents(2);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $response = $this->getJson('/api/v1/mobile/feed?date=' . $futureDate->format('Y-m-d'))->assertOk();
+        $response = $this->getJson('/api/v1/mobile/feed?date='.$futureDate->format('Y-m-d'))->assertOk();
 
         $this->assertCount(1, $response->json('data'));
         $this->assertSame($futureDate->format('Y-m-d'), Carbon::parse($response->json('data.0.time'))->format('Y-m-d'));
@@ -341,6 +341,57 @@ class FeedControllerTest extends TestCase
         $this->assertArrayHasKey('display_value', $item);
         $this->assertIsString($item['display_value']);
         $this->assertNotEmpty($item['display_value']);
+    }
+
+    #[Test]
+    public function events_include_a_shared_group_key_for_consecutive_runs(): void
+    {
+        $this->seedEvents(3);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $data = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data');
+
+        $this->assertCount(3, $data);
+        $this->assertSame($data[0]['group_key'], $data[1]['group_key']);
+        $this->assertSame($data[1]['group_key'], $data[2]['group_key']);
+        $this->assertNotEmpty($data[0]['group_key']);
+    }
+
+    #[Test]
+    public function money_events_include_a_resolved_direction(): void
+    {
+        $this->seedEvents(1);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertSame('out', $item['direction']);
+    }
+
+    #[Test]
+    public function pot_transfers_are_flagged_as_internal_direction(): void
+    {
+        $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account']);
+        $pot = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account']);
+
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'pot_transfer_to',
+            'value' => 500,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'actor_id' => $account->id,
+            'target_id' => $pot->id,
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertSame('internal', $item['direction']);
     }
 
     #[Test]

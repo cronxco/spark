@@ -214,6 +214,36 @@ class FlintTopicServiceTest extends TestCase
         $this->assertSame('Canada trip 2027', $topic->refresh()->title);
     }
 
+    #[Test]
+    public function watching_for_uses_the_explicit_field_when_given(): void
+    {
+        $topic = $this->topic('G7 reserves', ['kind' => 'strategic', 'status' => 'active']);
+        $topic->update(['content' => 'Talks continue. A decision looks close.']);
+
+        $payload = $this->service->update($this->user, $topic->id, [
+            'watching_for' => 'The G7 finance ministers meeting on Thursday.',
+        ]);
+
+        $this->assertSame('The G7 finance ministers meeting on Thursday.', $payload['watching_for']);
+    }
+
+    #[Test]
+    public function watching_for_falls_back_to_the_last_sentence_of_content(): void
+    {
+        $topic = $this->topic('G7 reserves', ['kind' => 'strategic', 'status' => 'active']);
+        $topic->update([
+            'content' => 'Talks continue between the finance ministries. '
+                .'The decisive next development is a G7 decision on reserves expected this quarter.',
+        ]);
+
+        $payload = $this->service->detail($this->user, $topic->id);
+
+        $this->assertSame(
+            'The decisive next development is a G7 decision on reserves expected this quarter.',
+            $payload['watching_for']
+        );
+    }
+
     private function topic(string $title, array $metadata = []): EventObject
     {
         return EventObject::factory()->create([

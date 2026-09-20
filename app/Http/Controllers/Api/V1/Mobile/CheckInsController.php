@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Mobile;
 
+use App\Http\Controllers\Api\V1\Mobile\Concerns\HandlesIdempotency;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactEventResource;
 use App\Integrations\DailyCheckin\DailyCheckinPlugin;
@@ -17,6 +18,8 @@ use Illuminate\Support\Str;
 
 class CheckInsController extends Controller
 {
+    use HandlesIdempotency;
+
     /**
      * Allowed image mime types → file extension for shared photos.
      */
@@ -74,8 +77,8 @@ class CheckInsController extends Controller
 
         $sourceIds = [];
         foreach (CarbonPeriod::create($from, $to) as $date) {
-            $sourceIds[] = 'daily_checkin_morning_' . $date->toDateString();
-            $sourceIds[] = 'daily_checkin_afternoon_' . $date->toDateString();
+            $sourceIds[] = 'daily_checkin_morning_'.$date->toDateString();
+            $sourceIds[] = 'daily_checkin_afternoon_'.$date->toDateString();
         }
 
         $events = Event::whereHas('integration', function ($q) use ($request) {
@@ -134,35 +137,39 @@ class CheckInsController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'period' => ['required', 'string', 'in:morning,afternoon'],
-            'physical' => ['required', 'integer', 'min:1', 'max:5'],
-            'mental' => ['required', 'integer', 'min:1', 'max:5'],
-            'date' => ['required', 'date_format:Y-m-d'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-        ]);
+        // MR-17: a phone retrying a check-in submission on a bad connection
+        // replays the first response instead of writing a second event.
+        return $this->idempotent($request, 'check-ins.store', function () use ($request) {
+            $validated = $request->validate([
+                'period' => ['required', 'string', 'in:morning,afternoon'],
+                'physical' => ['required', 'integer', 'min:1', 'max:5'],
+                'mental' => ['required', 'integer', 'min:1', 'max:5'],
+                'date' => ['required', 'date_format:Y-m-d'],
+                'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+                'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+                'address' => ['nullable', 'string', 'max:255'],
+                'notes' => ['nullable', 'string', 'max:1000'],
+            ]);
 
-        $integration = $this->resolveIntegration($request);
+            $integration = $this->resolveIntegration($request);
 
-        $event = (new DailyCheckinPlugin)->createCheckinEvent(
-            $integration,
-            $validated['period'],
-            $validated['physical'],
-            $validated['mental'],
-            $validated['date'],
-            $validated['latitude'] ?? null,
-            $validated['longitude'] ?? null,
-            $validated['address'] ?? null,
-            $validated['notes'] ?? null,
-        );
+            $event = (new DailyCheckinPlugin)->createCheckinEvent(
+                $integration,
+                $validated['period'],
+                $validated['physical'],
+                $validated['mental'],
+                $validated['date'],
+                $validated['latitude'] ?? null,
+                $validated['longitude'] ?? null,
+                $validated['address'] ?? null,
+                $validated['notes'] ?? null,
+            );
 
-        return response()->json(
-            (new CompactEventResource($event))->resolve($request),
-            201,
-        );
+            return response()->json(
+                (new CompactEventResource($event))->resolve($request),
+                201,
+            );
+        });
     }
 
     /**
@@ -198,7 +205,7 @@ class CheckInsController extends Controller
         }
 
         $extension = self::ALLOWED_IMAGE_TYPES[$contentType];
-        $fileName = 'shared_' . Str::uuid() . '.' . $extension;
+        $fileName = 'shared_'.Str::uuid().'.'.$extension;
         $tempPath = tempnam(sys_get_temp_dir(), 'spark_share_') ?: null;
 
         if ($tempPath === null || file_put_contents($tempPath, $content) === false) {
