@@ -14,6 +14,7 @@ use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Throwable;
 
 #[Name('get-flint-notes')]
 #[IsIdempotent]
@@ -56,7 +57,7 @@ class GetFlintNotesTool extends Tool
             $updatedSince = is_string($updatedSinceInput) && $updatedSinceInput !== ''
                 ? CarbonImmutable::parse($updatedSinceInput)->utc()
                 : null;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return Response::error('updated_since must be an ISO 8601 timestamp.');
         }
 
