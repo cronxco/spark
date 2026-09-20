@@ -87,6 +87,12 @@ paths:
       operationId: briefingToday
       tags: [feed]
       summary: Daily summary across all domains
+      description: >-
+        sync_status carries a stale/as_of freshness judgement per connected
+        service (MR-1), including services with nothing to report for the
+        day. sections.money splits total_spend from internal_transfers and
+        total_in (MR-4) and carries total_spend_vs_baseline_pct (MR-3). See
+        mobile_API.md for the full response shape.
       parameters:
         - { name: date, in: query, schema: { type: string, default: today } }
         - {
@@ -173,6 +179,11 @@ paths:
       operationId: contextDay
       tags: [feed]
       summary: Full raw day context (events, metrics, relationships)
+      deprecated: true
+      description: >-
+        Deprecated (MR-18): superseded by /briefing/today's sections. No
+        mobile client calls this. Responses carry Deprecation: true, Sunset,
+        and a Link header to the successor.
       parameters:
         - { name: date, in: query, schema: { type: string, format: date } }
         - {
@@ -188,6 +199,11 @@ paths:
       operationId: contextServiceStatus
       tags: [feed]
       summary: Sync coverage/freshness per service for a date
+      deprecated: true
+      description: >-
+        Deprecated (MR-18): superseded by /briefing/today's sync_status,
+        which now carries the same stale/as_of judgement. No mobile client
+        calls this. Same Deprecation/Sunset/Link headers as /context/day.
       parameters:
         - { name: date, in: query, schema: { type: string, format: date } }
       responses:
@@ -715,6 +731,7 @@ paths:
         [
           { $ref: "#/components/parameters/EntityId" },
           { $ref: "#/components/parameters/IfMatch" },
+          { $ref: "#/components/parameters/IdempotencyKeyOptional" },
         ]
       requestBody:
         content:
@@ -755,6 +772,7 @@ paths:
         [
           { $ref: "#/components/parameters/EntityId" },
           { $ref: "#/components/parameters/IfMatch" },
+          { $ref: "#/components/parameters/IdempotencyKeyOptional" },
         ]
       requestBody:
         content:
@@ -1218,6 +1236,8 @@ paths:
       operationId: submitCheckIn
       tags: [check-ins]
       summary: Submit a check-in (idempotent by period + date)
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKeyOptional" }
       requestBody:
         content:
           application/json:
@@ -1563,12 +1583,37 @@ paths:
                     period: { type: string },
                     date: { type: string, format: date },
                     summary: { type: string },
+                    opener: { type: string },
                     blocks: { type: array, items: { type: object } },
                   },
               }
       responses:
         "201": { description: Created }
         "422": { $ref: "#/components/responses/ValidationError" }
+
+  /flint/digests/latest:
+    get:
+      operationId: getLatestFlintDigest
+      tags: [flint]
+      summary: The single most recent digest across dates
+      description: >-
+        MR-8: for "the newest thing Flint has written" — not expressible via
+        the date-scoped /flint/digests alone before the day's first digest
+        has run (the newest digest is still yesterday evening's).
+      parameters:
+        - {
+            name: kind,
+            in: query,
+            schema:
+              { type: string, enum: [briefing, news_roundup, reading_list] },
+          }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FlintDigest" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /flint/digests/{id}:
     get:
@@ -1586,17 +1631,28 @@ paths:
 
   /flint/questions:
     get:
-      operationId: listOpenFlintQuestions
+      operationId: listFlintQuestions
       tags: [flint]
-      summary: Cursor-paginated open questions across recent digests
+      summary: Cursor-paginated questions across recent digests
       description: >-
-        Answered, skipped, and retired questions are excluded. Reader-facing
-        representations omit internal question priority.
+        Defaults to open questions bounded by the seven-day retirement
+        horizon. MR-9: status accepts a comma-separated list
+        (open,answered,skipped,retired), and since (an ISO timestamp or a
+        relative window like 48h/7d) bounds the query server-side when
+        provided. Reader-facing representations omit internal question
+        priority.
       parameters:
         - {
             name: status,
             in: query,
-            schema: { type: string, enum: [open], default: open },
+            schema: { type: string, default: open },
+            description: "Comma-separated: open, answered, skipped, retired.",
+          }
+        - {
+            name: since,
+            in: query,
+            schema: { type: string },
+            description: "ISO timestamp, or a relative window like 48h or 7d.",
           }
         - {
             name: limit,
@@ -1696,6 +1752,9 @@ paths:
       operationId: listFlintTopics
       tags: [flint]
       summary: List the account's long-lived Flint Threads
+      description: >-
+        MR-14: cursor-paginated with the same envelope as every other mobile
+        collection endpoint, even though the list is short today.
       parameters:
         - {
             name: status,
@@ -1708,6 +1767,12 @@ paths:
             in: query,
             schema: { type: string, enum: [strategic, thematic, tactical] },
           }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 50 },
+          }
+        - { name: cursor, in: query, schema: { type: string } }
       responses:
         "200":
           description: OK
@@ -1715,11 +1780,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required: [data, next_cursor, has_more]
                 properties:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/FlintTopic" }
+                  next_cursor: { type: [string, "null"] }
+                  has_more: { type: boolean }
         "422": { $ref: "#/components/responses/ValidationError" }
 
   /flint/topics/{id}:
@@ -1830,6 +1897,16 @@ paths:
       operationId: listMoneyAccounts
       tags: [money]
       summary: All non-archived finance accounts with latest balance
+      description: >-
+        MR-14: cursor-paginated with the same envelope as every other mobile
+        collection endpoint, even though the list is short today.
+      parameters:
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 50 },
+          }
+        - { name: cursor, in: query, schema: { type: string } }
       responses:
         "200":
           {
@@ -1849,6 +1926,8 @@ paths:
                                 items:
                                   { $ref: "#/components/schemas/MoneyAccount" },
                               },
+                            next_cursor: { type: [string, "null"] },
+                            has_more: { type: boolean },
                           },
                       },
                   },
@@ -1919,7 +1998,13 @@ paths:
     patch:
       operationId: updateMoneyAccount
       tags: [money]
-      summary: Update a manual finance account
+      summary: Update a manual finance account, or pin/unpin any account
+      description: >-
+        MR-6: is_pinned is a user preference rather than account data, so it
+        applies to any account the user owns — synced Monzo/GoCardless
+        accounts included. Every other field remains manual_account only.
+        Setting is_pinned true clears it on every other account first (at
+        most one pinned account per user).
       parameters:
         [
           { $ref: "#/components/parameters/EntityId" },
@@ -1931,11 +2016,14 @@ paths:
             schema:
               {
                 type: object,
-                description: "Same fields as create, all optional",
+                description: "Same fields as create, all optional, plus is_pinned (boolean).",
               }
       responses:
         "200": { description: OK }
-        "422": { description: Account is not manual_account }
+        "422":
+          {
+            description: "A field other than is_pinned was sent for a non-manual_account.",
+          }
     delete:
       operationId: archiveMoneyAccount
       tags: [money]
@@ -1988,6 +2076,7 @@ paths:
         [
           { $ref: "#/components/parameters/EntityId" },
           { $ref: "#/components/parameters/IfMatch" },
+          { $ref: "#/components/parameters/IdempotencyKeyOptional" },
         ]
       requestBody:
         content:
@@ -2013,6 +2102,39 @@ paths:
                   { schema: { $ref: "#/components/schemas/BalanceEntry" } },
               },
           }
+
+  /money/net-worth:
+    get:
+      operationId: getNetWorth
+      tags: [money]
+      summary: Current net worth and its change over a comparison window
+      description: >-
+        MR-5: net worth and its change in one request, replacing an N+1
+        client-side reconciliation across every account's balance history.
+        total sums every eligible (same-currency) account's latest balance,
+        new or old. comparison.then/change/change_pct only include accounts
+        whose history reaches the comparison window — a brand-new account
+        would otherwise read as pure growth. Multi-currency conversion isn't
+        implemented; accounts in another currency are excluded entirely.
+      parameters:
+        - name: compare
+          in: query
+          schema:
+            {
+              type: string,
+              enum: [1week, 1month, 3months, 6months, 1year],
+              default: 1month,
+            }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/NetWorth" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
 components:
   securitySchemes:
@@ -2054,6 +2176,16 @@ components:
       required: true
       schema: { type: string, format: uuid }
       description: Account-scoped UUID identifying one client mutation.
+    IdempotencyKeyOptional:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string }
+      description: >-
+        MR-17: optional. When present, a retried request with the same key
+        (scoped per user and per endpoint, 24h) replays the first successful
+        response instead of re-running the mutation. Absent, the request just
+        runs normally.
     FlintQuestionBlockId:
       name: block
       in: path
@@ -2119,9 +2251,20 @@ components:
         service: { type: string }
         domain: { type: string }
         action: { type: string }
+        group_key:
+          {
+            type: string,
+            description: "service:action:actor_id — consecutive events sharing this key are one run (e.g. twenty Spotify plays).",
+          }
         value: { type: string }
         unit: { type: string }
         display_value: { type: string }
+        direction:
+          {
+            type: string,
+            enum: [in, out, internal, excluded, unknown],
+            description: "Money events only (domain=money, value set) — resolved server-side so the client never infers direction from the action-name suffix.",
+          }
         url: { type: string }
         actor: { type: object }
         target: { type: object }
@@ -2297,11 +2440,21 @@ components:
         event_id: { type: string, format: uuid }
         digest_object_id: { type: [string, "null"], format: uuid }
         date: { type: string, format: date }
+        effective_timezone:
+          {
+            type: string,
+            description: "IANA timezone the day/date above resolved in — see the Timezone Contract in mobile_API.md.",
+          }
         period:
           { type: [string, "null"], enum: [morning, afternoon, evening, null] }
         kind: { type: [string, "null"] }
         title: { type: string }
         summary: { type: [string, "null"] }
+        opener:
+          {
+            type: [string, "null"],
+            description: "The digest's lede sentence, published as its own field so the client renders it verbatim. Explicit when the generating skill sends one; otherwise a best-effort extraction from summary.",
+          }
         created_at: { type: string, format: date-time }
         version:
           type: string
@@ -2415,6 +2568,11 @@ components:
                 enum: [morning, afternoon, evening, null],
               }
         status: { type: string, enum: [open, answered, skipped, retired] }
+        title:
+          {
+            type: string,
+            description: "The digest block's short label — the same title the block shows inline; question carries the full text.",
+          }
         question: { type: string }
         topic: { type: [string, "null"] }
         answer_options:
@@ -2506,6 +2664,11 @@ components:
         last_touched_at: { type: [string, "null"], format: date-time }
         next_review_at: { type: [string, "null"], format: date }
         origin: { type: [string, "null"] }
+        watching_for:
+          {
+            type: [string, "null"],
+            description: "What would move this thread on. Explicit when the writer sends one; otherwise a best-effort extraction from content's closing sentence.",
+          }
 
     FlintTopicMention:
       type: object
@@ -2733,8 +2896,34 @@ components:
         interest_rate: { type: [number, "null"] }
         start_date: { type: [string, "null"], format: date }
         integration_id: { type: [string, "null"] }
+        is_pinned:
+          {
+            type: boolean,
+            description: "The account the user chose to see first. At most one account is pinned per user; settable on any account type via PATCH, not just manual ones.",
+          }
         latest_balance: { $ref: "#/components/schemas/BalanceEntry" }
         updated_at: { type: [string, "null"], format: date-time }
+
+    NetWorthComparison:
+      type: object
+      properties:
+        window: { type: string, enum: [1week, 1month, 3months, 6months, 1year] }
+        then: { type: number }
+        change: { type: number }
+        change_pct: { type: [number, "null"] }
+
+    NetWorth:
+      type: object
+      properties:
+        total: { type: number }
+        currency: { type: string }
+        comparison: { $ref: "#/components/schemas/NetWorthComparison" }
+        excluded_accounts:
+          {
+            type: integer,
+            description: "Accounts left out of the comparison window (different currency, or history not spanning it); still counted in total.",
+          }
+        as_of: { type: string, format: date-time }
 
     BalanceEntry:
       type: object
