@@ -38,7 +38,7 @@ class NetWorthController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'compare' => ['nullable', 'string', 'in:'.implode(',', array_keys(self::WINDOWS))],
+            'compare' => ['nullable', 'string', 'in:' . implode(',', array_keys(self::WINDOWS))],
         ]);
 
         $window = $validated['compare'] ?? '1month';

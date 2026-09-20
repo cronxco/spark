@@ -600,7 +600,7 @@ class DaySummaryService
                 if ($summary) {
                     $content = $summary->getContent();
                     $bookmark['summary'] = mb_strlen($content, 'UTF-8') > 300
-                        ? mb_substr($content, 0, 300, 'UTF-8').'...'
+                        ? mb_substr($content, 0, 300, 'UTF-8') . '...'
                         : $content;
                 }
 
@@ -763,36 +763,6 @@ class DaySummaryService
     }
 
     /**
-     * The server's own freshness judgement for a service: when it last
-     * reached it successfully, and whether that is behind the cadence it
-     * knows that integration runs at. A service with no successful sync yet
-     * is stale by definition.
-     *
-     * @param  Collection<int, Integration>|null  $integrations
-     * @return array{0: Carbon|null, 1: bool}
-     */
-    private function serviceFreshness(?Collection $integrations): array
-    {
-        if ($integrations === null || $integrations->isEmpty()) {
-            return [null, true];
-        }
-
-        $asOf = $integrations->max('last_successful_update_at');
-
-        if ($asOf === null) {
-            return [null, true];
-        }
-
-        // A generous multiple of the integration's own polling cadence, so
-        // ordinary scheduling jitter never reads as staleness, floored at an
-        // hour for integrations configured with a very tight cadence.
-        $cadenceMinutes = max($integrations->max(fn (Integration $i) => $i->getUpdateFrequencyMinutes()), 15);
-        $staleAfterMinutes = max($cadenceMinutes * 4, 60);
-
-        return [$asOf, $asOf->diffInMinutes(now()) > $staleAfterMinutes];
-    }
-
-    /**
      * Build unacknowledged anomalies for the date.
      */
     protected function buildAnomalies(User $user, Carbon $date): array
@@ -856,58 +826,6 @@ class DaySummaryService
     }
 
     /**
-     * A day-level baseline for the user's total daily spend (MR-3), computed
-     * dynamically over their own history rather than stored — `MetricStatistic`
-     * is computed per event value, which is the same thing as a day baseline
-     * only for metrics that emit once a day; `money.total_spend` emits many
-     * times a day and needs its own aggregate.
-     *
-     * Cached briefly since it scans up to 60 days of money events; the day
-     * that just changed the baseline can lag by that long without materially
-     * changing the mean.
-     *
-     * @return array{mean: float, count: int}|null null when there isn't
-     *                                             enough history yet for a
-     *                                             meaningful baseline.
-     */
-    private function dailySpendBaseline(User $user): ?array
-    {
-        $daily = Cache::remember(
-            "day_summary.money_baseline.{$user->id}",
-            now()->addHours(6),
-            function () use ($user): Collection {
-                $windowStart = now()->subDays(60)->startOfDay();
-                $windowEnd = now()->startOfDay();
-
-                $events = Event::query()
-                    ->withoutInternal()
-                    ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
-                    ->where('domain', 'money')
-                    ->whereNotNull('value')
-                    ->whereBetween('time', [$windowStart, $windowEnd])
-                    ->with(['actor', 'target'])
-                    ->get();
-
-                return $events
-                    ->filter(fn (Event $e) => MoneyDirection::for($e) === MoneyDirection::OUT)
-                    ->groupBy(fn (Event $e) => $e->time->toDateString())
-                    ->map(fn (Collection $dayEvents) => $dayEvents->sum(fn (Event $e) => abs($e->formatted_value)));
-            }
-        );
-
-        // Fewer than a week of days with any spend isn't enough to call a mean
-        // meaningful yet — report the reason rather than a noisy percentage.
-        if ($daily->count() < 5) {
-            return null;
-        }
-
-        return [
-            'mean' => round((float) $daily->avg(), 2),
-            'count' => $daily->count(),
-        ];
-    }
-
-    /**
      * Attach baseline comparison data to an entry array.
      */
     protected function attachBaseline(array &$entry, Event $event, array $metricsCache): void
@@ -957,6 +875,88 @@ class DaySummaryService
         }
 
         return $actionTypes[$action]['exclude_from_flint'] ?? false;
+    }
+
+    /**
+     * The server's own freshness judgement for a service: when it last
+     * reached it successfully, and whether that is behind the cadence it
+     * knows that integration runs at. A service with no successful sync yet
+     * is stale by definition.
+     *
+     * @param  Collection<int, Integration>|null  $integrations
+     * @return array{0: Carbon|null, 1: bool}
+     */
+    private function serviceFreshness(?Collection $integrations): array
+    {
+        if ($integrations === null || $integrations->isEmpty()) {
+            return [null, true];
+        }
+
+        $asOf = $integrations->max('last_successful_update_at');
+
+        if ($asOf === null) {
+            return [null, true];
+        }
+
+        // A generous multiple of the integration's own polling cadence, so
+        // ordinary scheduling jitter never reads as staleness, floored at an
+        // hour for integrations configured with a very tight cadence.
+        $cadenceMinutes = max($integrations->max(fn (Integration $i) => $i->getUpdateFrequencyMinutes()), 15);
+        $staleAfterMinutes = max($cadenceMinutes * 4, 60);
+
+        return [$asOf, $asOf->diffInMinutes(now()) > $staleAfterMinutes];
+    }
+
+    /**
+     * A day-level baseline for the user's total daily spend (MR-3), computed
+     * dynamically over their own history rather than stored — `MetricStatistic`
+     * is computed per event value, which is the same thing as a day baseline
+     * only for metrics that emit once a day; `money.total_spend` emits many
+     * times a day and needs its own aggregate.
+     *
+     * Cached briefly since it scans up to 60 days of money events; the day
+     * that just changed the baseline can lag by that long without materially
+     * changing the mean.
+     *
+     * @return array{mean: float, count: int}|null null when there isn't
+     *                                             enough history yet for a
+     *                                             meaningful baseline.
+     */
+    private function dailySpendBaseline(User $user): ?array
+    {
+        $daily = Cache::remember(
+            "day_summary.money_baseline.{$user->id}",
+            now()->addHours(6),
+            function () use ($user): Collection {
+                $windowStart = now()->subDays(60)->startOfDay();
+                $windowEnd = now()->startOfDay();
+
+                $events = Event::query()
+                    ->withoutInternal()
+                    ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
+                    ->where('domain', 'money')
+                    ->whereNotNull('value')
+                    ->whereBetween('time', [$windowStart, $windowEnd])
+                    ->with(['actor', 'target'])
+                    ->get();
+
+                return $events
+                    ->filter(fn (Event $e) => MoneyDirection::for($e) === MoneyDirection::OUT)
+                    ->groupBy(fn (Event $e) => $e->time->toDateString())
+                    ->map(fn (Collection $dayEvents) => $dayEvents->sum(fn (Event $e) => abs($e->formatted_value)));
+            }
+        );
+
+        // Fewer than a week of days with any spend isn't enough to call a mean
+        // meaningful yet — report the reason rather than a noisy percentage.
+        if ($daily->count() < 5) {
+            return null;
+        }
+
+        return [
+            'mean' => round((float) $daily->avg(), 2),
+            'count' => $daily->count(),
+        ];
     }
 
     /**

@@ -197,7 +197,7 @@ class FlintTopicService
                     'local_date' => data_get($event->event_metadata, 'local_date', $event->time?->toDateString()),
                     'period' => data_get($event->event_metadata, 'period'),
                     'occurred_at' => $event->time?->toIso8601String(),
-                    'deep_link' => ($isDigest ? 'spark://digest/' : 'spark://event/').$event->id,
+                    'deep_link' => ($isDigest ? 'spark://digest/' : 'spark://event/') . $event->id,
                     'source_deleted' => $event->trashed(),
                 ];
             }
@@ -228,15 +228,15 @@ class FlintTopicService
                     'local_date' => data_get($block->event?->event_metadata, 'local_date', $occurredAt?->toDateString()),
                     'period' => data_get($block->event?->event_metadata, 'period'),
                     'occurred_at' => $occurredAt?->toIso8601String(),
-                    'deep_link' => 'spark://block/'.$block->id,
+                    'deep_link' => 'spark://block/' . $block->id,
                     'source_deleted' => $block->trashed(),
                 ];
             }
 
             return null;
         })->filter()
-            ->sortByDesc(fn (array $mention) => ($mention['occurred_at'] ?? '').':'.$mention['id'])
-            ->unique(fn (array $mention) => $mention['source_type'].':'.$mention['source_id'])
+            ->sortByDesc(fn (array $mention) => ($mention['occurred_at'] ?? '') . ':' . $mention['id'])
+            ->unique(fn (array $mention) => $mention['source_type'] . ':' . $mention['source_id'])
             ->take($limit)
             ->values();
     }

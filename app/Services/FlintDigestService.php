@@ -69,7 +69,7 @@ class FlintDigestService
             // for the same news-story block appeared in one week before anyone
             // noticed, so say plainly what is allowed.
             'blocks.*.block_type.in' => 'Unknown Flint block type. Registered types are: '
-                .implode(', ', array_keys(FlintPlugin::getBlockTypes())).'.',
+                . implode(', ', array_keys(FlintPlugin::getBlockTypes())) . '.',
         ])->validate();
 
         $date = Carbon::parse(
@@ -85,8 +85,8 @@ class FlintDigestService
         // would call the same digest: this user's briefing for this date,
         // period and title.
         $sourceId = $run
-            ? 'flint_digest_run:'.$run['run_uuid']
-            : 'flint_digest:'.sha1(implode('|', [
+            ? 'flint_digest_run:' . $run['run_uuid']
+            : 'flint_digest:' . sha1(implode('|', [
                 $user->id,
                 $date->toDateString(),
                 $period,
@@ -155,8 +155,8 @@ class FlintDigestService
             [
                 'user_id' => $user->id,
                 'concept' => 'digest',
-                'type' => ($ownObject ? $routine : $period).'_digest',
-                'title' => $date->format('Y-m-d').' '.($ownObject
+                'type' => ($ownObject ? $routine : $period) . '_digest',
+                'title' => $date->format('Y-m-d') . ' ' . ($ownObject
                     ? strtoupper(str_replace('_', ' ', $routine))
                     : match ($period) {
                         'morning' => 'AM',

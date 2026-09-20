@@ -83,7 +83,7 @@ class MoneyAccountsControllerTest extends TestCase
         $cursor = $first->json('next_cursor');
         $this->assertNotNull($cursor);
 
-        $this->getJson('/api/v1/mobile/money/accounts?limit=2&cursor='.urlencode($cursor))
+        $this->getJson('/api/v1/mobile/money/accounts?limit=2&cursor=' . urlencode($cursor))
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('has_more', false)

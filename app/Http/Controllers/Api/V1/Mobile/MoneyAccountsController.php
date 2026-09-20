@@ -35,7 +35,7 @@ class MoneyAccountsController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'limit' => ['nullable', 'integer', 'min:1', 'max:'.CollectionCursorPage::MAX_LIMIT],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:' . CollectionCursorPage::MAX_LIMIT],
             'cursor' => ['nullable', 'string'],
         ]);
         $limit = (int) ($validated['limit'] ?? CollectionCursorPage::DEFAULT_LIMIT);
@@ -251,7 +251,7 @@ class MoneyAccountsController extends Controller
         $this->financial->createBalanceEvent($integration, $account, [
             'balance' => 0,
             'date' => now()->toDateString(),
-            'notes' => 'Archived on '.now()->toFormattedDayDateString(),
+            'notes' => 'Archived on ' . now()->toFormattedDayDateString(),
         ]);
 
         $meta = $account->metadata ?? [];

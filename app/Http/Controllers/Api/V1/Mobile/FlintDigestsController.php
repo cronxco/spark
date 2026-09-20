@@ -273,7 +273,7 @@ class FlintDigestsController extends Controller
                     'generated_at' => $generatedAt->setTimezone($timezone)->toIso8601String(),
                     'updated_at' => $event->updated_at?->setTimezone($timezone)->toIso8601String(),
                     'unanswered_question_count' => (int) $event->unanswered_question_count,
-                    'version' => 'W/'.$versions->etag($event),
+                    'version' => 'W/' . $versions->etag($event),
                     'freshness' => FlintDigestFreshness::for($generatedAt),
                 ];
             })->all(),

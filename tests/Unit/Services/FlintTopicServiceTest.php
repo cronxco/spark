@@ -233,7 +233,7 @@ class FlintTopicServiceTest extends TestCase
         $topic = $this->topic('G7 reserves', ['kind' => 'strategic', 'status' => 'active']);
         $topic->update([
             'content' => 'Talks continue between the finance ministries. '
-                .'The decisive next development is a G7 decision on reserves expected this quarter.',
+                . 'The decisive next development is a G7 decision on reserves expected this quarter.',
         ]);
 
         $payload = $this->service->detail($this->user, $topic->id);

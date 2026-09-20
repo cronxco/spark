@@ -24,7 +24,7 @@ class FlintTopicsController extends Controller
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'limit' => ['nullable', 'integer', 'min:1', 'max:'.CollectionCursorPage::MAX_LIMIT],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:' . CollectionCursorPage::MAX_LIMIT],
             'cursor' => ['nullable', 'string'],
         ]);
         $limit = (int) ($validated['limit'] ?? CollectionCursorPage::DEFAULT_LIMIT);

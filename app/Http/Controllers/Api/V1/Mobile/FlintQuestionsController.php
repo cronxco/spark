@@ -45,7 +45,7 @@ class FlintQuestionsController extends Controller
         $unknown = array_diff($statuses, self::ALLOWED_STATUSES);
         if ($statuses === [] || $unknown !== []) {
             return response()->json([
-                'message' => 'Invalid status. Allowed values: '.implode(', ', self::ALLOWED_STATUSES).'.',
+                'message' => 'Invalid status. Allowed values: ' . implode(', ', self::ALLOWED_STATUSES) . '.',
             ], 422);
         }
 
@@ -94,6 +94,29 @@ class FlintQuestionsController extends Controller
         ]);
     }
 
+    public function storeAction(Request $request, string $block, FlintQuestionActionService $actions): JsonResponse
+    {
+        $validated = $request->validate([
+            'action' => ['required', Rule::in(['answer', 'correct', 'skip'])],
+            'answer' => ['nullable', 'required_if:action,answer,correct', 'string', 'max:1000', 'prohibited_if:action,skip'],
+            'context' => ['nullable', 'string', 'max:1000', 'prohibited_if:action,skip'],
+        ]);
+        $mutationId = $request->header('Idempotency-Key');
+        if (! is_string($mutationId) || ! Str::isUuid($mutationId)) {
+            return response()->json(['message' => 'A UUID Idempotency-Key header is required.'], 422);
+        }
+
+        $result = $actions->record($request->user(), $block, $validated, $request->header('If-Match'), $mutationId);
+        $payload = isset($result['data']) ? ['data' => $result['data']] : ['message' => $result['message'] ?? 'Unable to update question.'];
+        if (isset($result['etag']) && ! isset($result['data'])) {
+            $payload['etag'] = $result['etag'];
+        }
+
+        $response = response()->json($payload, $result['status']);
+
+        return isset($result['etag']) && $result['etag'] !== '' ? $response->header('ETag', $result['etag']) : $response;
+    }
+
     /** Mirrors FlintQuestion::status()'s precedence: answered, then skipped, then retired, else open. */
     private function applyStatus(Builder $query, string $status): void
     {
@@ -125,28 +148,5 @@ class FlintQuestionsController extends Controller
         } catch (Exception) {
             return null;
         }
-    }
-
-    public function storeAction(Request $request, string $block, FlintQuestionActionService $actions): JsonResponse
-    {
-        $validated = $request->validate([
-            'action' => ['required', Rule::in(['answer', 'correct', 'skip'])],
-            'answer' => ['nullable', 'required_if:action,answer,correct', 'string', 'max:1000', 'prohibited_if:action,skip'],
-            'context' => ['nullable', 'string', 'max:1000', 'prohibited_if:action,skip'],
-        ]);
-        $mutationId = $request->header('Idempotency-Key');
-        if (! is_string($mutationId) || ! Str::isUuid($mutationId)) {
-            return response()->json(['message' => 'A UUID Idempotency-Key header is required.'], 422);
-        }
-
-        $result = $actions->record($request->user(), $block, $validated, $request->header('If-Match'), $mutationId);
-        $payload = isset($result['data']) ? ['data' => $result['data']] : ['message' => $result['message'] ?? 'Unable to update question.'];
-        if (isset($result['etag']) && ! isset($result['data'])) {
-            $payload['etag'] = $result['etag'];
-        }
-
-        $response = response()->json($payload, $result['status']);
-
-        return isset($result['etag']) && $result['etag'] !== '' ? $response->header('ETag', $result['etag']) : $response;
     }
 }
