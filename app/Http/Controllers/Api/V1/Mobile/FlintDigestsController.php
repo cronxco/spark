@@ -13,10 +13,12 @@ use App\Support\FlintAudience;
 use App\Support\FlintBlockPresenter;
 use App\Support\FlintDigestFreshness;
 use App\Support\FlintDigestKind;
+use App\Support\FlintDigestOpener;
 use App\Support\FlintQuestion;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class FlintDigestsController extends Controller
 {
@@ -48,7 +50,10 @@ class FlintDigestsController extends Controller
             return $this->history($request, $validated);
         }
 
-        $timezone = $request->user()->getTimezone();
+        // MR-16: resolved the same way every day-scoped endpoint does — the
+        // user's effective (acknowledged time-travel) timezone, not just the
+        // profile default.
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($request->user());
         $date = isset($validated['date'])
             ? Carbon::parse($validated['date'], $timezone)
             : Carbon::today($timezone);
@@ -85,11 +90,12 @@ class FlintDigestsController extends Controller
             ], 404);
         }
 
-        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $date, $integrationIds));
+        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $date, $integrationIds, $timezone));
 
         if ($all) {
             return response()->json([
                 'date' => $date->toDateString(),
+                'effective_timezone' => $timezone,
                 'count' => $formatted->count(),
                 'digests' => $formatted->values(),
             ]);
@@ -99,12 +105,59 @@ class FlintDigestsController extends Controller
     }
 
     /**
+     * GET /api/v1/mobile/flint/digests/latest?kind=briefing
+     *
+     * MR-8: the single most recent digest across dates, so a client on cold
+     * start doesn't have to ask for today, inspect the result, then ask again
+     * for yesterday — the digest that answers "what has Flint most recently
+     * written" isn't expressible as a `date` query alone before the day's
+     * first digest has run.
+     */
+    public function latest(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'kind' => ['nullable', 'string', Rule::in(FlintDigestKind::ALL)],
+        ]);
+
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($request->user());
+        $integrationIds = $request->user()->integrations()->pluck('id');
+
+        $query = Event::whereIn('integration_id', $integrationIds)
+            ->where('service', 'flint')
+            ->where('action', 'had_summary')
+            ->with('blocks')
+            ->orderByDesc('time')
+            ->orderByDesc('id');
+
+        $events = $query->limit(25)->get();
+
+        if (isset($validated['kind'])) {
+            $events = $events->filter(
+                fn (Event $event) => FlintDigestKind::for($event, $event->event_metadata ?? []) === $validated['kind']
+            );
+        }
+
+        $event = $events->first();
+
+        if (! $event) {
+            $suffix = isset($validated['kind']) ? " of kind '{$validated['kind']}'" : '';
+
+            return response()->json(['error' => "No Flint digest found{$suffix}."], 404);
+        }
+
+        return response()->json(
+            $this->formatDigest($event, Carbon::parse($event->time, $timezone), $integrationIds, $timezone)
+        );
+    }
+
+    /**
      * GET /api/v1/mobile/flint/digests/{id}
      *
      * Returns a single Flint digest event with all blocks.
      */
     public function show(Request $request, string $id): JsonResponse
     {
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($request->user());
         $integrationIds = $request->user()->integrations()->pluck('id');
 
         $event = Event::whereIn('integration_id', $integrationIds)
@@ -117,7 +170,7 @@ class FlintDigestsController extends Controller
             return response()->json(['error' => 'Digest not found.'], 404);
         }
 
-        return response()->json($this->formatDigest($event, Carbon::parse($event->time), $integrationIds));
+        return response()->json($this->formatDigest($event, Carbon::parse($event->time), $integrationIds, $timezone));
     }
 
     /**
@@ -160,6 +213,11 @@ class FlintDigestsController extends Controller
             'answer' => $answer['answer'],
             'answer_note' => $answer['context'],
             'answered_at' => $answer['answered_at'],
+            // MR-11: the full updated question resource, additively — the
+            // legacy flat fields above stay put for clients still reading
+            // them, but a client can now update in place from `data` without
+            // a follow-up GET, same as the current POST .../actions endpoint.
+            'data' => $result['data'],
         ])->header('Deprecation', 'true')->header('Sunset', now()->addMonths(3)->toRfc7231String());
     }
 
@@ -249,7 +307,7 @@ class FlintDigestsController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function formatDigest(Event $event, Carbon $date, mixed $integrationIds = null): array
+    private function formatDigest(Event $event, Carbon $date, mixed $integrationIds = null, ?string $timezone = null): array
     {
         $eventMeta = $event->event_metadata ?? [];
 
@@ -264,10 +322,16 @@ class FlintDigestsController extends Controller
             'event_id' => $event->id,
             'digest_object_id' => $eventMeta['digest_object_id'] ?? null,
             'date' => $date->toDateString(),
+            'effective_timezone' => $timezone,
             'period' => $eventMeta['period'] ?? null,
             'kind' => FlintDigestKind::for($event, $eventMeta),
             'title' => $eventMeta['title'] ?? $event->action,
             'summary' => $eventMeta['summary'] ?? null,
+            // MR-7: the lede as its own field, so the client renders
+            // `opener` verbatim and owns no knowledge of digest prose
+            // structure. Falls back to a best-effort extraction for digests
+            // written before the skill started sending one explicitly.
+            'opener' => $eventMeta['opener'] ?? FlintDigestOpener::extract($eventMeta['summary'] ?? null),
             'created_at' => $event->created_at->toIso8601String(),
             'version' => app(ResourceVersion::class)->etag($event),
             'block_count' => $blocks->count(),

@@ -18,6 +18,7 @@ class FlintQuestionsControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Integration $integration;
 
     protected function setUp(): void
@@ -44,6 +45,73 @@ class FlintQuestionsControllerTest extends TestCase
             ->assertJsonPath('next_cursor', null)
             ->assertJsonPath('has_more', false)
             ->assertJsonMissingPath('data.0.priority');
+    }
+
+    #[Test]
+    public function question_resource_exposes_a_title(): void
+    {
+        $this->question(now());
+
+        $this->getJson('/api/v1/mobile/flint/questions?status=open')
+            ->assertOk()
+            ->assertJsonPath('data.0.title', 'A question');
+    }
+
+    #[Test]
+    public function status_accepts_a_comma_separated_list(): void
+    {
+        $open = $this->question(now()->subDay());
+        $answered = $this->question(now()->subDay(), ['answer' => 'Done', 'answered_at' => now()->toIso8601String()]);
+        $this->question(now()->subDay(), ['question_status' => 'skipped', 'skipped_at' => now()->toIso8601String()]);
+
+        $response = $this->getJson('/api/v1/mobile/flint/questions?status=open,answered&since=7d')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
+
+        $ids = collect($response->json('data'))->pluck('id');
+        $this->assertTrue($ids->contains($open->id));
+        $this->assertTrue($ids->contains($answered->id));
+    }
+
+    #[Test]
+    public function since_bounds_the_query_server_side(): void
+    {
+        $recent = $this->question(now()->subHours(10), ['answer' => 'Done', 'answered_at' => now()->toIso8601String()]);
+        $this->question(now()->subDays(10), ['answer' => 'Done', 'answered_at' => now()->toIso8601String()]);
+
+        $this->getJson('/api/v1/mobile/flint/questions?status=answered&since=48h')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $recent->id);
+    }
+
+    #[Test]
+    public function status_skipped_and_retired_are_independently_filterable(): void
+    {
+        $skipped = $this->question(now()->subDay(), ['question_status' => 'skipped', 'skipped_at' => now()->toIso8601String()]);
+        $retired = $this->question(now()->subDays(10), ['retired_at' => now()->toIso8601String()]);
+
+        $this->getJson('/api/v1/mobile/flint/questions?status=skipped&since=30d')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $skipped->id);
+
+        $this->getJson('/api/v1/mobile/flint/questions?status=retired&since=30d')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $retired->id);
+    }
+
+    #[Test]
+    public function rejects_an_unknown_status(): void
+    {
+        $this->getJson('/api/v1/mobile/flint/questions?status=bogus')->assertStatus(422);
+    }
+
+    #[Test]
+    public function rejects_an_unparseable_since(): void
+    {
+        $this->getJson('/api/v1/mobile/flint/questions?since=not-a-window')->assertStatus(422);
     }
 
     #[Test]

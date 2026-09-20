@@ -99,6 +99,9 @@ class CreateFlintDigestTool extends Tool
             'summary' => $schema->string()
                 ->description('Optional headline summary content for the digest.'),
 
+            'opener' => $schema->string()
+                ->description('The lede sentence of `summary`, verbatim — publish it explicitly so a client never has to parse it out of the prose. Falls back to a best-effort extraction when omitted.'),
+
             'run_token' => $schema->string()
                 ->description('Opaque run token from a scheduled or manual Flint trigger. Pass through unchanged.'),
 

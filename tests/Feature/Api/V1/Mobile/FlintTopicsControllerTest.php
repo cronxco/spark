@@ -51,6 +51,30 @@ class FlintTopicsControllerTest extends TestCase
     }
 
     #[Test]
+    public function paginates_with_the_shared_cursor_envelope(): void
+    {
+        $this->topic('First');
+        $this->topic('Second');
+        $this->topic('Third');
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $first = $this->getJson('/api/v1/mobile/flint/topics?limit=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('has_more', true);
+
+        $cursor = $first->json('next_cursor');
+        $this->assertNotNull($cursor);
+
+        $this->getJson('/api/v1/mobile/flint/topics?limit=2&cursor=' . urlencode($cursor))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('has_more', false)
+            ->assertJsonPath('next_cursor', null);
+    }
+
+    #[Test]
     public function filters_by_status(): void
     {
         $this->topic('Active thread', status: 'active');

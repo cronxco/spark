@@ -63,6 +63,7 @@ class ManageFlintTopicTool extends Tool
             'status' => $schema->string()->description('active, dormant, resolved, or expired.'),
             'next_review_at' => $schema->string()->description('Optional ISO date to revisit a dormant topic.'),
             'origin' => $schema->string()->description('conversation or digest_inference.'),
+            'watching_for' => $schema->string()->description('What would move this thread on — the sentence a client should show verbatim without parsing it out of content.'),
             'related_event_id' => $schema->string()->description('Optional owned digest event UUID that discussed this topic.'),
             'related_block_id' => $schema->string()->description('Optional owned digest block UUID that discussed this topic.'),
             'run_token' => $schema->string()->description('Opaque topics run token. Supply it on routine-owned creates and updates.'),

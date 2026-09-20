@@ -247,8 +247,8 @@ Saves a URL as a bookmark. New URLs enter Spark's normal fetch and enrichment
 pipeline; an existing URL returns the existing bookmark without creating or
 fetching a duplicate.
 
-| Parameter | Type   | Required | Notes                                      |
-| --------- | ------ | -------- | ------------------------------------------ |
+| Parameter | Type   | Required | Notes                                        |
+| --------- | ------ | -------- | -------------------------------------------- |
 | `url`     | string | **Yes**  | Public HTTP(S) URL, maximum 2,048 characters |
 
 #### `capture-bookmark`
@@ -260,10 +260,10 @@ content through Spark's normal enrichment pipeline without fetching the URL.
 Use this for content behind a login or paywall. Calls for an existing URL
 recapture that bookmark rather than creating a duplicate.
 
-| Parameter | Type   | Required | Notes                                                 |
-| --------- | ------ | -------- | ----------------------------------------------------- |
-| `url`     | string | **Yes**  | Canonical public HTTP(S) URL, maximum 2,048 characters |
-| `html`    | string | **Yes**  | Complete page HTML, maximum 5 MB                      |
+| Parameter | Type   | Required | Notes                                                   |
+| --------- | ------ | -------- | ------------------------------------------------------- |
+| `url`     | string | **Yes**  | Canonical public HTTP(S) URL, maximum 2,048 characters  |
+| `html`    | string | **Yes**  | Complete page HTML, maximum 5 MB                        |
 | `title`   | string | No       | Overrides the extracted title, maximum 1,000 characters |
 
 #### `set-event-note`
@@ -335,15 +335,15 @@ Creates a Flint digest event with an array of blocks. **Non-idempotent** —
 do not retry after an unknown outcome without checking
 `get-latest-flint-digest` first. Returns `event_id` and `block_ids`.
 
-| Parameter | Type            | Required | Default                    | Notes                                                       |
-| --------- | --------------- | -------- | -------------------------- | ----------------------------------------------------------- |
-| `title`   | string          | **Yes**  | —                          | Digest title                                                |
-| `period`  | string          | No       | inferred from current time | `morning`, `afternoon`, or `evening`                        |
-| `date`    | string          | No       | `today`                    | ISO date                                                    |
-| `summary` | string          | No       | —                          | Optional headline summary                                   |
-| `note_ids_used` | array of UUID | No | `[]` | Notes to Flint that materially informed the digest |
-| `question_omission` | object | Conditional | — | Required for a questionless briefing routine; reason + at least three rejected candidates |
-| `blocks`  | array of object | No       | —                          | Each requires `block_type` + `title`; see field notes below |
+| Parameter           | Type            | Required    | Default                    | Notes                                                                                     |
+| ------------------- | --------------- | ----------- | -------------------------- | ----------------------------------------------------------------------------------------- |
+| `title`             | string          | **Yes**     | —                          | Digest title                                                                              |
+| `period`            | string          | No          | inferred from current time | `morning`, `afternoon`, or `evening`                                                      |
+| `date`              | string          | No          | `today`                    | ISO date                                                                                  |
+| `summary`           | string          | No          | —                          | Optional headline summary                                                                 |
+| `note_ids_used`     | array of UUID   | No          | `[]`                       | Notes to Flint that materially informed the digest                                        |
+| `question_omission` | object          | Conditional | —                          | Required for a questionless briefing routine; reason + at least three rejected candidates |
+| `blocks`            | array of object | No          | —                          | Each requires `block_type` + `title`; see field notes below                               |
 
 Each block object supports: `content` (markdown, for `flint_editorial_note`
 and other content types), `referenced_event_ids` (surfaced as tappable
@@ -380,12 +380,12 @@ _Class_: `GetFlintNotesTool` · _Ability_: `flint:read` · _Read-only, idempoten
 Returns explicit user-authored Notes to Flint with context links and an
 `updated_at` watermark. Defaults to notes updated in the last 30 days.
 
-| Parameter | Type | Required | Default | Notes |
-| --- | --- | --- | --- | --- |
-| `updated_since` | ISO timestamp | No | 30 days ago | Inclusive update watermark |
-| `query` | string | No | — | Keyword filter over title/body |
-| `context_id` | UUID | No | — | Only notes linked to this entity |
-| `limit` | integer | No | 50 | 1–50 |
+| Parameter       | Type          | Required | Default     | Notes                            |
+| --------------- | ------------- | -------- | ----------- | -------------------------------- |
+| `updated_since` | ISO timestamp | No       | 30 days ago | Inclusive update watermark       |
+| `query`         | string        | No       | —           | Keyword filter over title/body   |
+| `context_id`    | UUID          | No       | —           | Only notes linked to this entity |
+| `limit`         | integer       | No       | 50          | 1–50                             |
 
 #### `get-saved-bookmarks`
 
@@ -394,10 +394,10 @@ _Class_: `GetSavedBookmarksTool` · _Ability_: `data:read` · _Read-only, idempo
 Lists bookmarks stored in Spark, deduplicated by bookmarked object, including
 their enrichment summaries. This is the reading-list routine's backlog source.
 
-| Parameter | Type | Required | Default | Notes |
-| --- | --- | --- | --- | --- |
-| `query` | string | No | — | Keyword filter over captured content |
-| `limit` | integer | No | 50 | 1–100 |
+| Parameter | Type    | Required | Default | Notes                                |
+| --------- | ------- | -------- | ------- | ------------------------------------ |
+| `query`   | string  | No       | —       | Keyword filter over captured content |
+| `limit`   | integer | No       | 50      | 1–100                                |
 
 #### `get-latest-flint-digest`
 

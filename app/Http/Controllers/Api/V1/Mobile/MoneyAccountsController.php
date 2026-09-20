@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Mobile;
 
+use App\Http\Controllers\Api\V1\Mobile\Concerns\HandlesIdempotency;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\BalanceEntryResource;
 use App\Http\Resources\Compact\MoneyAccountResource;
@@ -11,6 +12,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Services\Api\ResourceVersion;
+use App\Support\CollectionCursorPage;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,27 +20,48 @@ use Illuminate\Support\Str;
 
 class MoneyAccountsController extends Controller
 {
+    use HandlesIdempotency;
+
     public function __construct(protected FinancialPlugin $financial, protected ResourceVersion $versions) {}
 
     /**
-     * GET /api/v1/mobile/money/accounts
+     * GET /api/v1/mobile/money/accounts?limit=50&cursor=...
      *
      * Returns all non-archived accounts with their latest balance.
+     *
+     * MR-14: paginated with the same cursor envelope as every other mobile
+     * collection endpoint, even though the list is short today.
      */
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:' . CollectionCursorPage::MAX_LIMIT],
+            'cursor' => ['nullable', 'string'],
+        ]);
+        $limit = (int) ($validated['limit'] ?? CollectionCursorPage::DEFAULT_LIMIT);
+
         $user = $request->user();
         $accounts = $this->financial->getFinancialAccounts($user);
         $latestBalances = $this->financial->getLatestBalancesForAccounts($accounts);
 
-        $data = $accounts->map(function (EventObject $account) use ($latestBalances) {
+        [$page, $nextCursor, $hasMore] = CollectionCursorPage::paginate(
+            $accounts,
+            $validated['cursor'] ?? null,
+            $limit,
+        );
+
+        $data = $page->map(function (EventObject $account) use ($latestBalances) {
             return (new MoneyAccountResource($account))
                 ->withBalance($latestBalances->get($account->id));
         });
 
         $lastModified = $accounts->max('updated_at');
 
-        $response = response()->json(['data' => $data]);
+        $response = response()->json([
+            'data' => $data,
+            'next_cursor' => $nextCursor,
+            'has_more' => $hasMore,
+        ]);
 
         if ($lastModified) {
             $response->header('Last-Modified', Carbon::parse($lastModified)->toRfc7231String());
@@ -134,7 +157,11 @@ class MoneyAccountsController extends Controller
     /**
      * PATCH /api/v1/mobile/money/accounts/{id}
      *
-     * Updates a manual account. Returns 422 for non-manual accounts.
+     * Updates a manual account. Returns 422 for non-manual accounts, except
+     * for `is_pinned` (MR-6), which is user preference rather than account
+     * data and so applies to any account the user owns — the client picking
+     * which account the Day tab shows shouldn't require the account to be a
+     * manually-tracked one.
      */
     public function update(Request $request, string $id): JsonResponse
     {
@@ -145,8 +172,11 @@ class MoneyAccountsController extends Controller
             return response()->json(['message' => 'Account not found.'], 404);
         }
 
-        if ($account->type !== 'manual_account') {
-            return response()->json(['message' => 'Only manual accounts can be edited.'], 422);
+        $manualOnlyFields = ['name', 'account_type', 'currency', 'provider', 'account_number', 'sort_code', 'interest_rate', 'start_date', 'is_negative_balance'];
+        $requestsManualOnlyField = collect($manualOnlyFields)->contains(fn (string $field) => $request->has($field));
+
+        if ($account->type !== 'manual_account' && $requestsManualOnlyField) {
+            return response()->json(['message' => 'Only manual accounts can be edited. is_pinned can be set on any account.'], 422);
         }
 
         $validated = $request->validate([
@@ -159,7 +189,13 @@ class MoneyAccountsController extends Controller
             'interest_rate' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
             'start_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
             'is_negative_balance' => ['sometimes', 'boolean'],
+            'is_pinned' => ['sometimes', 'boolean'],
         ]);
+
+        // At most one pinned account per user.
+        if (($validated['is_pinned'] ?? false) === true) {
+            $this->unpinOtherAccounts($user->id, $account->id);
+        }
 
         $meta = $account->metadata ?? [];
 
@@ -234,30 +270,35 @@ class MoneyAccountsController extends Controller
      */
     public function addBalance(Request $request, string $id): JsonResponse
     {
-        $user = $request->user();
-        $account = $this->resolveAccount($id, $user->id);
+        // MR-17: a phone on a bad connection retries this write; an
+        // Idempotency-Key means a retry replays the first response instead
+        // of recording the same balance twice.
+        return $this->idempotent($request, 'money.balances.store', function () use ($request, $id) {
+            $user = $request->user();
+            $account = $this->resolveAccount($id, $user->id);
 
-        if (! $account) {
-            return response()->json(['message' => 'Account not found.'], 404);
-        }
+            if (! $account) {
+                return response()->json(['message' => 'Account not found.'], 404);
+            }
 
-        $validated = $request->validate([
-            'balance' => ['required', 'numeric'],
-            'date' => ['required', 'date_format:Y-m-d'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-        ]);
+            $validated = $request->validate([
+                'balance' => ['required', 'numeric'],
+                'date' => ['required', 'date_format:Y-m-d'],
+                'notes' => ['nullable', 'string', 'max:1000'],
+            ]);
 
-        $integration = $this->resolveManualAccountIntegration($user);
+            $integration = $this->resolveManualAccountIntegration($user);
 
-        $event = $this->financial->createBalanceEvent($integration, $account, $validated);
-        // Balance history is part of the account's mutation surface, so move
-        // the account version forward for clients retrying with If-Match.
-        $account->touch();
+            $event = $this->financial->createBalanceEvent($integration, $account, $validated);
+            // Balance history is part of the account's mutation surface, so move
+            // the account version forward for clients retrying with If-Match.
+            $account->touch();
 
-        return response()->json(
-            ['data' => (new BalanceEntryResource($event))->toArray($request)],
-            201,
-        )->header('ETag', $this->versions->etag($account->fresh()));
+            return response()->json(
+                ['data' => (new BalanceEntryResource($event))->toArray($request)],
+                201,
+            )->header('ETag', $this->versions->etag($account->fresh()));
+        });
     }
 
     /**
@@ -269,6 +310,27 @@ class MoneyAccountsController extends Controller
             ->where('user_id', $userId)
             ->where('concept', 'account')
             ->first();
+    }
+
+    /**
+     * Clear `is_pinned` on every other account this user owns, so pinning one
+     * account always leaves at most one pinned.
+     */
+    private function unpinOtherAccounts(string $userId, string $exceptAccountId): void
+    {
+        EventObject::where('user_id', $userId)
+            ->where('concept', 'account')
+            ->where('id', '!=', $exceptAccountId)
+            ->get()
+            ->each(function (EventObject $other): void {
+                if (! ($other->metadata['is_pinned'] ?? false)) {
+                    return;
+                }
+
+                $meta = $other->metadata;
+                $meta['is_pinned'] = false;
+                $other->update(['metadata' => $meta]);
+            });
     }
 
     /**

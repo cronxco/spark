@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Flint\FlintRunCompletionService;
 use App\Services\Flint\FlintRunToken;
 use App\Services\Flint\RoutineConfig;
+use App\Support\FlintDigestOpener;
 use App\Support\FlintQuestion;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -31,6 +32,11 @@ class FlintDigestService
             'date' => ['nullable', 'date_format:Y-m-d'],
             'run_token' => ['nullable', 'string', 'max:10000'],
             'summary' => ['nullable', 'string', 'max:10000'],
+            // MR-7: the skill already knows which sentence of `summary` is the
+            // lede — publishing it explicitly means the client never has to
+            // recover it by parsing prose. Optional: FlintDigestOpener derives
+            // a best-effort fallback when a caller doesn't send one yet.
+            'opener' => ['nullable', 'string', 'max:1000'],
             'note_ids_used' => ['nullable', 'array', 'max:50'],
             'note_ids_used.*' => ['uuid'],
             'question_omission' => ['nullable', 'array'],
@@ -213,6 +219,7 @@ class FlintDigestService
             'digest_object_id' => $digest->id,
             'title' => $data['title'],
             'summary' => $data['summary'] ?? null,
+            'opener' => $data['opener'] ?? null,
             'run_uuid' => $run['run_uuid'] ?? null,
             'routine' => $run['routine'] ?? null,
             // Derived from the verified run token rather than left for a
@@ -297,6 +304,8 @@ class FlintDigestService
             'date' => data_get($event->event_metadata, 'local_date', $event->time->toDateString()),
             'period' => $period,
             'title' => data_get($event->event_metadata, 'title'),
+            'opener' => data_get($event->event_metadata, 'opener')
+                ?? FlintDigestOpener::extract(data_get($event->event_metadata, 'summary')),
             'block_count' => $event->blocks->count(),
             'block_ids' => $event->blocks->pluck('id')->values()->all(),
             'deduplicated' => $deduplicated,

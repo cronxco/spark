@@ -8,6 +8,7 @@ This directory documents Spark's three programmatic surfaces — the general RES
 | --- | --- |
 | [API_v1.md](API_v1.md) | `/api/v1` full endpoint reference, plus a brief legacy `/api` section |
 | [mobile_API.md](mobile_API.md) | `/api/v1/mobile` full endpoint reference (iOS companion app) |
+| [MOBILE_API_REQUIREMENTS.md](MOBILE_API_REQUIREMENTS.md) | What `/api/v1/mobile` has to provide for the iOS app, and where today's surface falls short |
 | [MOBILE_CHECK_INS.md](MOBILE_CHECK_INS.md) | Deep dive on the check-in domain data model, shared by web and mobile |
 | [MCP.md](MCP.md) | Spark's MCP server (`/mcp/spark`) — tools, resources, and authorization |
 | [openapi/api-v1.openapi.yaml](openapi/api-v1.openapi.yaml) | Machine-readable OpenAPI 3.1 spec for `/api/v1` |

@@ -8,6 +8,9 @@ use App\Services\EffectiveTimezoneResolver;
 use App\Services\Flint\FlintQuestionActionService;
 use App\Support\FlintQuestion;
 use App\Support\FlintQuestionPresenter;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -15,25 +18,67 @@ use Illuminate\Validation\Rule;
 
 class FlintQuestionsController extends Controller
 {
+    /** Every status FlintQuestion::status() can return, and so every value `status` accepts. */
+    private const ALLOWED_STATUSES = ['open', 'answered', 'skipped', 'retired'];
+
+    /**
+     * GET /api/v1/mobile/flint/questions?status=open,answered&since=48h
+     *
+     * MR-9: `status` takes a comma-separated list so a client showing "the
+     * last 48 hours of questions, open or answered" doesn't have to make two
+     * unbounded requests and filter locally — `since` (an ISO timestamp, or a
+     * relative window like `48h`/`7d`) bounds the query server-side instead.
+     */
     public function index(Request $request, EffectiveTimezoneResolver $timezones): JsonResponse
     {
         $validated = $request->validate([
-            'status' => ['nullable', Rule::in(['open'])],
+            'status' => ['nullable', 'string'],
+            'since' => ['nullable', 'string', 'max:64'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
             'cursor' => ['nullable', 'string'],
         ]);
         $limit = (int) ($validated['limit'] ?? 20);
-        $cutoff = $timezones->now($request->user())->subDays(FlintQuestion::RETIREMENT_DAYS);
 
-        $questions = Block::query()
+        $statuses = isset($validated['status'])
+            ? array_values(array_filter(array_map('trim', explode(',', $validated['status']))))
+            : ['open'];
+        $unknown = array_diff($statuses, self::ALLOWED_STATUSES);
+        if ($statuses === [] || $unknown !== []) {
+            return response()->json([
+                'message' => 'Invalid status. Allowed values: ' . implode(', ', self::ALLOWED_STATUSES) . '.',
+            ], 422);
+        }
+
+        $since = null;
+        if (isset($validated['since'])) {
+            $since = $this->parseSince($validated['since'], $timezones->now($request->user()));
+            if ($since === null) {
+                return response()->json(['message' => 'Invalid since. Use an ISO timestamp or a relative window like "48h" or "7d".'], 422);
+            }
+        }
+
+        $query = Block::query()
             ->select(['blocks.*', 'xmin'])
             ->where('block_type', FlintQuestion::BLOCK_TYPE)
-            ->where('time', '>=', $cutoff)
-            ->whereNull('metadata->answer')
-            ->whereNull('metadata->retired_at')
-            ->whereNull('metadata->skipped_at')
             ->whereHas('event.integration', fn ($query) => $query->where('user_id', $request->user()->id))
-            ->with('event')
+            ->with('event');
+
+        if ($since !== null) {
+            $query->where('time', '>=', $since);
+        } elseif ($statuses === ['open']) {
+            // Preserves the original default: an open-only list is naturally
+            // bounded by the retirement horizon, so the badge doesn't grow
+            // forever when no explicit window was asked for.
+            $query->where('time', '>=', $timezones->now($request->user())->subDays(FlintQuestion::RETIREMENT_DAYS));
+        }
+
+        $query->where(function ($statusQuery) use ($statuses): void {
+            foreach ($statuses as $status) {
+                $statusQuery->orWhere(fn ($q) => $this->applyStatus($q, $status));
+            }
+        });
+
+        $questions = $query
             ->orderByDesc('time')
             ->orderByDesc('id')
             ->cursorPaginate($limit, ['*'], 'cursor');
@@ -70,5 +115,38 @@ class FlintQuestionsController extends Controller
         $response = response()->json($payload, $result['status']);
 
         return isset($result['etag']) && $result['etag'] !== '' ? $response->header('ETag', $result['etag']) : $response;
+    }
+
+    /** Mirrors FlintQuestion::status()'s precedence: answered, then skipped, then retired, else open. */
+    private function applyStatus(Builder $query, string $status): void
+    {
+        match ($status) {
+            'answered' => $query->whereNotNull('metadata->answer'),
+            'skipped' => $query->whereNull('metadata->answer')
+                ->where(fn ($q) => $q->whereNotNull('metadata->skipped_at')->orWhere('metadata->question_status', 'skipped')),
+            'retired' => $query->whereNull('metadata->answer')
+                ->whereNotNull('metadata->retired_at')
+                ->whereNull('metadata->skipped_at')
+                ->where(fn ($q) => $q->whereNull('metadata->question_status')->orWhere('metadata->question_status', '!=', 'skipped')),
+            default => $query->whereNull('metadata->answer')
+                ->whereNull('metadata->retired_at')
+                ->whereNull('metadata->skipped_at'),
+        };
+    }
+
+    /** A relative window ("48h", "7d") or an ISO timestamp, resolved against `$now`. */
+    private function parseSince(string $input, Carbon $now): ?Carbon
+    {
+        if (preg_match('/^(\d+)([hd])$/', trim($input), $matches) === 1) {
+            $amount = (int) $matches[1];
+
+            return $matches[2] === 'h' ? $now->copy()->subHours($amount) : $now->copy()->subDays($amount);
+        }
+
+        try {
+            return Carbon::parse($input);
+        } catch (Exception) {
+            return null;
+        }
     }
 }
