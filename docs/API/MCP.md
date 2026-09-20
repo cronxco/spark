@@ -98,7 +98,9 @@ _Class_: `GetDaySummaryTool` · _Ability_: `insights:read` · _Read-only, idempo
 Compact, pre-aggregated summary for one or more dates — structured domain
 sections (health, activity, money, media, knowledge) with baseline
 comparisons and anomaly detection. Preferred over `get-day-context-tool`
-for daily briefings.
+for daily briefings. Metric entries expose `observed_at`, `updated_at`, and
+`state` (`provisional` for the current local day, otherwise `settled`). Relative
+dates and database boundaries are resolved in the user's effective timezone.
 
 | Parameter | Type            | Required | Default     | Notes                                               |
 | --------- | --------------- | -------- | ----------- | --------------------------------------------------- |
@@ -124,8 +126,10 @@ Mirrors the `day-context-resource` MCP resource below.
 _Class_: `GetServiceStatusTool` · _Ability_: `insights:read` · _Read-only, idempotent_
 
 Sync status and data coverage for all services on a given date — event
-count, last event time, distinct actions, coverage notes for services with
-known sync lag (e.g. Apple Health).
+count, measurement time (`last_event_time`), ingest/update time
+(`last_updated_at`), distinct actions, and coverage notes. Apple Health
+freshness uses `last_updated_at`; a daily aggregate's notional midnight event
+time does not imply that syncing stopped at midnight.
 
 | Parameter | Type   | Required | Default | Notes           |
 | --------- | ------ | -------- | ------- | --------------- |
@@ -337,6 +341,8 @@ do not retry after an unknown outcome without checking
 | `period`  | string          | No       | inferred from current time | `morning`, `afternoon`, or `evening`                        |
 | `date`    | string          | No       | `today`                    | ISO date                                                    |
 | `summary` | string          | No       | —                          | Optional headline summary                                   |
+| `note_ids_used` | array of UUID | No | `[]` | Notes to Flint that materially informed the digest |
+| `question_omission` | object | Conditional | — | Required for a questionless briefing routine; reason + at least three rejected candidates |
 | `blocks`  | array of object | No       | —                          | Each requires `block_type` + `title`; see field notes below |
 
 Each block object supports: `content` (markdown, for `flint_editorial_note`
@@ -360,14 +366,49 @@ server-side rather than failing the whole digest write. A birthday is not a
 person-attributed commitment — it goes in `birthdays` (title only, no
 `person`), not `calendar`.
 
+Routine-bound writes are validated for completeness. Briefings require one
+`flint_day_context`, one final `flint_editorial_note`, and either a question or
+`question_omission`. News roundups require one final editorial note, and every
+`flint_news` block requires `news: {summary, sources: [{publication,
+position}], why_it_matters?, what_to_watch}`. Type/title pairs must be unique;
+reading picks require content, URL, and minutes, while drops require content and URL.
+
+#### `get-flint-notes`
+
+_Class_: `GetFlintNotesTool` · _Ability_: `flint:read` · _Read-only, idempotent_
+
+Returns explicit user-authored Notes to Flint with context links and an
+`updated_at` watermark. Defaults to notes updated in the last 30 days.
+
+| Parameter | Type | Required | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `updated_since` | ISO timestamp | No | 30 days ago | Inclusive update watermark |
+| `query` | string | No | — | Keyword filter over title/body |
+| `context_id` | UUID | No | — | Only notes linked to this entity |
+| `limit` | integer | No | 50 | 1–50 |
+
+#### `get-saved-bookmarks`
+
+_Class_: `GetSavedBookmarksTool` · _Ability_: `data:read` · _Read-only, idempotent_
+
+Lists bookmarks stored in Spark, deduplicated by bookmarked object, including
+their enrichment summaries. This is the reading-list routine's backlog source.
+
+| Parameter | Type | Required | Default | Notes |
+| --- | --- | --- | --- | --- |
+| `query` | string | No | — | Keyword filter over captured content |
+| `limit` | integer | No | 50 | 1–100 |
+
 #### `get-latest-flint-digest`
 
 _Class_: `GetLatestFlintDigestTool` · _Ability_: `flint:read` · _Read-only, idempotent_
 
 Retrieves Flint digest(s) for a date, including all blocks. Defaults to
 today's most recent digest. For `flint_user_question` blocks, returns the
-user's `answer`, `answer_note`, and `answered_at` (null until answered) —
-use this to check whether previously-asked questions have been answered.
+user’s `answer`, `answer_note`, and `answered_at` (null until answered) —
+use this to check whether previously-asked questions have been answered. It
+also returns `note_ids_used`, allowing later runs to avoid repeating one-off
+Notes to Flint while retaining durable corrections when still relevant.
 
 | Parameter | Type    | Required | Default | Notes                                                       |
 | --------- | ------- | -------- | ------- | ----------------------------------------------------------- |

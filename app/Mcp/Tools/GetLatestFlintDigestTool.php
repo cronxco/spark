@@ -127,6 +127,7 @@ class GetLatestFlintDigestTool extends Tool
             'kind' => FlintDigestKind::for($event, $eventMeta),
             'title' => $eventMeta['title'] ?? $event->action,
             'summary' => $eventMeta['summary'] ?? null,
+            'note_ids_used' => $eventMeta['note_ids_used'] ?? [],
             'created_at' => $event->created_at->toIso8601String(),
             'block_count' => $blocks->count(),
             'unanswered_question_count' => $blocks->filter(

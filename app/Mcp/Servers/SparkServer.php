@@ -17,9 +17,11 @@ use App\Mcp\Tools\GetDayContextTool;
 use App\Mcp\Tools\GetDaySummaryTool;
 use App\Mcp\Tools\GetEventsByFilterTool;
 use App\Mcp\Tools\GetEventTool;
+use App\Mcp\Tools\GetFlintNotesTool;
 use App\Mcp\Tools\GetLatestFlintDigestTool;
 use App\Mcp\Tools\GetMetricTrendTool;
 use App\Mcp\Tools\GetObjectTool;
+use App\Mcp\Tools\GetSavedBookmarksTool;
 use App\Mcp\Tools\GetServiceStatusTool;
 use App\Mcp\Tools\ListIntegrationsTool;
 use App\Mcp\Tools\ManageFlintTopicTool;
@@ -92,6 +94,7 @@ class SparkServer extends Server
         - `get-object`: Get full details for a specific object by ID.
         - `get-block`: Get full details for a specific block by ID.
         - `list-integrations`: List connected integrations and their sync state.
+        - `get-saved-bookmarks`: List bookmarks stored and enriched in Spark for reading-list curation.
 
         ## Actions
         - `create-bookmark`: Save a URL as a bookmark and queue Spark's normal fetch/enrichment flow. Requires `bookmark:write`.
@@ -104,6 +107,7 @@ class SparkServer extends Server
         ### Flint
         - `create-flint-digest`: Create a Flint digest event with an optional array of blocks. Requires `flint:write`. Supports `flint_user_question` (questions for the user with optional multiple-choice), `flint_editorial_note` (AI commentary), and any other `flint_*` block type. Returns event_id and block_ids.
         - `get-latest-flint-digest`: Retrieve the latest Flint digest for a date (default: today). Returns all blocks with full metadata — for `flint_user_question` blocks, includes the user's answer, answer_note, and answered_at.
+        - `get-flint-notes`: Retrieve explicit Notes to Flint, optionally since a watermark, by keyword, or linked context. Fresh notes and corrections outrank inferred context.
         - `answer-flint-question`: Record the user's answer to a Flint question.
         - `manage-flint-topic`: Create, update, or list persistent Flint Topics. Topics track strategic, thematic, and tactical threads, and may link digest events or blocks that discussed them.
         - `complete-flint-run`: Confirm that a topic routine produced its expected persisted output using its verified run token.
@@ -151,9 +155,11 @@ class SparkServer extends Server
         CaptureBookmarkTool::class,
         TriggerIntegrationUpdateTool::class,
         ListIntegrationsTool::class,
+        GetSavedBookmarksTool::class,
         CreateFlintDigestTool::class,
         CompleteFlintRunTool::class,
         GetLatestFlintDigestTool::class,
+        GetFlintNotesTool::class,
         AnswerFlintQuestionTool::class,
         ManageFlintTopicTool::class,
         RunFlintSkillTool::class,

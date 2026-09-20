@@ -1,7 +1,7 @@
 ---
 name: flint-reading-list
 description: >
-  Reviews the Karakeep bookmark backlog once a day and surfaces a small number
+  Reviews the Spark bookmark backlog once a day and surfaces a small number
   of things genuinely worth reading now, each with a reason it earned the slot.
   Writes the picks to Spark as a Flint digest and links any Topics they bear on.
 
@@ -10,13 +10,12 @@ description: >
   — "what should I read?", "what's in my backlog?" — answer directly.
 model: reasoning
 allowed_tools:
-  - karakeep__get-lists
-  - karakeep__search-bookmarks
-  - karakeep__get-list-bookmarks
-  - karakeep__get-bookmark-content
+  - spark__get-saved-bookmarks
+  - spark__get-event-tool
   - spark__get-latest-flint-digest
   - spark__create-flint-digest
   - spark__manage-flint-topic
+  - docs__fetch
 required_success_tools:
   - spark__create-flint-digest
 max_tool_calls: 40
@@ -34,6 +33,9 @@ The **Spark Briefing — Writing Styleguide**
 digest, not just the day briefing. Fetch it before writing. Where it and this file
 disagree on structure, this file wins for reading-list specifics; the styleguide wins on
 voice, tense, and how a fact is phrased.
+
+Fetch it with `docs__fetch(id: "586576f8-7bc5-49db-a48f-db664710ba91")` before
+composing the list.
 
 This is a **curation** job, not an inventory job. Listing what is in the backlog
 is useless — Will can see the backlog. The value is entirely in the choosing and
@@ -107,17 +109,16 @@ Do not repeat a reading recommendation the day's own digest already made either.
 ## Step 3: Survey the backlog
 
 ```text
-karakeep__get-lists()
-karakeep__search-bookmarks(query: "...")   — for topic-driven searches
-karakeep__get-list-bookmarks(listId: "...") — for the unread/inbox list
+spark__get-saved-bookmarks(limit: 100)
+spark__get-saved-bookmarks(query: "<active Topic>", limit: 30)
 ```
 
 Search by the active Topics first — that is where the best picks come from.
 Then take a broad slice of the unread backlog for the staleness and
 short-read passes.
 
-Use `karakeep__get-bookmark-content` only for a candidate you are close to
-picking, to check that it is what its title claims and to write an honest pitch.
+Use `spark__get-event-tool` only for a candidate you are close to picking, to
+check captured content when its Spark summary is insufficient.
 Do not fetch content for the whole backlog.
 
 Exclude anything already archived or marked read — a piece Will has dealt with is

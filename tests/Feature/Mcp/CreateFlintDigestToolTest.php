@@ -178,11 +178,7 @@ class CreateFlintDigestToolTest extends TestCase
             'period' => 'morning',
             'date' => today()->toDateString(),
             'run_token' => $token,
-            'blocks' => [[
-                'block_type' => 'flint_editorial_note',
-                'title' => 'One block',
-                'content' => 'Written once.',
-            ]],
+            'blocks' => $this->briefingBlocks(),
         ];
 
         SparkServer::actingAs($this->user)->tool(CreateFlintDigestTool::class, $payload)->assertOk();
@@ -190,7 +186,7 @@ class CreateFlintDigestToolTest extends TestCase
 
         $retry->assertOk()->assertSee('"deduplicated":true');
         $this->assertSame(1, Event::where('source_id', "flint_digest_run:{$runUuid}")->count());
-        $this->assertSame(1, Block::where('title', 'One block')->count());
+        $this->assertSame(1, Block::where('title', 'Run notes')->count());
     }
 
     #[Test]
@@ -200,11 +196,17 @@ class CreateFlintDigestToolTest extends TestCase
             ['digest', 'spark-day-briefing-async'],
             ['news_roundup', 'flint-news-roundup'],
         ] as [$routine, $skill]) {
+            $blocks = $routine === 'digest' ? $this->briefingBlocks() : [[
+                'block_type' => 'flint_editorial_note',
+                'title' => 'Run notes',
+                'content' => 'No stories today.',
+            ]];
             SparkServer::actingAs($this->user)->tool(CreateFlintDigestTool::class, [
                 'title' => $skill,
                 'period' => 'morning',
                 'date' => today()->toDateString(),
                 'run_token' => $this->runToken((string) Str::uuid(), $routine, $skill),
+                'blocks' => $blocks,
             ])->assertOk();
         }
 
@@ -229,6 +231,50 @@ class CreateFlintDigestToolTest extends TestCase
         ])->assertHasErrors(['does not match']);
     }
 
+    #[Test]
+    public function a_questionless_routine_digest_requires_a_structured_omission(): void
+    {
+        $blocks = [
+            ['block_type' => 'flint_day_context', 'title' => 'Today', 'day_context' => ['calendar' => [], 'birthdays' => []]],
+            ['block_type' => 'flint_editorial_note', 'title' => 'Run notes', 'content' => 'No question survived.'],
+        ];
+        $payload = [
+            'title' => 'Morning digest',
+            'period' => 'morning',
+            'date' => today()->toDateString(),
+            'run_token' => $this->runToken((string) Str::uuid(), 'digest', 'spark-day-briefing-async'),
+            'blocks' => $blocks,
+        ];
+
+        SparkServer::actingAs($this->user)->tool(CreateFlintDigestTool::class, $payload)
+            ->assertHasErrors(['questionless digest']);
+
+        $payload['run_token'] = $this->runToken((string) Str::uuid(), 'digest', 'spark-day-briefing-async');
+        $payload['question_omission'] = [
+            'reason' => 'Every useful uncertainty was already resolved.',
+            'candidates' => ['Planning: answered by calendar', 'Money: no ambiguity', 'Health: would be curiosity'],
+        ];
+        SparkServer::actingAs($this->user)->tool(CreateFlintDigestTool::class, $payload)->assertOk();
+    }
+
+    #[Test]
+    public function a_news_routine_requires_structured_story_data_and_run_notes_last(): void
+    {
+        $payload = [
+            'title' => 'News roundup',
+            'period' => 'morning',
+            'date' => today()->toDateString(),
+            'run_token' => $this->runToken((string) Str::uuid(), 'news_roundup', 'flint-news-roundup'),
+            'blocks' => [
+                ['block_type' => 'flint_news', 'title' => 'Rates hold', 'content' => 'The Bank held rates.'],
+                ['block_type' => 'flint_editorial_note', 'title' => 'Run notes', 'content' => 'Three sources.'],
+            ],
+        ];
+
+        SparkServer::actingAs($this->user)->tool(CreateFlintDigestTool::class, $payload)
+            ->assertHasErrors(['structured news']);
+    }
+
     private function runToken(string $runUuid, string $routine, string $skill): string
     {
         return app(FlintRunToken::class)->issue([
@@ -240,5 +286,26 @@ class CreateFlintDigestToolTest extends TestCase
             'period' => 'morning',
             'trigger_source' => 'scheduled',
         ]);
+    }
+
+    private function briefingBlocks(): array
+    {
+        return [
+            [
+                'block_type' => 'flint_day_context',
+                'title' => 'Today',
+                'day_context' => ['calendar' => [], 'birthdays' => []],
+            ],
+            [
+                'block_type' => 'flint_user_question',
+                'title' => 'Useful question',
+                'question' => 'Is this still the right plan?',
+            ],
+            [
+                'block_type' => 'flint_editorial_note',
+                'title' => 'Run notes',
+                'content' => 'Written once.',
+            ],
+        ];
     }
 }

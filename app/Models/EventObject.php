@@ -220,6 +220,12 @@ class EventObject extends Model implements HasMedia
         return $this->hasMany(Event::class, 'target_id')->withTrashed();
     }
 
+    /** Most recent non-deleted event that enriched or referenced this object. */
+    public function latestTargetEvent()
+    {
+        return $this->hasOne(Event::class, 'target_id')->latestOfMany('time');
+    }
+
     public function events()
     {
         return $this->actorEvents()->union($this->targetEvents());

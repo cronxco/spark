@@ -12,7 +12,37 @@
 
         <h3 class="text-base font-semibold text-base-content">{{ $block->title }}</h3>
 
-        @if ($block->getContent())
+        @php($news = $block->metadata['news'] ?? null)
+        @if (is_array($news))
+            <p class="text-sm leading-relaxed text-base-content/80">{{ $news['summary'] ?? $block->getContent() }}</p>
+
+            @if (!empty($news['sources']))
+                <div class="space-y-1.5 rounded-lg bg-base-100 p-3">
+                    <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Reporting</div>
+                    @foreach ($news['sources'] as $source)
+                        <div class="text-sm text-base-content/75">
+                            <span class="font-medium text-base-content">{{ $source['publication'] ?? 'Source' }}</span>
+                            — {{ $source['position'] ?? '' }}
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                @if (!empty($news['why_it_matters']))
+                    <div class="rounded-lg border border-base-300 p-3">
+                        <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Why it matters</div>
+                        <p class="mt-1 text-sm text-base-content/75">{{ $news['why_it_matters'] }}</p>
+                    </div>
+                @endif
+                @if (!empty($news['what_to_watch']))
+                    <div class="rounded-lg border border-base-300 p-3">
+                        <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50">What to watch</div>
+                        <p class="mt-1 text-sm text-base-content/75">{{ $news['what_to_watch'] }}</p>
+                    </div>
+                @endif
+            </div>
+        @elseif ($block->getContent())
             <div class="prose prose-sm max-w-none text-base-content/80">
                 {!! $block->getContentAsHtml() !!}
             </div>

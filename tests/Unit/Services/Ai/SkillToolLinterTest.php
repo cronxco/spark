@@ -87,8 +87,8 @@ class SkillToolLinterTest extends TestCase
     public function it_does_not_guess_at_arguments_for_a_remote_namespace(): void
     {
         $problems = $this->lint(
-            ['karakeep__search-bookmarks'],
-            'karakeep__search-bookmarks(query: "trains", whatever: 1)',
+            ['weather__get_forecast'],
+            'weather__get_forecast(location: "Croydon", whatever: 1)',
         );
 
         $this->assertSame([], $problems);

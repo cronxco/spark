@@ -795,6 +795,11 @@ references linkified) and an optional `references` array — except
 `flint_day_context`, which carries a structured `day_context` field instead
 (not linkified):
 
+`flint_news` additionally carries a structured `news` object with `summary`,
+`sources` (`publication` + `position`), optional `why_it_matters`, and
+`what_to_watch`. Clients should prefer it to reparsing the prose `content`;
+`content` remains for backwards compatibility.
+
 ```json
 {
     "id": "uuid",

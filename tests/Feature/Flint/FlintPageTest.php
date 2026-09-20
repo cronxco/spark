@@ -108,6 +108,33 @@ class FlintPageTest extends TestCase
     }
 
     #[Test]
+    public function it_renders_structured_news_without_reparsing_prose(): void
+    {
+        $digest = $this->createDigest(['routine' => 'news_roundup', 'kind' => 'news_roundup']);
+        $digest->createBlock([
+            'block_type' => 'flint_news',
+            'title' => 'Rates hold',
+            'time' => $digest->time,
+            'metadata' => [
+                'content' => 'Legacy fallback.',
+                'news' => [
+                    'summary' => 'The Bank held rates.',
+                    'sources' => [['publication' => 'The Economist', 'position' => 'Focused on inflation.']],
+                    'why_it_matters' => 'Mortgage pricing may remain stable.',
+                    'what_to_watch' => 'The next inflation release.',
+                ],
+            ],
+        ]);
+
+        Volt::test('flint.index')
+            ->set('activeTab', 'today')
+            ->assertSee('The Bank held rates.')
+            ->assertSee('Focused on inflation.')
+            ->assertSee('Mortgage pricing may remain stable.')
+            ->assertSee('The next inflation release.');
+    }
+
+    #[Test]
     public function it_strips_raw_html_from_rendered_digest_and_topic_markdown(): void
     {
         // The digest summary is written from newsletters, bookmarks and fetched
