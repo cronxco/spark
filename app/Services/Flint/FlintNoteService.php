@@ -150,6 +150,7 @@ class FlintNoteService
             'body' => $note->content,
             'authored_at' => $note->time?->toIso8601String(),
             'created_at' => $note->created_at?->toIso8601String(),
+            'updated_at' => $note->updated_at?->toIso8601String(),
             'deleted_at' => $note->deleted_at?->toIso8601String(),
             'context_links' => $note->relationshipsFrom->map(fn (Relationship $relationship) => [
                 'type' => data_get($relationship->metadata, 'api_type', $this->apiType($relationship)),

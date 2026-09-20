@@ -20,7 +20,8 @@ class ContextController extends Controller
             'domains' => ['nullable', 'array', 'max:10'],
             'domains.*' => ['string', 'max:100'],
         ]);
-        $date = Carbon::createFromFormat('Y-m-d', $data['date'] ?? now()->toDateString());
+        $timezone = $request->user()->getTimezone();
+        $date = Carbon::createFromFormat('Y-m-d', $data['date'] ?? now($timezone)->toDateString(), $timezone);
 
         return response()->json($this->context->forDay($request->user(), $date, $data['domains'] ?? null));
     }
@@ -28,7 +29,8 @@ class ContextController extends Controller
     public function status(Request $request): JsonResponse
     {
         $data = $request->validate(['date' => ['nullable', 'date_format:Y-m-d']]);
-        $date = Carbon::createFromFormat('Y-m-d', $data['date'] ?? now()->toDateString());
+        $timezone = $request->user()->getTimezone();
+        $date = Carbon::createFromFormat('Y-m-d', $data['date'] ?? now($timezone)->toDateString(), $timezone);
 
         return response()->json($this->status->forDay($request->user(), $date));
     }

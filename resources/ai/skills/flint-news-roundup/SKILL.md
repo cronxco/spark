@@ -16,9 +16,10 @@ allowed_tools:
   - spark__get-latest-flint-digest
   - spark__get-event-tool
   - spark__get-block-tool
-  - karakeep__get-bookmark-content
+  - spark__get-flint-notes
   - spark__create-flint-digest
   - spark__manage-flint-topic
+  - docs__fetch
 required_success_tools:
   - spark__create-flint-digest
 max_tool_calls: 60
@@ -46,6 +47,9 @@ The **Spark Briefing — Writing Styleguide**
 digest, not just the day briefing. Fetch it before writing. Where it and this file
 disagree on structure, this file wins for roundup specifics; the styleguide wins on
 voice, tense, and how a fact is phrased.
+
+Fetch it with `docs__fetch(id: "586576f8-7bc5-49db-a48f-db664710ba91")` before
+composing the roundup.
 
 **Everything comes from Will's own sources.** Spark holds the newsletters and
 fetches; that is the whole evidence base. Do not browse for material, do not
@@ -78,7 +82,7 @@ spark__get-day-summary-tool(dates: ["<local_date - 1d>", "<local_date>"], domain
 This is the whole load. It returns, per date, a `knowledge` section holding
 `newsletters[]`, `fetched_content[]` and `bookmarks[]` — each already carrying
 `tldr`, `summary`, `key_takeaways` and an `event_id` — plus a `sync_status`
-block with per-service `event_count` and `last_event_time`.
+block with per-service `event_count`, `last_event_time`, and `last_updated_at`.
 
 Two days rather than one, because the roundup runs in the morning and a source
 that landed yesterday afternoon has not been covered by any previous run.
@@ -94,8 +98,10 @@ and only when a story's framing genuinely turns on the original wording rather
 than on what the summary says about it. `spark__get-block-tool` fetches a single
 block from an event you have already opened.
 
-`karakeep__get-bookmark-content` reads the captured content of something Will
-saved, when a story rests on it.
+Also call `spark__get-flint-notes` for notes updated in the last 30 days. Apply
+only notes that explicitly bear on news selection, framing, or a linked source
+or Topic. A relevant note is direct user intent and outranks inferred
+preferences. Keep the IDs of notes materially used.
 
 ## Step 3: Establish coverage from the data, not from impression
 
@@ -106,7 +112,7 @@ Read the numbers before forming any view of whether it was a quiet news day.
 | The call errors, or returns no `knowledge` section | **Flint is broken, not the news** | Stop. Go to Step 6 and report the failure, naming the tool and the error. Never describe this as a quiet day. |
 | `newsletters`, `fetched_content` and `bookmarks` all empty, and `sync_status` shows zero `newsletter` and `fetch` events | A genuinely empty window | Go to Step 6 and say so in one line. |
 | Sources present | Normal | Continue. |
-| Some present, but a service's `last_event_time` is well before the window's end | Partial coverage | Continue, and name the gap in the roundup. |
+| Some present, but a service's `last_updated_at` is well before the window's end | Partial coverage | Continue, and name the gap in the roundup. |
 
 Record the counts you actually saw — they go into the editorial note in Step 6.
 
@@ -177,6 +183,7 @@ spark__create-flint-digest(
   title: "News roundup — <weekday>",
   date: "<local_date>",
   period: "morning",
+  note_ids_used: ["<relevant Flint Note UUIDs actually used>"],
   summary: "<the three stories, as prose, one section each>",
   blocks: [ <one flint_news per story>, <editorial note last> ]
 )
@@ -198,8 +205,15 @@ wall of text.
 {
   "block_type": "flint_news",
   "title": "<the story's headline — the same one the summary section uses>",
-  "content": "<40–70 words: what happened, who reported it, and the single
-               most important limit on what the sources establish>",
+  "content": "<40–70 word standalone distillation>",
+  "news": {
+    "summary": "<what happened and the limit on what is established>",
+    "sources": [
+      {"publication": "<publication>", "position": "<what it uniquely reported or argued>"}
+    ],
+    "why_it_matters": "<specific relevance, or omit when simply worth knowing>",
+    "what_to_watch": "<the concrete development that would change the picture>"
+  },
   "referenced_event_ids": ["<event_id>", "..."]
 }
 ```
@@ -306,6 +320,9 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 - [ ] `what to watch next` on every story;
 - [ ] one `flint_news` block per story, each with a distinct title and content
       that is neither a copy of the summary nor a bare source list;
+- [ ] every `flint_news` block carries structured summary, source positions and
+      what-to-watch data;
+- [ ] Notes to Flint checked and only news-relevant notes applied;
 - [ ] `referenced_event_ids` set on the blocks that draw on sources;
 - [ ] editorial note written last, titled "Run notes", with source counts and the
       selection reasoning;

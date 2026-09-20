@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -16,6 +17,12 @@ class BriefingControllerTest extends TestCase
     {
         parent::setUp();
         config(['ios.mobile_api_enabled' => true]);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     #[Test]
@@ -34,6 +41,19 @@ class BriefingControllerTest extends TestCase
             ->assertJsonStructure(['sections', 'anomalies', 'sync_status'])
             ->assertHeader('ETag')
             ->assertHeader('Last-Modified');
+    }
+
+    #[Test]
+    public function today_is_resolved_in_the_users_timezone(): void
+    {
+        Carbon::setTestNow('2026-07-01 23:30:00 UTC');
+        $user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
+        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/briefing/today')
+            ->assertOk()
+            ->assertJsonPath('date', '2026-07-02')
+            ->assertJsonPath('timezone', 'Europe/London');
     }
 
     #[Test]

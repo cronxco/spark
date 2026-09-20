@@ -243,13 +243,34 @@ class GetLatestFlintDigestToolTest extends TestCase
             'event_id' => $event->id,
             'block_type' => 'flint_news',
             'title' => 'A story',
-            'metadata' => ['content' => 'Something happened.', 'referenced_event_ids' => [$referenced]],
+            'metadata' => [
+                'content' => 'Something happened.',
+                'referenced_event_ids' => [$referenced],
+                'news' => [
+                    'summary' => 'Something happened.',
+                    'sources' => [['publication' => 'The Economist', 'position' => 'Reported the change.']],
+                    'what_to_watch' => 'The next vote.',
+                ],
+            ],
         ]);
 
         $response = SparkServer::actingAs($this->user)->tool(GetLatestFlintDigestTool::class, []);
 
         $response->assertOk();
         $response->assertSee($referenced);
+        $response->assertSee('what_to_watch');
+        $response->assertSee('The next vote');
+    }
+
+    #[Test]
+    public function returns_note_ids_used_for_one_off_instruction_deduplication(): void
+    {
+        $noteId = (string) Str::uuid();
+        $this->createDigestEvent('morning', eventMeta: ['note_ids_used' => [$noteId]]);
+
+        SparkServer::actingAs($this->user)->tool(GetLatestFlintDigestTool::class, [])
+            ->assertOk()
+            ->assertSee($noteId);
     }
 
     /**

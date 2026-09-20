@@ -14,6 +14,8 @@ class DaySummaryService
 {
     private ?MetricPresentation $presentation = null;
 
+    private bool $summaryDateIsToday = false;
+
     /**
      * Generate a compact summary for a single date.
      *
@@ -21,8 +23,11 @@ class DaySummaryService
      */
     public function generateSummary(User $user, Carbon $date, ?array $domains = null): array
     {
-        $startOfDay = $date->copy()->startOfDay();
-        $endOfDay = $date->copy()->endOfDay();
+        $timezone = $user->getTimezone();
+        $localDate = Carbon::parse($date->toDateString(), $timezone)->startOfDay();
+        $this->summaryDateIsToday = $localDate->isToday();
+        $startOfDay = $localDate->copy()->utc();
+        $endOfDay = $localDate->copy()->endOfDay()->utc();
 
         // Query all events for this date
         $events = $this->queryEvents($user, $startOfDay, $endOfDay, $domains);
@@ -54,14 +59,14 @@ class DaySummaryService
         }
 
         // Build sync status
-        $syncStatus = $this->buildSyncStatus($events);
+        $syncStatus = $this->buildSyncStatus($events, $localDate);
 
         // Build anomalies
-        $anomalies = $this->buildAnomalies($user, $date);
+        $anomalies = $this->buildAnomalies($user, $localDate);
 
         return [
-            'date' => $date->toDateString(),
-            'timezone' => $user->timezone ?? 'UTC',
+            'date' => $localDate->toDateString(),
+            'timezone' => $timezone,
             'sync_status' => $syncStatus,
             'sections' => $sections,
             'anomalies' => $anomalies,
@@ -661,21 +666,30 @@ class DaySummaryService
     /**
      * Build sync status per service.
      */
-    protected function buildSyncStatus(Collection $events): array
+    protected function buildSyncStatus(Collection $events, Carbon $localDate): array
     {
         $realTimeServices = ['apple_health'];
 
-        return $events->groupBy('service')->map(function ($serviceEvents, $service) use ($realTimeServices) {
+        return $events->groupBy('service')->map(function ($serviceEvents, $service) use ($realTimeServices, $localDate) {
             $lastEvent = $serviceEvents->sortByDesc('time')->first();
+            $lastUpdated = $serviceEvents->sortByDesc('updated_at')->first();
             $status = [
                 'event_count' => $serviceEvents->count(),
                 'last_event_time' => $lastEvent->time->toISOString(),
+                'last_updated_at' => $lastUpdated->updated_at->toISOString(),
+                'freshness_basis' => 'updated_at',
                 'actions' => $serviceEvents->pluck('action')->unique()->values()->all(),
             ];
 
             if (in_array($service, $realTimeServices)) {
-                $hoursSinceLastEvent = $lastEvent->time->diffInHours(now());
-                $status['coverage'] = $hoursSinceLastEvent > 2 ? 'partial' : 'complete';
+                $referenceTime = $localDate->isToday() ? now() : $localDate->copy()->endOfDay();
+                $hoursSinceLastUpdate = $lastUpdated->updated_at->lessThan($referenceTime)
+                    ? $lastUpdated->updated_at->diffInHours($referenceTime)
+                    : 0;
+                $status['coverage'] = $hoursSinceLastUpdate > 2 ? 'partial' : 'complete';
+                if ($hoursSinceLastUpdate > 2) {
+                    $status['coverage_note'] = "Last updated {$hoursSinceLastUpdate}h ago — data may be incomplete.";
+                }
             }
 
             return $status;
@@ -750,6 +764,10 @@ class DaySummaryService
      */
     protected function attachBaseline(array &$entry, Event $event, array $metricsCache): void
     {
+        $entry['observed_at'] = $event->time?->toIso8601String();
+        $entry['updated_at'] = $event->updated_at?->toIso8601String();
+        $entry['state'] = $this->summaryDateIsToday ? 'provisional' : 'settled';
+
         if ($event->value === null || $event->value_unit === null) {
             return;
         }

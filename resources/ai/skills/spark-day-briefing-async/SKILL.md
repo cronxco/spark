@@ -17,6 +17,8 @@ allowed_tools:
   - spark__get-event-tool
   - spark__get-block-tool
   - spark__get-latest-flint-digest
+  - spark__get-flint-notes
+  - spark__get-saved-bookmarks
   - spark__create-flint-digest
   - spark__manage-flint-topic
   - fastmail__search_events
@@ -70,8 +72,10 @@ structure. Fetch it fresh before writing.
    influence relevance and what to investigate, but it does not by itself prove that
    something happened today or that Will intends something now.
 
-4. **Fresh user intent outranks Flint memory.** Explicit user answers, calendar events,
-   and explicit day-note plans outrank Topics, prior digests, and Flint inference.
+4. **Fresh user intent outranks Flint memory.** Notes to Flint and explicit user answers
+   outrank calendar labels, day-note plans, Topics, prior digests, and Flint inference.
+   A Note that corrects another source is authoritative until newer explicit evidence
+   supersedes it.
 
 5. **Recent digests and Topics do different jobs.**
    - Topics provide durable continuity across weeks or months.
@@ -184,6 +188,24 @@ question restraint, corrections, uncertainty, and morning/evening differences.
 
 If unavailable, continue using this skill's inline rules and record the failure only in
 the editorial block.
+
+## Step 0c: Read Notes to Flint
+
+Always fetch the user's explicit notes before interpreting any other source:
+
+```text
+spark__get-flint-notes(updated_since: "<local_date - 30d at 00:00 in timezone>", limit: 50)
+```
+
+These are direct user intent, not optional colour. A correction overrides a stale
+calendar label, Topic, prior digest, or inference. An instruction applies at the next
+relevant opportunity. A one-off wording request should normally be honoured once; an
+unlinked correction remains relevant for as long as the corrected fact matters.
+
+Use `authored_at` and `updated_at` to resolve conflicts. If scope is ambiguous, do not
+invent it. Record every note that materially affected the digest in `note_ids_used`
+when creating it. Do not copy Notes to Flint into Outline Reflections unless an
+answered question independently makes the same fact appropriate durable content.
 
 ---
 
@@ -389,6 +411,8 @@ Build a temporary **editorial register** containing:
 - whether Will answered;
 - latest answer or correction;
 - previous provisional claims that may now need correction;
+- `note_ids_used` from each digest, so a one-off instruction already honoured is not
+  repeated merely because it remains inside the 30-day notes window;
 - whether something was already heavily covered this morning or yesterday;
 - whether a thread maps onto an active/dormant/resolved Topic;
 - whether the underlying evidence came from Will/calendar/day note or Flint inference.
@@ -463,12 +487,18 @@ Classify mentally:
 Use interval overlap, not start-date equality: multi-day events can begin before the
 day and still be relevant.
 
+Once the distinctive names in the calendar, day note and active Topics are known, make
+targeted `spark__get-flint-notes(query: "<name>")` calls where an older correction or
+instruction could materially change the briefing. A targeted query searches the
+durable note history rather than only the 30-day inbox window. Do not search every
+generic word; use this for concrete people, trips, projects, or labelled days.
+
 ### Evidence hierarchy
 
 When sources differ or compete, use roughly:
 
 ```text
-explicit recent user answer
+explicit relevant Note to Flint / recent user answer
 > calendar / explicit day-note plan
 > fresh external/source evidence
 > durable Topic memory
@@ -524,6 +554,11 @@ Examples:
   reading.
 - No workout on a fully synced completed day can be factual; the same absence during
   partial sync cannot.
+
+For Apple Health, freshness is based on `last_updated_at`, not `last_event_time`.
+The event time is the measurement's notional day and may legitimately be midnight.
+Treat current-day metrics marked `state: provisional` as mutable and use their
+`updated_at` value when deciding whether the data is fresh.
 
 ### Media
 
@@ -823,13 +858,14 @@ Collapse into broad facts such as “office day”, “out most of the day”, o
 
 Presence is corroborative, not perfect ground truth; tracking can lag or bounce.
 
-### Karakeep — source drill-down, not backlog
+### Spark bookmarks — source drill-down, not backlog
 
-Do not browse Karakeep simply to find material.
+Do not browse the bookmark backlog simply to find material.
 
 If Spark identifies a saved article as one of the few genuinely important reading
-stories, use Karakeep to retrieve bookmark metadata/full captured content. Prefer the
-source content over embellishing an LLM-generated summary.
+stories, use `spark__get-saved-bookmarks` to retrieve its stored metadata and summary,
+then `spark__get-event-tool` only when the captured content is needed. Prefer source
+content over embellishing an LLM-generated summary.
 
 ### Trek — optional travel enrichment
 
@@ -1015,13 +1051,17 @@ The preference for one question does **not** override fatigue rules.
 If the strongest candidate was recently ignored, find a different genuinely useful
 question from another area rather than paraphrasing the old one.
 
-If no independent quality candidate exists, zero questions is correct.
+If no independent quality candidate exists, zero questions is correct only after
+considering at least three candidates from different useful areas where possible.
 
-When choosing zero, record a brief reason in the editorial note, e.g.:
+When choosing zero, record a brief reason in the editorial note and pass a structured
+`question_omission` object to `create-flint-digest` with the reason and at least three
+rejected candidates, e.g.:
 
 > **Question:** none — strongest candidates repeated unanswered prompts from yesterday.
 
-That makes zero an editorial decision rather than the default.
+The server rejects a questionless routine digest without this evidence. That makes zero
+an exceptional editorial decision rather than an easy default.
 
 #### Second/third-question bar
 
@@ -1205,6 +1245,7 @@ spark__create-flint-digest(
   title: "...",
   date: "<payload local_date>",
   period: "<payload period>",
+  note_ids_used: ["<every Flint Note UUID materially used>"],
   summary: "<briefing prose>",
   blocks: [
     <optional insight blocks>,
@@ -1213,6 +1254,18 @@ spark__create-flint-digest(
   ]
 )
 ```
+
+When and only when there is no question block, add:
+
+```text
+question_omission: {
+  "reason": "<why none survived>",
+  "candidates": ["<candidate and rejection>", "<candidate and rejection>", "<candidate and rejection>"]
+}
+```
+
+Send an empty `note_ids_used` array when notes were read but none materially affected
+the digest.
 
 Store returned digest/block IDs if needed for logging.
 
@@ -1308,6 +1361,8 @@ Before writing today's digest verify:
 - [ ] `period`, `local_date`, and `timezone` taken directly from the payload;
 - [ ] morning `trigger_reason` / `sleep_score_event_id` understood where relevant;
 - [ ] current style guide fetched;
+- [ ] Notes to Flint fetched before interpreting other sources;
+- [ ] explicit note corrections applied ahead of stale calendar/Topic/inference data;
 - [ ] yesterday Pass One processed;
 - [ ] current Flint Topics loaded read-only;
 - [ ] previous four days + today Flint digests checked for editorial history and
@@ -1329,7 +1384,7 @@ Before writing today's digest verify:
       (evening: `local_date` + 1 day), and the calendar + birthdays + weather for that day,
       every `calendar` entry carrying a `person` decided by the title-attribution rule,
       birthdays kept out of `calendar` and left person-free;
-- [ ] any hourly weather / HA / Karakeep / Trek / refresh usage passed its relevance
+- [ ] any hourly weather / HA / Spark bookmark / Trek / refresh usage passed its relevance
       gate;
 - [ ] lede is consequential, not merely interesting;
 - [ ] active Topics only influenced the digest where fresh evidence justified it;
@@ -1338,7 +1393,7 @@ Before writing today's digest verify:
       intent;
 - [ ] repeated unanswered questions are suppressed;
 - [ ] one high-quality question was actively sought;
-- [ ] zero questions, if chosen, has an explicit editorial reason;
+- [ ] zero questions, if chosen, has a structured reason plus at least three rejected candidates;
 - [ ] a second/third question, if used, independently clears the quality bar;
 - [ ] insights are useful but not forced into actionability;
 - [ ] corrections are explicit if source data changed;

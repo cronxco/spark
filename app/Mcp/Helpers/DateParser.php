@@ -13,15 +13,15 @@ trait DateParser
      * Supports: "today", "yesterday", "tomorrow", ISO dates (YYYY-MM-DD),
      * and relative keywords like "7_days_ago", "30_days_ago".
      */
-    protected function parseDate(string $input): ?Carbon
+    protected function parseDate(string $input, ?string $timezone = null): ?Carbon
     {
         $input = strtolower(trim($input));
 
         return match ($input) {
-            'today' => Carbon::today(),
-            'yesterday' => Carbon::yesterday(),
-            'tomorrow' => Carbon::tomorrow(),
-            default => $this->parseRelativeOrIsoDate($input),
+            'today' => Carbon::today($timezone),
+            'yesterday' => Carbon::yesterday($timezone),
+            'tomorrow' => Carbon::tomorrow($timezone),
+            default => $this->parseRelativeOrIsoDate($input, $timezone),
         };
     }
 
@@ -31,12 +31,12 @@ trait DateParser
      * @param  array<string>  $inputs
      * @return array<Carbon>
      */
-    protected function parseDates(array $inputs): array
+    protected function parseDates(array $inputs, ?string $timezone = null): array
     {
         $dates = [];
 
         foreach ($inputs as $input) {
-            $date = $this->parseDate($input);
+            $date = $this->parseDate($input, $timezone);
             if ($date) {
                 $dates[] = $date;
             }
@@ -80,14 +80,14 @@ trait DateParser
     /**
      * Parse relative date keywords like "7_days_ago" or range keywords.
      */
-    protected function parseRelativeOrIsoDate(string $input): ?Carbon
+    protected function parseRelativeOrIsoDate(string $input, ?string $timezone = null): ?Carbon
     {
         // Match N_days_ago pattern
         if (preg_match('/^(\d+)_days?_ago$/', $input, $matches)) {
-            return Carbon::today()->subDays((int) $matches[1]);
+            return Carbon::today($timezone)->subDays((int) $matches[1]);
         }
 
-        return $this->parseIsoDate($input);
+        return $this->parseIsoDate($input, $timezone);
     }
 
     /**
@@ -135,10 +135,10 @@ trait DateParser
     /**
      * Parse ISO date string.
      */
-    protected function parseIsoDate(string $input): ?Carbon
+    protected function parseIsoDate(string $input, ?string $timezone = null): ?Carbon
     {
         try {
-            return Carbon::parse($input)->startOfDay();
+            return Carbon::parse($input, $timezone)->startOfDay();
         } catch (Exception) {
             return null;
         }

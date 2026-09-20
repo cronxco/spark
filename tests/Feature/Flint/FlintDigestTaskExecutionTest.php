@@ -154,6 +154,7 @@ class FlintDigestTaskExecutionTest extends TestCase
             'period' => 'morning',
             'date' => '2026-06-15',
             'run_token' => $job->runToken,
+            'blocks' => $this->routineDigestBlocks(),
         ]);
 
         $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
@@ -173,6 +174,7 @@ class FlintDigestTaskExecutionTest extends TestCase
                 'period' => 'morning',
                 'date' => '2026-06-15',
                 'run_token' => $job->runToken,
+                'blocks' => $this->routineDigestBlocks(),
             ]);
 
             return Http::response(['ok' => true], 200);
@@ -183,5 +185,14 @@ class FlintDigestTaskExecutionTest extends TestCase
         $execution = TaskExecution::where('task_key', 'flint_routine_digest')->firstOrFail();
         $this->assertSame('success', $execution->status);
         $this->assertSame($job->runUuid, $execution->last_success['run_uuid']);
+    }
+
+    private function routineDigestBlocks(): array
+    {
+        return [
+            ['block_type' => 'flint_day_context', 'title' => 'Today', 'day_context' => ['calendar' => [], 'birthdays' => []]],
+            ['block_type' => 'flint_user_question', 'title' => 'Question', 'question' => 'Is this still the plan?'],
+            ['block_type' => 'flint_editorial_note', 'title' => 'Run notes', 'content' => 'Complete.'],
+        ];
     }
 }

@@ -53,7 +53,7 @@ class GetDaySummaryTool extends Tool
             $datesInput = [$datesInput];
         }
 
-        $dates = $this->parseDates($datesInput);
+        $dates = $this->parseDates($datesInput, $user->getTimezone());
 
         if (empty($dates)) {
             return Response::error('No valid dates provided. Use ISO format (YYYY-MM-DD) or relative: "today", "yesterday", "tomorrow".');

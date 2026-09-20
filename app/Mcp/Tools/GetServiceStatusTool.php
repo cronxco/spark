@@ -45,7 +45,7 @@ class GetServiceStatusTool extends Tool
         }
 
         $dateInput = $request->get('date', 'today');
-        $date = $this->parseDate($dateInput);
+        $date = $this->parseDate($dateInput, $user->getTimezone());
 
         if (! $date) {
             return Response::error('Invalid date format. Use ISO date (YYYY-MM-DD) or relative: "today", "yesterday", "tomorrow".');
