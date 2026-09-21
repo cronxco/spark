@@ -89,10 +89,10 @@ paths:
       summary: Daily summary across all domains
       description: >-
         sync_status carries a stale/as_of freshness judgement per connected
-        service (MR-1), including services with nothing to report for the
-        day. sections.money splits total_spend from internal_transfers and
-        total_in (MR-4) and carries total_spend_vs_baseline_pct (MR-3). See
-        mobile_API.md for the full response shape.
+        service, including services with nothing to report for the day.
+        sections.money splits total_spend from internal_transfers and
+        total_in and carries total_spend_vs_baseline_pct. See mobile_API.md
+        for the full response shape.
       parameters:
         - { name: date, in: query, schema: { type: string, default: today } }
         - {
@@ -181,9 +181,9 @@ paths:
       summary: Full raw day context (events, metrics, relationships)
       deprecated: true
       description: >-
-        Deprecated (MR-18): superseded by /briefing/today's sections. No
-        mobile client calls this. Responses carry Deprecation: true, Sunset,
-        and a Link header to the successor.
+        Deprecated: superseded by /briefing/today's sections. No mobile
+        client calls this. Responses carry Deprecation: true, Sunset, and a
+        Link header to the successor.
       parameters:
         - { name: date, in: query, schema: { type: string, format: date } }
         - {
@@ -201,9 +201,9 @@ paths:
       summary: Sync coverage/freshness per service for a date
       deprecated: true
       description: >-
-        Deprecated (MR-18): superseded by /briefing/today's sync_status,
-        which now carries the same stale/as_of judgement. No mobile client
-        calls this. Same Deprecation/Sunset/Link headers as /context/day.
+        Deprecated: superseded by /briefing/today's sync_status, which now
+        carries the same stale/as_of judgement. No mobile client calls this.
+        Same Deprecation/Sunset/Link headers as /context/day.
       parameters:
         - { name: date, in: query, schema: { type: string, format: date } }
       responses:
@@ -1597,9 +1597,9 @@ paths:
       tags: [flint]
       summary: The single most recent digest across dates
       description: >-
-        MR-8: for "the newest thing Flint has written" — not expressible via
-        the date-scoped /flint/digests alone before the day's first digest
-        has run (the newest digest is still yesterday evening's).
+        For "the newest thing Flint has written" — not expressible via the
+        date-scoped /flint/digests alone before the day's first digest has
+        run (the newest digest is still yesterday evening's).
       parameters:
         - {
             name: kind,
@@ -1636,7 +1636,7 @@ paths:
       summary: Cursor-paginated questions across recent digests
       description: >-
         Defaults to open questions bounded by the seven-day retirement
-        horizon. MR-9: status accepts a comma-separated list
+        horizon. status accepts a comma-separated list
         (open,answered,skipped,retired), and since (an ISO timestamp or a
         relative window like 48h/7d) bounds the query server-side when
         provided. Reader-facing representations omit internal question
@@ -1753,7 +1753,7 @@ paths:
       tags: [flint]
       summary: List the account's long-lived Flint Threads
       description: >-
-        MR-14: cursor-paginated with the same envelope as every other mobile
+        Cursor-paginated with the same envelope as every other mobile
         collection endpoint, even though the list is short today.
       parameters:
         - {
@@ -1898,7 +1898,7 @@ paths:
       tags: [money]
       summary: All non-archived finance accounts with latest balance
       description: >-
-        MR-14: cursor-paginated with the same envelope as every other mobile
+        Cursor-paginated with the same envelope as every other mobile
         collection endpoint, even though the list is short today.
       parameters:
         - {
@@ -2000,7 +2000,7 @@ paths:
       tags: [money]
       summary: Update a manual finance account, or pin/unpin any account
       description: >-
-        MR-6: is_pinned is a user preference rather than account data, so it
+        is_pinned is a user preference rather than account data, so it
         applies to any account the user owns — synced Monzo/GoCardless
         accounts included. Every other field remains manual_account only.
         Setting is_pinned true clears it on every other account first (at
@@ -2109,7 +2109,7 @@ paths:
       tags: [money]
       summary: Current net worth and its change over a comparison window
       description: >-
-        MR-5: net worth and its change in one request, replacing an N+1
+        Net worth and its change in one request, replacing an N+1
         client-side reconciliation across every account's balance history.
         total sums every eligible (same-currency) account's latest balance,
         new or old. comparison.then/change/change_pct only include accounts
@@ -2182,8 +2182,8 @@ components:
       required: false
       schema: { type: string }
       description: >-
-        MR-17: optional. When present, a retried request with the same key
-        (scoped per user and per endpoint, 24h) replays the first successful
+        Optional. When present, a retried request with the same key (scoped
+        per user and per endpoint, 24h) replays the first successful
         response instead of re-running the mutation. Absent, the request just
         runs normally.
     FlintQuestionBlockId:

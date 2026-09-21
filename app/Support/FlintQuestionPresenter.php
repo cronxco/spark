@@ -29,8 +29,8 @@ class FlintQuestionPresenter
                 'period' => data_get($block->event?->event_metadata, 'period'),
             ],
             'status' => $status,
-            // MR-9: the short title a digest block already carries — the
-            // digest itself shows this, not the full `question` text.
+            // The short title a digest block already carries — the digest
+            // itself shows this, not the full `question` text.
             'title' => $block->title,
             'question' => $metadata['question'] ?? $block->title,
             'topic' => $metadata['topic'] ?? null,

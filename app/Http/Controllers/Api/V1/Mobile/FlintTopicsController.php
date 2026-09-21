@@ -18,13 +18,13 @@ class FlintTopicsController extends Controller
      * Flint's long-lived strategic/thematic/tactical threads — the "running
      * threads" list on the Flint tab. Defaults to every status/kind.
      *
-     * MR-14: paginated with the same cursor envelope as every other mobile
+     * Paginated with the same cursor envelope as every other mobile
      * collection endpoint, even though the list is short today.
      */
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'limit' => ['nullable', 'integer', 'min:1', 'max:' . CollectionCursorPage::MAX_LIMIT],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:'.CollectionCursorPage::MAX_LIMIT],
             'cursor' => ['nullable', 'string'],
         ]);
         $limit = (int) ($validated['limit'] ?? CollectionCursorPage::DEFAULT_LIMIT);

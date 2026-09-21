@@ -4,7 +4,7 @@ namespace App\Support;
 
 /**
  * Derives a digest's lede from its prose `summary` when the generating skill
- * hasn't published one explicitly yet (MR-7).
+ * hasn't published one explicitly yet.
  *
  * This is the same heuristic the client used to have to run on-device: drop a
  * short greeting, drop an all-caps heading, strip a leading em dash and
@@ -80,6 +80,6 @@ class FlintDigestOpener
             return mb_substr($slice, 0, $boundary + 1);
         }
 
-        return rtrim($slice) . '…';
+        return rtrim($slice).'…';
     }
 }

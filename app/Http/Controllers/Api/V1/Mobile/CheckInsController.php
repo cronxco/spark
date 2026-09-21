@@ -77,8 +77,8 @@ class CheckInsController extends Controller
 
         $sourceIds = [];
         foreach (CarbonPeriod::create($from, $to) as $date) {
-            $sourceIds[] = 'daily_checkin_morning_' . $date->toDateString();
-            $sourceIds[] = 'daily_checkin_afternoon_' . $date->toDateString();
+            $sourceIds[] = 'daily_checkin_morning_'.$date->toDateString();
+            $sourceIds[] = 'daily_checkin_afternoon_'.$date->toDateString();
         }
 
         $events = Event::whereHas('integration', function ($q) use ($request) {
@@ -137,8 +137,8 @@ class CheckInsController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // MR-17: a phone retrying a check-in submission on a bad connection
-        // replays the first response instead of writing a second event.
+        // A phone retrying a check-in submission on a bad connection replays
+        // the first response instead of writing a second event.
         return $this->idempotent($request, 'check-ins.store', function () use ($request) {
             $validated = $request->validate([
                 'period' => ['required', 'string', 'in:morning,afternoon'],
@@ -205,7 +205,7 @@ class CheckInsController extends Controller
         }
 
         $extension = self::ALLOWED_IMAGE_TYPES[$contentType];
-        $fileName = 'shared_' . Str::uuid() . '.' . $extension;
+        $fileName = 'shared_'.Str::uuid().'.'.$extension;
         $tempPath = tempnam(sys_get_temp_dir(), 'spark_share_') ?: null;
 
         if ($tempPath === null || file_put_contents($tempPath, $content) === false) {

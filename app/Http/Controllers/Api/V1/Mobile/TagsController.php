@@ -37,7 +37,7 @@ class TagsController extends Controller
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'cursor' => ['nullable', 'string'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_LIMIT],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_LIMIT],
         ]);
 
         $tags = $this->withTotals(
@@ -61,7 +61,7 @@ class TagsController extends Controller
     {
         $validated = $request->validate([
             'cursor' => ['nullable', 'string'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_LIMIT],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_LIMIT],
         ]);
 
         $tag = $this->tagQuery($request->user())
@@ -165,8 +165,8 @@ class TagsController extends Controller
 
     private function attach(Request $request, Event|EventObject $entity): JsonResponse
     {
-        // MR-17: a phone retrying a tag-add on a bad connection replays the
-        // first response instead of attaching (or creating) the tag twice.
+        // A phone retrying a tag-add on a bad connection replays the first
+        // response instead of attaching (or creating) the tag twice.
         return $this->idempotent($request, 'tags.attach', function () use ($request, $entity) {
             $validated = $request->validate([
                 'tag_id' => ['nullable', 'integer'],
@@ -325,7 +325,7 @@ class TagsController extends Controller
             $detectedType = strtolower($matches[1]);
             $name = trim($matches[2]);
         } elseif ($detectedType !== null
-            && preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $matches) === 1) {
+            && preg_match('/^'.preg_quote($detectedType, '/').'[_:](.+)$/i', $name, $matches) === 1) {
             $name = trim($matches[1]);
         }
 

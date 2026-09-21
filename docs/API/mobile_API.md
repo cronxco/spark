@@ -95,7 +95,7 @@ Unmatched `/api/*` routes return the same sanitized JSON shape in production:
 
 Hand-rolled `422`s (a small number of endpoints validate something Laravel's rule set can't express, e.g. a comma-separated `status` list) return the plain `{"message": "..."}` shape instead — there is no `errors` object in that case, since there's no single field to attach it to.
 
-**Known inconsistency (MR-15):** most endpoints use `message` as the top-level key. A handful of older Flint endpoints (`GET /flint/digests`, `GET /flint/digests/{id}`, `POST /flint/questions/{block}/answer`) instead return `{"error": "..."}`. New endpoints should use `message`; the `error` key on those three is kept for existing clients and not a pattern to copy.
+**Known inconsistency:** most endpoints use `message` as the top-level key. A handful of older Flint endpoints (`GET /flint/digests`, `GET /flint/digests/{id}`, `POST /flint/questions/{block}/answer`) instead return `{"error": "..."}`. New endpoints should use `message`; the `error` key on those three is kept for existing clients and not a pattern to copy.
 
 **Which endpoints return which codes:** every endpoint returns `401` (missing/invalid token) and `403` (missing ability) via the shared guard middleware — those aren't called out per-endpoint below. `404` is returned by any endpoint that resolves an `{id}` the caller doesn't own or that doesn't exist. `422` is returned by any endpoint with a request body or query parameters to validate. Anything narrower than that (a specific business-rule `422`, a `409` conflict, a `428` precondition-required) is documented in that endpoint's own section below.
 
@@ -142,7 +142,7 @@ Endpoints that return collections use opaque cursor pagination:
 
 Pass the `next_cursor` value as the `cursor` query parameter on the next request. Cursors are valid indefinitely. When `has_more` is `false`, no further pages exist.
 
-**MR-14:** every collection endpoint uses this same envelope and accepts `cursor`/`limit`, including `GET /flint/topics` and `GET /money/accounts` — both short lists today, paginated so growth never needs a breaking response-shape change later. Their cursors are an opaque offset rather than the `{time}|{id}` shape above (there's no stable per-row timestamp/id ordering to key on the way there is for events), but they follow the same contract: pass `next_cursor` back as `cursor`, stop when `has_more` is `false`.
+Every collection endpoint uses this same envelope and accepts `cursor`/`limit`, including `GET /flint/topics` and `GET /money/accounts` — both short lists today, paginated so growth never needs a breaking response-shape change later. Their cursors are an opaque offset rather than the `{time}|{id}` shape above (there's no stable per-row timestamp/id ordering to key on the way there is for events), but they follow the same contract: pass `next_cursor` back as `cursor`, stop when `has_more` is `false`.
 
 ### Timezone Contract
 
@@ -357,7 +357,7 @@ Returns a structured daily summary across all domains for a given date.
 
 The shape of each section is domain-specific and driven by `DaySummaryService`.
 
-**`sync_status` (MR-1)** carries one entry per service the user has connected — including a service with nothing to report today, which is different from a service that's behind and must be distinguishable from it:
+**`sync_status`** carries one entry per service the user has connected — including a service with nothing to report today, which is different from a service that's behind and must be distinguishable from it:
 
 | Field             | Type                                 | Description                                                                                                                |
 | ----------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
@@ -368,13 +368,13 @@ The shape of each section is domain-specific and driven by `DaySummaryService`.
 | `stale`           | boolean                              | The server's own judgement that this service is behind, using the cadence it knows that integration runs at.               |
 | `coverage`        | `"complete"`\|`"partial"` (optional) | Only present for services whose data can arrive partially within a day (currently `apple_health`); absent everywhere else. |
 
-**`sections.money` (MR-4)** splits money movement by where it actually went, rather than reporting one `total_spend` that mixes real spend with internal transfers:
+**`sections.money`** splits money movement by where it actually went, rather than reporting one `total_spend` that mixes real spend with internal transfers:
 
 - `total_spend` — outflow to third parties. Moving money between the user's own accounts/pots is excluded.
 - `internal_transfers` — movement between the user's own accounts and pots (e.g. a savings sweep, a pot withdrawal).
 - `total_in` — inbound from third parties.
 - Each entry in `transactions` carries its own resolved `direction` (`"in"`\|`"out"`\|`"internal"`\|`"excluded"`\|`"unknown"`) — same values as the `direction` field on [CompactEvent](#compactevent) money events in `GET /feed`.
-- `total_spend_vs_baseline_pct` (MR-3) — the day's spend against the user's own daily-spend history (mean over the trailing 60 days, minimum 5 days with any spend). When there isn't enough history yet, `total_spend_baseline_unavailable_reason: "insufficient_history"` is present instead.
+- `total_spend_vs_baseline_pct` — the day's spend against the user's own daily-spend history (mean over the trailing 60 days, minimum 5 days with any spend). When there isn't enough history yet, `total_spend_baseline_unavailable_reason: "insufficient_history"` is present instead.
 
 ---
 
@@ -1001,7 +1001,7 @@ Exact service/action/date-range filtering — the mobile equivalent of MCP's
 
 ---
 
-### `GET /context/day` — **deprecated (MR-18)**
+### `GET /context/day` — **deprecated**
 
 > **Deprecated.** Superseded by `GET /briefing/today`'s `sections`. No
 > mobile client calls this. Still returns its original shape for any
@@ -1028,11 +1028,11 @@ MCP resource.
 
 ---
 
-### `GET /context/service-status` — **deprecated (MR-18)**
+### `GET /context/service-status` — **deprecated**
 
 > **Deprecated.** Superseded by `GET /briefing/today`'s `sync_status`, which
 > now carries the same `stale`/`as_of` judgement this endpoint was the only
-> source of (see MR-1). No mobile client calls this. Same `Deprecation`/
+> source of. No mobile client calls this. Same `Deprecation`/
 > `Sunset`/`Link` headers as `GET /context/day` above.
 
 Sync coverage and data freshness per service for a date. Mirrors MCP's
@@ -1344,7 +1344,7 @@ representation. Its base fields match API v1, with the mobile-only
 reader/version additions described below, plus:
 
 - `effective_timezone` — see [Timezone Contract](#timezone-contract).
-- `opener` (MR-7) — the digest's lede sentence, published as its own field so
+- `opener` — the digest's lede sentence, published as its own field so
   the client renders it verbatim and owns no knowledge of digest prose
   structure. Written explicitly by the generating skill when it sends one;
   otherwise derived server-side from `summary` with the same heuristic the
@@ -1405,7 +1405,7 @@ canonical `status`, `answer_history`, and the digest's strong `version`.
 
 ---
 
-### `GET /flint/digests/latest` (MR-8)
+### `GET /flint/digests/latest`
 
 The single most recent digest across dates — for "the newest thing Flint has
 written," which isn't expressible as `GET /flint/digests` with a `date`
@@ -1432,12 +1432,12 @@ within the seven-day retirement horizon.
 
 **Query Parameters**
 
-| Parameter | Type   | Default | Description                                                                                    |
-| --------- | ------ | ------- | ---------------------------------------------------------------------------------------------- |
-| `status`  | string | `open`  | Comma-separated: `open`, `answered`, `skipped`, `retired` (MR-9) — e.g. `status=open,answered` |
-| `since`   | string | —       | ISO timestamp, or a relative window like `48h`/`7d` (MR-9). Bounds the query server-side.      |
-| `limit`   | int    | 20      | 1–50                                                                                           |
-| `cursor`  | string | —       | Opaque cursor                                                                                  |
+| Parameter | Type   | Default | Description                                                                             |
+| --------- | ------ | ------- | --------------------------------------------------------------------------------------- |
+| `status`  | string | `open`  | Comma-separated: `open`, `answered`, `skipped`, `retired` — e.g. `status=open,answered` |
+| `since`   | string | —       | ISO timestamp, or a relative window like `48h`/`7d`. Bounds the query server-side.      |
+| `limit`   | int    | 20      | 1–50                                                                                    |
+| `cursor`  | string | —       | Opaque cursor                                                                           |
 
 Without `since`, an `open`-only request keeps the original default: bounded
 by the seven-day retirement horizon so the list doesn't grow forever. Any
@@ -1475,7 +1475,7 @@ other status combination, or an explicit `since`, is bounded by `since` alone.
 }
 ```
 
-`title` (MR-9) is the short label the digest block itself carries — the same
+`title` is the short label the digest block itself carries — the same
 title the block shows inline. `question` remains the full question text.
 
 The mobile representation never includes question priority.
@@ -1492,7 +1492,7 @@ list on the Flint tab. Topics are created and maintained by the
 
 **Query Parameters**: `status` (`active`/`dormant`/`resolved`/`expired`),
 `kind` (`strategic`/`thematic`/`tactical`) — both optional, omit either to
-include every value; `limit`/`cursor` (MR-14 — see [Cursor Pagination](#cursor-pagination)).
+include every value; `limit`/`cursor` (see [Cursor Pagination](#cursor-pagination)).
 
 **Response `200`**
 
@@ -1519,7 +1519,7 @@ include every value; `limit`/`cursor` (MR-14 — see [Cursor Pagination](#cursor
 
 Ordered newest-touched first (`updated_at desc`).
 
-`watching_for` (MR-10) is what would move the thread on — the closing
+`watching_for` is what would move the thread on — the closing
 sentence `content` conventionally ends with, published as its own field so
 the client shows it directly and owns no sentence-splitting of `content`.
 Written explicitly by the same routine that writes `content` when it sends
@@ -1606,7 +1606,7 @@ secrets, and exception messages are never returned.
 Response metadata includes `effective_timezone`, `account_id`, and the web
 `management_url`.
 
-**Coverage (MR-18):** no mobile client surface calls this today. Kept live
+**Coverage:** no mobile client surface calls this today. Kept live
 and undeprecated — unlike `context/day`/`context/service-status`, it has no
 superseding endpoint; it's an operational monitoring read (the web
 `management_url` it links to is the actual consumer), not a candidate for
@@ -1619,11 +1619,11 @@ the reader UI to wire up.
 All non-archived finance accounts (manual and synced) with their latest
 balance.
 
-**Query Parameters**: `limit`/`cursor` (MR-14 — see [Cursor Pagination](#cursor-pagination)).
+**Query Parameters**: `limit`/`cursor` (see [Cursor Pagination](#cursor-pagination)).
 
 **Response `200`**: `{"data": [MoneyAccount, ...], "next_cursor": "...", "has_more": false}` — see
 [MoneyAccount](API_v1.md#moneyaccount). Each account now carries `is_pinned`
-(MR-6) — the account the user has chosen to see first on the Day tab and the
+— the account the user has chosen to see first on the Day tab and the
 Explore money hero, replacing a client-side guess (first account whose type
 contains "current"). At most one account is pinned at a time; see
 `PATCH /money/accounts/{id}` below.
@@ -1645,7 +1645,7 @@ Cursor-paginated balance history, newest first (25 per page).
 
 ---
 
-### `GET /money/net-worth` (MR-5)
+### `GET /money/net-worth`
 
 Net worth and its change over a window, in one request. Without this, showing
 net worth and its month-on-month change takes `GET /money/accounts` then
@@ -1817,7 +1817,7 @@ or `{"name": "running", "type": "spark"}` to find-or-create one. A
 automatically when `type` is omitted; a single-emoji name is typed `emoji`;
 otherwise it defaults to `spark`.
 
-**`Idempotency-Key` (MR-17, optional):** send a UUID and a retried `POST` with
+**`Idempotency-Key` (optional):** send a UUID and a retried `POST` with
 the same key replays the first response instead of attaching (or
 find-or-creating) the tag a second time. Keys are scoped per user and per
 endpoint, and stay live for 24 hours.
@@ -1987,7 +1987,7 @@ through the same canonical action service as the versioned endpoint.
 
 **Response `200`**: `{"block_id": "uuid", "answer": "Yes", "answer_note": null, "answered_at": "...", "data": FlintQuestion}`
 
-`data` (MR-11) is the full updated question resource — the same shape
+`data` is the full updated question resource — the same shape
 `GET /flint/questions` and `POST .../actions` return — added additively
 alongside the original flat fields so a client can update in place without a
 follow-up `GET`, without breaking anything still reading the flat shape.
@@ -2100,7 +2100,7 @@ the iOS session's `ios:write` ability.
 **Response `422`** — URL fails the safety validator or readable content cannot
 be extracted.
 
-**Coverage (MR-18):** neither this endpoint nor `POST /bookmarks` above has a
+**Coverage:** neither this endpoint nor `POST /bookmarks` above has a
 client counterpart in `spark-ios`'s `SparkKit/API/Endpoints` as of this
 writing — the iOS share extension doesn't call either yet. Not deprecated:
 these exist specifically to receive the share-extension capture once it's
@@ -2143,7 +2143,7 @@ Updates a manual account (partial — all fields `sometimes`, same allow-list
 as `POST`). Requires `If-Match`. Fields under `metadata.integration_id` /
 `account_id` / `pot_id` / `raw` are always preserved.
 
-**`is_pinned` (MR-6, boolean, any account type):** the one field on this
+**`is_pinned` (boolean, any account type):** the one field on this
 endpoint that isn't restricted to manual accounts — pinning is a user
 preference, not account data, so a synced Monzo or GoCardless account can be
 pinned too. At most one account is pinned per user: setting `is_pinned: true`
@@ -2175,7 +2175,7 @@ subsequent `If-Match` writes). Requires `If-Match`.
 
 **Request Body**: `{"balance": 1500.00, "date": "2026-05-10", "notes": "optional, max 1000 chars"}`
 
-**`Idempotency-Key` (MR-17, optional):** a retried `POST` with the same key
+**`Idempotency-Key` (optional):** a retried `POST` with the same key
 replays the first response instead of recording the balance twice — same
 contract as `POST /events/{id}/tags` above.
 
@@ -2534,7 +2534,7 @@ Records a daily mood check-in for morning or afternoon.
 | `longitude` | number  | No       | Location longitude (–180 to 180)       |
 | `address`   | string  | No       | Human-readable address (max 255 chars) |
 
-**`Idempotency-Key` (MR-17, optional):** a retried `POST` with the same key
+**`Idempotency-Key` (optional):** a retried `POST` with the same key
 replays the first response instead of re-running the submission — same
 contract as `POST /events/{id}/tags`.
 
@@ -2734,14 +2734,14 @@ shapes.
 
 | Field                 | Always present | Description                                                                                                                                                                                                                                                                 |
 | --------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `group_key` (MR-12)   | Yes            | `service:action:actor_id`. Consecutive events sharing this key are one run (e.g. twenty Spotify plays) — group on it directly instead of implementing a client-side run-length rule that has to happen to agree with the web app's.                                         |
+| `group_key`           | Yes            | `service:action:actor_id`. Consecutive events sharing this key are one run (e.g. twenty Spotify plays) — group on it directly instead of implementing a client-side run-length rule that has to happen to agree with the web app's.                                         |
 | `display_name`        | Yes            | Human-readable action label from plugin registry                                                                                                                                                                                                                            |
 | `display_with_object` | Yes            | `true` if UI should include the related object title when rendering the action                                                                                                                                                                                              |
 | `hidden`              | Yes            | `true` if this action should be hidden in default UI (e.g. balance updates)                                                                                                                                                                                                 |
 | `value`               | No             | Formatted numeric value (applies `value_multiplier`); omitted when no value                                                                                                                                                                                                 |
 | `unit`                | No             | Unit string; omitted when no value                                                                                                                                                                                                                                          |
 | `display_value`       | No             | Fully formatted string, e.g. `"£10.50"`; omitted when no value                                                                                                                                                                                                              |
-| `direction` (MR-13)   | Money only     | `"in"` \| `"out"` \| `"internal"` \| `"excluded"` \| `"unknown"`, resolved server-side (see [MoneyDirection](../../app/Support/MoneyDirection.php)) — present only when `domain` is `"money"` and `value` is set. Replaces inferring direction from the action-name suffix. |
+| `direction`           | Money only     | `"in"` \| `"out"` \| `"internal"` \| `"excluded"` \| `"unknown"`, resolved server-side (see [MoneyDirection](../../app/Support/MoneyDirection.php)) — present only when `domain` is `"money"` and `value` is set. Replaces inferring direction from the action-name suffix. |
 | `url`                 | No             | Omitted when not set on the event                                                                                                                                                                                                                                           |
 | `actor`               | No             | Omitted when not set; `media_url` within may be `null`                                                                                                                                                                                                                      |
 | `target`              | No             | Omitted when not set; `media_url` within may be `null`                                                                                                                                                                                                                      |

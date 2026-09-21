@@ -6,10 +6,10 @@ use App\Models\Event;
 
 /**
  * Classifies a money event by where the money actually went — the single
- * source of truth behind the briefing's spend/transfer split (MR-4) and the
- * per-event `direction` field (MR-13). Without this, a client has to guess
- * from the action name's `_to`/`_from` suffix, which breaks the moment a
- * new integration adds an action the client hasn't seen.
+ * source of truth behind the briefing's spend/transfer split and the
+ * per-event `direction` field. Without this, a client has to guess from the
+ * action name's `_to`/`_from` suffix, which breaks the moment a new
+ * integration adds an action the client hasn't seen.
  */
 class MoneyDirection
 {

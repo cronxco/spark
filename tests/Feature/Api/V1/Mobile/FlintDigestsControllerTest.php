@@ -208,7 +208,7 @@ class FlintDigestsControllerTest extends TestCase
             ->assertJsonPath('blocks.0.references.0.domain', 'health');
 
         $this->assertStringContainsString(
-            '[Morning Walk](https://spark.cronx.co/event/' . $referenced->id . ')',
+            '[Morning Walk](https://spark.cronx.co/event/'.$referenced->id.')',
             $response->json('blocks.0.content'),
         );
     }
@@ -259,7 +259,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read']);
 
-        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+        $this->getJson('/api/v1/mobile/flint/digests/'.$event->id)
             ->assertOk()
             ->assertJsonPath('event_id', $event->id)
             ->assertJsonPath('period', 'morning')
@@ -289,7 +289,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read']);
 
-        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+        $this->getJson('/api/v1/mobile/flint/digests/'.$event->id)
             ->assertNotFound();
     }
 
@@ -320,7 +320,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Good',
             'answer_note' => 'Feeling productive today',
         ])
@@ -348,7 +348,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Yes',
         ])
             ->assertOk()
@@ -369,7 +369,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Yes',
         ])->assertStatus(403);
     }
@@ -401,7 +401,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Yes',
         ])->assertStatus(403);
     }
@@ -420,7 +420,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [
             'answer' => 'Yes',
         ])->assertStatus(422);
     }
@@ -439,7 +439,7 @@ class FlintDigestsControllerTest extends TestCase
 
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [])
+        $this->postJson('/api/v1/mobile/flint/questions/'.$block->id.'/answer', [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['answer']);
     }
@@ -453,7 +453,7 @@ class FlintDigestsControllerTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
-    // MR-7: opener field
+    // Opener field
     // -------------------------------------------------------------------------
 
     #[Test]
@@ -550,7 +550,7 @@ class FlintDigestsControllerTest extends TestCase
             'time' => $date->midDay(),
             'event_metadata' => array_merge([
                 'period' => $period,
-                'title' => ucfirst($period) . ' Digest',
+                'title' => ucfirst($period).' Digest',
             ], $meta),
         ]);
     }

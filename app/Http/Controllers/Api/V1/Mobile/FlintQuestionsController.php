@@ -24,8 +24,8 @@ class FlintQuestionsController extends Controller
     /**
      * GET /api/v1/mobile/flint/questions?status=open,answered&since=48h
      *
-     * MR-9: `status` takes a comma-separated list so a client showing "the
-     * last 48 hours of questions, open or answered" doesn't have to make two
+     * `status` takes a comma-separated list so a client showing "the last 48
+     * hours of questions, open or answered" doesn't have to make two
      * unbounded requests and filter locally — `since` (an ISO timestamp, or a
      * relative window like `48h`/`7d`) bounds the query server-side instead.
      */
@@ -45,7 +45,7 @@ class FlintQuestionsController extends Controller
         $unknown = array_diff($statuses, self::ALLOWED_STATUSES);
         if ($statuses === [] || $unknown !== []) {
             return response()->json([
-                'message' => 'Invalid status. Allowed values: ' . implode(', ', self::ALLOWED_STATUSES) . '.',
+                'message' => 'Invalid status. Allowed values: '.implode(', ', self::ALLOWED_STATUSES).'.',
             ], 422);
         }
 

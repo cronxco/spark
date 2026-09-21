@@ -32,7 +32,7 @@ class FlintDigestService
             'date' => ['nullable', 'date_format:Y-m-d'],
             'run_token' => ['nullable', 'string', 'max:10000'],
             'summary' => ['nullable', 'string', 'max:10000'],
-            // MR-7: the skill already knows which sentence of `summary` is the
+            // The skill already knows which sentence of `summary` is the
             // lede — publishing it explicitly means the client never has to
             // recover it by parsing prose. Optional: FlintDigestOpener derives
             // a best-effort fallback when a caller doesn't send one yet.
@@ -83,7 +83,7 @@ class FlintDigestService
             // for the same news-story block appeared in one week before anyone
             // noticed, so say plainly what is allowed.
             'blocks.*.block_type.in' => 'Unknown Flint block type. Registered types are: '
-                . implode(', ', array_keys(FlintPlugin::getBlockTypes())) . '.',
+                .implode(', ', array_keys(FlintPlugin::getBlockTypes())).'.',
         ])->validate();
 
         $date = Carbon::parse(
@@ -100,8 +100,8 @@ class FlintDigestService
         // would call the same digest: this user's briefing for this date,
         // period and title.
         $sourceId = $run
-            ? 'flint_digest_run:' . $run['run_uuid']
-            : 'flint_digest:' . sha1(implode('|', [
+            ? 'flint_digest_run:'.$run['run_uuid']
+            : 'flint_digest:'.sha1(implode('|', [
                 $user->id,
                 $date->toDateString(),
                 $period,
@@ -170,8 +170,8 @@ class FlintDigestService
             [
                 'user_id' => $user->id,
                 'concept' => 'digest',
-                'type' => ($ownObject ? $routine : $period) . '_digest',
-                'title' => $date->format('Y-m-d') . ' ' . ($ownObject
+                'type' => ($ownObject ? $routine : $period).'_digest',
+                'title' => $date->format('Y-m-d').' '.($ownObject
                     ? strtoupper(str_replace('_', ' ', $routine))
                     : match ($period) {
                         'morning' => 'AM',
@@ -331,7 +331,7 @@ class FlintDigestService
         $routine = $run['routine'] ?? null;
         $blocks = collect($data['blocks'] ?? []);
         $types = $blocks->pluck('block_type');
-        $identities = $blocks->map(fn (array $block) => $block['block_type'] . ':' . mb_strtolower($block['title']));
+        $identities = $blocks->map(fn (array $block) => $block['block_type'].':'.mb_strtolower($block['title']));
         if ($identities->unique()->count() !== $identities->count()) {
             throw ValidationException::withMessages([
                 'blocks' => 'Routine block type/title pairs must be unique so one block cannot overwrite another.',

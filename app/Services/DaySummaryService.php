@@ -26,8 +26,8 @@ class DaySummaryService
      */
     public function generateSummary(User $user, Carbon $date, ?array $domains = null): array
     {
-        // MR-16: every day-scoped endpoint resolves and names the day's
-        // timezone the same way — the user's effective (acknowledged
+        // Every day-scoped endpoint resolves and names the day's timezone
+        // the same way — the user's effective (acknowledged
         // time-travel) timezone, not just the profile default — and that
         // same value decides which calendar day's events this summary
         // covers.
@@ -389,7 +389,7 @@ class DaySummaryService
                     'action' => $event->action,
                     'service' => $event->service,
                     'time' => $event->time->toISOString(),
-                    // MR-13: the client no longer infers in/out/internal from the
+                    // The client no longer infers in/out/internal from the
                     // action-name suffix — an open vocabulary that grows with
                     // every integration.
                     'direction' => MoneyDirection::for($event),
@@ -414,9 +414,9 @@ class DaySummaryService
                 return $tx;
             })->values()->all();
 
-            // MR-4: split spend from internal transfers. Moving money between the
-            // user's own accounts/pots is not spending and must not be counted
-            // as such — see MoneyDirection.
+            // Split spend from internal transfers. Moving money between the
+            // user's own accounts/pots is not spending and must not be
+            // counted as such — see MoneyDirection.
             $totalSpend = $transactions
                 ->filter(fn ($e) => MoneyDirection::for($e) === MoneyDirection::OUT)
                 ->sum(fn ($e) => abs($e->formatted_value));
@@ -431,8 +431,8 @@ class DaySummaryService
             $section['internal_transfers'] = round($internalTransfers, 2);
             $section['total_in'] = round($totalIn, 2);
 
-            // MR-3: a day-level baseline for the one day-total figure that
-            // didn't have one — vs_baseline_pct on `total_spend`, computed
+            // A day-level baseline for the one day-total figure that didn't
+            // have one — vs_baseline_pct on `total_spend`, computed
             // over the user's own daily spend history, or an explicit reason
             // there is none yet.
             $baseline = $this->dailySpendBaseline($user);
@@ -605,7 +605,7 @@ class DaySummaryService
                 if ($summary) {
                     $content = $summary->getContent();
                     $bookmark['summary'] = mb_strlen($content, 'UTF-8') > 300
-                        ? mb_substr($content, 0, 300, 'UTF-8') . '...'
+                        ? mb_substr($content, 0, 300, 'UTF-8').'...'
                         : $content;
                 }
 
@@ -704,7 +704,7 @@ class DaySummaryService
     /**
      * Build sync status per service.
      *
-     * MR-1: alongside the event-derived fields, every service now carries the
+     * Alongside the event-derived fields, every service now carries the
      * server's own judgement of freshness so a client never has to infer it
      * from a timestamp and a hard-coded threshold:
      *
@@ -926,7 +926,7 @@ class DaySummaryService
     }
 
     /**
-     * A day-level baseline for the user's total daily spend (MR-3), computed
+     * A day-level baseline for the user's total daily spend, computed
      * dynamically over their own history rather than stored — `MetricStatistic`
      * is computed per event value, which is the same thing as a day baseline
      * only for metrics that emit once a day; `money.total_spend` emits many

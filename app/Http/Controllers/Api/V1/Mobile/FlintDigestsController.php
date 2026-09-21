@@ -50,8 +50,8 @@ class FlintDigestsController extends Controller
             return $this->history($request, $validated);
         }
 
-        // MR-16: resolved the same way every day-scoped endpoint does — the
-        // user's effective (acknowledged time-travel) timezone, not just the
+        // Resolved the same way every day-scoped endpoint does — the user's
+        // effective (acknowledged time-travel) timezone, not just the
         // profile default.
         $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($request->user());
         $date = isset($validated['date'])
@@ -107,8 +107,8 @@ class FlintDigestsController extends Controller
     /**
      * GET /api/v1/mobile/flint/digests/latest?kind=briefing
      *
-     * MR-8: the single most recent digest across dates, so a client on cold
-     * start doesn't have to ask for today, inspect the result, then ask again
+     * The single most recent digest across dates, so a client on cold start
+     * doesn't have to ask for today, inspect the result, then ask again
      * for yesterday — the digest that answers "what has Flint most recently
      * written" isn't expressible as a `date` query alone before the day's
      * first digest has run.
@@ -213,8 +213,8 @@ class FlintDigestsController extends Controller
             'answer' => $answer['answer'],
             'answer_note' => $answer['context'],
             'answered_at' => $answer['answered_at'],
-            // MR-11: the full updated question resource, additively — the
-            // legacy flat fields above stay put for clients still reading
+            // The full updated question resource, additively — the legacy
+            // flat fields above stay put for clients still reading
             // them, but a client can now update in place from `data` without
             // a follow-up GET, same as the current POST .../actions endpoint.
             'data' => $result['data'],
@@ -273,7 +273,7 @@ class FlintDigestsController extends Controller
                     'generated_at' => $generatedAt->setTimezone($timezone)->toIso8601String(),
                     'updated_at' => $event->updated_at?->setTimezone($timezone)->toIso8601String(),
                     'unanswered_question_count' => (int) $event->unanswered_question_count,
-                    'version' => 'W/' . $versions->etag($event),
+                    'version' => 'W/'.$versions->etag($event),
                     'freshness' => FlintDigestFreshness::for($generatedAt),
                 ];
             })->all(),
@@ -327,8 +327,8 @@ class FlintDigestsController extends Controller
             'kind' => FlintDigestKind::for($event, $eventMeta),
             'title' => $eventMeta['title'] ?? $event->action,
             'summary' => $eventMeta['summary'] ?? null,
-            // MR-7: the lede as its own field, so the client renders
-            // `opener` verbatim and owns no knowledge of digest prose
+            // The lede as its own field, so the client renders `opener`
+            // verbatim and owns no knowledge of digest prose
             // structure. Falls back to a best-effort extraction for digests
             // written before the skill started sending one explicitly.
             'opener' => $eventMeta['opener'] ?? FlintDigestOpener::extract($eventMeta['summary'] ?? null),

@@ -6,7 +6,7 @@ use App\Services\FlintTopicService;
 
 /**
  * Derives a topic's `watching_for` from its prose `content` when the writer
- * hasn't published one explicitly yet (MR-10).
+ * hasn't published one explicitly yet.
  *
  * By convention `content` ends with the sentence naming what would move the
  * thread on — this is the client's former sentence-splitting heuristic, moved

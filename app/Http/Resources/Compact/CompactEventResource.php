@@ -35,10 +35,10 @@ class CompactEventResource extends JsonResource
             'service' => $this->service,
             'domain' => $this->domain,
             'action' => $this->action,
-            // MR-12: consecutive events sharing this key are the same run
-            // (e.g. twenty Spotify plays back to back) — the client groups on
-            // it directly instead of implementing its own run-length rule
-            // that has to agree with the web app's by coincidence.
+            // Consecutive events sharing this key are the same run (e.g.
+            // twenty Spotify plays back to back) — the client groups on it
+            // directly instead of implementing its own run-length rule that
+            // has to agree with the web app's by coincidence.
             'group_key' => $this->groupKey(),
         ];
 
@@ -52,8 +52,8 @@ class CompactEventResource extends JsonResource
                 $this->action,
             );
 
-            // MR-13: resolved server-side so the client never infers in/out/
-            // internal from the action-name suffix.
+            // Resolved server-side so the client never infers in/out/internal
+            // from the action-name suffix.
             if ($this->domain === 'money') {
                 $data['direction'] = MoneyDirection::for($this->resource);
             }

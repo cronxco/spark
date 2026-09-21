@@ -29,13 +29,13 @@ class MoneyAccountsController extends Controller
      *
      * Returns all non-archived accounts with their latest balance.
      *
-     * MR-14: paginated with the same cursor envelope as every other mobile
+     * Paginated with the same cursor envelope as every other mobile
      * collection endpoint, even though the list is short today.
      */
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'limit' => ['nullable', 'integer', 'min:1', 'max:' . CollectionCursorPage::MAX_LIMIT],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:'.CollectionCursorPage::MAX_LIMIT],
             'cursor' => ['nullable', 'string'],
         ]);
         $limit = (int) ($validated['limit'] ?? CollectionCursorPage::DEFAULT_LIMIT);
@@ -158,8 +158,8 @@ class MoneyAccountsController extends Controller
      * PATCH /api/v1/mobile/money/accounts/{id}
      *
      * Updates a manual account. Returns 422 for non-manual accounts, except
-     * for `is_pinned` (MR-6), which is user preference rather than account
-     * data and so applies to any account the user owns — the client picking
+     * for `is_pinned`, which is user preference rather than account data and
+     * so applies to any account the user owns — the client picking
      * which account the Day tab shows shouldn't require the account to be a
      * manually-tracked one.
      */
@@ -251,7 +251,7 @@ class MoneyAccountsController extends Controller
         $this->financial->createBalanceEvent($integration, $account, [
             'balance' => 0,
             'date' => now()->toDateString(),
-            'notes' => 'Archived on ' . now()->toFormattedDayDateString(),
+            'notes' => 'Archived on '.now()->toFormattedDayDateString(),
         ]);
 
         $meta = $account->metadata ?? [];
@@ -270,9 +270,9 @@ class MoneyAccountsController extends Controller
      */
     public function addBalance(Request $request, string $id): JsonResponse
     {
-        // MR-17: a phone on a bad connection retries this write; an
-        // Idempotency-Key means a retry replays the first response instead
-        // of recording the same balance twice.
+        // A phone on a bad connection retries this write; an Idempotency-Key
+        // means a retry replays the first response instead of recording the
+        // same balance twice.
         return $this->idempotent($request, 'money.balances.store', function () use ($request, $id) {
             $user = $request->user();
             $account = $this->resolveAccount($id, $user->id);

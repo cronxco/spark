@@ -10,11 +10,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * MR-18: both endpoints here are superseded in practice by
- * `GET /briefing/today` — `day()` by the briefing's `sections`, `status()` by
- * its `sync_status` (now carrying the same `stale`/`as_of` judgement, see
- * MR-1). No mobile client surface calls either. Kept live and unchanged for
- * any existing caller, but marked for removal.
+ * Both endpoints here are superseded in practice by `GET /briefing/today` —
+ * `day()` by the briefing's `sections`, `status()` by its `sync_status` (now
+ * carrying the same `stale`/`as_of` judgement). No mobile client surface
+ * calls either. Kept live and unchanged for any existing caller, but marked
+ * for removal.
  */
 class ContextController extends Controller
 {
