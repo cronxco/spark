@@ -45,7 +45,7 @@ class FlintQuestionsController extends Controller
         $unknown = array_diff($statuses, self::ALLOWED_STATUSES);
         if ($statuses === [] || $unknown !== []) {
             return response()->json([
-                'message' => 'Invalid status. Allowed values: '.implode(', ', self::ALLOWED_STATUSES).'.',
+                'message' => 'Invalid status. Allowed values: ' . implode(', ', self::ALLOWED_STATUSES) . '.',
             ], 422);
         }
 
