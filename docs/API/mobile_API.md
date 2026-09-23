@@ -261,11 +261,6 @@ Carries a strong `ETag` for the user resource. This is the value to echo as
 `If-Match` on routes guarded by `if-match:user`, currently
 `PATCH /settings/notifications`.
 
-> **Changed.** This endpoint previously emitted no explicit `ETag`, so the
-> generic middleware supplied a weak `W/"md5(body)"` that could never equal the
-> strong version the `if-match:user` guard compares against — a client echoing
-> what it read got `412` rather than success.
-
 ---
 
 ### `POST /logout`
@@ -282,10 +277,6 @@ tokens the user created separately are untouched.
 
 **Response `204`** — No content. The bearer token used for this request is now
 invalid and will return `401`.
-
-> **New.** There was previously no logout or revocation endpoint on the mobile
-> surface at all. Sign-out revoked the client's device registration only, so the
-> access and refresh pair stayed valid until natural expiry.
 
 The client is responsible for the local half of sign-out — Keychain, SwiftData,
 App Group defaults, Core Spotlight, widgets and delivered notifications. See
@@ -2357,14 +2348,6 @@ making the request.
 **Response `422`** — `abilities` omitted, empty, or containing an unknown or
 non-delegable value (including `*` and `ios:*`).
 
-> **Changed.** This endpoint previously accepted arbitrary ability strings,
-> defaulted a missing `abilities` to `["*"]`, and — because it stripped
-> `ios:*` scopes before checking emptiness — also returned `["*"]` when the
-> request asked for _only_ those scopes. A `["*"]` token satisfies every
-> capability check in the application, so an iOS session could mint itself
-> full authority. Callers that relied on the wildcard default must now name
-> their capabilities.
-
 ---
 
 ### `DELETE /api-tokens/{id}`
@@ -2593,16 +2576,6 @@ Marks all unread notifications for the authenticated user as read. **No
 `If-Match` required.**
 
 **Response `204`** — No content. Carries the user's refreshed `ETag`.
-
----
-
-> **Changed.** Both routes above previously required `If-Match` and returned
-> `428` without one. That precondition was unsatisfiable: the list payload
-> exposed no per-notification version and there is no per-notification `GET`,
-> so no client could obtain the strong ETag the guard compared against. Every
-> shipped inbox control therefore failed. The precondition has been removed
-> from these two idempotent transitions and retained on `DELETE`, which now
-> has a version to compare against.
 
 ---
 
