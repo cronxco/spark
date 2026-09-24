@@ -5,13 +5,13 @@ namespace App\Support;
 use Illuminate\Support\Collection;
 
 /**
- * MR-14: cursor pagination over an already-materialised, stably-ordered
- * collection, for the handful of mobile list endpoints (Flint topics, money
- * accounts) whose source isn't a query builder — {@see CursorPaginator} is
- * for those. The lists these serve are small, but "small today" is exactly
- * the case the requirement calls out: every collection endpoint should carry
- * the same envelope and accept `cursor`/`limit`, so growth never needs a
- * breaking response-shape change later.
+ * Cursor pagination over an already-materialised, stably-ordered collection,
+ * for the handful of mobile list endpoints (Flint topics, money accounts)
+ * whose source isn't a query builder — {@see CursorPaginator} is for those.
+ * The lists these serve are small, but "small today" is not a reason to skip
+ * pagination: every collection endpoint should carry the same envelope and
+ * accept `cursor`/`limit`, so growth never needs a breaking response-shape
+ * change later.
  *
  * The cursor is an opaque, base64-encoded offset — safe here specifically
  * because the caller's ordering is stable for the lifetime of one paging

@@ -165,8 +165,8 @@ class TagsController extends Controller
 
     private function attach(Request $request, Event|EventObject $entity): JsonResponse
     {
-        // MR-17: a phone retrying a tag-add on a bad connection replays the
-        // first response instead of attaching (or creating) the tag twice.
+        // A phone retrying a tag-add on a bad connection replays the first
+        // response instead of attaching (or creating) the tag twice.
         return $this->idempotent($request, 'tags.attach', function () use ($request, $entity) {
             $validated = $request->validate([
                 'tag_id' => ['nullable', 'integer'],

@@ -465,9 +465,9 @@ class GetDaySummaryToolTest extends TestCase
         $summary = $service->generateSummary($this->user, Carbon::today());
 
         $this->assertEquals(Carbon::today()->toDateString(), $summary['date']);
-        // MR-1: a service the user has connected but which has nothing to
-        // report today still appears, with its own freshness judgement — that
-        // is different from a service that's behind.
+        // A service the user has connected but which has nothing to report
+        // today still appears, with its own freshness judgement — that is
+        // different from a service that's behind.
         $this->assertArrayHasKey('oura', $summary['sync_status']);
         $this->assertEquals(0, $summary['sync_status']['oura']['event_count']);
         $this->assertTrue($summary['sync_status']['oura']['stale']);

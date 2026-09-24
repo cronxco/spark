@@ -25,8 +25,8 @@ class NetWorthController extends Controller
     /**
      * GET /api/v1/mobile/money/net-worth?compare=1month
      *
-     * MR-5: net worth and its change over a window in one request. Without
-     * this, the client fetches every account, then every account's balance
+     * Net worth and its change over a window in one request. Without this,
+     * the client fetches every account, then every account's balance
      * history, and reconciles both by hand — N+1 requests for two numbers,
      * with the reconciliation logic duplicated between the app and here.
      *

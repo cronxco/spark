@@ -137,8 +137,8 @@ class CheckInsController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        // MR-17: a phone retrying a check-in submission on a bad connection
-        // replays the first response instead of writing a second event.
+        // A phone retrying a check-in submission on a bad connection replays
+        // the first response instead of writing a second event.
         return $this->idempotent($request, 'check-ins.store', function () use ($request) {
             $validated = $request->validate([
                 'period' => ['required', 'string', 'in:morning,afternoon'],

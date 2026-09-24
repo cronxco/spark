@@ -306,8 +306,8 @@ class FlintTopicService
             'last_touched_at' => $topic->metadata['last_touched_at'] ?? null,
             'next_review_at' => $topic->metadata['next_review_at'] ?? null,
             'origin' => $topic->metadata['origin'] ?? null,
-            // MR-10: what would move this thread on, published explicitly so
-            // the client owns no sentence-splitting of `content`.
+            // What would move this thread on, published explicitly so the
+            // client owns no sentence-splitting of `content`.
             'watching_for' => $topic->metadata['watching_for']
                 ?? FlintTopicWatchingFor::extract($topic->content),
         ];

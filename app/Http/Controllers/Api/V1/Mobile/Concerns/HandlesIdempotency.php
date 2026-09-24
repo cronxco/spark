@@ -7,8 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * MR-17: `Idempotency-Key` support for mutating POSTs that create something,
- * so a phone retrying on a bad connection can't create the thing twice.
+ * `Idempotency-Key` support for mutating POSTs that create something, so a
+ * phone retrying on a bad connection can't create the thing twice.
  *
  * Optional, not required — a request without the header just runs normally.
  * When present, a repeat of the same key replays the first response rather

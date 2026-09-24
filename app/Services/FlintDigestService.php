@@ -32,7 +32,7 @@ class FlintDigestService
             'date' => ['nullable', 'date_format:Y-m-d'],
             'run_token' => ['nullable', 'string', 'max:10000'],
             'summary' => ['nullable', 'string', 'max:10000'],
-            // MR-7: the skill already knows which sentence of `summary` is the
+            // The skill already knows which sentence of `summary` is the
             // lede — publishing it explicitly means the client never has to
             // recover it by parsing prose. Optional: FlintDigestOpener derives
             // a best-effort fallback when a caller doesn't send one yet.

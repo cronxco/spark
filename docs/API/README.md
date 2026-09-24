@@ -4,16 +4,15 @@ This directory documents Spark's three programmatic surfaces — the general RES
 
 ## Where to look
 
-| Document | Covers |
-| --- | --- |
-| [API_v1.md](API_v1.md) | `/api/v1` full endpoint reference, plus a brief legacy `/api` section |
-| [mobile_API.md](mobile_API.md) | `/api/v1/mobile` full endpoint reference (iOS companion app) |
-| [MOBILE_API_REQUIREMENTS.md](MOBILE_API_REQUIREMENTS.md) | What `/api/v1/mobile` has to provide for the iOS app, and where today's surface falls short |
-| [MOBILE_CHECK_INS.md](MOBILE_CHECK_INS.md) | Deep dive on the check-in domain data model, shared by web and mobile |
-| [MCP.md](MCP.md) | Spark's MCP server (`/mcp/spark`) — tools, resources, and authorization |
-| [openapi/api-v1.openapi.yaml](openapi/api-v1.openapi.yaml) | Machine-readable OpenAPI 3.1 spec for `/api/v1` |
-| [openapi/mobile-api.openapi.yaml](openapi/mobile-api.openapi.yaml) | Machine-readable OpenAPI 3.1 spec for `/api/v1/mobile` |
-| [openapi/mcp-tools.json](openapi/mcp-tools.json) | Verified JSON Schema snapshot of every MCP tool |
+| Document                                                           | Covers                                                                  |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| [API_v1.md](API_v1.md)                                             | `/api/v1` full endpoint reference, plus a brief legacy `/api` section   |
+| [mobile_API.md](mobile_API.md)                                     | `/api/v1/mobile` full endpoint reference (iOS companion app)            |
+| [MOBILE_CHECK_INS.md](MOBILE_CHECK_INS.md)                         | Deep dive on the check-in domain data model, shared by web and mobile   |
+| [MCP.md](MCP.md)                                                   | Spark's MCP server (`/mcp/spark`) — tools, resources, and authorization |
+| [openapi/api-v1.openapi.yaml](openapi/api-v1.openapi.yaml)         | Machine-readable OpenAPI 3.1 spec for `/api/v1`                         |
+| [openapi/mobile-api.openapi.yaml](openapi/mobile-api.openapi.yaml) | Machine-readable OpenAPI 3.1 spec for `/api/v1/mobile`                  |
+| [openapi/mcp-tools.json](openapi/mcp-tools.json)                   | Verified JSON Schema snapshot of every MCP tool                         |
 
 ## Canonical v1 API
 
@@ -84,16 +83,16 @@ and manual finance account/balance management, including archival.
 
 ### Surface matrix
 
-| Feature                                                          | General REST               | Mobile adapter                | MCP                           | Boundary                        |
-| ----------------------------------------------------------------- | --------------------------- | ------------------------------ | ------------------------------ | -------------------------------- |
-| User data, insights, integrations, Flint and finance             | Yes, granular capabilities | Yes, `ios:read` / `ios:write` | Yes, granular capabilities    | Shared services where available |
-| Entity edits, relationships and locations                        | Yes where listed           | Yes                           | Entity/relationship MCP tools | Owned resources only            |
-| Device/APNs, HealthKit ingestion, Live Activities, OAuth handoff | No                         | Yes                           | No                            | iOS lifecycle transport only    |
+| Feature                                                          | General REST               | Mobile adapter                | MCP                           | Boundary                                                      |
+| ---------------------------------------------------------------- | -------------------------- | ----------------------------- | ----------------------------- | ------------------------------------------------------------- |
+| User data, insights, integrations, Flint and finance             | Yes, granular capabilities | Yes, `ios:read` / `ios:write` | Yes, granular capabilities    | Shared services where available                               |
+| Entity edits, relationships and locations                        | Yes where listed           | Yes                           | Entity/relationship MCP tools | Owned resources only                                          |
+| Device/APNs, HealthKit ingestion, Live Activities, OAuth handoff | No                         | Yes                           | No                            | iOS lifecycle transport only                                  |
 | API-token administration                                         | No                         | List/revoke only              | No                            | Creation requires `tokens:manage`, which no iOS session holds |
-| URL-only bookmark creation                                      | Yes, `data:write`          | Yes, `ios:write`             | Yes, `bookmark:write`         | Shared dedupe and fetch pipeline |
-| Supplied webpage-content capture                                | Yes, `bookmark:write`      | Yes, `ios:write`             | Yes, `bookmark:write`         | Caller supplies HTML; no site cookies leave the caller |
-| Browser HTML fetch with saved cookies                            | No                         | No                            | Yes, `web:fetch`              | MCP-only                        |
-| Admin and task-pipeline operations                               | No                         | No                            | No                            | Internal/web administration     |
+| URL-only bookmark creation                                       | Yes, `data:write`          | Yes, `ios:write`              | Yes, `bookmark:write`         | Shared dedupe and fetch pipeline                              |
+| Supplied webpage-content capture                                 | Yes, `bookmark:write`      | Yes, `ios:write`              | Yes, `bookmark:write`         | Caller supplies HTML; no site cookies leave the caller        |
+| Browser HTML fetch with saved cookies                            | No                         | No                            | Yes, `web:fetch`              | MCP-only                                                      |
+| Admin and task-pipeline operations                               | No                         | No                            | No                            | Internal/web administration                                   |
 
 ### MCP capability mapping
 
@@ -103,18 +102,18 @@ The MCP transport only authenticates the caller (`auth:sanctum` on
 cannot read events or metrics. Existing `mcp:read` tokens remain a read-only
 compatibility alias while clients migrate.
 
-| Capability          | MCP tools                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| `data:read`         | `get-event-tool`, `get-object-tool`, `get-block-tool`, `get-events-by-filter-tool`, `search-events-tool`, `search-blocks-tool`, `search-objects-tool` |
+| Capability          | MCP tools                                                                                                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data:read`         | `get-event-tool`, `get-object-tool`, `get-block-tool`, `get-events-by-filter-tool`, `search-events-tool`, `search-blocks-tool`, `search-objects-tool`             |
 | `insights:read`     | `get-day-summary-tool`, `get-day-context-tool`, `get-metric-trend-tool`, `get-baselines-tool`, `get-service-status-tool`, `get-check-ins`, `day-context-resource` |
-| `integrations:read` | `list-integrations`                                                                       |
-| `flint:read`        | `get-latest-flint-digest`                                                                |
-| `insights:write`    | `acknowledge-anomaly-tool`                                                                |
-| `integrations:sync` | `trigger-integration-update-tool`                                                        |
-| `flint:write`       | `create-flint-digest`, `answer-flint-question`                                          |
-| `bookmark:write`    | `create-bookmark`, `capture-bookmark`                                                     |
-| `data:write`        | `set-event-note`, `update-entity`, `manage-relationship` (read-only `list` operation needs `data:read` instead) |
-| `web:fetch`         | `fetch-webpage-html` (MCP only)                                                          |
+| `integrations:read` | `list-integrations`                                                                                                                                               |
+| `flint:read`        | `get-latest-flint-digest`                                                                                                                                         |
+| `insights:write`    | `acknowledge-anomaly-tool`                                                                                                                                        |
+| `integrations:sync` | `trigger-integration-update-tool`                                                                                                                                 |
+| `flint:write`       | `create-flint-digest`, `answer-flint-question`                                                                                                                    |
+| `bookmark:write`    | `create-bookmark`, `capture-bookmark`                                                                                                                             |
+| `data:write`        | `set-event-note`, `update-entity`, `manage-relationship` (read-only `list` operation needs `data:read` instead)                                                   |
+| `web:fetch`         | `fetch-webpage-html` (MCP only)                                                                                                                                   |
 
 See [MCP.md](MCP.md) for full tool detail, including the actual registered
 tool name for each class (several differ from the short names their own
