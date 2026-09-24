@@ -74,6 +74,14 @@ class HealthControllerTest extends TestCase
         }
 
         Queue::assertPushed(AppleHealthMetricData::class);
+
+        // The batch is the phone's sync; the day summary reads freshness from it.
+        $this->assertNotNull(
+            Integration::where('user_id', $this->user->id)
+                ->where('service', 'apple_health')
+                ->where('instance_type', 'metrics')
+                ->value('last_successful_update_at')
+        );
     }
 
     #[Test]

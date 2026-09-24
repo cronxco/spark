@@ -11,6 +11,7 @@ use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
 use App\Services\DaySummaryService;
+use App\Services\EffectiveTimezoneResolver;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -581,5 +582,255 @@ class GetDaySummaryToolTest extends TestCase
         $summary = $service->generateSummary($this->user, Carbon::today());
 
         $this->assertEmpty($summary['anomalies']);
+    }
+
+    #[Test]
+    public function sleep_is_attributed_to_the_day_it_ends_on(): void
+    {
+        $tz = $this->timezone();
+        $today = Carbon::today($tz);
+
+        // Last night: bedtime yesterday evening, woke this morning. This is
+        // the night today's sleep score describes.
+        $lastNight = $this->sleepRecord($today->copy()->subDay()->setTime(21, 40), $today->copy()->setTime(6, 46), 25110, 69);
+        // Tonight: starts today, ends tomorrow — tomorrow's sleep.
+        $tonight = $this->sleepRecord($today->copy()->setTime(22, 30), $today->copy()->addDay()->setTime(6, 30), 27000, 88);
+
+        $service = app(DaySummaryService::class);
+
+        $todays = $service->generateSummary($this->user, $today)['sections']['health']['sleep_duration'];
+        $this->assertEquals($lastNight->id, $todays['event_id']);
+        $this->assertEquals(25110, $todays['duration_seconds']);
+        // Oura's measured efficiency, a real percentage.
+        $this->assertSame(69, $todays['efficiency_pct']);
+
+        $yesterdays = $service->generateSummary($this->user, $today->copy()->subDay())['sections']['health'];
+        $this->assertArrayNotHasKey('sleep_duration', $yesterdays);
+
+        $tomorrows = $service->generateSummary($this->user, $today->copy()->addDay())['sections']['health']['sleep_duration'];
+        $this->assertEquals($tonight->id, $tomorrows['event_id']);
+    }
+
+    #[Test]
+    public function the_main_sleep_wins_over_a_nap_on_the_same_day(): void
+    {
+        $today = Carbon::today($this->timezone());
+
+        $night = $this->sleepRecord($today->copy()->subDay()->setTime(23, 0), $today->copy()->setTime(7, 0), 26000, 90);
+        $this->sleepRecord($today->copy()->setTime(14, 0), $today->copy()->setTime(15, 0), 3600, 50);
+
+        $summary = app(DaySummaryService::class)->generateSummary($this->user, $today);
+
+        $this->assertEquals($night->id, $summary['sections']['health']['sleep_duration']['event_id']);
+    }
+
+    #[Test]
+    public function a_running_daily_total_is_not_low_until_the_day_is_over(): void
+    {
+        $health = $this->appleHealthIntegration();
+        $tz = $this->timezone();
+
+        MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'apple_health',
+            'action' => 'had_apple_stand_hour',
+            'value_unit' => 'hours',
+            'mean_value' => 9,
+            'stddev_value' => 1.5,
+            'normal_lower_bound' => 6,
+            'normal_upper_bound' => 12,
+            'event_count' => 100,
+        ]);
+
+        foreach ([Carbon::today($tz), Carbon::yesterday($tz)] as $day) {
+            $this->appleHealthEvent($health, 'had_apple_stand_hour', 3, 'hours', $day);
+        }
+
+        $service = app(DaySummaryService::class);
+
+        // Three stand hours so far today is where most days are at 8pm.
+        $today = $service->generateSummary($this->user, Carbon::today($tz));
+        $this->assertFalse($today['sections']['activity']['stand_hours']['is_anomaly']);
+
+        // A finished day with three is genuinely low.
+        $yesterday = $service->generateSummary($this->user, Carbon::yesterday($tz));
+        $this->assertTrue($yesterday['sections']['activity']['stand_hours']['is_anomaly']);
+    }
+
+    #[Test]
+    public function a_suppressed_anomaly_direction_is_not_flagged(): void
+    {
+        $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $target = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'oura',
+            'domain' => 'health',
+            'action' => 'had_sleep_score',
+            'value' => 55,
+            'value_multiplier' => 1,
+            'value_unit' => 'percent',
+            'time' => Carbon::today()->setHour(8),
+            'actor_id' => $actor->id,
+            'target_id' => $target->id,
+        ]);
+
+        MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_sleep_score',
+            'value_unit' => 'percent',
+            'mean_value' => 80,
+            'stddev_value' => 5,
+            'normal_lower_bound' => 70,
+            'normal_upper_bound' => 90,
+            'event_count' => 100,
+            'anomaly_low_suppressed_until' => now()->addDays(3),
+        ]);
+
+        $summary = app(DaySummaryService::class)->generateSummary($this->user, Carbon::today());
+
+        $this->assertFalse($summary['sections']['health']['sleep_score']['is_anomaly']);
+    }
+
+    #[Test]
+    public function a_day_with_no_spend_has_no_percentage_against_baseline(): void
+    {
+        $group = IntegrationGroup::factory()->create(['user_id' => $this->user->id, 'service' => 'monzo']);
+        $monzo = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'monzo',
+        ]);
+        $actor = EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'Current Account']);
+        $merchant = EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'Tesco']);
+
+        $transaction = fn (string $action, int $pence, Carbon $time) => Event::factory()->create([
+            'integration_id' => $monzo->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => $action,
+            'value' => $pence,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => $time,
+            'actor_id' => $actor->id,
+            'target_id' => $merchant->id,
+        ]);
+
+        // Enough spending history for a baseline to exist.
+        foreach (range(1, 6) as $daysAgo) {
+            $transaction('card_payment_to', 2000, Carbon::today()->subDays($daysAgo)->setHour(12));
+        }
+        // Today: only money moved into a pot.
+        $transaction('pot_transfer_to', 534, Carbon::today()->setHour(3));
+
+        $money = app(DaySummaryService::class)->generateSummary($this->user, Carbon::today())['sections']['money'];
+
+        $this->assertEquals(0, $money['total_spend']);
+        // Zero against any baseline is "-100%", which says nothing the
+        // zero doesn't.
+        $this->assertArrayNotHasKey('total_spend_vs_baseline_pct', $money);
+        $this->assertSame('no_spend', $money['total_spend_baseline_unavailable_reason']);
+    }
+
+    #[Test]
+    public function a_pushed_service_is_as_fresh_as_what_it_last_sent(): void
+    {
+        // Apple Health is pushed to Spark; nothing polls it, so nothing had
+        // ever set `last_successful_update_at` and it read as permanently
+        // stale.
+        $health = $this->appleHealthIntegration();
+        $this->appleHealthEvent($health, 'had_step_count', 8064, 'steps', Carbon::today($this->timezone()));
+
+        $status = app(DaySummaryService::class)->generateSummary($this->user, Carbon::today())['sync_status']['apple_health'];
+
+        $this->assertFalse($status['stale']);
+        $this->assertNotNull($status['as_of']);
+    }
+
+    #[Test]
+    public function a_pushed_service_goes_stale_when_nothing_has_arrived_for_a_day(): void
+    {
+        $health = $this->appleHealthIntegration(['last_successful_update_at' => now()->subHours(30)]);
+        $this->appleHealthEvent($health, 'had_step_count', 41, 'steps', Carbon::today($this->timezone()));
+
+        $status = app(DaySummaryService::class)->generateSummary($this->user, Carbon::today())['sync_status']['apple_health'];
+
+        $this->assertTrue($status['stale']);
+    }
+
+    #[Test]
+    public function apple_health_coverage_follows_the_last_push_not_the_newest_sample(): void
+    {
+        $this->travelTo(Carbon::today($this->timezone())->setTime(19, 36));
+
+        // The last push was two and a half hours ago…
+        $health = $this->appleHealthIntegration(['last_successful_update_at' => now()->subMinutes(150)]);
+        $this->appleHealthEvent($health, 'had_step_count', 5109, 'steps', Carbon::today($this->timezone()), now()->subMinutes(150));
+        // …but a heart-rate sample from it was touched moments ago.
+        $this->appleHealthEvent($health, 'had_heart_rate', 72, 'bpm', Carbon::today($this->timezone()), now()->subMinutes(2));
+
+        $status = app(DaySummaryService::class)->generateSummary($this->user, Carbon::today())['sync_status']['apple_health'];
+
+        $this->assertSame('partial', $status['coverage']);
+    }
+
+    private function timezone(): string
+    {
+        return app(EffectiveTimezoneResolver::class)->timezoneFor($this->user);
+    }
+
+    private function sleepRecord(Carbon $bedtime, Carbon $wake, int $seconds, int $efficiency): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'oura',
+            'domain' => 'health',
+            'action' => 'slept_for',
+            'value' => $seconds,
+            'value_multiplier' => 1,
+            'value_unit' => 'seconds',
+            'time' => $bedtime,
+            'event_metadata' => ['end' => $wake->toIso8601String(), 'efficiency' => $efficiency],
+            'actor_id' => EventObject::factory()->create(['user_id' => $this->user->id])->id,
+            'target_id' => EventObject::factory()->create(['user_id' => $this->user->id])->id,
+        ]);
+    }
+
+    private function appleHealthIntegration(array $attributes = []): Integration
+    {
+        $group = IntegrationGroup::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health']);
+
+        return Integration::factory()->create(array_merge([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'apple_health',
+            'instance_type' => 'metrics',
+            'last_successful_update_at' => null,
+        ], $attributes));
+    }
+
+    private function appleHealthEvent(Integration $integration, string $action, float $value, string $unit, Carbon $day, ?Carbon $updatedAt = null): Event
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'apple_health',
+            'domain' => 'health',
+            'action' => $action,
+            'value' => $value,
+            'value_multiplier' => 1,
+            'value_unit' => $unit,
+            'time' => $day->copy()->startOfDay(),
+            'actor_id' => EventObject::factory()->create(['user_id' => $this->user->id])->id,
+            'target_id' => EventObject::factory()->create(['user_id' => $this->user->id])->id,
+        ]);
+
+        if ($updatedAt !== null) {
+            Event::whereKey($event->id)->update(['updated_at' => $updatedAt]);
+        }
+
+        return $event;
     }
 }

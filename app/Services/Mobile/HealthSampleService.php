@@ -95,6 +95,12 @@ class HealthSampleService
             AppleHealthWorkoutData::dispatch($workoutsIntegration, $workout);
         }
 
+        // Every batch is a sync from the phone, duplicates included — it says
+        // Apple Health is current as of now, which is what the day summary's
+        // freshness reads.
+        $metricsIntegration->markAsSuccessfullyUpdated();
+        $workoutsIntegration->markAsSuccessfullyUpdated();
+
         return $results;
     }
 
