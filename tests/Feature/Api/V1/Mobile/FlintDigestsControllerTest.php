@@ -532,6 +532,36 @@ class FlintDigestsControllerTest extends TestCase
     }
 
     #[Test]
+    public function latest_returns_the_last_written_digest_when_a_day_has_several(): void
+    {
+        // Every digest is filed at the start of its local day, so the
+        // morning and evening briefings share `time`. The evening one is
+        // given the lower UUID so an `id` tiebreak would pick the morning.
+        $dayStart = Carbon::today()->startOfDay();
+        $this->createDigestEvent('morning', meta: ['kind' => 'briefing'], overrides: [
+            'id' => 'ffffffff-ffff-4fff-bfff-ffffffffffff',
+            'time' => $dayStart,
+            'created_at' => $dayStart->copy()->setTime(6, 20),
+        ]);
+        $evening = $this->createDigestEvent('evening', meta: ['kind' => 'briefing'], overrides: [
+            'id' => '00000000-0000-4000-8000-000000000000',
+            'time' => $dayStart,
+            'created_at' => $dayStart->copy()->setTime(18, 36),
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest?kind=briefing')
+            ->assertOk()
+            ->assertJsonPath('event_id', $evening->id)
+            ->assertJsonPath('period', 'evening');
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('event_id', $evening->id);
+    }
+
+    #[Test]
     public function latest_returns_404_when_no_digest_exists(): void
     {
         Sanctum::actingAs($this->user, ['ios:read']);
@@ -539,11 +569,11 @@ class FlintDigestsControllerTest extends TestCase
         $this->getJson('/api/v1/mobile/flint/digests/latest')->assertNotFound();
     }
 
-    private function createDigestEvent(string $period = 'morning', ?Carbon $date = null, array $meta = []): Event
+    private function createDigestEvent(string $period = 'morning', ?Carbon $date = null, array $meta = [], array $overrides = []): Event
     {
         $date ??= Carbon::today();
 
-        return Event::factory()->create([
+        return Event::factory()->create(array_merge([
             'integration_id' => $this->integration->id,
             'service' => 'flint',
             'action' => 'had_summary',
@@ -552,6 +582,6 @@ class FlintDigestsControllerTest extends TestCase
                 'period' => $period,
                 'title' => ucfirst($period) . ' Digest',
             ], $meta),
-        ]);
+        ], $overrides));
     }
 }

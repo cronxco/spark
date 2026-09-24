@@ -78,8 +78,12 @@ class FlintQuestionsController extends Controller
             }
         });
 
+        // A question's `time` is its digest's local day, shared by every
+        // question that day; `created_at` puts the evening's above the
+        // morning's.
         $questions = $query
             ->orderByDesc('time')
+            ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->cursorPaginate($limit, ['*'], 'cursor');
 
