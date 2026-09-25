@@ -5,12 +5,14 @@
         {
             "name": "get-day-summary-tool",
             "ability": "insights:read",
-            "description": "    Get a compact, pre-aggregated summary for one or more dates.\n    Returns structured domain sections (health, activity, money, media, knowledge)\n    with baseline comparisons and anomaly detection.\n    Much more compact than get-day-context — use this for daily briefings.\n    Relative dates and day boundaries follow the user's effective (time-travel) timezone,\n    named in `effective_timezone`; every timestamp carries that day's UTC offset, so its\n    clock time is already local.",
+            "description": "Get a compact, pre-aggregated summary for one or more dates.\n    Returns structured domain sections (health, activity, money, media, knowledge)\n    with baseline comparisons and anomaly detection.\n    Much more compact than get-day-context — use this for daily briefings.\n    Relative dates and day boundaries follow the user's effective (time-travel) timezone,\n    named in `effective_timezone`; every timestamp carries that day's UTC offset, so its\n    clock time is already local.",
             "inputSchema": {
                 "properties": {
                     "dates": {
                         "description": "Array of dates to summarize. ISO format (YYYY-MM-DD) or relative: \"today\", \"yesterday\", \"tomorrow\". Defaults to [\"today\"].",
-                        "default": ["today"],
+                        "default": [
+                            "today"
+                        ],
                         "items": {
                             "type": "string"
                         },
@@ -93,7 +95,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["metric"]
+                "required": [
+                    "metric"
+                ]
             },
             "annotations": {
                 "idempotentHint": true,
@@ -103,7 +107,7 @@
         {
             "name": "get-events-by-filter-tool",
             "ability": "data:read",
-            "description": "    Filter events precisely by service, action, and date range.\n    Unlike semantic search, this returns exact matches — use for specific queries\n    like \"all Monzo transactions this week\" or \"Oura sleep scores last 7 days\".\n    `time` is UTC; `local_time` is the same instant in the user's timezone at that moment\n    (named in `timezone`, which follows time travel). Quote clock times from `local_time`.",
+            "description": "Filter events precisely by service, action, and date range.\n    Unlike semantic search, this returns exact matches — use for specific queries\n    like \"all Monzo transactions this week\" or \"Oura sleep scores last 7 days\".\n    `time` is UTC; `local_time` is the same instant in the user's timezone at that moment\n    (named in `timezone`, which follows time travel). Quote clock times from `local_time`.",
             "inputSchema": {
                 "properties": {
                     "service": {
@@ -129,7 +133,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["service"]
+                "required": [
+                    "service"
+                ]
             },
             "annotations": {
                 "idempotentHint": true,
@@ -220,7 +226,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["metric"]
+                "required": [
+                    "metric"
+                ]
             },
             "annotations": {
                 "idempotentHint": true
@@ -229,7 +237,7 @@
         {
             "name": "search-events-tool",
             "ability": "data:read",
-            "description": "    Search for events using semantic (vector similarity) or keyword search.\n    Events represent timestamped activities like transactions, workouts, media plays, etc.\n    Returns matching events with similarity scores when using semantic search.\n    `time` is UTC; `local_time` is the same instant in the user's timezone at that moment\n    (named in `timezone`, which follows time travel). Quote clock times from `local_time`.",
+            "description": "Search for events using semantic (vector similarity) or keyword search.\n    Events represent timestamped activities like transactions, workouts, media plays, etc.\n    Returns matching events with similarity scores when using semantic search.\n    `time` is UTC; `local_time` is the same instant in the user's timezone at that moment\n    (named in `timezone`, which follows time travel). Quote clock times from `local_time`.",
             "inputSchema": {
                 "properties": {
                     "query": {
@@ -271,7 +279,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["query"]
+                "required": [
+                    "query"
+                ]
             },
             "annotations": {
                 "idempotentHint": true,
@@ -312,7 +322,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["query"]
+                "required": [
+                    "query"
+                ]
             },
             "annotations": {
                 "idempotentHint": true,
@@ -349,7 +361,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["query"]
+                "required": [
+                    "query"
+                ]
             },
             "annotations": {
                 "idempotentHint": true,
@@ -359,7 +373,7 @@
         {
             "name": "get-event-tool",
             "ability": "data:read",
-            "description": "    Retrieve full details for a specific event by its UUID.\n    Returns the complete event with actor, target, blocks, tags, and integration context.\n    `time` is UTC; `local_time` is the same instant in the user's timezone at that moment\n    (named in `timezone`, which follows time travel). Quote clock times from `local_time`.",
+            "description": "Retrieve full details for a specific event by its UUID.\n    Returns the complete event with actor, target, blocks, tags, and integration context.\n    `time` is UTC; `local_time` is the same instant in the user's timezone at that moment\n    (named in `timezone`, which follows time travel). Quote clock times from `local_time`.",
             "inputSchema": {
                 "properties": {
                     "id": {
@@ -368,7 +382,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["id"]
+                "required": [
+                    "id"
+                ]
             },
             "annotations": {
                 "idempotentHint": true,
@@ -399,7 +415,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["id"]
+                "required": [
+                    "id"
+                ]
             },
             "annotations": {
                 "idempotentHint": true,
@@ -418,7 +436,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["id"]
+                "required": [
+                    "id"
+                ]
             },
             "annotations": {
                 "idempotentHint": true,
@@ -441,7 +461,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["event_id"]
+                "required": [
+                    "event_id"
+                ]
             },
             "annotations": []
         },
@@ -465,7 +487,11 @@
                     }
                 },
                 "type": "object",
-                "required": ["kind", "id", "attributes"]
+                "required": [
+                    "kind",
+                    "id",
+                    "attributes"
+                ]
             },
             "annotations": []
         },
@@ -521,7 +547,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["operation"]
+                "required": [
+                    "operation"
+                ]
             },
             "annotations": []
         },
@@ -624,13 +652,18 @@
                                 }
                             },
                             "type": "object",
-                            "required": ["block_type", "title"]
+                            "required": [
+                                "block_type",
+                                "title"
+                            ]
                         },
                         "type": "array"
                     }
                 },
                 "type": "object",
-                "required": ["title"]
+                "required": [
+                    "title"
+                ]
             },
             "annotations": []
         },
@@ -682,7 +715,10 @@
                     }
                 },
                 "type": "object",
-                "required": ["block_id", "answer"]
+                "required": [
+                    "block_id",
+                    "answer"
+                ]
             },
             "annotations": []
         },
@@ -698,7 +734,9 @@
                     }
                 },
                 "type": "object",
-                "required": ["url"]
+                "required": [
+                    "url"
+                ]
             },
             "annotations": []
         },
@@ -722,7 +760,10 @@
                     }
                 },
                 "type": "object",
-                "required": ["url", "html"]
+                "required": [
+                    "url",
+                    "html"
+                ]
             },
             "annotations": []
         },
