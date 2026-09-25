@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Integrations\DailyCheckin\DailyCheckinPlugin;
 use App\Models\User;
 use Carbon\Carbon;
+use Throwable;
 
 /**
  * Resolves a user's effective timezone — the latest acknowledged "time travel"
@@ -68,6 +69,36 @@ class EffectiveTimezoneResolver
         }
 
         return $this->pointInTimeMemo[$key];
+    }
+
+    /**
+     * The IANA timezone a given local calendar date belongs to.
+     *
+     * The current and future days always use the live effective timezone, so
+     * "today" never regresses (CRX-682). Past days use point-in-time resolution —
+     * the timezone that was acknowledged on that date — probed at noon UTC of the
+     * target date to break the tz/day-boundary circularity at extreme offsets.
+     *
+     * @param  string  $date  Local calendar date (Y-m-d)
+     */
+    public function timezoneForDate(?User $user, string $date): string
+    {
+        if ($user === null) {
+            return 'UTC';
+        }
+
+        try {
+            $isPast = $date < $this->today($user)->toDateString();
+            $probe = Carbon::parse($date, 'UTC')->setTime(12, 0);
+        } catch (Throwable) {
+            return $this->timezoneFor($user);
+        }
+
+        if (! $isPast) {
+            return $this->timezoneFor($user);
+        }
+
+        return $this->timezoneForAt($user, $probe);
     }
 
     /**

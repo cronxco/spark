@@ -157,6 +157,8 @@ The field carrying that zone is named `effective_timezone`:
 
 A client assembling one screen from several of these endpoints can rely on them agreeing — they resolve through the same service.
 
+Day-scoped payloads also **render** in that zone: every timestamp inside `GET /briefing/today` (transaction `time`, `observed_at`, `sync_status.*`, `anomalies[].detected_at`) carries the day's UTC offset, e.g. `2026-09-25T01:06:53+01:00` — the same instant as `00:06:53Z`, but with the local clock time. For a **past** date the zone is the one acknowledged on that date (so a London day stays London after flying to Vancouver); today and future dates use the live effective zone. `GET /widgets/today` and `GET /widgets/spend` resolve "today" the same way. Parse these as offset-bearing ISO 8601; never assume `Z`.
+
 ### Response Headers
 
 | Header          | Endpoints  | Description                        |
@@ -330,7 +332,7 @@ Returns a structured daily summary across all domains for a given date.
                     "currency": "GBP",
                     "action": "card_payment_to",
                     "service": "monzo",
-                    "time": "2025-01-15T12:00:00Z",
+                    "time": "2025-01-15T12:00:00+00:00",
                     "direction": "out"
                 }
             ],

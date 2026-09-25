@@ -20,6 +20,12 @@ class DaySummaryService
     private bool $summaryDateIsToday = false;
 
     /**
+     * The IANA timezone the summary's day belongs to; every timestamp in the
+     * payload is rendered in it.
+     */
+    private string $timezone = 'UTC';
+
+    /**
      * Generate a compact summary for a single date.
      *
      * @param  array<string>|null  $domains
@@ -27,11 +33,12 @@ class DaySummaryService
     public function generateSummary(User $user, Carbon $date, ?array $domains = null): array
     {
         // Every day-scoped endpoint resolves and names the day's timezone
-        // the same way — the user's effective (acknowledged
-        // time-travel) timezone, not just the profile default — and that
-        // same value decides which calendar day's events this summary
-        // covers.
-        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($user);
+        // the same way — the user's effective (acknowledged time-travel)
+        // timezone as it stood on that date, not just the profile default —
+        // and that same value decides which calendar day's events this
+        // summary covers and the offset every timestamp is rendered with.
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneForDate($user, $date->toDateString());
+        $this->timezone = $timezone;
         $localDate = Carbon::parse($date->toDateString(), $timezone)->startOfDay();
         $this->summaryDateIsToday = $localDate->isToday();
         $startOfDay = $localDate->copy()->utc();
@@ -321,7 +328,7 @@ class DaySummaryService
                     'source' => $event->service,
                     'type' => $event->target?->title ?? 'Unknown',
                     'calories' => $event->formatted_value,
-                    'time' => $event->time->toISOString(),
+                    'time' => $this->localTimestamp($event->time),
                 ];
 
                 // Duration from blocks
@@ -349,7 +356,7 @@ class DaySummaryService
                     'event_id' => $event->id,
                     'title' => $event->target?->title ?? 'Workout',
                     'total_volume_kg' => $event->formatted_value,
-                    'time' => $event->time->toISOString(),
+                    'time' => $this->localTimestamp($event->time),
                 ];
 
                 $exercises = $event->blocks->where('block_type', 'exercise');
@@ -388,7 +395,7 @@ class DaySummaryService
                     'currency' => $event->value_unit ?? 'GBP',
                     'action' => $event->action,
                     'service' => $event->service,
-                    'time' => $event->time->toISOString(),
+                    'time' => $this->localTimestamp($event->time),
                     // The client no longer infers in/out/internal from the
                     // action-name suffix — an open vocabulary that grows with
                     // every integration.
@@ -454,7 +461,7 @@ class DaySummaryService
                     'merchant' => $event->target?->title ?? 'Unknown',
                     'amount' => $event->formatted_value,
                     'currency' => $event->value_unit ?? 'GBP',
-                    'time' => $event->time->toISOString(),
+                    'time' => $this->localTimestamp($event->time),
                 ];
 
                 $lineItems = $event->blocks->where('block_type', 'receipt_line_item');
@@ -523,8 +530,8 @@ class DaySummaryService
                 return [
                     'first_event_id' => $first->id,
                     'last_event_id' => $last->id,
-                    'start' => $first->time->toISOString(),
-                    'end' => $last->time->toISOString(),
+                    'start' => $this->localTimestamp($first->time),
+                    'end' => $this->localTimestamp($last->time),
                     'track_count' => $sessionEvents->count(),
                     'top_artist' => $topArtist,
                     'description' => $isAlbumSession
@@ -542,7 +549,7 @@ class DaySummaryService
                     'event_id' => $event->id,
                     'beer' => $event->target?->title ?? 'Unknown',
                     'rating' => $event->formatted_value,
-                    'time' => $event->time->toISOString(),
+                    'time' => $this->localTimestamp($event->time),
                 ];
 
                 // Brewery from blocks
@@ -686,7 +693,7 @@ class DaySummaryService
                     'event_id' => $event->id,
                     'title' => $event->target?->title ?? 'Event',
                     'duration_minutes' => $event->formatted_value,
-                    'time' => $event->time->toISOString(),
+                    'time' => $this->localTimestamp($event->time),
                 ];
 
                 $location = $event->blocks->firstWhere('block_type', 'event_location');
@@ -731,8 +738,8 @@ class DaySummaryService
             $lastUpdated = $serviceEvents->sortByDesc('updated_at')->first();
             $status = [
                 'event_count' => $serviceEvents->count(),
-                'last_event_time' => $lastEvent->time->toISOString(),
-                'last_updated_at' => $lastUpdated->updated_at->toISOString(),
+                'last_event_time' => $this->localTimestamp($lastEvent->time),
+                'last_updated_at' => $this->localTimestamp($lastUpdated->updated_at),
                 'freshness_basis' => 'updated_at',
                 'actions' => $serviceEvents->pluck('action')->unique()->values()->all(),
             ];
@@ -749,7 +756,7 @@ class DaySummaryService
             }
 
             [$asOf, $stale] = $this->serviceFreshness($integrationsByService->get($service));
-            $status['as_of'] = $asOf?->toISOString();
+            $status['as_of'] = $this->localTimestamp($asOf);
             $status['stale'] = $stale;
 
             return $status;
@@ -768,7 +775,7 @@ class DaySummaryService
                     'event_count' => 0,
                     'last_event_time' => null,
                     'actions' => [],
-                    'as_of' => $asOf?->toISOString(),
+                    'as_of' => $this->localTimestamp($asOf),
                     'stale' => $stale,
                 ];
             });
@@ -834,9 +841,19 @@ class DaySummaryService
                 'baseline_value' => round($trend->baseline_value, 2),
                 'deviation' => round($trend->deviation, 2),
                 'streak_days' => $streakCount,
-                'detected_at' => $trend->detected_at->toISOString(),
+                'detected_at' => $this->localTimestamp($trend->detected_at),
             ];
         })->values()->all();
+    }
+
+    /**
+     * Render an instant as ISO 8601 with the summary day's UTC offset, so the
+     * clock time a reader sees is the local one (e.g. `01:06+01:00`, never
+     * `00:06Z`) while the instant itself is unchanged.
+     */
+    protected function localTimestamp(?Carbon $instant): ?string
+    {
+        return $instant?->copy()->setTimezone($this->timezone)->toIso8601String();
     }
 
     /**
@@ -844,8 +861,8 @@ class DaySummaryService
      */
     protected function attachBaseline(array &$entry, Event $event, array $metricsCache): void
     {
-        $entry['observed_at'] = $event->time?->toIso8601String();
-        $entry['updated_at'] = $event->updated_at?->toIso8601String();
+        $entry['observed_at'] = $this->localTimestamp($event->time);
+        $entry['updated_at'] = $this->localTimestamp($event->updated_at);
         $entry['state'] = $this->summaryDateIsToday ? 'provisional' : 'settled';
 
         if ($event->value === null || $event->value_unit === null) {

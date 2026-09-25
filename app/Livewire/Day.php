@@ -1051,25 +1051,10 @@ class Day extends Component
     /**
      * Resolve the IANA timezone to render a given local date in.
      *
-     * The current and future days always use the live effective timezone, so
-     * "today" never regresses (CRX-682). Past days use point-in-time resolution —
-     * the timezone that was acknowledged on that date — probed at noon UTC of the
-     * target date to break the tz/day-boundary circularity at extreme offsets.
+     * @see EffectiveTimezoneResolver::timezoneForDate()
      */
     private function timezoneForDate(User $user, string $date): string
     {
-        $resolver = app(EffectiveTimezoneResolver::class);
-
-        try {
-            $isPast = $date < $resolver->today($user)->toDateString();
-        } catch (Throwable $e) {
-            return $resolver->timezoneFor($user);
-        }
-
-        if (! $isPast) {
-            return $resolver->timezoneFor($user);
-        }
-
-        return $resolver->timezoneForAt($user, Carbon::parse($date, 'UTC')->setTime(12, 0));
+        return app(EffectiveTimezoneResolver::class)->timezoneForDate($user, $date);
     }
 }

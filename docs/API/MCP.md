@@ -100,7 +100,10 @@ sections (health, activity, money, media, knowledge) with baseline
 comparisons and anomaly detection. Preferred over `get-day-context-tool`
 for daily briefings. Metric entries expose `observed_at`, `updated_at`, and
 `state` (`provisional` for the current local day, otherwise `settled`). Relative
-dates and database boundaries are resolved in the user's effective timezone.
+dates and database boundaries are resolved in the user's effective timezone —
+for a past date, the time-travel timezone acknowledged on that date — and every
+timestamp in the payload carries that timezone's UTC offset (e.g.
+`2026-09-25T01:06:53+01:00`), so its clock time is already local.
 
 | Parameter | Type            | Required | Default     | Notes                                               |
 | --------- | --------------- | -------- | ----------- | --------------------------------------------------- |
@@ -221,6 +224,12 @@ _Ability_: `data:read` · _Read-only, idempotent_
 
 Full detail for a specific entity by UUID, ownership-scoped through the
 caller — a cross-user ID is treated as not found.
+
+Every event returned by `get-event-tool`, `search-events-tool` and
+`get-events-by-filter-tool` keeps its canonical UTC `time` and adds
+`local_time` (the same instant with the local offset) plus `timezone` — the
+user's effective timezone at that instant, so an event from a trip reads in
+the zone the user was in. Quote clock times from `local_time`.
 
 | Tool              | Parameter        | Type    | Required | Default | Notes                                          |
 | ----------------- | ---------------- | ------- | -------- | ------- | ---------------------------------------------- |

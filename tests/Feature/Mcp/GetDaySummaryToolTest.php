@@ -582,4 +582,107 @@ class GetDaySummaryToolTest extends TestCase
 
         $this->assertEmpty($summary['anomalies']);
     }
+
+    #[Test]
+    public function timestamps_carry_the_days_utc_offset(): void
+    {
+        Carbon::setTestNow('2026-09-25 06:00:00 UTC');
+        $this->user->settings = array_merge($this->user->settings ?? [], ['timezone' => 'Europe/London']);
+        $this->user->save();
+
+        $this->makeMoneyEvent(Carbon::parse('2026-09-25T00:06:53Z'));
+
+        $summary = app(DaySummaryService::class)->generateSummary($this->user, Carbon::parse('2026-09-25'));
+
+        $transaction = $summary['sections']['money']['transactions'][0];
+        $this->assertSame('2026-09-25T01:06:53+01:00', $transaction['time']);
+        $this->assertSame('2026-09-25T01:06:53+01:00', $summary['sync_status']['monzo']['last_event_time']);
+        $this->assertStringEndsWith('+01:00', $summary['sync_status']['monzo']['last_updated_at']);
+
+        Carbon::setTestNow();
+    }
+
+    #[Test]
+    public function past_day_uses_the_timezone_acknowledged_on_that_date(): void
+    {
+        Carbon::setTestNow('2026-09-25 12:00:00 UTC');
+        $this->user->settings = array_merge($this->user->settings ?? [], ['timezone' => 'Europe/London']);
+        $this->user->save();
+        $this->acknowledgeTimezone('America/Vancouver', '2026-09-01T10:00:00.000000Z');
+
+        // 00:30 on 20 Aug in London — still 19 Aug in Vancouver, so only a
+        // London-cut day picks it up.
+        $this->makeMoneyEvent(Carbon::parse('2026-08-19T23:30:00Z'));
+
+        $summary = app(DaySummaryService::class)->generateSummary($this->user, Carbon::parse('2026-08-20'));
+
+        $this->assertSame('Europe/London', $summary['timezone']);
+        $this->assertSame('Europe/London', $summary['effective_timezone']);
+        $this->assertCount(1, $summary['sections']['money']['transactions']);
+        $this->assertSame('2026-08-20T00:30:00+01:00', $summary['sections']['money']['transactions'][0]['time']);
+
+        Carbon::setTestNow();
+    }
+
+    #[Test]
+    public function today_uses_the_acknowledged_travel_timezone(): void
+    {
+        Carbon::setTestNow('2026-09-25 20:00:00 UTC');
+        $this->user->settings = array_merge($this->user->settings ?? [], ['timezone' => 'Europe/London']);
+        $this->user->save();
+        $this->acknowledgeTimezone('America/Vancouver', '2026-09-24T10:00:00.000000Z');
+
+        $this->makeMoneyEvent(Carbon::parse('2026-09-25T19:00:00Z'));
+
+        $summary = app(DaySummaryService::class)->generateSummary($this->user, Carbon::parse('2026-09-25'));
+
+        $this->assertSame('America/Vancouver', $summary['timezone']);
+        $this->assertSame('2026-09-25T12:00:00-07:00', $summary['sections']['money']['transactions'][0]['time']);
+
+        Carbon::setTestNow();
+    }
+
+    private function makeMoneyEvent(Carbon $time): Event
+    {
+        $group = IntegrationGroup::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'monzo',
+        ]);
+        $integration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'monzo',
+        ]);
+
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'card_payment_to',
+            'value' => 59900,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => $time,
+            'actor_id' => EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'Amex'])->id,
+            'target_id' => EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'British Airways'])->id,
+        ]);
+    }
+
+    private function acknowledgeTimezone(string $timezone, string $acknowledgedAt): void
+    {
+        $integration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'daily_checkin',
+        ]);
+
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'daily_checkin',
+            'action' => 'time_travel',
+            'event_metadata' => [
+                'timezone' => $timezone,
+                'acknowledged_at' => $acknowledgedAt,
+            ],
+        ]);
+    }
 }
