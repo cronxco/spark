@@ -136,6 +136,14 @@ class HealthControllerTest extends TestCase
             ->assertJsonPath('results.0.status', 'accepted');
 
         Queue::assertPushed(AppleHealthWorkoutData::class);
+
+        // A workout-only batch syncs the workouts instance, not the metrics
+        // one whose step and exercise totals it says nothing about.
+        $instances = Integration::where('user_id', $this->user->id)
+            ->where('service', 'apple_health')
+            ->pluck('last_successful_update_at', 'instance_type');
+        $this->assertNotNull($instances['workouts']);
+        $this->assertNull($instances['metrics']);
     }
 
     #[Test]

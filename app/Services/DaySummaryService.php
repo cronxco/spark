@@ -792,7 +792,7 @@ class DaySummaryService
         $realTimeServices = ['apple_health'];
 
         $integrationsByService = $user->integrations()
-            ->get(['id', 'service', 'last_successful_update_at', 'configuration'])
+            ->get(['id', 'service', 'instance_type', 'last_successful_update_at', 'configuration'])
             ->groupBy('service');
 
         $servicesWithEvents = $events->groupBy('service')->map(function ($serviceEvents, $service) use ($realTimeServices, $integrationsByService, $localDate) {
@@ -812,8 +812,11 @@ class DaySummaryService
                 // land continuously, so one fresh sample made a push that
                 // was hours old — and its step and exercise totals — read as
                 // complete. Events are the fallback for integrations that
-                // predate push tracking.
-                $lastPush = $integrationsByService->get($service)?->max('last_successful_update_at');
+                // predate push tracking. Only the metrics instance carries
+                // the day's totals; a workouts push says nothing about them.
+                $lastPush = $integrationsByService->get($service)
+                    ?->where('instance_type', 'metrics')
+                    ->max('last_successful_update_at');
                 $lastReceived = $lastPush !== null && $lastPush->lessThanOrEqualTo($referenceTime)
                     ? $lastPush
                     : $lastUpdated->updated_at;
@@ -822,7 +825,8 @@ class DaySummaryService
                     : 0;
                 $status['coverage'] = $hoursSinceLastUpdate > 2 ? 'partial' : 'complete';
                 if ($hoursSinceLastUpdate > 2) {
-                    $status['coverage_note'] = "Last updated {$hoursSinceLastUpdate}h ago — data may be incomplete.";
+                    $hours = (int) floor($hoursSinceLastUpdate);
+                    $status['coverage_note'] = "Last updated {$hours}h ago — data may be incomplete.";
                 }
             }
 

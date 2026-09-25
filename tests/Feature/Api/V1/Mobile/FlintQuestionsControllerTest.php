@@ -113,6 +113,23 @@ class FlintQuestionsControllerTest extends TestCase
     }
 
     #[Test]
+    public function since_counts_from_when_a_question_was_asked(): void
+    {
+        $this->travelTo(now()->startOfDay()->setTime(12, 0));
+
+        // Asked at 21:00 yesterday, filed under yesterday's midnight: 15 hours
+        // ago by `asked_at`, 36 by its digest's day.
+        $lastNight = $this->question(now()->subDay()->startOfDay(), overrides: [
+            'created_at' => now()->subDay()->setTime(21, 0),
+        ]);
+
+        $this->getJson('/api/v1/mobile/flint/questions?status=open&since=24h')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $lastNight->id);
+    }
+
+    #[Test]
     public function status_skipped_and_retired_are_independently_filterable(): void
     {
         $skipped = $this->question(now()->subDay(), ['question_status' => 'skipped', 'skipped_at' => now()->toIso8601String()]);
@@ -230,6 +247,8 @@ class FlintQuestionsControllerTest extends TestCase
             'block_type' => 'flint_user_question',
             'title' => 'A question',
             'time' => $time,
+            // A question is written when its digest runs.
+            'created_at' => $time,
             'metadata' => array_merge(['question' => 'What should change?', 'answer' => null], $metadata),
         ], $overrides));
     }

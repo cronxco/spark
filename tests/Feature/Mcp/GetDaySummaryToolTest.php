@@ -775,6 +775,25 @@ class GetDaySummaryToolTest extends TestCase
         $status = app(DaySummaryService::class)->generateSummary($this->user, Carbon::today())['sync_status']['apple_health'];
 
         $this->assertSame('partial', $status['coverage']);
+        $this->assertSame('Last updated 2h ago — data may be incomplete.', $status['coverage_note']);
+    }
+
+    #[Test]
+    public function apple_health_coverage_ignores_a_workouts_push(): void
+    {
+        $this->travelTo(Carbon::today($this->timezone())->setTime(19, 36));
+
+        $metrics = $this->appleHealthIntegration(['last_successful_update_at' => now()->subHours(3)]);
+        // A workout arrived just now; the day's totals are still three hours old.
+        $this->appleHealthIntegration([
+            'instance_type' => 'workouts',
+            'last_successful_update_at' => now()->subMinutes(5),
+        ]);
+        $this->appleHealthEvent($metrics, 'had_step_count', 5109, 'steps', Carbon::today($this->timezone()), now()->subHours(3));
+
+        $status = app(DaySummaryService::class)->generateSummary($this->user, Carbon::today())['sync_status']['apple_health'];
+
+        $this->assertSame('partial', $status['coverage']);
     }
 
     private function timezone(): string

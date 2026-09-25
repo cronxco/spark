@@ -30,6 +30,10 @@ class HealthSampleService
         $results = [];
         $metricBuckets = [];
         $workoutBatch = [];
+        // Which instances this batch actually synced — accepted or already on
+        // record. A batch of rejected samples says nothing about either.
+        $metricsSynced = false;
+        $workoutsSynced = false;
 
         foreach ($samples as $sample) {
             $externalId = (string) ($sample['external_id'] ?? '');
@@ -47,6 +51,7 @@ class HealthSampleService
 
             if ($this->isWorkout($type)) {
                 $sourceId = $externalId;
+                $workoutsSynced = true;
                 if ($this->eventExists($workoutsIntegration, $sourceId)) {
                     $results[] = ['external_id' => $externalId, 'status' => 'duplicate'];
 
@@ -70,6 +75,7 @@ class HealthSampleService
                 continue;
             }
 
+            $metricsSynced = true;
             $sourceId = 'apple_metric_' . $metricName . '_' . $this->normalizeDate($sample['start'] ?? null);
             if ($this->eventExists($metricsIntegration, $sourceId)) {
                 $results[] = ['external_id' => $externalId, 'status' => 'duplicate'];
@@ -95,11 +101,14 @@ class HealthSampleService
             AppleHealthWorkoutData::dispatch($workoutsIntegration, $workout);
         }
 
-        // Every batch is a sync from the phone, duplicates included — it says
-        // Apple Health is current as of now, which is what the day summary's
-        // freshness reads.
-        $metricsIntegration->markAsSuccessfullyUpdated();
-        $workoutsIntegration->markAsSuccessfullyUpdated();
+        // A batch is a sync from the phone for each instance it carried,
+        // duplicates included — the day summary's freshness reads it.
+        if ($metricsSynced) {
+            $metricsIntegration->markAsSuccessfullyUpdated();
+        }
+        if ($workoutsSynced) {
+            $workoutsIntegration->markAsSuccessfullyUpdated();
+        }
 
         return $results;
     }
