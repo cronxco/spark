@@ -60,10 +60,6 @@ class OuraVO2MaxData extends BaseProcessingJob
         }
 
         $sourceId = "oura_vo2_max_{$this->integration->id}_{$id}";
-        $exists = Event::where('source_id', $sourceId)->where('integration_id', $this->integration->id)->first();
-        if ($exists) {
-            return;
-        }
 
         $actor = $plugin->ensureUserProfile($this->integration);
         $target = $plugin->getStaticMetricObject(
@@ -75,7 +71,7 @@ class OuraVO2MaxData extends BaseProcessingJob
 
         [$encodedVO2, $vo2Multiplier] = $plugin->encodeNumericValue((float) $vo2Max);
 
-        Event::create([
+        Event::withTrashed()->updateOrCreate(['integration_id' => $this->integration->id, 'source_id' => $sourceId], [
             'source_id' => $sourceId,
             'time' => $timestamp ? Str::substr($timestamp, 0, 19) : ($day . ' 00:00:00'),
             'integration_id' => $this->integration->id,

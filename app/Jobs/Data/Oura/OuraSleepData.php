@@ -6,7 +6,6 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Oura\Traits\HasOuraBlocks;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class OuraSleepData extends BaseProcessingJob
@@ -37,19 +36,8 @@ class OuraSleepData extends BaseProcessingJob
             'sleep_count' => count($sleepItems),
         ]);
 
-        // Batch check existence to prevent N+1 queries
-        $sourceIds = collect($sleepItems)
-            ->map(fn ($item) => $item['day'] ? "oura_sleep_{$this->integration->id}_{$item['day']}" : null)
-            ->filter()
-            ->toArray();
-
-        $existingSourceIds = Event::where('integration_id', $this->integration->id)
-            ->whereIn('source_id', $sourceIds)
-            ->pluck('source_id')
-            ->flip(); // For O(1) lookup
-
         foreach ($sleepItems as $item) {
-            $this->createEnhancedSleepEvent($plugin, $item, $existingSourceIds);
+            $this->createEnhancedSleepEvent($plugin, $item);
         }
 
         Log::info('OuraSleepData: Completed processing sleep data', [
@@ -60,7 +48,7 @@ class OuraSleepData extends BaseProcessingJob
     /**
      * Create enhanced sleep event with full API v2 field support
      */
-    private function createEnhancedSleepEvent(OuraPlugin $plugin, array $item, Collection $existingSourceIds): void
+    private function createEnhancedSleepEvent(OuraPlugin $plugin, array $item): void
     {
         $day = $item['day'] ?? null;
         if (! $day) {
@@ -68,11 +56,6 @@ class OuraSleepData extends BaseProcessingJob
         }
 
         $sourceId = "oura_sleep_{$this->integration->id}_{$day}";
-
-        // Check existence in memory (no query)
-        if ($existingSourceIds->has($sourceId)) {
-            return;
-        }
 
         $actor = $plugin->ensureUserProfile($this->integration);
         $target = $plugin->getStaticMetricObject(
@@ -85,7 +68,7 @@ class OuraSleepData extends BaseProcessingJob
         $score = $item['score'] ?? null;
         [$encodedScore, $scoreMultiplier] = $plugin->encodeNumericValue($score);
 
-        $event = Event::create([
+        $event = Event::withTrashed()->updateOrCreate(['integration_id' => $this->integration->id, 'source_id' => $sourceId], [
             'source_id' => $sourceId,
             'time' => $day . ' 00:00:00',
             'integration_id' => $this->integration->id,

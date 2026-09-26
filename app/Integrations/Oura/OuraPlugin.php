@@ -33,6 +33,11 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
     protected string $redirectUri;
 
+    /**
+     * @var array<string, EventObject>
+     */
+    protected array $userProfiles = [];
+
     public function __construct()
     {
         $this->clientId = config('services.oura.client_id') ?? '';
@@ -1371,10 +1376,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         $sourceId = "oura_{$kind}_{$integration->id}_{$day}";
-        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
-        if ($exists) {
-            return;
-        }
 
         $actor = $this->ensureUserProfile($integration);
         $target = $this->getStaticMetricObject(
@@ -1405,7 +1406,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         ];
         $action = $actionMap[$kind] ?? 'scored';
 
-        $event = Event::create([
+        $event = Event::withTrashed()->updateOrCreate(['integration_id' => $integration->id, 'source_id' => $sourceId], [
             'source_id' => $sourceId,
             'time' => $day . ' 00:00:00',
             'integration_id' => $integration->id,
@@ -1986,7 +1987,15 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         return $data['data'] ?? [];
     }
 
+    /**
+     * Resolve the Oura user profile object, fetching personal info at most once per integration for this plugin instance.
+     */
     public function ensureUserProfile(Integration $integration): EventObject
+    {
+        return $this->userProfiles[$integration->id] ??= $this->fetchUserProfile($integration);
+    }
+
+    protected function fetchUserProfile(Integration $integration): EventObject
     {
         $info = $this->getJson('/usercollection/personal_info', $integration);
         $data = Arr::first($info['data'] ?? []) ?? $info;

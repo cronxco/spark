@@ -71,20 +71,6 @@ class OuraResilienceData extends BaseProcessingJob
 
         $sourceId = "oura_resilience_{$this->integration->id}_{$day}";
 
-        // Check if event already exists
-        $existingEvent = Event::where('source_id', $sourceId)
-            ->where('integration_id', $this->integration->id)
-            ->first();
-
-        if ($existingEvent) {
-            Log::debug('OuraResilienceData: Event already exists, skipping', [
-                'source_id' => $sourceId,
-                'integration_id' => $this->integration->id,
-            ]);
-
-            return;
-        }
-
         // Create actor and target
         $actor = $plugin->ensureUserProfile($this->integration);
         $target = $plugin->getStaticMetricObject(
@@ -98,7 +84,7 @@ class OuraResilienceData extends BaseProcessingJob
         [$encodedValue, $multiplier] = $plugin->encodeNumericValue($mappedValue);
 
         // Create the main resilience event with mapped level value
-        $event = Event::create([
+        $event = Event::withTrashed()->updateOrCreate(['integration_id' => $this->integration->id, 'source_id' => $sourceId], [
             'source_id' => $sourceId,
             'time' => $day . ' 00:00:00',
             'integration_id' => $this->integration->id,

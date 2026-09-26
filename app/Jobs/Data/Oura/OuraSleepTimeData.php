@@ -56,10 +56,6 @@ class OuraSleepTimeData extends BaseProcessingJob
         }
 
         $sourceId = "oura_sleep_time_{$this->integration->id}_{$id}";
-        $exists = Event::where('source_id', $sourceId)->where('integration_id', $this->integration->id)->first();
-        if ($exists) {
-            return;
-        }
 
         $actor = $plugin->ensureUserProfile($this->integration);
 
@@ -74,7 +70,7 @@ class OuraSleepTimeData extends BaseProcessingJob
             'Sleep timing recommendation'
         );
 
-        $event = Event::create([
+        $event = Event::withTrashed()->updateOrCreate(['integration_id' => $this->integration->id, 'source_id' => $sourceId], [
             'source_id' => $sourceId,
             'time' => $day . ' 00:00:00',
             'integration_id' => $this->integration->id,

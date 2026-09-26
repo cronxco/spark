@@ -56,12 +56,6 @@ class OuraSpo2Data extends BaseProcessingJob
         }
 
         $sourceId = "oura_spo2_{$this->integration->id}_{$id}";
-        $exists = Event::where('source_id', $sourceId)
-            ->where('integration_id', $this->integration->id)
-            ->first();
-        if ($exists) {
-            return;
-        }
 
         $actor = $plugin->ensureUserProfile($this->integration);
         $target = $plugin->getStaticMetricObject(
@@ -75,7 +69,7 @@ class OuraSpo2Data extends BaseProcessingJob
         $spo2Average = Arr::get($item, 'spo2_percentage.average');
         [$encodedSpo2, $spo2Multiplier] = $plugin->encodeNumericValue($spo2Average);
 
-        $event = Event::create([
+        $event = Event::withTrashed()->updateOrCreate(['integration_id' => $this->integration->id, 'source_id' => $sourceId], [
             'source_id' => $sourceId,
             'time' => $day . ' 00:00:00',
             'integration_id' => $this->integration->id,
