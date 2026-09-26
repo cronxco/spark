@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Livewire;
 
+use App\Models\ActionProgress;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
@@ -88,6 +89,32 @@ class UpdatesIndexTest extends TestCase
             ->assertSee('Update now')
             ->assertSee('Was due')
             ->assertDontSee('Next 2 hours ago');
+    }
+
+    #[Test]
+    public function an_overdue_integration_with_a_failed_migration_counts_once(): void
+    {
+        $integration = $this->makeIntegration('oura', 'Sleep', [
+            'last_successful_update_at' => now()->subHours(3),
+            'configuration' => ['update_frequency_minutes' => 60],
+        ]);
+        ActionProgress::create([
+            'user_id' => $this->user->id,
+            'action_type' => 'migration',
+            'action_id' => "integration_{$integration->id}",
+            'step' => 'fetching',
+            'message' => 'Fetching history',
+            'progress' => 40,
+            'total' => 100,
+            'failed_at' => now(),
+        ]);
+
+        Volt::actingAs($this->user)
+            ->test('updates.index')
+            ->assertSee('1 integration needs attention')
+            ->assertSee('Needs update')
+            ->assertSee('Migration failed')
+            ->assertDontSee('2 integrations need attention');
     }
 
     #[Test]

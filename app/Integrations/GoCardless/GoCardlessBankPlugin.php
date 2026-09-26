@@ -85,7 +85,7 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
         return [
             'label' => 'Weekly sweep',
             'window' => 'last 60 days',
-            'period_hours' => 24 * 7,
+            'period_hours' => 24 * 6,
             'config_key' => 'gocardless_last_sweep_at',
         ];
     }

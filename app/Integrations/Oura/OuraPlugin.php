@@ -58,7 +58,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         return [
             'label' => 'Daily sweep',
             'window' => 'last 30 days',
-            'period_hours' => 24,
+            'period_hours' => 22,
             'config_key' => 'oura_last_sweep_at',
         ];
     }

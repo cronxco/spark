@@ -48,7 +48,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsSweeps, 
         return [
             'label' => 'Weekly sweep',
             'window' => 'last 30 days',
-            'period_hours' => 24 * 7,
+            'period_hours' => 24 * 6,
             'config_key' => 'hevy_last_sweep_at',
         ];
     }

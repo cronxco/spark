@@ -55,7 +55,7 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         return [
             'label' => 'Daily sweep',
             'window' => 'last 30 days',
-            'period_hours' => 24,
+            'period_hours' => 22,
             'config_key' => 'monzo_last_sweep_at',
         ];
     }

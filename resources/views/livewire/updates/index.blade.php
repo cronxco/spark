@@ -50,11 +50,10 @@ new class extends Component
     public function summary(): array
     {
         $statuses = collect($this->groups)->flatMap(fn (array $group) => array_column($group['instances'], 'status'));
-        $failed = collect($this->groups)->sum(fn (array $group) => $group['counts']['failed']);
 
         return [
             'total' => $statuses->count(),
-            'needs_attention' => $statuses->filter(fn (string $status) => $status === 'needs_update')->count() + $failed,
+            'needs_attention' => collect($this->groups)->sum(fn (array $group) => $group['attention']),
             'processing' => $statuses->filter(fn (string $status) => $status === 'processing')->count(),
             'paused' => $statuses->filter(fn (string $status) => $status === 'paused')->count(),
             'stale' => $statuses->filter(fn (string $status) => $status === 'stale')->count(),
@@ -178,7 +177,9 @@ new class extends Component
             'cadence' => $sharedCadence,
             'sweep' => $this->describeSweep($pluginClass, $instances),
             'counts' => $counts,
-            'attention' => $counts['needs_update'] + $counts['failed'],
+            'attention' => collect($rows)
+                ->filter(fn (array $row) => $row['status'] === 'needs_update' || ($row['migration']['failed'] ?? false))
+                ->count(),
             'instances' => array_map(fn (array $row) => [...$row, 'show_cadence' => $sharedCadence === null], $rows),
         ];
     }
