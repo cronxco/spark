@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
 use App\Services\DaySummaryService;
+use App\Services\EffectiveTimezoneResolver;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -26,7 +27,7 @@ class BriefingController extends Controller
             return response()->json(['message' => 'Invalid date.'], 422);
         }
 
-        $date = $this->resolveDate($rawDate, $request->user()->getTimezone());
+        $date = $this->resolveDate($rawDate, app(EffectiveTimezoneResolver::class)->timezoneFor($request->user()));
 
         if ($date === null) {
             return response()->json(['message' => 'Invalid date.'], 422);

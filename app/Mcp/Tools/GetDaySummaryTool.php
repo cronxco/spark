@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Mcp\Helpers\DateParser;
 use App\Services\DaySummaryService;
+use App\Services\EffectiveTimezoneResolver;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -27,6 +28,9 @@ class GetDaySummaryTool extends Tool
         Returns structured domain sections (health, activity, money, media, knowledge)
         with baseline comparisons and anomaly detection.
         Much more compact than get-day-context — use this for daily briefings.
+        Relative dates and day boundaries follow the user's effective (time-travel) timezone,
+        named in `effective_timezone`; every timestamp carries that day's UTC offset, so its
+        clock time is already local.
     MARKDOWN;
 
     public function __construct(
@@ -53,7 +57,7 @@ class GetDaySummaryTool extends Tool
             $datesInput = [$datesInput];
         }
 
-        $dates = $this->parseDates($datesInput, $user->getTimezone());
+        $dates = $this->parseDates($datesInput, app(EffectiveTimezoneResolver::class)->timezoneFor($user));
 
         if (empty($dates)) {
             return Response::error('No valid dates provided. Use ISO format (YYYY-MM-DD) or relative: "today", "yesterday", "tomorrow".');

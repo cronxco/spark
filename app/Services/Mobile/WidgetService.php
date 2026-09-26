@@ -5,7 +5,7 @@ namespace App\Services\Mobile;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\DaySummaryService;
-use Carbon\Carbon;
+use App\Services\EffectiveTimezoneResolver;
 
 /**
  * Build small payloads for the iOS WidgetKit timeline entries.
@@ -28,7 +28,7 @@ class WidgetService
      */
     public function today(User $user): array
     {
-        $date = Carbon::today();
+        $date = app(EffectiveTimezoneResolver::class)->today($user);
         $summary = $this->summaryService->generateSummary($user, $date);
 
         $metrics = $this->extractTopMetrics($summary);
@@ -86,10 +86,11 @@ class WidgetService
     public function spend(User $user): array
     {
         $integrationIds = $user->integrations()->where('service', 'monzo')->pluck('id')->all();
+        $today = app(EffectiveTimezoneResolver::class)->today($user);
 
         if (empty($integrationIds)) {
             return [
-                'date' => Carbon::today()->toDateString(),
+                'date' => $today->toDateString(),
                 'total' => 0.0,
                 'unit' => 'GBP',
                 'currency' => 'GBP',
@@ -102,7 +103,7 @@ class WidgetService
             ->whereIn('integration_id', $integrationIds)
             ->where('service', 'monzo')
             ->where('domain', 'money')
-            ->whereDate('time', Carbon::today())
+            ->whereBetween('time', [$today->copy()->utc(), $today->copy()->endOfDay()->utc()])
             ->with('target')
             ->get();
 
@@ -135,7 +136,7 @@ class WidgetService
         }
 
         return [
-            'date' => Carbon::today()->toDateString(),
+            'date' => $today->toDateString(),
             'total' => round($total, 2),
             'unit' => $unit,
             'currency' => $unit,

@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Http\Resources\EventResource;
+use App\Mcp\Concerns\PresentsEventTimes;
 use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Event;
 use App\Services\Ai\EmbeddingClient;
@@ -18,7 +18,9 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class SearchEventsTool extends Tool
 {
+    use PresentsEventTimes;
     use RequiresSparkAbility;
+
     /**
      * The tool's description.
      */
@@ -26,6 +28,8 @@ class SearchEventsTool extends Tool
         Search for events using semantic (vector similarity) or keyword search.
         Events represent timestamped activities like transactions, workouts, media plays, etc.
         Returns matching events with similarity scores when using semantic search.
+        `time` is UTC; `local_time` is the same instant in the user's timezone at that moment
+        (named in `timezone`, which follows time travel). Quote clock times from `local_time`.
     MARKDOWN;
 
     public function __construct(
@@ -114,7 +118,7 @@ class SearchEventsTool extends Tool
             }
 
             $results = [
-                'events' => EventResource::collection($events)->resolve(request()),
+                'events' => $this->presentEvents($events, $user),
                 'meta' => [
                     'query' => $query,
                     'semantic' => $semantic,
@@ -125,8 +129,8 @@ class SearchEventsTool extends Tool
 
             // Add similarity scores if available
             if ($semantic && $events->isNotEmpty()) {
-                $results['events'] = $events->map(function ($event) {
-                    $data = (new EventResource($event))->resolve(request());
+                $results['events'] = $events->map(function ($event) use ($user) {
+                    $data = $this->presentEvent($event, $user);
                     if (isset($event->similarity)) {
                         $data['similarity'] = round(1 - $event->similarity, 4);
                     }

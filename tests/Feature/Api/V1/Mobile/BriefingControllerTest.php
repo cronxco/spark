@@ -61,6 +61,31 @@ class BriefingControllerTest extends TestCase
     }
 
     #[Test]
+    public function today_follows_an_acknowledged_travel_timezone(): void
+    {
+        // 21:00 in London on 25 Sep, but already 08:00 on 26 Sep in Auckland.
+        Carbon::setTestNow('2026-09-25 20:00:00 UTC');
+        $user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
+        $checkin = Integration::factory()->create(['user_id' => $user->id, 'service' => 'daily_checkin']);
+        Event::factory()->create([
+            'integration_id' => $checkin->id,
+            'service' => 'daily_checkin',
+            'action' => 'time_travel',
+            'event_metadata' => ['timezone' => 'Pacific/Auckland', 'acknowledged_at' => '2026-09-24T10:00:00.000000Z'],
+        ]);
+        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/briefing/today')
+            ->assertOk()
+            ->assertJsonPath('date', '2026-09-26')
+            ->assertJsonPath('effective_timezone', 'Pacific/Auckland');
+
+        $this->getJson('/api/v1/mobile/briefing/today?date=yesterday')
+            ->assertOk()
+            ->assertJsonPath('date', '2026-09-25');
+    }
+
+    #[Test]
     public function rejects_malformed_date(): void
     {
         Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);

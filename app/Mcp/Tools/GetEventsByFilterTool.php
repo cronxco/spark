@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Http\Resources\EventResource;
+use App\Mcp\Concerns\PresentsEventTimes;
 use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Services\Mobile\EventFeed;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -16,7 +16,9 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class GetEventsByFilterTool extends Tool
 {
+    use PresentsEventTimes;
     use RequiresSparkAbility;
+
     /**
      * The tool's description.
      */
@@ -24,6 +26,8 @@ class GetEventsByFilterTool extends Tool
         Filter events precisely by service, action, and date range.
         Unlike semantic search, this returns exact matches — use for specific queries
         like "all Monzo transactions this week" or "Oura sleep scores last 7 days".
+        `time` is UTC; `local_time` is the same instant in the user's timezone at that moment
+        (named in `timezone`, which follows time travel). Quote clock times from `local_time`.
     MARKDOWN;
 
     /**
@@ -64,7 +68,7 @@ class GetEventsByFilterTool extends Tool
             'action' => $result['action'],
             'total_count' => $result['total_count'],
             'returned_count' => $result['returned_count'],
-            'events' => EventResource::collection($result['events'])->resolve(request()),
+            'events' => $this->presentEvents($result['events'], $user),
         ];
 
         return Response::text(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));

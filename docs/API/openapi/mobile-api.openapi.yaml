@@ -91,8 +91,10 @@ paths:
         sync_status carries a stale/as_of freshness judgement per connected
         service, including services with nothing to report for the day.
         sections.money splits total_spend from internal_transfers and
-        total_in and carries total_spend_vs_baseline_pct. See mobile_API.md
-        for the full response shape.
+        total_in and carries total_spend_vs_baseline_pct. Every timestamp
+        carries the day's effective-timezone UTC offset (for a past date, the
+        zone acknowledged on that date). See mobile_API.md for the full
+        response shape.
       parameters:
         - { name: date, in: query, schema: { type: string, default: today } }
         - {
