@@ -1378,7 +1378,7 @@ Before writing today's digest verify:
 
 - [ ] trigger payload read before any date/period decisions;
 - [ ] `period`, `local_date`, and `timezone` taken directly from the payload;
-- [ ] every clock time quoted is local to `timezone` — UTC (`Z`/`+00:00`) readings converted;
+- [ ] every clock time quoted uses its applicable source timezone; for Pass One, use `effective_timezone` when it differs from `timezone`;
 - [ ] morning `trigger_reason` / `sleep_score_event_id` understood where relevant;
 - [ ] current style guide fetched;
 - [ ] Notes to Flint fetched before interpreting other sources;
