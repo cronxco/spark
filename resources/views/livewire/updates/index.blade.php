@@ -83,6 +83,7 @@ new class extends Component
                 ->orderByDesc('time')
                 ->limit(1),
             ])
+            ->with('group')
             ->orderBy('integration_group_id')
             ->orderBy('name')
             ->get()
@@ -169,6 +170,8 @@ new class extends Component
             'failed' => collect($rows)->filter(fn (array $row) => $row['migration']['failed'] ?? false)->count(),
         ];
 
+        $instanceRows = array_map(fn (array $row) => [...$row, 'show_cadence' => $sharedCadence === null], $rows);
+
         return [
             'service' => $service,
             'name' => $name,
@@ -180,8 +183,33 @@ new class extends Component
             'attention' => collect($rows)
                 ->filter(fn (array $row) => $row['status'] === 'needs_update' || ($row['migration']['failed'] ?? false))
                 ->count(),
-            'instances' => array_map(fn (array $row) => [...$row, 'show_cadence' => $sharedCadence === null], $rows),
+            'instances' => $instanceRows,
+            'connections' => $this->describeConnections($instanceRows),
         ];
+    }
+
+    /**
+     * Instances split by the connection (IntegrationGroup) they belong to, so a
+     * plugin with several bank or account connections reads as sections.
+     * Connections without a stored name are numbered rather than showing a raw
+     * ID, and sections are ordered by label.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array{id: string, label: string, instances: array<int, array<string, mixed>>}>
+     */
+    private function describeConnections(array $rows): array
+    {
+        return collect($rows)
+            ->groupBy('connection_id')
+            ->values()
+            ->map(fn (Collection $connectionRows, int $index) => [
+                'id' => (string) $connectionRows->first()['connection_id'],
+                'label' => $connectionRows->first()['connection_label'] ?? __('Connection :number', ['number' => $index + 1]),
+                'instances' => $connectionRows->all(),
+            ])
+            ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
     }
 
     /**
@@ -194,6 +222,8 @@ new class extends Component
         return [
             'id' => $integration->id,
             'name' => $integration->name ?: $pluginName,
+            'connection_id' => $integration->integration_group_id ?? 'none',
+            'connection_label' => $this->connectionLabel($integration),
             'status' => $integration->statusKey($lastEventTime),
             'receives_pushed_data' => $receivesPushedData,
             'is_manual' => $serviceType === 'manual',
@@ -203,6 +233,19 @@ new class extends Component
             'cadence' => $receivesPushedData ? null : $this->describeCadence($integration),
             'migration' => $this->describeMigration($integration, $progress),
         ];
+    }
+
+    private function connectionLabel(Integration $integration): ?string
+    {
+        $metadata = $integration->group?->auth_metadata;
+
+        if (! is_array($metadata)) {
+            return null;
+        }
+
+        $label = $metadata['gocardless_institution_name'] ?? $metadata['institution_name'] ?? null;
+
+        return is_string($label) && $label !== '' ? $label : null;
     }
 
     private function describeCadence(Integration $integration): string
@@ -416,7 +459,11 @@ new class extends Component
                             wire:click="toggle('{{ $service }}')"
                             aria-expanded="{{ $isOpen ? 'true' : 'false' }}"
                             aria-controls="group-{{ $service }}"
-                            class="flex w-full items-center gap-3 rounded-box p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                            @class([
+                                'flex w-full items-center gap-3 bg-base-200 p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                                'rounded-t-box' => $isOpen,
+                                'rounded-box' => ! $isOpen,
+                            ])
                         >
                             <x-icon :name="$group['icon']" class="h-5 w-5 shrink-0" />
                             <span class="flex min-w-0 flex-1 flex-col">
@@ -465,9 +512,17 @@ new class extends Component
                     </h2>
 
                     @if ($isOpen)
+                        @php($showConnections = count($group['connections']) > 1)
                         <ul id="group-{{ $service }}" class="divide-y divide-base-300 border-t border-base-300">
-                            @foreach ($group['instances'] as $instance)
-                                <li wire:key="instance-{{ $instance['id'] }}" class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                            @foreach ($group['connections'] as $connection)
+                            @if ($showConnections)
+                                <li wire:key="connection-{{ $service }}-{{ $connection['id'] }}" class="flex items-center justify-between gap-3 bg-base-200/50 px-4 py-2">
+                                    <h3 class="font-mono text-sm font-semibold">{{ $connection['label'] }}</h3>
+                                    <span class="text-sm text-base-content/70">{{ trans_choice('{1} 1 instance|[2,*] :count instances', count($connection['instances']), ['count' => count($connection['instances'])]) }}</span>
+                                </li>
+                            @endif
+                            @foreach ($connection['instances'] as $instance)
+                                <li wire:key="instance-{{ $instance['id'] }}" @class(['flex flex-col gap-3 p-4 sm:flex-row sm:items-center', 'sm:pl-8' => $showConnections])>
                                     <div class="flex min-w-0 flex-1 flex-col gap-1">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <a href="{{ route('integrations.details', $instance['id']) }}" class="truncate font-semibold hover:underline">{{ $instance['name'] }}</a>
@@ -541,6 +596,7 @@ new class extends Component
                                         />
                                     </div>
                                 </li>
+                            @endforeach
                             @endforeach
                         </ul>
                     @endif
