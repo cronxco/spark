@@ -151,6 +151,25 @@ Do **not**:
 
 Derive `yesterday` and `tomorrow` relative to `local_date` in `timezone`.
 
+### Clock times — always local, never raw UTC
+
+Tool timestamps are instants, not local clock readings. Before any clock time
+reaches prose, an insight, a question or Reflections, express it in local time:
+
+- **Spark day summary** timestamps already carry the day's offset
+  (`2026-09-25T01:06:53+01:00`) — read the clock time as given.
+- **Spark events** carry both `time` (UTC) and `local_time` plus `timezone` —
+  quote `local_time`, never `time`.
+- **Anything ending in `Z` or `+00:00`** (email `receivedAt`, calendar and other
+  external sources, older payloads) is UTC. Convert it into `timezone` first —
+  `00:06Z` is `01:06` in British Summer Time, not "just after midnight".
+
+`timezone` follows time travel, so never assume `Europe/London`. For a past day
+(Pass One), the day summary's `effective_timezone` for that date is the zone Will
+was in then — use it over the payload's `timezone` if they differ. If an instant
+cannot be converted with confidence, describe it without a clock time ("overnight",
+"late evening") rather than quoting a UTC reading as local.
+
 ### Pass Two date window
 
 | Period | Dates |
@@ -1359,6 +1378,7 @@ Before writing today's digest verify:
 
 - [ ] trigger payload read before any date/period decisions;
 - [ ] `period`, `local_date`, and `timezone` taken directly from the payload;
+- [ ] every clock time quoted uses its applicable source timezone; for Pass One, use `effective_timezone` when it differs from `timezone`;
 - [ ] morning `trigger_reason` / `sleep_score_event_id` understood where relevant;
 - [ ] current style guide fetched;
 - [ ] Notes to Flint fetched before interpreting other sources;
