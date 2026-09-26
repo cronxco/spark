@@ -385,7 +385,8 @@ class UpToSpeedController extends Controller
         return $events->map(function (Event $event) use ($summaryBlockTypes): array {
             $blocks = $event->blocks->keyBy('block_type');
             $payload = [
-                'title' => $event->displayTargetTitle() ?? $event->actor?->title ?? 'Untitled',
+                'title' => $this->newsTitle($event),
+                'publication' => $this->newsPublication($event),
                 'source' => $event->service,
                 'url' => $event->displayTargetUrl(),
                 'time' => $event->time->toIso8601String(),
@@ -418,6 +419,39 @@ class UpToSpeedController extends Controller
                 'payload' => $payload,
             ];
         })->all();
+    }
+
+    /**
+     * A newsletter event targets its publication, so the target title is the
+     * masthead ("POLITICO London Playbook") rather than the issue itself. The
+     * email subject is what distinguishes one issue from the next.
+     */
+    private function newsTitle(Event $event): string
+    {
+        if ($event->service === 'newsletter') {
+            $subject = trim((string) data_get($event->event_metadata, 'email_subject', ''));
+            if ($subject !== '') {
+                return $subject;
+            }
+        }
+
+        return $event->displayTargetTitle() ?? $event->actor?->title ?? 'Untitled';
+    }
+
+    /**
+     * The outlet an article came from, where Spark knows it. Only newsletters
+     * carry a stable publication object; fetched pages and bookmarks return
+     * null and the client falls back to the URL host.
+     */
+    private function newsPublication(Event $event): ?string
+    {
+        if ($event->service !== 'newsletter') {
+            return null;
+        }
+
+        $publication = $event->target?->title ?? data_get($event->event_metadata, 'email_from_name');
+
+        return filled($publication) ? (string) $publication : null;
     }
 
     /**
