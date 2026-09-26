@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OuraSweepTest extends TestCase
@@ -41,11 +42,19 @@ class OuraSweepTest extends TestCase
             'service' => 'oura',
             'instance_type' => 'activity',
         ]);
+
+        // Events are attributed to the Oura user profile, which the plugin
+        // resolves from personal_info before writing any event.
+        Http::fake([
+            'api.ouraring.com/v2/usercollection/personal_info*' => Http::response([
+                'id' => 'oura-user-1',
+                'email' => 'sleeper@example.com',
+                'age' => 35,
+            ]),
+        ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_sweep_if_needed_runs_when_no_previous_sweep(): void
     {
         // Mock API responses
@@ -96,9 +105,7 @@ class OuraSweepTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_sweep_if_needed_skips_when_recent_sweep(): void
     {
         // Set recent sweep timestamp
@@ -125,9 +132,7 @@ class OuraSweepTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_sweep_if_needed_runs_when_old_sweep(): void
     {
         // Set old sweep timestamp (25 hours ago)
@@ -157,9 +162,7 @@ class OuraSweepTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_data_sweep_creates_events_for_all_data_types(): void
     {
         // Mock API responses with different data types
@@ -201,9 +204,7 @@ class OuraSweepTest extends TestCase
         $this->assertEquals(['did_workout', 'had_activity_score', 'had_readiness_score', 'had_sleep_score'], $eventTypes->toArray());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_data_sweep_handles_api_errors_gracefully(): void
     {
         // Mock API error response
@@ -228,9 +229,7 @@ class OuraSweepTest extends TestCase
         $this->assertEquals(0, Event::where('integration_id', $this->integration->id)->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_works_for_different_instance_types(): void
     {
         // Test with different instance types
@@ -257,6 +256,8 @@ class OuraSweepTest extends TestCase
                 'api.ouraring.com/v2/usercollection/daily_activity*' => Http::response(['data' => []]),
                 'api.ouraring.com/v2/usercollection/daily_sleep*' => Http::response(['data' => []]),
                 'api.ouraring.com/v2/usercollection/daily_readiness*' => Http::response(['data' => []]),
+                'api.ouraring.com/v2/usercollection/daily_stress*' => Http::response(['data' => []]),
+                'api.ouraring.com/v2/usercollection/daily_resilience*' => Http::response(['data' => []]),
             ]);
 
             // Call fetchData
@@ -277,9 +278,7 @@ class OuraSweepTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_timestamp_format_is_correct(): void
     {
         // Mock API responses
