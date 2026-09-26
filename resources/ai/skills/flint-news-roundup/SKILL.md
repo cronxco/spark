@@ -229,6 +229,54 @@ Three things this block must not be, each of which has actually happened:
 - **Not a teaser.** This is the version someone reads instead of the full
   section, not an advertisement for it. It should stand on its own.
 
+### How each field reads on the card
+
+The app puts these fields on one phone screen, in this order: title, `content`,
+`why_it_matters`, `what_to_watch`, then the sources. Most mornings Will reads
+only the top of that screen, so each field has to earn its place.
+
+- **`title` states what happened.** Write it as a news headline: the development
+  in plain words. Do not describe how much is known. "Man City found guilty on
+  most financial charges" is a headline. "Manchester City faces a ruling, but
+  not yet a settled public account" is a note about the evidence, and it makes
+  Will work out what the news was.
+- **`content` leads with the fact.** The first sentence is what happened. Give
+  the limit of what is established in at most one short clause after that; do
+  not wrap every claim in a caveat. Never mention the pipeline: no "the supplied
+  summaries", "the report does not establish" or "the sources provided". Will
+  did not supply anything, and to him the story is the news, not your inputs.
+- **`sources` lists only outlets that reported *this* story.** Every entry has
+  to be about the same event as the headline. An unrelated item from the same
+  newsletter does not belong just because it was nearby. A Meta call-centre
+  item under a UK AI-access story is a clustering error, and it makes the card
+  look like it's padding. Each `position` says what that outlet claimed or
+  emphasised, in a full sentence.
+- **`why_it_matters` is about Will, not Spark.** Connect it to his work, money,
+  plans or a real interest, in words he'd use. Never refer to Spark or Flint
+  internals: no "updates the active … Topic", "Topic", "digest" or "thread".
+  If there is no genuine connection, **omit the field**; the card is better
+  without it than with a generic line.
+- **`what_to_watch` names the next event.** Make it a concrete thing that could
+  happen, with a date when the sources give one ("The commission's full
+  findings, due within 28 days"). A bare list of nouns is not enough.
+
+Before and after, from a real run:
+
+```text
+title:   ✗ "Manchester City faces a ruling, but not yet a settled public account"
+         ✓ "Man City found guilty on most financial charges"
+content: ✗ "Manchester City was reportedly found guilty of nearly all alleged
+            financial-rule breaches, but the supplied summaries do not state the
+            detailed findings, sanction or appeal timetable."
+         ✓ "An independent commission has found Manchester City guilty of nearly
+            all the Premier League's financial charges. The sanction and any
+            appeal route haven't been published yet."
+why_it_matters:
+         ✗ "It updates the active AI safety and governance Topic with a
+            reported practical constraint on testing access."
+         ✓ omitted, unless the story touches something Will is actually doing
+```
+
 Give every block a **distinct title**. Two blocks sharing a title and type in one
 digest silently overwrite each other and you lose a story with no error.
 

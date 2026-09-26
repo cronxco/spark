@@ -399,6 +399,104 @@ class UpToSpeedControllerTest extends TestCase
     }
 
     /**
+     * A newsletter event targets its publication, so without the subject every
+     * issue of the same newsletter would be titled with the masthead.
+     */
+    #[Test]
+    public function newsletter_items_carry_the_publication_and_issue_subject(): void
+    {
+        $publication = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'POLITICO London Playbook',
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'newsletter',
+            'action' => 'received_post',
+            'target_id' => $publication->id,
+            'event_metadata' => ['email_subject' => 'City verdict lands'],
+            'time' => now()->subHours(3),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'newsletter_tldr',
+            'metadata' => ['content' => 'The commission found against City.'],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $newsItem = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
+            ->firstWhere('type', 'news_summary');
+
+        $this->assertNotNull($newsItem);
+        $this->assertEquals('City verdict lands', $newsItem['payload']['title']);
+        $this->assertEquals('POLITICO London Playbook', $newsItem['payload']['publication']);
+    }
+
+    #[Test]
+    public function newsletter_without_a_subject_falls_back_to_the_publication_title(): void
+    {
+        $publication = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'The Economist Espresso',
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'newsletter',
+            'action' => 'received_post',
+            'target_id' => $publication->id,
+            'event_metadata' => ['email_subject' => '   '],
+            'time' => now()->subHours(3),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'newsletter_tldr',
+            'metadata' => ['content' => 'Short summary'],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $newsItem = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
+            ->firstWhere('type', 'news_summary');
+
+        $this->assertEquals('The Economist Espresso', $newsItem['payload']['title']);
+        $this->assertEquals('The Economist Espresso', $newsItem['payload']['publication']);
+    }
+
+    #[Test]
+    public function fetched_items_leave_publication_null_for_the_client_to_derive(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'fetch',
+            'action' => 'bookmarked',
+            'time' => now()->subHours(2),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_tldr',
+            'metadata' => ['content' => 'Short summary'],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $newsItem = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
+            ->firstWhere('type', 'news_summary');
+
+        $this->assertNotNull($newsItem);
+        $this->assertArrayHasKey('publication', $newsItem['payload']);
+        $this->assertNull($newsItem['payload']['publication']);
+    }
+
+    /**
      * A busy monitored page must not prevent older, distinct reading from
      * filling the requested queue just because its repeated events span more
      * than one candidate batch.
