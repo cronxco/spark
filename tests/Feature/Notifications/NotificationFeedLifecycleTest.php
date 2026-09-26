@@ -140,7 +140,86 @@ class NotificationFeedLifecycleTest extends TestCase
         $this->assertNull($persistent->fresh()->archived_at);
         $this->assertNull($oldHistory->fresh());
         $this->assertNotNull($activeProgress->fresh());
+        $this->assertTrue($activeProgress->fresh()->isFailed());
         $this->assertNull($terminalProgress->fresh());
+    }
+
+    #[Test]
+    public function maintenance_fails_abandoned_activity_so_it_leaves_the_active_count(): void
+    {
+        $user = User::factory()->create();
+
+        $abandoned = ActionProgress::createProgress(
+            (string) $user->id,
+            'deletion',
+            (string) Str::uuid(),
+            'analyzing',
+            'Found data to delete',
+            20,
+        );
+        $abandoned->forceFill(['created_at' => now()->subMonths(4), 'updated_at' => now()->subMonths(4)])->saveQuietly();
+
+        $running = ActionProgress::createProgress(
+            (string) $user->id,
+            'migration',
+            (string) Str::uuid(),
+            'fetching',
+            'Starting data fetch...',
+            30,
+        );
+        $running->forceFill(['updated_at' => now()->subHours(2)])->saveQuietly();
+
+        $service = app(NotificationFeedService::class);
+        $this->assertSame(2, $service->feed($user)['counts']['active_activity']);
+
+        $this->artisan('notifications:maintain-history')->assertSuccessful();
+
+        $abandoned->refresh();
+        $this->assertTrue($abandoned->isFailed());
+        $this->assertSame('failed', $abandoned->step);
+        $this->assertStringContainsString('Stopped responding', $abandoned->error_message);
+        $this->assertSame('analyzing', $abandoned->details['abandoned_step']);
+        $this->assertTrue($running->fresh()->isInProgress());
+        $this->assertSame(1, $service->feed($user)['counts']['active_activity']);
+    }
+
+    #[Test]
+    public function maintenance_dry_run_does_not_fail_abandoned_activity(): void
+    {
+        $user = User::factory()->create();
+        $abandoned = ActionProgress::createProgress(
+            (string) $user->id,
+            'migration',
+            (string) Str::uuid(),
+            'fetching',
+            'Starting data fetch...',
+            30,
+        );
+        $abandoned->forceFill(['updated_at' => now()->subDays(3)])->saveQuietly();
+
+        $this->artisan('notifications:maintain-history', ['--dry-run' => true])->assertSuccessful();
+
+        $this->assertTrue($abandoned->fresh()->isInProgress());
+    }
+
+    #[Test]
+    public function maintenance_respects_a_custom_stale_threshold(): void
+    {
+        $user = User::factory()->create();
+        $progress = ActionProgress::createProgress(
+            (string) $user->id,
+            'sync',
+            (string) Str::uuid(),
+            'processing',
+            'Working',
+        );
+        $progress->forceFill(['updated_at' => now()->subHours(3)])->saveQuietly();
+
+        $this->artisan('notifications:maintain-history')->assertSuccessful();
+        $this->assertTrue($progress->fresh()->isInProgress());
+
+        $this->artisan('notifications:maintain-history', ['--stale-hours' => 2])->assertSuccessful();
+        $this->assertTrue($progress->fresh()->isFailed());
     }
 
     /** @param array<string, mixed> $data */

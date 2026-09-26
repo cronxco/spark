@@ -16,14 +16,15 @@ class MaintainNotificationHistory extends Command
      * @var string
      */
     protected $signature = 'notifications:maintain-history
-        {--dry-run : Report changes without writing them}';
+        {--dry-run : Report changes without writing them}
+        {--stale-hours=24 : Fail in-progress activity with no updates for this many hours}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Archive expired notification feed items and prune terminal history after 30 days';
+    protected $description = 'Archive expired notification feed items, fail abandoned activity and prune terminal history after 30 days';
 
     /**
      * Execute the console command.
@@ -34,6 +35,7 @@ class MaintainNotificationHistory extends Command
         $archived = 0;
         $deletedNotifications = 0;
         $deletedActivities = 0;
+        $staleHours = max(1, (int) $this->option('stale-hours'));
 
         foreach (NotificationCatalogue::all() as $type => $definition) {
             $activeHours = $definition['active_hours'];
@@ -75,6 +77,26 @@ class MaintainNotificationHistory extends Command
             });
         }
 
+        $staleActivities = ActionProgress::query()
+            ->whereNull('completed_at')
+            ->whereNull('failed_at')
+            ->where('updated_at', '<', now()->subHours($staleHours));
+
+        if ($dryRun) {
+            $failedActivities = $staleActivities->count();
+        } else {
+            $failedActivities = 0;
+            $staleActivities->chunkById(250, function ($activities) use ($staleHours, &$failedActivities) {
+                foreach ($activities as $activity) {
+                    $activity->markFailed("Stopped responding: no progress for over {$staleHours} hours", [
+                        'abandoned_step' => $activity->step,
+                        'abandoned_message' => $activity->message,
+                    ]);
+                    $failedActivities++;
+                }
+            });
+        }
+
         $notificationHistory = DatabaseNotification::query()
             ->whereNotNull('archived_at')
             ->where('archived_at', '<', now()->subDays(30));
@@ -93,10 +115,11 @@ class MaintainNotificationHistory extends Command
         }
 
         $this->table(
-            ['Mode', 'Archived', 'Deleted notifications', 'Deleted activities'],
+            ['Mode', 'Archived', 'Failed stale activities', 'Deleted notifications', 'Deleted activities'],
             [[
                 $dryRun ? 'dry-run' : 'write',
                 $archived,
+                $failedActivities,
                 $deletedNotifications,
                 $deletedActivities,
             ]],
