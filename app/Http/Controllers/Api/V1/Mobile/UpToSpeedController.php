@@ -155,7 +155,11 @@ class UpToSpeedController extends Controller
             ->where('action', 'had_summary')
             ->whereBetween('time', $this->localDayRange($today, $timezone))
             ->with('blocks')
+            // All of a day's digests share the same `time` (the local day),
+            // so the run order comes from `created_at`.
             ->orderBy('time', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->get();
 
         return $events->map(function (Event $event): array {

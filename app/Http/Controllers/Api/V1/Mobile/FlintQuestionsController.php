@@ -64,7 +64,12 @@ class FlintQuestionsController extends Controller
             ->with('event');
 
         if ($since !== null) {
-            $query->where('time', '>=', $since);
+            // The same moment the response presents as `asked_at`: when the
+            // question was written, not its digest's day, which would drop
+            // last night's question from a morning `since=24h`.
+            $query->where(fn ($q) => $q
+                ->where('created_at', '>=', $since)
+                ->orWhere(fn ($q) => $q->whereNull('created_at')->where('time', '>=', $since)));
         } elseif ($statuses === ['open']) {
             // Preserves the original default: an open-only list is naturally
             // bounded by the retirement horizon, so the badge doesn't grow
@@ -78,8 +83,12 @@ class FlintQuestionsController extends Controller
             }
         });
 
+        // A question's `time` is its digest's local day, shared by every
+        // question that day; `created_at` puts the evening's above the
+        // morning's.
         $questions = $query
             ->orderByDesc('time')
+            ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->cursorPaginate($limit, ['*'], 'cursor');
 

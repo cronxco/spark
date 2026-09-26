@@ -67,7 +67,11 @@ class GetLatestFlintDigestTool extends Tool
             ->where('time', '>=', $dayStart->copy()->setTimezone('UTC'))
             ->where('time', '<', $dayEnd->copy()->setTimezone('UTC'))
             ->with('blocks')
-            ->orderBy('time', 'desc');
+            // A day's digests all share `time` (the local day); `created_at`
+            // decides which one is the latest.
+            ->orderBy('time', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc');
 
         if ($period) {
             $query->whereJsonContains('event_metadata->period', $period);
