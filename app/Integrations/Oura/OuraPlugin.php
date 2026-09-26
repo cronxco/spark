@@ -3,6 +3,7 @@
 namespace App\Integrations\Oura;
 
 use App\Integrations\Base\OAuthPlugin;
+use App\Integrations\Contracts\SupportsSweeps;
 use App\Integrations\Contracts\SupportsValueMapping;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -21,7 +22,7 @@ use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
 use Throwable;
 
-class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
+class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMapping
 {
     protected string $baseUrl = 'https://api.ouraring.com/v2';
 
@@ -47,6 +48,19 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         if (app()->environment() !== 'testing' && (empty($this->clientId) || empty($this->clientSecret))) {
             throw new InvalidArgumentException('Oura OAuth credentials are not configured');
         }
+    }
+
+    /**
+     * @return array{label: string, window: string, period_hours: int, config_key: string}
+     */
+    public static function getSweepSchedule(): array
+    {
+        return [
+            'label' => 'Daily sweep',
+            'window' => 'last 30 days',
+            'period_hours' => 24,
+            'config_key' => 'oura_last_sweep_at',
+        ];
     }
 
     public static function getIcon(): string
