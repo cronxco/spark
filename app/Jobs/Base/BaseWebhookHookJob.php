@@ -83,6 +83,19 @@ abstract class BaseWebhookHookJob implements ShouldQueue
             // Dispatch processing jobs for each chunk
             $this->dispatchProcessingJobs($processingData);
 
+            // A push is this integration's sync. Without it nothing ever
+            // records one, and freshness checks (the day summary's
+            // `as_of`/`coverage`) had only event timestamps to go on. It is
+            // bookkeeping: failing it must not fail — and so retry and
+            // re-dispatch — a push whose chunks are already queued.
+            try {
+                $this->integration->markAsSuccessfullyUpdated();
+            } catch (Throwable $exception) {
+                Log::warning("Failed to mark integration {$this->integration->id} ({$this->serviceName}) as updated after {$this->getJobType()} webhook", [
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+
             try {
                 $store->recordStatus($this->integration, $task, 'success', [
                     'chunks' => is_array($processingData) ? count($processingData) : 0,

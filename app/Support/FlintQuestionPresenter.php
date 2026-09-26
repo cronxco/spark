@@ -35,7 +35,10 @@ class FlintQuestionPresenter
             'question' => $metadata['question'] ?? $block->title,
             'topic' => $metadata['topic'] ?? null,
             'answer_options' => $metadata['answer_options'] ?? null,
-            'asked_at' => $block->time?->toIso8601String() ?? $block->created_at?->toIso8601String(),
+            // A digest block's `time` is the digest's local day (midnight),
+            // not the moment Flint asked — an evening question would read
+            // as asked 19 hours ago. The block is written when it is asked.
+            'asked_at' => $block->created_at?->toIso8601String() ?? $block->time?->toIso8601String(),
             'effective_answer' => $status === 'answered' ? [
                 'answer' => $metadata['answer'] ?? null,
                 'context' => $metadata['answer_note'] ?? null,

@@ -352,14 +352,14 @@ The shape of each section is domain-specific and driven by `DaySummaryService`.
 
 **`sync_status`** carries one entry per service the user has connected — including a service with nothing to report today, which is different from a service that's behind and must be distinguishable from it:
 
-| Field             | Type                                 | Description                                                                                                                |
-| ----------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `event_count`     | integer                              | Events from this service on this day.                                                                                      |
-| `last_event_time` | string\|null                         | ISO timestamp of the newest event that day, or `null` if none.                                                             |
-| `actions`         | string[]                             | Distinct actions seen that day.                                                                                            |
-| `as_of`           | string\|null                         | When the server last **successfully reached** the service — not the same as `last_event_time`. `null` if never synced.     |
-| `stale`           | boolean                              | The server's own judgement that this service is behind, using the cadence it knows that integration runs at.               |
-| `coverage`        | `"complete"`\|`"partial"` (optional) | Only present for services whose data can arrive partially within a day (currently `apple_health`); absent everywhere else. |
+| Field             | Type                                 | Description                                                                                                                                                                                                                                                   |
+| ----------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `event_count`     | integer                              | Events from this service on this day.                                                                                                                                                                                                                         |
+| `last_event_time` | string\|null                         | ISO timestamp of the newest event that day, or `null` if none.                                                                                                                                                                                                |
+| `actions`         | string[]                             | Distinct actions seen that day.                                                                                                                                                                                                                               |
+| `as_of`           | string\|null                         | When the server last **successfully reached** the service — not the same as `last_event_time`. For services that push to Spark (webhooks, manual entry) it is the last push, or failing that the last thing received. `null` if nothing ever has been.        |
+| `stale`           | boolean                              | The server's own judgement that this service is behind: for polled services against the cadence it knows the integration runs at; for webhooks, nothing received within the plugin's window (24h). Manual entry is never stale.                               |
+| `coverage`        | `"complete"`\|`"partial"` (optional) | Only present for services whose data can arrive partially within a day (currently `apple_health`); absent everywhere else. `"partial"` when the last push is more than two hours old, so the day's running totals (steps, exercise minutes, …) may be behind. |
 
 **`sections.money`** splits money movement by where it actually went, rather than reporting one `total_spend` that mixes real spend with internal transfers:
 
@@ -367,7 +367,11 @@ The shape of each section is domain-specific and driven by `DaySummaryService`.
 - `internal_transfers` — movement between the user's own accounts and pots (e.g. a savings sweep, a pot withdrawal).
 - `total_in` — inbound from third parties.
 - Each entry in `transactions` carries its own resolved `direction` (`"in"`\|`"out"`\|`"internal"`\|`"excluded"`\|`"unknown"`) — same values as the `direction` field on [CompactEvent](#compactevent) money events in `GET /feed`.
-- `total_spend_vs_baseline_pct` — the day's spend against the user's own daily-spend history (mean over the trailing 60 days, minimum 5 days with any spend). When there isn't enough history yet, `total_spend_baseline_unavailable_reason: "insufficient_history"` is present instead.
+- `total_spend_vs_baseline_pct` — the day's spend against the user's own daily-spend history (mean over the trailing 60 days, minimum 5 days with any spend). When there isn't enough history yet, `total_spend_baseline_unavailable_reason: "insufficient_history"` is present instead; on a day with no spend it is `"no_spend"` (zero against any baseline would only ever read as −100%).
+
+**`sections.health.sleep_duration`** is the main sleep that **ended** on this day — the night the day's `sleep_score` describes — even though it began the evening before. A nap on the same day never displaces it. `efficiency_pct` is Oura's measured sleep efficiency (time asleep ÷ time in bed, a percentage), distinct from the `Efficiency` entry in `sleep_score.contributors`, which is a 0–100 rating.
+
+**`is_anomaly`** on a metric is `false` while the value is only low because the day isn't over: running daily totals (`steps`, `distance_km`, `active_energy_kcal`, `exercise_minutes`, `flights_climbed`, `stand_hours`) are not flagged low until the day has ended. A direction the user has suppressed is not flagged either.
 
 ---
 
@@ -1470,6 +1474,9 @@ other status combination, or an explicit `since`, is bounded by `since` alone.
 
 `title` is the short label the digest block itself carries — the same
 title the block shows inline. `question` remains the full question text.
+`asked_at` is when Flint wrote the question, not the digest's local day, and
+questions are listed newest first within a day, so an evening question sits
+above that morning's.
 
 The mobile representation never includes question priority.
 

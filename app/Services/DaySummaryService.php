@@ -47,6 +47,10 @@ class DaySummaryService
         // Query all events for this date
         $events = $this->queryEvents($user, $startOfDay, $endOfDay, $domains);
 
+        if (! $domains || in_array('health', $domains)) {
+            $events = $this->attributeSleepToWakeDay($user, $events, $localDate);
+        }
+
         // Pre-load metrics for baseline comparisons
         $metricsCache = $this->loadMetricsForEvents($user, $events);
 
@@ -122,6 +126,53 @@ class DaySummaryService
     }
 
     /**
+     * A night's sleep belongs to the day it ends on — that is the day Oura
+     * scores it for — but a `slept_for` event is stamped at bedtime, which
+     * is almost always the evening before. Without this, a day's summary
+     * carries the sleep score for last night alongside the duration of
+     * tonight's (or nothing at all until tomorrow).
+     *
+     * Drops sleep that ends on another day and pulls in sleep that started
+     * the previous local day and ended on this one. Naps start and end on
+     * the same day and are unaffected.
+     */
+    protected function attributeSleepToWakeDay(User $user, Collection $events, Carbon $localDate): Collection
+    {
+        $dayStart = $localDate->copy()->startOfDay();
+        $dayEnd = $localDate->copy()->endOfDay();
+
+        $isSleep = fn (Event $event): bool => $event->service === 'oura' && $event->action === 'slept_for';
+        $wakeTime = function (Event $event): ?Carbon {
+            $end = data_get($event->event_metadata, 'end');
+
+            return is_string($end) ? Carbon::parse($end) : null;
+        };
+        $wokeOnThisDay = function (Event $event) use ($wakeTime, $dayStart, $dayEnd): bool {
+            $end = $wakeTime($event);
+
+            return $end !== null && $end->betweenIncluded($dayStart, $dayEnd);
+        };
+
+        // Sleep with no recorded wake time stays where its bedtime put it.
+        $events = $events->reject(
+            fn (Event $event) => $isSleep($event) && $wakeTime($event) !== null && ! $wokeOnThisDay($event)
+        );
+
+        $overnight = Event::query()
+            ->withoutInternal()
+            ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
+            ->where('service', 'oura')
+            ->where('action', 'slept_for')
+            ->where('time', '>=', $dayStart->copy()->subDay()->utc())
+            ->where('time', '<', $dayStart->copy()->utc())
+            ->with(['actor', 'target', 'blocks', 'tags'])
+            ->get()
+            ->filter($wokeOnThisDay);
+
+        return $events->concat($overnight)->unique('id')->values();
+    }
+
+    /**
      * Pre-load metric statistics for baseline comparisons.
      *
      * @return array<string, array{statistic: MetricStatistic, trends: Collection}>
@@ -192,11 +243,22 @@ class DaySummaryService
             $section['sleep_score'] = $entry;
         }
 
-        // Sleep duration
-        $sleepDuration = $healthEvents->firstWhere('action', 'slept_for');
+        // Sleep duration — the main sleep, not a nap, when a day has both.
+        $sleepDuration = $healthEvents
+            ->where('action', 'slept_for')
+            ->sortByDesc(fn ($e) => $e->formatted_value)
+            ->first();
         if ($sleepDuration) {
             $entry = ['event_id' => $sleepDuration->id, 'duration_seconds' => $sleepDuration->formatted_value];
             $this->attachBaseline($entry, $sleepDuration, $metricsCache);
+
+            // Oura's measured sleep efficiency (time asleep / time in bed),
+            // a percentage — unlike the score's `Efficiency` contributor,
+            // which is a 0–100 rating of it.
+            $efficiency = data_get($sleepDuration->event_metadata, 'efficiency');
+            if (is_numeric($efficiency)) {
+                $entry['efficiency_pct'] = (int) $efficiency;
+            }
 
             // Sleep stages from blocks
             $stages = $sleepDuration->blocks->where('block_type', 'sleep_stage');
@@ -300,21 +362,23 @@ class DaySummaryService
         $section = [];
 
         // Simple metric mappings
+        // `total` marks a running daily total, which only reaches its final
+        // value once the day is over.
         $simpleMetrics = [
-            'steps' => ['action' => 'had_step_count', 'unit' => 'steps'],
-            'distance_km' => ['action' => 'had_walking_running_distance', 'unit' => 'km'],
-            'active_energy_kcal' => ['action' => 'had_active_energy', 'unit' => 'kcal'],
-            'exercise_minutes' => ['action' => 'had_apple_exercise_time', 'unit' => 'min'],
-            'flights_climbed' => ['action' => 'had_flights_climbed', 'unit' => 'flights'],
-            'stand_hours' => ['action' => 'had_apple_stand_hour', 'unit' => 'hours'],
-            'resting_heart_rate' => ['action' => 'had_resting_heart_rate', 'unit' => 'bpm'],
+            'steps' => ['action' => 'had_step_count', 'unit' => 'steps', 'total' => true],
+            'distance_km' => ['action' => 'had_walking_running_distance', 'unit' => 'km', 'total' => true],
+            'active_energy_kcal' => ['action' => 'had_active_energy', 'unit' => 'kcal', 'total' => true],
+            'exercise_minutes' => ['action' => 'had_apple_exercise_time', 'unit' => 'min', 'total' => true],
+            'flights_climbed' => ['action' => 'had_flights_climbed', 'unit' => 'flights', 'total' => true],
+            'stand_hours' => ['action' => 'had_apple_stand_hour', 'unit' => 'hours', 'total' => true],
+            'resting_heart_rate' => ['action' => 'had_resting_heart_rate', 'unit' => 'bpm', 'total' => false],
         ];
 
         foreach ($simpleMetrics as $key => $config) {
             $event = $ahEvents->firstWhere('action', $config['action']);
             if ($event) {
                 $entry = ['event_id' => $event->id, 'value' => $event->formatted_value, 'unit' => $config['unit']];
-                $this->attachBaseline($entry, $event, $metricsCache);
+                $this->attachBaseline($entry, $event, $metricsCache, $config['total']);
                 $section[$key] = $entry;
             }
         }
@@ -443,7 +507,12 @@ class DaySummaryService
             // over the user's own daily spend history, or an explicit reason
             // there is none yet.
             $baseline = $this->dailySpendBaseline($user);
-            if ($baseline !== null) {
+            if ($totalSpend == 0.0) {
+                // Nothing spent reads as "-100%" against any baseline, which
+                // says nothing the zero doesn't — and on a day still in
+                // progress it is not even a comparison yet.
+                $section['total_spend_baseline_unavailable_reason'] = 'no_spend';
+            } elseif ($baseline !== null) {
                 $section['total_spend_vs_baseline_pct'] = $baseline['mean'] != 0.0
                     ? round((($totalSpend - $baseline['mean']) / abs($baseline['mean'])) * 100, 1)
                     : 0.0;
@@ -730,7 +799,7 @@ class DaySummaryService
         $realTimeServices = ['apple_health'];
 
         $integrationsByService = $user->integrations()
-            ->get(['id', 'service', 'last_successful_update_at', 'configuration'])
+            ->get(['id', 'service', 'instance_type', 'last_successful_update_at', 'configuration'])
             ->groupBy('service');
 
         $servicesWithEvents = $events->groupBy('service')->map(function ($serviceEvents, $service) use ($realTimeServices, $integrationsByService, $localDate) {
@@ -746,16 +815,29 @@ class DaySummaryService
 
             if (in_array($service, $realTimeServices)) {
                 $referenceTime = $localDate->isToday() ? now() : $localDate->copy()->endOfDay();
-                $hoursSinceLastUpdate = $lastUpdated->updated_at->lessThan($referenceTime)
-                    ? $lastUpdated->updated_at->diffInHours($referenceTime)
+                // The last push, not the newest event: heart-rate samples
+                // land continuously, so one fresh sample made a push that
+                // was hours old — and its step and exercise totals — read as
+                // complete. Events are the fallback for integrations that
+                // predate push tracking. Only the metrics instance carries
+                // the day's totals; a workouts push says nothing about them.
+                $lastPush = $integrationsByService->get($service)
+                    ?->where('instance_type', 'metrics')
+                    ->max('last_successful_update_at');
+                $lastReceived = $lastPush !== null && $lastPush->lessThanOrEqualTo($referenceTime)
+                    ? $lastPush
+                    : $lastUpdated->updated_at;
+                $hoursSinceLastUpdate = $lastReceived->lessThan($referenceTime)
+                    ? $lastReceived->diffInHours($referenceTime)
                     : 0;
                 $status['coverage'] = $hoursSinceLastUpdate > 2 ? 'partial' : 'complete';
                 if ($hoursSinceLastUpdate > 2) {
-                    $status['coverage_note'] = "Last updated {$hoursSinceLastUpdate}h ago — data may be incomplete.";
+                    $hours = (int) floor($hoursSinceLastUpdate);
+                    $status['coverage_note'] = "Last updated {$hours}h ago — data may be incomplete.";
                 }
             }
 
-            [$asOf, $stale] = $this->serviceFreshness($integrationsByService->get($service));
+            [$asOf, $stale] = $this->serviceFreshness($integrationsByService->get($service), $service);
             $status['as_of'] = $this->localTimestamp($asOf);
             $status['stale'] = $stale;
 
@@ -768,8 +850,8 @@ class DaySummaryService
         // with its own stale/as_of judgement.
         $servicesWithoutEvents = $integrationsByService
             ->reject(fn ($integrations, $service) => $servicesWithEvents->has($service))
-            ->map(function ($integrations) {
-                [$asOf, $stale] = $this->serviceFreshness($integrations);
+            ->map(function ($integrations, $service) {
+                [$asOf, $stale] = $this->serviceFreshness($integrations, $service);
 
                 return [
                     'event_count' => 0,
@@ -859,7 +941,7 @@ class DaySummaryService
     /**
      * Attach baseline comparison data to an entry array.
      */
-    protected function attachBaseline(array &$entry, Event $event, array $metricsCache): void
+    protected function attachBaseline(array &$entry, Event $event, array $metricsCache, bool $isRunningDailyTotal = false): void
     {
         $entry['observed_at'] = $this->localTimestamp($event->time);
         $entry['updated_at'] = $this->localTimestamp($event->updated_at);
@@ -879,7 +961,9 @@ class DaySummaryService
         $currentValue = $event->formatted_value;
         $presentation = $this->presentation();
 
-        $entry['is_anomaly'] = $presentation->isAnomalous($statistic, $currentValue);
+        $entry['is_anomaly'] = $presentation->isAnomalous($statistic, $currentValue)
+            && ! $this->anomalyIsPremature($statistic, $currentValue, $isRunningDailyTotal)
+            && ! $this->anomalyIsSuppressed($statistic, $currentValue);
 
         // Ordinal metrics get their band, not a percentage against a
         // fractional mean — see MetricPresentation::baselineDeltaPct().
@@ -913,24 +997,82 @@ class DaySummaryService
     }
 
     /**
+     * A running daily total is below its usual full-day value for most of
+     * the day simply because the day is not over — 3 stand hours at 8pm is
+     * not yet a low day. Only a finished day can be anomalously low; an
+     * unusually high total is already true.
+     */
+    private function anomalyIsPremature(MetricStatistic $statistic, ?float $value, bool $isRunningDailyTotal): bool
+    {
+        return $isRunningDailyTotal
+            && $this->summaryDateIsToday
+            && $value !== null
+            && ! $this->presentation()->isOrdinal($statistic)
+            && $value < (float) $statistic->normal_lower_bound;
+    }
+
+    /**
+     * The user has silenced this direction of anomaly for the metric — the
+     * same suppression the day's `anomalies` list already honours.
+     */
+    private function anomalyIsSuppressed(MetricStatistic $statistic, ?float $value): bool
+    {
+        if ($value === null || $this->presentation()->isOrdinal($statistic)) {
+            return false;
+        }
+
+        $until = $value < (float) $statistic->normal_lower_bound
+            ? $statistic->anomaly_low_suppressed_until
+            : $statistic->anomaly_high_suppressed_until;
+
+        return $until !== null && now()->isBefore($until);
+    }
+
+    /**
      * The server's own freshness judgement for a service: when it last
      * reached it successfully, and whether that is behind the cadence it
-     * knows that integration runs at. A service with no successful sync yet
-     * is stale by definition.
+     * knows that integration runs at. A polled service with no successful
+     * sync yet is stale by definition.
+     *
+     * Data that is sent to Spark rather than fetched (webhooks, Flint
+     * routines, manual entry) never passes through a polling run. Webhooks
+     * now record each successful push; for anything that predates that, or
+     * is entered by hand, what was last received stands in for "as of", and
+     * having received nothing yet is not being behind.
      *
      * @param  Collection<int, Integration>|null  $integrations
      * @return array{0: Carbon|null, 1: bool}
      */
-    private function serviceFreshness(?Collection $integrations): array
+    private function serviceFreshness(?Collection $integrations, string $service): array
     {
         if ($integrations === null || $integrations->isEmpty()) {
             return [null, true];
         }
 
+        $pluginClass = PluginRegistry::getPlugin($service);
+        $serviceType = $pluginClass ? $pluginClass::getServiceType() : null;
+        // A webhook has no polling cadence to fall behind, only the window
+        // its plugin declares for "nothing has arrived in too long".
+        $pushWindow = $serviceType === 'webhook' ? $pluginClass::getTimeUntilStaleMinutes() : null;
+
         $asOf = $integrations->max('last_successful_update_at');
 
         if ($asOf === null) {
-            return [null, true];
+            if (! in_array($serviceType, ['webhook', 'manual'], true)) {
+                return [null, true];
+            }
+
+            $asOf = $this->lastReceivedAt($integrations);
+
+            if ($asOf === null || $pushWindow === null) {
+                return [$asOf, false];
+            }
+
+            return [$asOf, $asOf->diffInMinutes(now()) > $pushWindow];
+        }
+
+        if ($pushWindow !== null) {
+            return [$asOf, $asOf->diffInMinutes(now()) > $pushWindow];
         }
 
         // A generous multiple of the integration's own polling cadence, so
@@ -940,6 +1082,20 @@ class DaySummaryService
         $staleAfterMinutes = max($cadenceMinutes * 4, 60);
 
         return [$asOf, $asOf->diffInMinutes(now()) > $staleAfterMinutes];
+    }
+
+    /**
+     * When Spark last received anything from these integrations.
+     *
+     * @param  Collection<int, Integration>  $integrations
+     */
+    private function lastReceivedAt(Collection $integrations): ?Carbon
+    {
+        $latest = Event::query()
+            ->whereIn('integration_id', $integrations->pluck('id'))
+            ->max('updated_at');
+
+        return $latest !== null ? Carbon::parse($latest) : null;
     }
 
     /**

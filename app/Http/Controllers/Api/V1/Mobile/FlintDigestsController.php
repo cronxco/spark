@@ -74,7 +74,12 @@ class FlintDigestsController extends Controller
             ->where('time', '>=', $dayStart)
             ->where('time', '<', $dayEnd)
             ->with('blocks')
-            ->orderBy('time', 'desc');
+            ->orderBy('time', 'desc')
+            // Every digest is filed at the start of its local day, so `time`
+            // ties across a day's morning, evening and roundup runs; the
+            // newest one is the one written last.
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc');
 
         if (isset($validated['period'])) {
             $query->whereJsonContains('event_metadata->period', $validated['period']);
@@ -126,7 +131,11 @@ class FlintDigestsController extends Controller
             ->where('service', 'flint')
             ->where('action', 'had_summary')
             ->with('blocks')
+            // `time` is the digest's local day, shared by every run that day;
+            // `created_at` is what makes the evening digest newer than the
+            // morning one. `id` alone is a random UUID, not an order.
             ->orderByDesc('time')
+            ->orderByDesc('created_at')
             ->orderByDesc('id');
 
         $events = $query->limit(25)->get();
@@ -254,6 +263,7 @@ class FlintDigestsController extends Controller
                 ->whereNull('metadata->retired_at')
                 ->whereNull('metadata->skipped_at')])
             ->orderByDesc('time')
+            ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->cursorPaginate((int) ($validated['limit'] ?? 20), ['*'], 'cursor');
         $versions = app(ResourceVersion::class);

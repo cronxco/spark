@@ -2580,7 +2580,10 @@ components:
         answer_options:
           type: [array, "null"]
           items: { type: string }
-        asked_at: { type: [string, "null"], format: date-time }
+        asked_at:
+          type: [string, "null"]
+          format: date-time
+          description: When Flint wrote the question — not the digest's local day.
         effective_answer:
           oneOf:
             - type: "null"

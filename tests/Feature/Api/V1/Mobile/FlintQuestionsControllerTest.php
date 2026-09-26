@@ -58,6 +58,33 @@ class FlintQuestionsControllerTest extends TestCase
     }
 
     #[Test]
+    public function asked_at_is_when_the_question_was_written_not_its_digest_day(): void
+    {
+        // A digest's blocks carry the digest's local day as `time`, so the
+        // morning and evening questions share it; the evening question is
+        // given the lower UUID so an `id` tiebreak would put it second.
+        $dayStart = now()->startOfDay();
+        $this->question($dayStart, overrides: [
+            'id' => 'ffffffff-ffff-4fff-bfff-ffffffffffff',
+            'created_at' => $dayStart->copy()->setTime(6, 20),
+        ]);
+        $evening = $this->question($dayStart, overrides: [
+            'id' => '00000000-0000-4000-8000-000000000000',
+            'created_at' => $dayStart->copy()->setTime(18, 36),
+        ]);
+
+        $response = $this->getJson('/api/v1/mobile/flint/questions?status=open')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $evening->id);
+
+        $this->assertTrue(
+            $dayStart->copy()->setTime(18, 36)->equalTo($response->json('data.0.asked_at')),
+            'asked_at should be the question block\'s created_at'
+        );
+    }
+
+    #[Test]
     public function status_accepts_a_comma_separated_list(): void
     {
         $open = $this->question(now()->subDay());
@@ -83,6 +110,23 @@ class FlintQuestionsControllerTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $recent->id);
+    }
+
+    #[Test]
+    public function since_counts_from_when_a_question_was_asked(): void
+    {
+        $this->travelTo(now()->startOfDay()->setTime(12, 0));
+
+        // Asked at 21:00 yesterday, filed under yesterday's midnight: 15 hours
+        // ago by `asked_at`, 36 by its digest's day.
+        $lastNight = $this->question(now()->subDay()->startOfDay(), overrides: [
+            'created_at' => now()->subDay()->setTime(21, 0),
+        ]);
+
+        $this->getJson('/api/v1/mobile/flint/questions?status=open&since=24h')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $lastNight->id);
     }
 
     #[Test]
@@ -188,7 +232,7 @@ class FlintQuestionsControllerTest extends TestCase
             ->assertJsonPath('error', 'Only open or retired questions can be answered.');
     }
 
-    private function question(mixed $time, array $metadata = []): Block
+    private function question(mixed $time, array $metadata = [], array $overrides = []): Block
     {
         $event = Event::factory()->create([
             'integration_id' => $this->integration->id,
@@ -198,12 +242,14 @@ class FlintQuestionsControllerTest extends TestCase
             'event_metadata' => ['local_date' => $time->toDateString(), 'period' => 'morning'],
         ]);
 
-        return Block::factory()->create([
+        return Block::factory()->create(array_merge([
             'event_id' => $event->id,
             'block_type' => 'flint_user_question',
             'title' => 'A question',
             'time' => $time,
+            // A question is written when its digest runs.
+            'created_at' => $time,
             'metadata' => array_merge(['question' => 'What should change?', 'answer' => null], $metadata),
-        ]);
+        ], $overrides));
     }
 }
