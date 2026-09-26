@@ -47,6 +47,50 @@ class OuraDailyRevisionTest extends TestCase
         ]);
     }
 
+    /**
+     * @return array<string, array{0: class-string<BaseProcessingJob>, 1: string, 2: array<string, mixed>, 3: array<string, mixed>, 4: int}>
+     */
+    public static function revisableMetricProvider(): array
+    {
+        return [
+            'stress' => [
+                OuraStressData::class,
+                'had_stress_score',
+                ['day' => '2026-09-26', 'day_summary' => 'normal', 'stress_high' => 600],
+                ['day' => '2026-09-26', 'day_summary' => 'stressful', 'stress_high' => 5400],
+                3,
+            ],
+            'resilience' => [
+                OuraResilienceData::class,
+                'had_resilience_score',
+                ['day' => '2026-09-26', 'level' => 'adequate', 'contributors' => ['sleep_recovery' => 40]],
+                ['day' => '2026-09-26', 'level' => 'strong', 'contributors' => ['sleep_recovery' => 80]],
+                4,
+            ],
+            'spo2' => [
+                OuraSpo2Data::class,
+                'had_spo2',
+                ['id' => 'spo2-1', 'day' => '2026-09-26', 'spo2_percentage' => ['average' => 94]],
+                ['id' => 'spo2-1', 'day' => '2026-09-26', 'spo2_percentage' => ['average' => 97]],
+                97,
+            ],
+            'vo2 max' => [
+                OuraVO2MaxData::class,
+                'had_vo2_max',
+                ['id' => 'vo2-1', 'day' => '2026-09-26', 'vo2_max' => 40],
+                ['id' => 'vo2-1', 'day' => '2026-09-26', 'vo2_max' => 42],
+                42,
+            ],
+            'cardiovascular age' => [
+                OuraCardiovascularAgeData::class,
+                'had_cardiovascular_age',
+                ['day' => '2026-09-26', 'vascular_age' => 38],
+                ['day' => '2026-09-26', 'vascular_age' => 35],
+                35,
+            ],
+        ];
+    }
+
     #[Test]
     public function revised_sleep_score_updates_existing_event_and_contributors(): void
     {
@@ -139,50 +183,6 @@ class OuraDailyRevisionTest extends TestCase
         $events = Event::where('action', $action)->get();
         $this->assertCount(1, $events);
         $this->assertSame($expectedValue, (int) $events->first()->value);
-    }
-
-    /**
-     * @return array<string, array{0: class-string<BaseProcessingJob>, 1: string, 2: array<string, mixed>, 3: array<string, mixed>, 4: int}>
-     */
-    public static function revisableMetricProvider(): array
-    {
-        return [
-            'stress' => [
-                OuraStressData::class,
-                'had_stress_score',
-                ['day' => '2026-09-26', 'day_summary' => 'normal', 'stress_high' => 600],
-                ['day' => '2026-09-26', 'day_summary' => 'stressful', 'stress_high' => 5400],
-                3,
-            ],
-            'resilience' => [
-                OuraResilienceData::class,
-                'had_resilience_score',
-                ['day' => '2026-09-26', 'level' => 'adequate', 'contributors' => ['sleep_recovery' => 40]],
-                ['day' => '2026-09-26', 'level' => 'strong', 'contributors' => ['sleep_recovery' => 80]],
-                4,
-            ],
-            'spo2' => [
-                OuraSpo2Data::class,
-                'had_spo2',
-                ['id' => 'spo2-1', 'day' => '2026-09-26', 'spo2_percentage' => ['average' => 94]],
-                ['id' => 'spo2-1', 'day' => '2026-09-26', 'spo2_percentage' => ['average' => 97]],
-                97,
-            ],
-            'vo2 max' => [
-                OuraVO2MaxData::class,
-                'had_vo2_max',
-                ['id' => 'vo2-1', 'day' => '2026-09-26', 'vo2_max' => 40],
-                ['id' => 'vo2-1', 'day' => '2026-09-26', 'vo2_max' => 42],
-                42,
-            ],
-            'cardiovascular age' => [
-                OuraCardiovascularAgeData::class,
-                'had_cardiovascular_age',
-                ['day' => '2026-09-26', 'vascular_age' => 38],
-                ['day' => '2026-09-26', 'vascular_age' => 35],
-                35,
-            ],
-        ];
     }
 
     #[Test]
