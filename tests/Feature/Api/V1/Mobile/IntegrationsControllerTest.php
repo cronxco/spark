@@ -207,6 +207,66 @@ class IntegrationsControllerTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
+    // POST /api/v1/mobile/integrations/{id}/pause
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function pause_requires_write_ability(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => true])
+            ->assertStatus(403);
+    }
+
+    #[Test]
+    public function pause_requires_if_match(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => true])
+            ->assertStatus(428);
+    }
+
+    #[Test]
+    public function pause_and_resume_toggle_the_integration(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => true], $this->ifMatch($this->integration))
+            ->assertOk()
+            ->assertJsonPath('status', 'paused')
+            ->assertJsonPath('paused', true)
+            ->assertHeader('ETag');
+        $this->assertTrue($this->integration->fresh()->isPaused());
+
+        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => false], $this->ifMatch($this->integration->fresh()))
+            ->assertOk()
+            ->assertJsonPath('paused', false);
+        $this->assertFalse($this->integration->fresh()->isPaused());
+    }
+
+    #[Test]
+    public function pause_validates_the_flag(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => 'sometimes'], $this->ifMatch($this->integration))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('paused');
+    }
+
+    #[Test]
+    public function pause_returns_404_for_other_users_integration(): void
+    {
+        $other = User::factory()->create();
+        Sanctum::actingAs($other, ['ios:read', 'ios:write']);
+
+        $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => true], ['If-Match' => '"x"'])
+            ->assertStatus(404);
+    }
+
+    // -------------------------------------------------------------------------
     // POST /api/v1/mobile/integrations/{id}/oauth/start
     // -------------------------------------------------------------------------
 

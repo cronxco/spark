@@ -842,7 +842,7 @@ paths:
     get:
       operationId: getIntegration
       tags: [integrations]
-      summary: A single integration
+      summary: A single integration, shaped for the detail screen
       parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
         "200":
@@ -852,7 +852,7 @@ paths:
               {
                 application/json:
                   {
-                    schema: { $ref: "#/components/schemas/CompactIntegration" },
+                    schema: { $ref: "#/components/schemas/IntegrationDetail" },
                   },
               },
           }
@@ -871,6 +871,41 @@ paths:
       responses:
         "200": { description: OK }
         "422": { description: Integration is paused }
+
+  /integrations/{id}/pause:
+    post:
+      operationId: setIntegrationPaused
+      tags: [integrations]
+      summary: Pause or resume scheduled fetches for one integration
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              {
+                type: object,
+                required: [paused],
+                properties: { paused: { type: boolean } },
+              }
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema: { $ref: "#/components/schemas/CompactIntegration" },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: paused missing or not a boolean }
 
   /integrations/sync:
     post:
@@ -2321,8 +2356,30 @@ components:
         id: { type: string, format: uuid }
         service: { type: string }
         name: { type: string }
-        instance_type: { type: string }
-        status: { type: string }
+        instance_type: { type: [string, "null"] }
+        status:
+          {
+            type: string,
+            enum: [paused, processing, stale, needs_update, up_to_date],
+          }
+        domain: { type: [string, "null"] }
+        paused: { type: boolean }
+        last_sync_at: { type: [string, "null"], format: date-time }
+        next_update_at: { type: [string, "null"], format: date-time }
+        schedule_summary: { type: [string, "null"] }
+
+    IntegrationDetail:
+      type: object
+      properties:
+        integration: { $ref: "#/components/schemas/CompactIntegration" }
+        last_sync_at: { type: [string, "null"], format: date-time }
+        coverage_percent: { type: [number, "null"] }
+        recent_events:
+          { type: array, items: { $ref: "#/components/schemas/CompactEvent" } }
+        domain: { type: [string, "null"] }
+        status_message: { type: [string, "null"] }
+        supports_reauth: { type: boolean }
+        oauth_start_url: { type: [string, "null"], format: uri }
 
     CompactMetric:
       type: object

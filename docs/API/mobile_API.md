@@ -867,9 +867,28 @@ Returns all integrations for the authenticated user, ordered by service name.
 
 ### `GET /integrations/{id}`
 
-Returns a single integration by UUID.
+Returns a single integration by UUID, shaped for the app's integration
+detail screen. The response carries an `ETag` to send as `If-Match` on
+`POST /integrations/{id}/sync` and `POST /integrations/{id}/pause`.
 
-**Response `200`** — [CompactIntegration](#compactintegration)
+**Response `200`**
+
+```json
+{
+    "integration": CompactIntegration,
+    "last_sync_at": "2026-09-26T10:14:00+00:00",
+    "coverage_percent": null,
+    "recent_events": [ CompactEvent, ... ],
+    "domain": "health",
+    "status_message": null,
+    "supports_reauth": true,
+    "oauth_start_url": "https://spark.cronx.co/api/v1/mobile/integrations/{id}/oauth/start"
+}
+```
+
+`recent_events` holds the latest five events. `supports_reauth` is true for
+OAuth-backed integrations with a connected group; `oauth_start_url` is the
+`POST` endpoint to call in that case, not the provider URL.
 
 **Response `404`** — Integration not found or belongs to another user.
 
@@ -1726,6 +1745,7 @@ All write endpoints require `ios:write` ability.
 | `POST`   | `/objects/{id}/tags`               | Attach a tag to an object (`Idempotency-Key` accepted)                                     |
 | `DELETE` | `/objects/{id}/tags/{tagId}`       | Detach a tag from an object                                                                |
 | `POST`   | `/integrations/{id}/sync`          | Trigger an immediate fetch for one integration                                             |
+| `POST`   | `/integrations/{id}/pause`         | Pause or resume scheduled fetches (`If-Match` required)                                    |
 | `POST`   | `/integrations/sync`               | Trigger an immediate fetch for all instances of a service                                  |
 | `POST`   | `/integrations/{id}/oauth/start`   | Start a PKCE re-authentication flow (mobile-only)                                          |
 | `POST`   | `/{kind}/{id}/relationships`       | Create a relationship from an owned entity                                                 |
@@ -1843,6 +1863,19 @@ Triggers an immediate fetch for one integration instance.
 **Response `200`**: `{"message": "Integration update triggered.", "jobs_dispatched": 2}`
 
 **Response `422`** — Integration is paused.
+
+---
+
+### `POST /integrations/{id}/pause`
+
+Pauses or resumes scheduled fetches for one integration. Requires `If-Match`
+with the `ETag` from `GET /integrations/{id}`.
+
+**Request Body**: `{"paused": true}` (required, boolean).
+
+**Response `200`** — the updated [CompactIntegration](#compactintegration), with a fresh `ETag`.
+
+**Response `422`** — `paused` missing or not a boolean.
 
 ---
 
@@ -2376,10 +2409,10 @@ Ingests a batch of HealthKit samples. Each sample is processed individually — 
 
 A metric sample (`HKQuantityTypeIdentifier*`) is the day's reading for that metric: the day's cumulative total for a summed metric such as steps, or its average for a discrete one such as heart rate. There is one reading per metric per local day, and the client re-sends it as the day goes on. A reading taken later replaces the one on record; one taken no later is a `duplicate`. Two optional `metadata` keys say which day and when:
 
-| Key              | Description                                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| Key              | Description                                                                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `metadata.date`  | The reading's local day, `YYYY-MM-DD`. Without it the day is `start`'s date as sent, which is wrong for a UTC `start` east of UTC. |
-| `metadata.as_of` | When the reading was taken, ISO 8601. Falls back to `end`, then `start`.                                     |
+| `metadata.as_of` | When the reading was taken, ISO 8601. Falls back to `end`, then `start`.                                                           |
 
 **Request Body**
 
@@ -2786,9 +2819,19 @@ shapes.
     "service": "oura",
     "name": "Oura Ring",
     "instance_type": "default",
-    "status": "active"
+    "status": "up_to_date",
+    "domain": "health",
+    "paused": false,
+    "last_sync_at": "2026-09-26T10:14:00+00:00",
+    "next_update_at": "2026-09-26T11:14:00+00:00",
+    "schedule_summary": null
 }
 ```
+
+`status` is derived by `Integration::statusKey()` and is one of `paused`,
+`processing`, `stale`, `needs_update` or `up_to_date`. `stale` means a push or
+manual source has gone quiet; there is nothing to trigger, so clients should
+not present it as an error.
 
 ### CompactMetric
 

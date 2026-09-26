@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Actions\DispatchIntegrationFetchJobs;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Mobile\SetIntegrationPausedRequest;
 use App\Http\Resources\Compact\CompactEventResource;
 use App\Http\Resources\Compact\CompactIntegrationResource;
 use App\Integrations\Contracts\OAuthIntegrationPlugin;
@@ -110,6 +111,30 @@ class IntegrationsController extends Controller
             'message' => 'Integration update triggered.',
             'jobs_dispatched' => $jobsDispatched,
         ])->header('ETag', $this->versions->etag($integration->fresh()));
+    }
+
+    /**
+     * POST /api/v1/mobile/integrations/{id}/pause
+     *
+     * Pauses or resumes scheduled fetches. Mirrors the web Updates page toggle.
+     */
+    public function setPaused(SetIntegrationPausedRequest $request, string $id): JsonResponse
+    {
+        $integration = $request->user()->integrations()->find($id);
+
+        if (! $integration) {
+            return response()->json(['message' => 'Integration not found.'], 404);
+        }
+
+        $configuration = $integration->configuration ?? [];
+        $configuration['paused'] = $request->boolean('paused');
+        $integration->update(['configuration' => $configuration]);
+
+        $integration = $integration->fresh();
+
+        return response()->json(
+            (new CompactIntegrationResource($integration))->resolve($request),
+        )->header('ETag', $this->versions->etag($integration));
     }
 
     /** Trigger all non-paused integrations for one service, matching MCP. */
