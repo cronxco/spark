@@ -2009,23 +2009,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         return $this->userProfiles[$integration->id] ??= $this->fetchUserProfile($integration);
     }
 
-    protected function fetchUserProfile(Integration $integration): EventObject
-    {
-        $info = $this->getJson('/usercollection/personal_info', $integration);
-        $data = Arr::first($info['data'] ?? []) ?? $info;
-        $profile = [
-            'user_id' => $integration->group?->account_id,
-            'email' => Arr::get($data, 'email'),
-            'age' => Arr::get($data, 'age'),
-            'biological_sex' => Arr::get($data, 'biological_sex'),
-            'weight' => Arr::get($data, 'weight'),
-            'height' => Arr::get($data, 'height'),
-            'dominant_hand' => Arr::get($data, 'dominant_hand'),
-        ];
-
-        return $this->createOrUpdateUser($integration, $profile);
-    }
-
     /**
      * Get or create a static metric reference object (never updates metadata).
      * Use this for metric types that don't have changing identity - just a label.
@@ -2045,6 +2028,23 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'metadata' => [],
             ]
         );
+    }
+
+    protected function fetchUserProfile(Integration $integration): EventObject
+    {
+        $info = $this->getJson('/usercollection/personal_info', $integration);
+        $data = Arr::first($info['data'] ?? []) ?? $info;
+        $profile = [
+            'user_id' => $integration->group?->account_id,
+            'email' => Arr::get($data, 'email'),
+            'age' => Arr::get($data, 'age'),
+            'biological_sex' => Arr::get($data, 'biological_sex'),
+            'weight' => Arr::get($data, 'weight'),
+            'height' => Arr::get($data, 'height'),
+            'dominant_hand' => Arr::get($data, 'dominant_hand'),
+        ];
+
+        return $this->createOrUpdateUser($integration, $profile);
     }
 
     /**
