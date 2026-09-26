@@ -1104,7 +1104,13 @@ paths:
                       value: { type: number }
                       unit: { type: string, maxLength: 40 }
                       source: { type: string, maxLength: 100 }
-                      metadata: { type: object }
+                      metadata:
+                        type: object
+                        description: >-
+                          HealthKit metadata. For a metric sample, `date` (local
+                          day, YYYY-MM-DD) files the reading under that day, and
+                          `as_of` (date-time) says when it was taken; a later
+                          reading of a metric-day replaces the one on record.
       responses:
         "200":
           description: OK
@@ -1122,8 +1128,9 @@ paths:
                         status:
                           {
                             type: string,
-                            enum: [created, duplicate, skipped, error],
+                            enum: [accepted, updated, duplicate, rejected],
                           }
+                        reason: { type: string }
 
   /live-activities:
     post:

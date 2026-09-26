@@ -2374,6 +2374,13 @@ Revokes a personal access token.
 
 Ingests a batch of HealthKit samples. Each sample is processed individually — the response reports per-sample status so the client can retry failures without re-sending successes.
 
+A metric sample (`HKQuantityTypeIdentifier*`) is the day's reading for that metric: the day's cumulative total for a summed metric such as steps, or its average for a discrete one such as heart rate. There is one reading per metric per local day, and the client re-sends it as the day goes on. A reading taken later replaces the one on record; one taken no later is a `duplicate`. Two optional `metadata` keys say which day and when:
+
+| Key              | Description                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| `metadata.date`  | The reading's local day, `YYYY-MM-DD`. Without it the day is `start`'s date as sent, which is wrong for a UTC `start` east of UTC. |
+| `metadata.as_of` | When the reading was taken, ISO 8601. Falls back to `end`, then `start`.                                     |
+
 **Request Body**
 
 ```json
@@ -2403,7 +2410,7 @@ Ingests a batch of HealthKit samples. Each sample is processed individually — 
 | `samples[].value`       | number   | No       | Numeric quantity                                                       |
 | `samples[].unit`        | string   | No       | Unit string, e.g. `bpm`, `kcal` (max 40 chars)                         |
 | `samples[].source`      | string   | No       | Source device name (max 100 chars)                                     |
-| `samples[].metadata`    | object   | No       | Arbitrary HealthKit metadata                                           |
+| `samples[].metadata`    | object   | No       | HealthKit metadata; `date` and `as_of` are read for metric samples     |
 
 **Response `200`**
 
@@ -2412,13 +2419,18 @@ Ingests a batch of HealthKit samples. Each sample is processed individually — 
     "results": [
         {
             "external_id": "ABC123",
-            "status": "created"
+            "status": "accepted"
         }
     ]
 }
 ```
 
-Sample status values: `created`, `duplicate`, `skipped`, `error`.
+Sample status values:
+
+- `accepted`: new, and queued for processing.
+- `updated`: a later reading of a metric-day already on record, queued to replace it.
+- `duplicate`: already on record, or superseded by a later reading of the same metric-day in this batch. Nothing is queued.
+- `rejected`: not processed; `reason` says why (missing `external_id` or `type`, or an unknown sample type).
 
 ---
 

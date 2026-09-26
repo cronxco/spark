@@ -16,9 +16,14 @@ use Throwable;
 /**
  * Ingests HealthKit samples POSTed from the iOS client and turns them into the
  * `$rawData` shape that `AppleHealthMetricData` and `AppleHealthWorkoutData`
- * already know how to process. Dedupe is passive — the jobs `updateOrCreate`
- * events keyed on `(integration_id, source_id)` so replays are safe; this
- * service also reports back which samples are already on record.
+ * already know how to process. The jobs `updateOrCreate` events keyed on
+ * `(integration_id, source_id)`, so replays are safe.
+ *
+ * A metric sample is the day's reading for that metric: one event per metric
+ * per day. The phone re-sends a day's running total as it grows, so a reading
+ * taken later (`metadata.as_of`, else `end`) replaces the stored one rather
+ * than being turned away as a duplicate. Only a reading no newer than the one
+ * on record is a duplicate.
  */
 class HealthSampleService
 {
@@ -28,7 +33,9 @@ class HealthSampleService
         $workoutsIntegration = $this->resolveIntegration($user, 'workouts');
 
         $results = [];
-        $metricBuckets = [];
+        // The newest reading in this batch for each metric-day, keyed
+        // "{metric}|{date}".
+        $metricDays = [];
         $workoutBatch = [];
         // Which instances this batch actually synced — accepted or already on
         // record. A batch of rejected samples says nothing about either.
@@ -76,21 +83,49 @@ class HealthSampleService
             }
 
             $metricsSynced = true;
-            $sourceId = 'apple_metric_' . $metricName . '_' . $this->normalizeDate($sample['start'] ?? null);
-            if ($this->eventExists($metricsIntegration, $sourceId)) {
-                $results[] = ['external_id' => $externalId, 'status' => 'duplicate'];
+            $day = $this->sampleDay($sample);
+            $asOf = $this->sampleAsOf($sample);
+            $key = $metricName . '|' . $day;
 
-                continue;
+            if (isset($metricDays[$key])) {
+                if ($metricDays[$key]['as_of']->gte($asOf)) {
+                    $results[] = ['external_id' => $externalId, 'status' => 'duplicate'];
+
+                    continue;
+                }
+
+                // A newer reading later in the batch supersedes this one.
+                $results[$metricDays[$key]['result']]['status'] = 'duplicate';
+                $onRecord = $metricDays[$key]['on_record'];
+            } else {
+                $onRecord = $this->storedReading($metricsIntegration, 'apple_metric_' . $metricName . '_' . $day);
+                if ($onRecord['as_of'] !== null && $onRecord['as_of']->gte($asOf)) {
+                    $results[] = ['external_id' => $externalId, 'status' => 'duplicate'];
+
+                    continue;
+                }
             }
 
-            $unit = (string) ($sample['unit'] ?? '');
-            $metricBuckets[$metricName] ??= ['name' => $metricName, 'units' => $unit, 'data' => []];
-            $metricBuckets[$metricName]['data'][] = [
-                'date' => $this->normalizeDate($sample['start'] ?? null),
-                'qty' => $sample['value'] ?? null,
-                'source' => $sample['source'] ?? null,
+            $results[] = ['external_id' => $externalId, 'status' => $onRecord['exists'] ? 'updated' : 'accepted'];
+            $metricDays[$key] = [
+                'name' => $metricName,
+                'unit' => (string) ($sample['unit'] ?? ''),
+                'as_of' => $asOf,
+                'on_record' => $onRecord,
+                'result' => array_key_last($results),
+                'point' => [
+                    'date' => $day,
+                    'qty' => $sample['value'] ?? null,
+                    'source' => $sample['source'] ?? null,
+                    'as_of' => $asOf->toIso8601String(),
+                ],
             ];
-            $results[] = ['external_id' => $externalId, 'status' => 'accepted'];
+        }
+
+        $metricBuckets = [];
+        foreach ($metricDays as $reading) {
+            $metricBuckets[$reading['name']] ??= ['name' => $reading['name'], 'units' => $reading['unit'], 'data' => []];
+            $metricBuckets[$reading['name']]['data'][] = $reading['point'];
         }
 
         foreach ($metricBuckets as $bucket) {
@@ -145,6 +180,64 @@ class HealthSampleService
         return Event::where('integration_id', $integration->id)
             ->where('source_id', $sourceId)
             ->exists();
+    }
+
+    /**
+     * Whether a metric-day is on record, and when its reading was taken. Events
+     * written before readings carried `as_of` have none, so any reading
+     * replaces them.
+     *
+     * @return array{exists: bool, as_of: ?Carbon}
+     */
+    protected function storedReading(Integration $integration, string $sourceId): array
+    {
+        $event = Event::where('integration_id', $integration->id)
+            ->where('source_id', $sourceId)
+            ->first(['id', 'event_metadata']);
+
+        if ($event === null) {
+            return ['exists' => false, 'as_of' => null];
+        }
+
+        $asOf = data_get($event->event_metadata, 'raw.as_of');
+
+        return ['exists' => true, 'as_of' => is_string($asOf) ? $this->parseTime($asOf) : null];
+    }
+
+    /**
+     * The local day a metric reading belongs to. The client sends it as
+     * `metadata.date`, because `start` arrives in UTC and the local midnight
+     * that begins a day falls on the previous UTC date for anyone east of UTC.
+     */
+    protected function sampleDay(array $sample): string
+    {
+        $date = $sample['metadata']['date'] ?? null;
+        if (is_string($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1) {
+            return $date;
+        }
+
+        return $this->normalizeDate($sample['start'] ?? null);
+    }
+
+    /** When a reading was taken: `metadata.as_of`, else the sample's `end`, else `start`. */
+    protected function sampleAsOf(array $sample): Carbon
+    {
+        foreach ([$sample['metadata']['as_of'] ?? null, $sample['end'] ?? null, $sample['start'] ?? null] as $candidate) {
+            if (is_string($candidate) && $candidate !== '' && ($time = $this->parseTime($candidate)) !== null) {
+                return $time;
+            }
+        }
+
+        return now();
+    }
+
+    protected function parseTime(string $input): ?Carbon
+    {
+        try {
+            return Carbon::parse($input);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     protected function isWorkout(string $type): bool
