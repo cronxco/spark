@@ -154,6 +154,48 @@ class UpdatesIndexTest extends TestCase
     }
 
     #[Test]
+    public function a_plugin_with_several_connections_shows_each_as_a_labelled_section(): void
+    {
+        foreach (['American Express' => ['Platinum', 'Avios'], 'Monzo Bank' => ['Current account']] as $institution => $names) {
+            $group = IntegrationGroup::factory()->create([
+                'user_id' => $this->user->id,
+                'service' => 'gocardless',
+                'auth_metadata' => ['gocardless_institution_name' => $institution],
+            ]);
+            foreach ($names as $name) {
+                Integration::factory()->create([
+                    'user_id' => $this->user->id,
+                    'integration_group_id' => $group->id,
+                    'service' => 'gocardless',
+                    'name' => $name,
+                ]);
+            }
+        }
+
+        Volt::actingAs($this->user)
+            ->test('updates.index')
+            ->set('expanded.gocardless', true)
+            ->assertSeeInOrder(['American Express', '2 instances', 'Avios', 'Platinum', 'Monzo Bank', '1 instance', 'Current account']);
+    }
+
+    #[Test]
+    public function a_single_connection_gets_no_section_heading(): void
+    {
+        $sleep = $this->makeIntegration('oura', 'Sleep', ['last_successful_update_at' => now()->subMinutes(5)]);
+        $this->makeIntegration('oura', 'Stress', [
+            'integration_group_id' => $sleep->integration_group_id,
+            'last_successful_update_at' => now()->subMinutes(5),
+        ]);
+
+        Volt::actingAs($this->user)
+            ->test('updates.index')
+            ->set('expanded.oura', true)
+            ->assertSee('Sleep')
+            ->assertSee('Stress')
+            ->assertDontSee('Connection 1');
+    }
+
+    #[Test]
     public function it_pauses_and_resumes_an_integration(): void
     {
         $integration = $this->makeIntegration('oura', 'Sleep', ['last_successful_update_at' => now()->subMinutes(5)]);
