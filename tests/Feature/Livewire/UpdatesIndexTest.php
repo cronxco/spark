@@ -116,6 +116,17 @@ class UpdatesIndexTest extends TestCase
     }
 
     #[Test]
+    public function spotify_shows_no_sweep_because_its_api_only_returns_recent_plays(): void
+    {
+        $this->makeIntegration('spotify', 'Listening', ['last_successful_update_at' => now()->subMinutes(5)]);
+
+        Volt::actingAs($this->user)
+            ->test('updates.index')
+            ->assertSee('Spotify')
+            ->assertDontSee('sweep');
+    }
+
+    #[Test]
     public function it_pauses_and_resumes_an_integration(): void
     {
         $integration = $this->makeIntegration('oura', 'Sleep', ['last_successful_update_at' => now()->subMinutes(5)]);

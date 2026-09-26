@@ -43,7 +43,7 @@ A failed migration also shows an error chip and counts towards "needs attention"
 
 ## Sweeps
 
-Plugins that periodically re-fetch a longer window implement `App\Integrations\Contracts\SupportsSweeps` and describe the sweep via `getSweepSchedule()` (label, window, period and the configuration key they stamp after each run). Monzo, Oura, Hevy and GoCardless implement it today.
+Plugins that periodically re-fetch a longer window implement `App\Integrations\Contracts\SupportsSweeps` and describe the sweep via `getSweepSchedule()` (label, window, period and the configuration key they stamp after each run). Monzo, Oura, Hevy and GoCardless implement it today. Spotify doesn't: its recently-played endpoint only ever returns the last 50 plays, so there is no longer window to sweep.
 
 ## Navigation
 
