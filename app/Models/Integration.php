@@ -506,6 +506,51 @@ class Integration extends Model
     }
 
     /**
+     * One status vocabulary for the Updates page and the mobile API.
+     *
+     * `stale` belongs to push and manual sources that have gone quiet: there is
+     * nothing Spark can trigger, so it is reported but never counted as an issue.
+     * `needs_update` allows the every-minute scheduler a short grace period
+     * before an overdue pull integration is flagged.
+     *
+     * @param  Carbon|null  $lastEventTime  Pre-fetched latest event time for push/manual sources, to avoid a query per row.
+     * @return 'paused'|'processing'|'stale'|'needs_update'|'up_to_date'
+     */
+    public function statusKey(?Carbon $lastEventTime = null): string
+    {
+        if ($this->isPaused()) {
+            return 'paused';
+        }
+
+        if ($this->isProcessing()) {
+            return 'processing';
+        }
+
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        $staleAfterMinutes = $pluginClass ? $pluginClass::getTimeUntilStaleMinutes() : null;
+
+        if ($staleAfterMinutes !== null) {
+            $lastEventTime ??= $this->getLastEventTime();
+
+            return ! $lastEventTime || $lastEventTime->lessThan(now()->subMinutes($staleAfterMinutes))
+                ? 'stale'
+                : 'up_to_date';
+        }
+
+        if (! $this->isDue()) {
+            return 'up_to_date';
+        }
+
+        $nextUpdateTime = $this->getNextUpdateTime();
+
+        if ($nextUpdateTime && $nextUpdateTime->greaterThan(now()->subMinutes(2))) {
+            return 'up_to_date';
+        }
+
+        return 'needs_update';
+    }
+
+    /**
      * Get the anomaly detection mode for this integration
      * Returns one of: 'realtime', 'retrospective', 'disabled', or null if not configured
      */

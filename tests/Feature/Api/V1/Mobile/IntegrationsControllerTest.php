@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
+use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -64,8 +66,90 @@ class IntegrationsControllerTest extends TestCase
 
         $this->getJson("/api/v1/mobile/integrations/{$this->integration->id}")
             ->assertOk()
-            ->assertJsonPath('id', $this->integration->id)
-            ->assertJsonPath('service', 'monzo');
+            ->assertJsonStructure([
+                'integration' => ['id', 'service', 'name', 'instance_type', 'status', 'domain', 'paused', 'last_sync_at', 'next_update_at'],
+                'last_sync_at',
+                'recent_events',
+                'domain',
+                'status_message',
+                'supports_reauth',
+                'oauth_start_url',
+            ])
+            ->assertJsonPath('integration.id', $this->integration->id)
+            ->assertJsonPath('integration.service', 'monzo')
+            ->assertJsonPath('domain', 'money')
+            ->assertJsonPath('supports_reauth', true);
+    }
+
+    #[Test]
+    public function show_includes_the_latest_events_for_the_integration(): void
+    {
+        $this->makeEvent($this->integration, now()->subHours(2));
+        $latest = $this->makeEvent($this->integration, now()->subMinutes(5));
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson("/api/v1/mobile/integrations/{$this->integration->id}")
+            ->assertOk()
+            ->assertJsonCount(2, 'recent_events')
+            ->assertJsonPath('recent_events.0.id', $latest->id);
+    }
+
+    #[Test]
+    public function show_does_not_offer_reauth_for_manual_integrations(): void
+    {
+        $group = IntegrationGroup::factory()->create(['user_id' => $this->user->id, 'service' => 'daily_checkin']);
+        $manual = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'daily_checkin',
+        ]);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson("/api/v1/mobile/integrations/{$manual->id}")
+            ->assertOk()
+            ->assertJsonPath('supports_reauth', false)
+            ->assertJsonPath('oauth_start_url', null);
+    }
+
+    #[Test]
+    public function index_reports_a_derived_status_for_each_integration(): void
+    {
+        $this->integration->update(['last_successful_update_at' => now()->subMinute()]);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/integrations')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'up_to_date')
+            ->assertJsonPath('data.0.paused', false);
+    }
+
+    #[Test]
+    public function index_reports_paused_integrations_as_paused(): void
+    {
+        $this->integration->update(['configuration' => ['paused' => true]]);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->getJson('/api/v1/mobile/integrations')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'paused')
+            ->assertJsonPath('data.0.paused', true);
+    }
+
+    #[Test]
+    public function index_reports_quiet_push_integrations_as_stale_not_needing_update(): void
+    {
+        $group = IntegrationGroup::factory()->create(['user_id' => $this->user->id, 'service' => 'daily_checkin']);
+        Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'daily_checkin',
+        ]);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $response = $this->getJson('/api/v1/mobile/integrations')->assertOk();
+
+        $manual = collect($response->json('data'))->firstWhere('service', 'daily_checkin');
+        $this->assertSame('stale', $manual['status']);
     }
 
     #[Test]
@@ -176,6 +260,14 @@ class IntegrationsControllerTest extends TestCase
 
         $this->postJson("/api/v1/mobile/integrations/{$manual->id}/oauth/start")
             ->assertStatus(422);
+    }
+
+    protected function makeEvent(Integration $integration, Carbon $time): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'time' => $time,
+        ]);
     }
 
     /** @return array{If-Match: string} */
