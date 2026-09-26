@@ -8,6 +8,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GoCardlessSweepTest extends TestCase
@@ -42,9 +43,7 @@ class GoCardlessSweepTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_logic_runs_when_no_previous_sweep(): void
     {
         // Integration has no previous sweep timestamp
@@ -58,9 +57,7 @@ class GoCardlessSweepTest extends TestCase
         $this->assertTrue($doSweep, 'Sweep should run when no previous sweep exists');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_logic_skips_when_recent_sweep(): void
     {
         // Set recent sweep timestamp (2 days ago)
@@ -80,9 +77,7 @@ class GoCardlessSweepTest extends TestCase
         $this->assertFalse($doSweep, 'Sweep should skip when recent sweep exists');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_logic_runs_when_old_sweep(): void
     {
         // Set old sweep timestamp (7 days ago)
@@ -102,9 +97,7 @@ class GoCardlessSweepTest extends TestCase
         $this->assertTrue($doSweep, 'Sweep should run when old sweep exists');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_works_for_different_instance_types(): void
     {
         // Test with different instance types
@@ -128,9 +121,7 @@ class GoCardlessSweepTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_handles_missing_account_id(): void
     {
         // Integration without account_id
@@ -144,9 +135,7 @@ class GoCardlessSweepTest extends TestCase
         $this->assertTrue($doSweep, 'Sweep logic should work even without account_id');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_uses_correct_timing(): void
     {
         // Test that the sweep timing is correct (6 days)
@@ -171,9 +160,7 @@ class GoCardlessSweepTest extends TestCase
         $this->assertTrue($doSweep, 'Sweep should run when 7 days ago');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_timestamp_format(): void
     {
         // Test that sweep timestamps are stored in ISO format

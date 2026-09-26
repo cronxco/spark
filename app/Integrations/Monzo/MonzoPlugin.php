@@ -3,6 +3,7 @@
 namespace App\Integrations\Monzo;
 
 use App\Integrations\Base\OAuthPlugin;
+use App\Integrations\Contracts\SupportsSweeps;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -20,7 +21,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
 
-class MonzoPlugin extends OAuthPlugin
+class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
 {
     // Cache of account_id => type to avoid repeated HTTP calls per transaction
     private static array $accountTypeCache = [];
@@ -44,6 +45,19 @@ class MonzoPlugin extends OAuthPlugin
         if (app()->environment() !== 'testing' && (empty($this->clientId) || empty($this->clientSecret))) {
             throw new InvalidArgumentException('Monzo OAuth credentials are not configured');
         }
+    }
+
+    /**
+     * @return array{label: string, window: string, period_hours: int, config_key: string}
+     */
+    public static function getSweepSchedule(): array
+    {
+        return [
+            'label' => 'Daily sweep',
+            'window' => 'last 30 days',
+            'period_hours' => 22,
+            'config_key' => 'monzo_last_sweep_at',
+        ];
     }
 
     public static function getIdentifier(): string

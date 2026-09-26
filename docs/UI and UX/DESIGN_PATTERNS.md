@@ -1128,6 +1128,12 @@ Use tabs for switching between different view modes of the same data (e.g., card
 
 ### Left Border Status Indicators
 
+> **Superseded by the Spark Design System.** Left-border status cards are on the
+> design system's list of patterns to avoid, and status tone must never be the
+> only carrier of meaning. Put status in text with a chip only when action is
+> needed, as the Updates page (`livewire/updates/index.blade.php`) now does.
+> The guidance below is kept for reference while older pages are migrated.
+
 Use left border colors to provide at-a-glance status indication on cards.
 
 ```blade

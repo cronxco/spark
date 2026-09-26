@@ -135,6 +135,9 @@ Route::get('integrations/{id}', [IntegrationsController::class, 'show'])->name('
 Route::post('integrations/{id}/sync', [IntegrationsController::class, 'sync'])
     ->middleware(['ability:ios:write', 'if-match:integration'])
     ->name('integrations.sync');
+Route::post('integrations/{id}/pause', [IntegrationsController::class, 'setPaused'])
+    ->middleware(['ability:ios:write', 'if-match:integration'])
+    ->name('integrations.pause');
 Route::post('integrations/sync', [IntegrationsController::class, 'syncService'])
     ->middleware('ability:ios:write')
     ->name('integrations.sync-service');

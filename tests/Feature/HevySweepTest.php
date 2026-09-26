@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Throwable;
 
@@ -44,9 +45,7 @@ class HevySweepTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_sweep_if_needed_runs_when_no_previous_sweep(): void
     {
         // Mock API responses
@@ -106,9 +105,7 @@ class HevySweepTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_sweep_if_needed_skips_when_recent_sweep(): void
     {
         // Set recent sweep timestamp (2 days ago)
@@ -135,9 +132,7 @@ class HevySweepTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_sweep_if_needed_runs_when_old_sweep(): void
     {
         // Set old sweep timestamp (7 days ago)
@@ -164,9 +159,7 @@ class HevySweepTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_data_sweep_processes_workout_data(): void
     {
         // Mock API responses with workout data
@@ -207,9 +200,7 @@ class HevySweepTest extends TestCase
         $this->assertEquals('completed_workout', $event->action);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_data_sweep_handles_different_response_formats(): void
     {
         // Test different response formats that Hevy might return
@@ -243,9 +234,7 @@ class HevySweepTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_data_sweep_handles_api_errors_gracefully(): void
     {
         // Mock API error response
@@ -263,9 +252,7 @@ class HevySweepTest extends TestCase
         $this->plugin->fetchData($this->integration);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_works_for_different_instance_types(): void
     {
         // Test with different instance types (Hevy only has workouts, but test the pattern)
@@ -295,9 +282,7 @@ class HevySweepTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_timestamp_format_is_correct(): void
     {
         // Mock API responses
@@ -320,9 +305,7 @@ class HevySweepTest extends TestCase
         $this->assertTrue(Carbon::parse($sweepTimestamp)->isAfter(now()->subMinutes(1)));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_uses_correct_date_range(): void
     {
         // Mock API responses
@@ -344,9 +327,7 @@ class HevySweepTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_handles_non_array_workout_items(): void
     {
         // Mock API response with non-array workout item
@@ -371,9 +352,7 @@ class HevySweepTest extends TestCase
         $this->assertEquals('completed_workout', $events->first()->action);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_includes_limit_parameter(): void
     {
         // Mock API responses

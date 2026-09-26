@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\EffectiveTimezoneResolver;
 use App\Services\LoggingService;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Http;
@@ -62,6 +63,33 @@ if (! function_exists('format_time_for_user')) {
         $userDatetime = to_user_timezone($datetime, $user);
 
         return $userDatetime->format($format);
+    }
+}
+
+if (! function_exists('format_relative_time')) {
+    /**
+     * Spark Design System time rule: relative within a day of now
+     * ("22 minutes ago", "in 3 hours"), absolute beyond it in the user's
+     * timezone ("Tue 14:05" within a week, then "12 Aug", then "12 Aug 2025").
+     * Defaults to the signed-in user's timezone.
+     */
+    function format_relative_time(Carbon $datetime, ?User $user = null, ?Carbon $now = null): string
+    {
+        $now ??= Carbon::now();
+        $user ??= auth()->user();
+
+        if (abs($now->diffInHours($datetime)) < 24) {
+            return $datetime->diffForHumans($now, ['syntax' => CarbonInterface::DIFF_RELATIVE_TO_NOW, 'parts' => 1]);
+        }
+
+        $local = to_user_timezone($datetime->copy(), $user);
+        $localNow = to_user_timezone($now->copy(), $user);
+
+        if (abs($now->diffInDays($datetime)) < 7) {
+            return $local->format('D H:i');
+        }
+
+        return $local->format($local->year === $localNow->year ? 'j M' : 'j M Y');
     }
 }
 
