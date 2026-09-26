@@ -85,7 +85,9 @@ class UpdatesIndexTest extends TestCase
             ->assertSee('1 integration needs attention')
             ->assertSet('expanded.oura', true)
             ->assertSee('Needs update')
-            ->assertSee('Update now');
+            ->assertSee('Update now')
+            ->assertSee('Was due')
+            ->assertDontSee('Next 2 hours ago');
     }
 
     #[Test]

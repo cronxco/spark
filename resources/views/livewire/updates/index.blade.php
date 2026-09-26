@@ -432,7 +432,7 @@ new class extends Component
                                     @if ($group['sweep'])
                                         · {{ $group['sweep']['label'] }} {{ __('of the') }} {{ $group['sweep']['window'] }},
                                         @if ($group['sweep']['last_at'])
-                                            <span class="font-mono">{{ format_relative_time($group['sweep']['last_at']) }}</span>
+                                            <x-relative-time :time="$group['sweep']['last_at']" />
                                         @else
                                             {{ __('not run yet') }}
                                         @endif
@@ -489,7 +489,7 @@ new class extends Component
                                             @if ($instance['receives_pushed_data'])
                                                 @if ($instance['last_at'])
                                                     {{ $instance['is_manual'] ? __('Last entry') : __('Last data') }}
-                                                    <span class="font-mono">{{ format_relative_time($instance['last_at']) }}</span>
+                                                    <x-relative-time :time="$instance['last_at']" />
                                                     @if ($instance['status'] === 'stale')
                                                         · {{ __('Quiet for a while — nothing to fix unless you expected more.') }}
                                                     @endif
@@ -498,12 +498,12 @@ new class extends Component
                                                 @endif
                                             @else
                                                 @if ($instance['last_at'])
-                                                    {{ __('Updated') }} <span class="font-mono">{{ format_relative_time($instance['last_at']) }}</span>
+                                                    {{ __('Updated') }} <x-relative-time :time="$instance['last_at']" />
                                                 @else
                                                     {{ __('Never updated') }}
                                                 @endif
                                                 @if ($instance['next_at'] && $instance['status'] !== 'paused')
-                                                    · {{ __('Next') }} <span class="font-mono">{{ format_relative_time($instance['next_at']) }}</span>
+                                                    · {{ $instance['next_at']->isPast() ? __('Was due') : __('Next') }} <x-relative-time :time="$instance['next_at']" />
                                                 @endif
                                                 @if ($instance['show_cadence'] && $instance['cadence'])
                                                     · {{ $instance['cadence'] }}
@@ -514,7 +514,7 @@ new class extends Component
                                         @if ($instance['migration'] && ! $instance['migration']['failed'])
                                             <div class="flex items-center gap-3">
                                                 <progress class="progress w-40" value="{{ $instance['migration']['percent'] ?? 0 }}" max="100" aria-label="{{ __('Migration progress') }}"></progress>
-                                                <span class="font-mono text-sm text-base-content/70">{{ $instance['migration']['percent'] ?? 0 }}%</span>
+                                                <span class="text-sm text-base-content/70">{{ $instance['migration']['percent'] ?? 0 }}%</span>
                                                 @if ($instance['migration']['message'])
                                                     <span class="truncate text-sm text-base-content/70">{{ $instance['migration']['message'] }}</span>
                                                 @endif
