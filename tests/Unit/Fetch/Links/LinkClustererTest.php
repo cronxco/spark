@@ -28,6 +28,38 @@ class LinkClustererTest extends TestCase
     }
 
     #[Test]
+    public function it_builds_a_group_from_json_ld_item_lists_linked_on_the_page(): void
+    {
+        $jsonLd = json_encode(['@type' => 'ItemList', 'itemListElement' => [
+            ['url' => '/p/first-story'], ['url' => '/p/second-story'], ['url' => '/p/not-on-page'],
+        ]]);
+        $html = "<html><head><script type=\"application/ld+json\">{$jsonLd}</script></head><body>"
+            . '<div><a href="/p/second-story">The second story headline</a></div>'
+            . '<section><a href="/p/first-story">The first story headline</a></section></body></html>';
+
+        $page = (new LinkCandidateExtractor)->fromHtml($html, 'https://example.com/');
+        $cluster = (new LinkClusterer)->structuredCluster($page);
+
+        $this->assertNotNull($cluster);
+        $this->assertSame('s0', $cluster->id);
+        $this->assertSame(['The first story headline', 'The second story headline'], array_map(fn (LinkCandidate $item): string => $item->anchorText, $cluster->items));
+    }
+
+    #[Test]
+    public function it_ignores_json_ld_lists_that_are_mostly_not_on_the_page(): void
+    {
+        $jsonLd = json_encode(['@type' => 'ItemList', 'itemListElement' => [
+            ['url' => '/p/a'], ['url' => '/p/b'], ['url' => '/p/c'], ['url' => '/p/d'], ['url' => '/p/e'],
+        ]]);
+        $html = "<html><head><script type=\"application/ld+json\">{$jsonLd}</script></head><body>"
+            . '<a href="/p/a">Story A headline</a><a href="/p/b">Story B headline</a></body></html>';
+
+        $page = (new LinkCandidateExtractor)->fromHtml($html, 'https://example.com/');
+
+        $this->assertNull((new LinkClusterer)->structuredCluster($page));
+    }
+
+    #[Test]
     public function it_ranks_the_primary_post_list_first(): void
     {
         $page = (new LinkCandidateExtractor)->fromHtml(FetchPages::blogIndex(), 'https://blog.example.com/');

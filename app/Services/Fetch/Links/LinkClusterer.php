@@ -105,6 +105,48 @@ class LinkClusterer
     }
 
     /**
+     * A group built from the page's JSON-LD ItemList, when at least half of
+     * its URLs are also linked on the page (their anchors supply the titles).
+     * Publishers' own structured data is the most reliable list signal.
+     */
+    public function structuredCluster(PageLinks $page): ?LinkCluster
+    {
+        if ($page->structuredItemUrls === []) {
+            return null;
+        }
+
+        $byIdentity = [];
+        foreach ($page->candidates as $candidate) {
+            $identity = UrlCanonicalizer::canonicalize($candidate->url);
+            $existing = $byIdentity[$identity] ?? null;
+
+            if ($existing === null || mb_strlen($candidate->anchorText) > mb_strlen($existing->anchorText)) {
+                $byIdentity[$identity] = $candidate;
+            }
+        }
+
+        $items = [];
+        foreach ($page->structuredItemUrls as $url) {
+            $candidate = $byIdentity[UrlCanonicalizer::canonicalize($url)] ?? null;
+
+            if ($candidate !== null) {
+                $items[UrlCanonicalizer::canonicalize($url)] = $candidate;
+            }
+        }
+
+        $items = array_values($items);
+
+        if (count($items) < 2 || count($items) / count($page->structuredItemUrls) < 0.5) {
+            return null;
+        }
+
+        $pageHost = strtolower((string) parse_url($page->pageUrl, PHP_URL_HOST));
+        $cluster = $this->build('structured-data|' . self::urlTemplate($items[0]->url), $items, $pageHost, max(1, count($page->candidates)));
+
+        return $this->withId($cluster, 's0');
+    }
+
+    /**
      * Cheap gate before asking Jev anything: is there any structure that could
      * be a list of articles? Deliberately loose.
      *
