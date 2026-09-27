@@ -90,6 +90,27 @@ class NewsletterIssueContentTest extends TestCase
             && $job->taskFilter === ['newsletter_extract_content']);
     }
 
+    #[Test]
+    public function resummarising_retires_the_old_summaries_and_regenerates_them_after_extraction(): void
+    {
+        Queue::fake([ProcessTaskPipelineJob::class]);
+        $issue = $this->issue('Needs it', null);
+        $issue->createBlock([
+            'title' => 'TL;DR',
+            'block_type' => 'newsletter_tldr',
+            'time' => $issue->time,
+            'metadata' => ['content' => 'Summary of the wrong issue'],
+        ]);
+
+        $this->artisan('newsletter:backfill-issue-content', ['--days' => 14, '--resummarise' => true])->assertSuccessful();
+
+        $this->assertSame(0, $issue->blocks()->where('block_type', 'newsletter_tldr')->whereNull('deleted_at')->count());
+        $this->assertSame(1, $issue->blocks()->where('block_type', 'newsletter_tldr')->whereNotNull('deleted_at')->count());
+        Queue::assertPushed(ProcessTaskPipelineJob::class, fn ($job) => $job->model->is($issue)
+            && $job->force
+            && $job->taskFilter === ['newsletter_extract_content', 'newsletter_generate_summaries']);
+    }
+
     private function issue(string $subject, ?string $content, ?Carbon $time = null): Event
     {
         $event = Event::factory()->create([

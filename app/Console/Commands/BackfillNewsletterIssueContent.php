@@ -13,18 +13,30 @@ use Illuminate\Console\Command;
  * its summaries may have been written against the wrong issue.
  *
  * Extraction is forced, because the pipeline otherwise skips a task that has
- * already succeeded. Summaries are left alone: an issue was summarised while
- * its own text was still the publication's latest, so re-summarising every
- * issue would spend a model call apiece to change almost nothing.
+ * already succeeded. Summaries are left alone by default: an issue was
+ * summarised while its own text was still the publication's latest, so only an
+ * issue caught in a race with another from the same publication is wrong, and
+ * re-summarising every issue spends a model call apiece. `--resummarise` does
+ * it anyway, soft-deleting the old summary blocks so they stay recoverable.
  */
 class BackfillNewsletterIssueContent extends Command
 {
     protected $signature = 'newsletter:backfill-issue-content
                             {--days=14 : How far back to look}
                             {--limit=200 : Maximum events to queue}
+                            {--resummarise : Also regenerate each issue\'s summaries from its own text}
                             {--dry-run : List matching events without queueing them}';
 
     protected $description = 'Queue re-extraction for newsletter issues missing their own issue text';
+
+    /** @var array<int, string> */
+    private const SUMMARY_BLOCK_TYPES = [
+        'newsletter_summary_tweet',
+        'newsletter_summary_short',
+        'newsletter_summary_paragraph',
+        'newsletter_key_takeaways',
+        'newsletter_tldr',
+    ];
 
     public function handle(): int
     {
@@ -58,11 +70,23 @@ class BackfillNewsletterIssueContent extends Command
             return Command::SUCCESS;
         }
 
+        $resummarise = (bool) $this->option('resummarise');
+
         foreach ($events as $event) {
+            if ($resummarise) {
+                $event->blocks()
+                    ->whereIn('block_type', self::SUMMARY_BLOCK_TYPES)
+                    ->whereNull('deleted_at')
+                    ->get()
+                    ->each->delete();
+            }
+
             ProcessTaskPipelineJob::dispatch(
                 model: $event,
                 trigger: 'manual',
-                taskFilter: ['newsletter_extract_content'],
+                taskFilter: $resummarise
+                    ? ['newsletter_extract_content', 'newsletter_generate_summaries']
+                    : ['newsletter_extract_content'],
                 force: true,
             );
         }
