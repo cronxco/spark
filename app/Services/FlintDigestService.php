@@ -44,7 +44,7 @@ class FlintDigestService
             'question_omission.candidates' => ['required_with:question_omission', 'array', 'min:3', 'max:10'],
             'question_omission.candidates.*' => ['string', 'max:500'],
             'blocks' => ['nullable', 'array', 'max:50'],
-            'blocks.*.block_type' => ['required', 'string', 'max:100', Rule::in(array_keys(FlintPlugin::getBlockTypes()))],
+            'blocks.*.block_type' => ['required', 'string', 'max:100', Rule::in(array_values(array_diff(array_keys(FlintPlugin::getBlockTypes()), ['flint_topic_task'])))],
             'blocks.*.title' => ['required', 'string', 'max:255'],
             'blocks.*.content' => ['nullable', 'string', 'max:20000'],
             'blocks.*.url' => ['nullable', 'url', 'max:2048'],
