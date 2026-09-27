@@ -312,6 +312,7 @@ class FetchEngineManager
 
             return [
                 'html' => $result['html'],
+                'final_url' => $result['url'] ?? $url,
                 'status_code' => 200,
                 'screenshot' => $result['screenshot'] ?? null,
                 'method' => 'playwright',

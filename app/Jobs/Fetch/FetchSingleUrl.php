@@ -10,6 +10,9 @@ use App\Jobs\Data\Fetch\ProcessFetchedContent;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Notifications\FetchMultipleFailures;
+use App\Services\Fetch\Assessment\ListPageDetector;
+use App\Services\Fetch\BookmarkCreator;
+use App\Services\Fetch\Expansion\ListItem;
 use App\Services\Fetch\FetchMetadata;
 use App\Services\Fetch\UrlSafetyValidator;
 use App\Services\Media\MediaDownloadHelper;
@@ -140,7 +143,13 @@ class FetchSingleUrl implements ShouldQueue
             ]);
 
             // Extract content using Readability
-            $extraction = ContentExtractor::extract($html, $this->url, $webpage->user_id);
+            $parsed = ContentExtractor::parse($html, $this->url);
+            $extraction = ContentExtractor::validateParsed($parsed, $html, $this->url, $webpage->user_id);
+
+            // A list of articles is expanded instead of being treated as one article
+            if ($this->handleListPage($webpage, $engine, $result, $html, $parsed, $extraction, $durationMs)) {
+                return;
+            }
 
             if (! $extraction['success']) {
                 $reason = $extraction['reason'] ?? 'Unknown error';
@@ -386,6 +395,95 @@ class FetchSingleUrl implements ShouldQueue
         }
 
         return false;
+    }
+
+    /**
+     * Treat the page as a list of articles when list detection says so:
+     * record the fetch, then hand the articles to ExpandLinkListJob instead of
+     * creating an article revision.
+     *
+     * @param  array<string, mixed>  $result
+     * @param  array{success: bool, reason: ?string, data: ?array}  $parsed
+     * @param  array{success: bool, reason: ?string}  $validation
+     */
+    private function handleListPage(
+        EventObject $webpage,
+        FetchEngineManager $engine,
+        array $result,
+        string $html,
+        array $parsed,
+        array $validation,
+        float $durationMs,
+    ): bool {
+        $assessment = app(ListPageDetector::class)->detect($webpage, $html, $result['final_url'] ?? $this->url, $parsed, $validation);
+
+        if ($assessment === null) {
+            return false;
+        }
+
+        $method = $result['method'] ?? 'unknown';
+        $title = trim((string) ($parsed['data']['title'] ?? ''));
+        if ($title !== '' && ! app(BookmarkCreator::class)->titleIsAvailable($webpage, $title)) {
+            $title = '';
+        }
+
+        FetchMetadata::mutate($webpage, function (array $metadata) use ($result, $method): array {
+            $once = ($metadata['fetch_mode'] ?? 'recurring') === 'once';
+
+            $metadata = array_merge($metadata, $this->fetchMethodMetadata($result, $method), [
+                'last_checked_at' => now()->toIso8601String(),
+                'fetch_count' => ($metadata['fetch_count'] ?? 0) + 1,
+                'last_error' => null,
+                'pipeline_status' => 'complete',
+            ]);
+
+            if ($once) {
+                $metadata['enabled'] = false;
+                $metadata['discovery_status'] = 'completed';
+            }
+
+            $metadata['list_detection'] = array_merge($metadata['list_detection'] ?? [], [
+                'expansion_status' => 'pending',
+            ]);
+
+            return $metadata;
+        }, $title !== '' ? ['title' => $title] : []);
+
+        app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
+            "fetch_multiple_failures:{$webpage->id}",
+        ]);
+
+        $engine->updateLastHistoryEntry($webpage, [
+            'outcome' => $this->fetchOutcome($result, true),
+            'content_kind' => 'list',
+            'duration_ms' => $durationMs,
+            'status_code' => $result['status_code'] ?? null,
+            'final_status_code' => $result['status_code'] ?? null,
+            'actual_method' => $result['actual_method'] ?? $method,
+            'playwright_error' => $result['playwright_error'] ?? null,
+            'playwright_reached_worker' => $result['playwright_reached_worker'] ?? null,
+            'playwright_worker_status' => $result['playwright_worker_status'] ?? null,
+            'fallback_status_code' => $result['fallback_status_code'] ?? null,
+            'playwright_meta' => $result['playwright_meta'] ?? null,
+        ]);
+
+        (new PlaywrightHealthMetrics)->recordFetch($method, true, (int) $durationMs);
+
+        ExpandLinkListJob::dispatch(
+            $this->integration,
+            (string) $webpage->id,
+            array_map(fn ($candidate): array => ListItem::fromCandidate($candidate)->toArray(), $assessment->acceptedItems),
+            $assessment->toArray(),
+        );
+
+        Log::info('Fetch: Page is a list of articles, expansion queued', [
+            'url' => $this->url,
+            'webpage_id' => $webpage->id,
+            'items' => count($assessment->acceptedItems),
+            'assessment' => $assessment->status,
+        ]);
+
+        return true;
     }
 
     private function isHandledPermanentFetchFailure(string $error): bool

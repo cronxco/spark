@@ -109,6 +109,18 @@ class BookmarkCreator
     }
 
     /**
+     * Whether a bookmark can take a title. Objects are unique per user,
+     * concept, type and title, so two bookmarks cannot share one.
+     */
+    public function titleIsAvailable(EventObject $bookmark, string $title): bool
+    {
+        return ! $this->bookmarks((string) $bookmark->user_id)
+            ->where('title', $title)
+            ->whereKeyNot($bookmark->getKey())
+            ->exists();
+    }
+
+    /**
      * Bookmarks created before canonical_url existed: match by canonicalising
      * their stored URL (narrowed by host) and backfill the identity.
      *

@@ -24,6 +24,11 @@ class CaptureBookmarkTool extends Tool
         such as a logged-in or paywalled page. Spark extracts and enriches the supplied HTML
         without fetching the URL again. Repeated calls for the same URL update the existing
         bookmark rather than creating duplicates.
+
+        When list detection is enabled and the page is a list of articles (a blog index,
+        section front or similar), the state is `list_expanded`: the page is stored as a
+        list and the articles it lists are bookmarked individually; `items_found` gives
+        how many articles were found.
     MARKDOWN;
 
     public function __construct(protected CaptureBookmarkService $captures) {}
@@ -74,6 +79,7 @@ class CaptureBookmarkTool extends Tool
                 'url' => $bookmark->url,
                 'title' => $bookmark->title,
             ],
+            ...(isset($result['items_found']) ? ['items_found' => $result['items_found']] : []),
         ]);
     }
 
