@@ -79,6 +79,18 @@ class FlintPlugin extends ManualPlugin
     public static function getActionTypes(): array
     {
         return [
+            'had_topic_task' => [
+                'display_name' => 'Topic task',
+                'description' => 'A dated task attached to a Flint Topic',
+                'icon' => 'fas.list-check',
+                'display_with_object' => false,
+                'hidden' => true,
+                'exclude_from_flint' => true,
+                'supports_value' => false,
+                'value_formatter' => null,
+                'value_multiplier' => null,
+                'value_unit' => null,
+            ],
             'had_summary' => [
                 'display_name' => 'Had Digest',
                 'display_name_past_tense' => 'Generated Digest',
@@ -110,6 +122,15 @@ class FlintPlugin extends ManualPlugin
     public static function getBlockTypes(): array
     {
         return [
+            'flint_topic_task' => [
+                'display_name' => 'Topic Task',
+                'description' => 'An actionable task with optional due and review dates',
+                'icon' => 'fas.list-check',
+                'display_with_object' => false,
+                'hidden' => false,
+                'supports_value' => false,
+                'value_unit' => null,
+            ],
             'flint_insight' => [
                 'display_name' => 'Insight',
                 'description' => 'An observation the digest drew from the day\'s data',

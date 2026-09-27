@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\User;
 use App\Services\FlintTopicService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -171,6 +172,71 @@ class FlintTopicsControllerTest extends TestCase
         $this->assertNull($eventMention['digest_id']);
         $this->assertSame($event->time->toIso8601String(), $blockMention['occurred_at']);
         $this->assertSame($event->time->toDateString(), $blockMention['local_date']);
+    }
+
+    #[Test]
+    public function changes_an_owned_topics_kind_with_version_and_preserves_its_summary(): void
+    {
+        $topic = $this->topic('Work/life balance & resilience', kind: 'tactical');
+        $topic->update(['content' => 'NWDs can be skipped when work needs it.']);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        $version = $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->json('data.version');
+
+        $this->patchJson("/api/v1/mobile/flint/topics/{$topic->id}", ['kind' => 'thematic'])
+            ->assertStatus(428);
+        $this->withHeader('If-Match', $version)
+            ->patchJson("/api/v1/mobile/flint/topics/{$topic->id}", ['kind' => 'thematic'])
+            ->assertOk()
+            ->assertJsonPath('data.kind', 'thematic')
+            ->assertJsonPath('data.content', 'NWDs can be skipped when work needs it.');
+        $this->withHeader('If-Match', $version)
+            ->patchJson("/api/v1/mobile/flint/topics/{$topic->id}", ['kind' => 'strategic'])
+            ->assertStatus(412);
+    }
+
+    #[Test]
+    public function task_blocks_have_independent_due_and_review_dates_and_can_be_completed(): void
+    {
+        $topic = $this->topic('Canada trip', kind: 'strategic');
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        $body = [
+            'client_mutation_id' => (string) Str::uuid(),
+            'title' => 'Book final Vancouver hotel night',
+            'due_on' => '2027-08-01',
+            'review_on' => '2027-07-15',
+        ];
+        $first = $this->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", $body)
+            ->assertCreated()
+            ->assertJsonPath('data.due_on', '2027-08-01')
+            ->assertJsonPath('data.review_on', '2027-07-15');
+        $taskId = $first->json('data.id');
+        $this->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", $body)
+            ->assertJsonPath('data.id', $taskId);
+        $this->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", [
+            ...$body, 'review_on' => '2027-07-16',
+        ])->assertStatus(409);
+        $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")
+            ->assertJsonCount(1, 'data.tasks')
+            ->assertJsonPath('data.tasks.0.id', $taskId)
+            ->assertJsonPath('data.next_review_at', null);
+        $completed = $this->withHeader('If-Match', $first->json('data.version'))
+            ->patchJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks/{$taskId}", ['completed' => true])
+            ->assertOk();
+        $this->assertNotNull($completed->json('data.completed_at'));
+    }
+
+    #[Test]
+    public function one_users_task_cannot_be_created_on_or_modified_through_another_users_topic(): void
+    {
+        $other = User::factory()->create();
+        $foreign = EventObject::factory()->create([
+            'user_id' => $other->id, 'concept' => 'flint', 'type' => 'topic',
+            'title' => 'Private', 'metadata' => ['kind' => 'thematic'],
+        ]);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        $this->postJson("/api/v1/mobile/flint/topics/{$foreign->id}/tasks", [
+            'client_mutation_id' => (string) Str::uuid(), 'title' => 'Intrusion',
+        ])->assertNotFound();
     }
 
     #[Test]

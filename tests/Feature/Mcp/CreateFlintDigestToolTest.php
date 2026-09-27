@@ -169,6 +169,21 @@ class CreateFlintDigestToolTest extends TestCase
     }
 
     #[Test]
+    public function a_topic_task_block_cannot_be_created_inside_a_digest(): void
+    {
+        SparkServer::actingAs($this->user)->tool(CreateFlintDigestTool::class, [
+            'title' => 'Morning Digest',
+            'period' => 'morning',
+            'blocks' => [[
+                'block_type' => 'flint_topic_task',
+                'title' => 'Book the hotel',
+            ]],
+        ])->assertHasErrors(['Unknown Flint block type']);
+
+        $this->assertDatabaseMissing('blocks', ['block_type' => 'flint_topic_task']);
+    }
+
+    #[Test]
     public function a_run_token_makes_callback_retries_durably_idempotent(): void
     {
         $runUuid = (string) Str::uuid();
