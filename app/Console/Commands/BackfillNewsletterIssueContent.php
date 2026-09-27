@@ -29,6 +29,7 @@ class BackfillNewsletterIssueContent extends Command
         'newsletter_key_takeaways',
         'newsletter_tldr',
     ];
+
     protected $signature = 'newsletter:backfill-issue-content
                             {--days=14 : How far back to look}
                             {--limit=200 : Maximum events to queue}
