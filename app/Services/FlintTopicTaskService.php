@@ -105,19 +105,6 @@ class FlintTopicTaskService
         }
     }
 
-    /** @return array<string, mixed> */
-    private function replayedTask(Event $existing, EventObject $topic, string $requestHash): array
-    {
-        if ($existing->target_id !== $topic->id) {
-            abort(409, 'This mutation ID belongs to another thread.');
-        }
-        if (! hash_equals((string) data_get($existing->event_metadata, 'request_hash', ''), $requestHash)) {
-            abort(409, 'The client mutation ID has already been used with different content.');
-        }
-
-        return $this->payload($existing->blocks()->where('block_type', 'flint_topic_task')->firstOrFail());
-    }
-
     /** @param array<string, mixed> $data
      * @return array<string, mixed>|null
      */
@@ -155,6 +142,19 @@ class FlintTopicTaskService
 
             return $this->payload($block);
         });
+    }
+
+    /** @return array<string, mixed> */
+    private function replayedTask(Event $existing, EventObject $topic, string $requestHash): array
+    {
+        if ($existing->target_id !== $topic->id) {
+            abort(409, 'This mutation ID belongs to another thread.');
+        }
+        if (! hash_equals((string) data_get($existing->event_metadata, 'request_hash', ''), $requestHash)) {
+            abort(409, 'The client mutation ID has already been used with different content.');
+        }
+
+        return $this->payload($existing->blocks()->where('block_type', 'flint_topic_task')->firstOrFail());
     }
 
     /** @return Builder<Block> */
