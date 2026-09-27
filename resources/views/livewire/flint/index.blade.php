@@ -10,6 +10,7 @@ use App\Services\FlintTopicTaskService;
 use App\Support\FlintDigestKind;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
@@ -226,7 +227,7 @@ new class extends Component
             ]);
             $task = app(FlintTopicTaskService::class)->create(Auth::user(), $topicId, [
                 'title' => $data['newTaskTitle'],
-                'client_mutation_id' => (string) \Illuminate\Support\Str::uuid(),
+                'client_mutation_id' => (string) Str::uuid(),
                 'content' => $data['newTaskContent'],
                 'due_on' => $data['newTaskDueOn'],
                 'review_on' => $data['newTaskReviewOn'],
