@@ -34,8 +34,9 @@ class CreateFlintDigestTool extends Tool
           `birthdays` (array of `{title}` — a birthday is not a commitment either of you is
           attending, so no `person` field; keep it out of `calendar`), and `weather`
           (`{location, condition, temp_high_c, rain_probability_pct}`). Do not put this in `content`.
-        - `flint_news`: One story from the news roundup. Provide `content` (a short standalone
-          distillation, not a copy of the summary section), structured `news`, and
+        - `flint_news`: One story from the news roundup. Provide `content` (the story's TL;DR, one
+          or two sentences), structured `news` (`key_points`, optional `contested`, `sources`
+          with a `url` or `event_id` each, optional `why_it_matters`, `what_to_watch`), and
           `referenced_event_ids`.
         - `flint_reading_pick` / `flint_reading_drop`: One item from the reading list. Provide
           `content` (why this, tonight), `url`, and for a pick `minutes` (a whole number).
@@ -143,10 +144,22 @@ class CreateFlintDigestTool extends Tool
                         ->items($schema->string())
                         ->description('For flint_user_question: optional multiple-choice answers. Omit for freeform.'),
                     'news' => $schema->object([
-                        'summary' => $schema->string()->required(),
+                        'key_points' => $schema->array()->items($schema->string())
+                            ->description('2–4 specifics a reader would otherwise have to go and find: figures, names, dates, mechanism. Each adds something the TL;DR in `content` does not.'),
+                        'contested' => $schema->string()
+                            ->description('Where named outlets actually differ on the facts or their reading, and why. Omit when they do not.'),
+                        'summary' => $schema->string()
+                            ->description('Legacy prose summary. Required only when `key_points` is omitted.'),
                         'sources' => $schema->array()->items($schema->object([
                             'publication' => $schema->string()->required(),
-                            'position' => $schema->string()->required(),
+                            'position' => $schema->string()->required()
+                                ->description('One sentence: what this outlet uniquely reported or argued.'),
+                            'url' => $schema->string()
+                                ->description('Link to the article itself. Required for research sources.'),
+                            'event_id' => $schema->string()
+                                ->description('For a source from the user\'s own feeds: the event UUID of that issue. Must also appear in the block\'s referenced_event_ids.'),
+                            'origin' => $schema->string()->enum(['feed', 'research'])
+                                ->description('`feed` for the user\'s own newsletters and fetches, `research` for anything found by searching.'),
                         ]))->required(),
                         'why_it_matters' => $schema->string(),
                         'what_to_watch' => $schema->string()->required(),

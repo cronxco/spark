@@ -57,10 +57,16 @@ class FlintDigestService
             'blocks.*.answer_options' => ['nullable', 'array', 'max:20'],
             'blocks.*.answer_options.*' => ['string', 'max:255'],
             'blocks.*.news' => ['nullable', 'array'],
-            'blocks.*.news.summary' => ['required_with:blocks.*.news', 'string', 'max:2000'],
+            'blocks.*.news.key_points' => ['nullable', 'array', 'min:2', 'max:4'],
+            'blocks.*.news.key_points.*' => ['required', 'string', 'max:300'],
+            'blocks.*.news.contested' => ['nullable', 'string', 'max:1000'],
+            'blocks.*.news.summary' => ['nullable', 'string', 'max:2000'],
             'blocks.*.news.sources' => ['required_with:blocks.*.news', 'array', 'min:1', 'max:20'],
             'blocks.*.news.sources.*.publication' => ['required', 'string', 'max:255'],
             'blocks.*.news.sources.*.position' => ['required', 'string', 'max:1000'],
+            'blocks.*.news.sources.*.url' => ['nullable', 'required_if:blocks.*.news.sources.*.origin,research', 'url', 'max:2048'],
+            'blocks.*.news.sources.*.event_id' => ['nullable', 'uuid'],
+            'blocks.*.news.sources.*.origin' => ['nullable', 'in:feed,research'],
             'blocks.*.news.why_it_matters' => ['nullable', 'string', 'max:2000'],
             'blocks.*.news.what_to_watch' => ['required_with:blocks.*.news', 'string', 'max:2000'],
             'blocks.*.day_context' => ['nullable', 'array'],
@@ -373,6 +379,28 @@ class FlintDigestService
             if ($incomplete) {
                 throw ValidationException::withMessages([
                     'blocks' => 'Every flint_news block must include structured news data.',
+                ]);
+            }
+
+            $unsummarised = $blocks->where('block_type', 'flint_news')
+                ->contains(fn (array $block) => empty($block['news']['key_points']) && empty($block['news']['summary']));
+            if ($unsummarised) {
+                throw ValidationException::withMessages([
+                    'blocks' => 'Every flint_news block needs key_points, or a summary for older callers.',
+                ]);
+            }
+
+            $unreferenced = $blocks->where('block_type', 'flint_news')->contains(function (array $block): bool {
+                $referenced = $block['referenced_event_ids'] ?? [];
+
+                return collect($block['news']['sources'] ?? [])
+                    ->pluck('event_id')
+                    ->filter()
+                    ->contains(fn (string $eventId) => ! in_array($eventId, $referenced, true));
+            });
+            if ($unreferenced) {
+                throw ValidationException::withMessages([
+                    'blocks' => 'A news source event_id must also appear in its block\'s referenced_event_ids.',
                 ]);
             }
         }

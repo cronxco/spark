@@ -12,6 +12,8 @@ use RuntimeException;
 /** Runs an unattended Flint skill through streamed OpenAI Responses + MCP. */
 class SkillRunner
 {
+    /** The manifest namespace for tools served by the You.com MCP server. */
+    public const YOU_NAMESPACE = 'you';
     private const ENDPOINT = 'https://api.openai.com/v1/responses';
 
     /** @param array<string, mixed> $payload */
@@ -54,14 +56,7 @@ class SkillRunner
                 'input' => json_encode($payload, JSON_THROW_ON_ERROR),
                 'stream' => true,
                 'max_tool_calls' => $skill->maxToolCalls,
-                'tools' => [[
-                    'type' => 'mcp',
-                    'server_label' => 'cronxtools',
-                    'server_description' => 'Spark, Karakeep, Fastmail, Outline and weather tools.',
-                    'server_url' => $serverUrl,
-                    'allowed_tools' => $skill->allowedTools,
-                    'require_approval' => 'never',
-                ]],
+                'tools' => $this->mcpServers($skill, $serverUrl),
             ];
             if ($continuation) {
                 $request['previous_response_id'] = $continuation->responseId;
@@ -116,6 +111,69 @@ class SkillRunner
         } finally {
             finish_ai_agent_span($agentSpan, $result?->toArray() ?? [], $agentSucceeded);
         }
+    }
+
+    /**
+     * One MCP entry per server the skill needs. CronxTools serves every
+     * namespaced tool under its own name; the You.com server names its tools
+     * without our namespace, so `you__you-search` is offered as `you-search`.
+     * Research is optional: with no You.com URL configured the skill still
+     * runs, just without its search tool.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function mcpServers(SkillDefinition $skill, string $cronxToolsUrl): array
+    {
+        $cronxTools = [];
+        $you = [];
+        foreach ($skill->allowedTools as $tool) {
+            if (str_starts_with($tool, self::YOU_NAMESPACE . '__')) {
+                $you[] = substr($tool, strlen(self::YOU_NAMESPACE) + 2);
+            } else {
+                $cronxTools[] = $tool;
+            }
+        }
+
+        $servers = [[
+            'type' => 'mcp',
+            'server_label' => 'cronxtools',
+            'server_description' => 'Spark, Karakeep, Fastmail, Outline and weather tools.',
+            'server_url' => $cronxToolsUrl,
+            'allowed_tools' => $cronxTools,
+            'require_approval' => 'never',
+        ]];
+
+        $youUrl = config('services.flint_routine.you_mcp_url');
+        if ($you !== [] && is_string($youUrl) && $youUrl !== '') {
+            $servers[] = [
+                'type' => 'mcp',
+                'server_label' => self::YOU_NAMESPACE,
+                'server_description' => 'You.com web and news search, for developing stories already chosen from the user\'s own sources.',
+                'server_url' => $youUrl,
+                'allowed_tools' => $you,
+                'require_approval' => 'never',
+            ];
+        }
+
+        return $servers;
+    }
+
+    /**
+     * The manifest name of a tool call, restoring the namespace the You.com
+     * server does not carry so it can be checked against the allowlist.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function qualifiedToolName(array $item): ?string
+    {
+        $name = $item['name'] ?? null;
+        if (! is_string($name)) {
+            return null;
+        }
+
+        return ($item['server_label'] ?? null) === self::YOU_NAMESPACE
+            ? self::YOU_NAMESPACE . '__' . $name
+            : $name;
     }
 
     /** @return array{0: array<string, mixed>, 1: array<int, string>} */
@@ -210,7 +268,7 @@ class SkillRunner
                 continue;
             }
             if ($type === 'mcp_call') {
-                $name = $item['name'] ?? null;
+                $name = $this->qualifiedToolName($item);
                 if (! is_string($name) || ! in_array($name, $skill->allowedTools, true)) {
                     throw new RuntimeException("Skill {$skill->name} invoked an unapproved tool.");
                 }

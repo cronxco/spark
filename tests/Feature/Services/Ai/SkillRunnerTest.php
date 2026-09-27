@@ -120,6 +120,101 @@ class SkillRunnerTest extends TestCase
         Http::assertSent(fn ($request) => ($request['previous_response_id'] ?? null) === 'resp-one');
     }
 
+    #[Test]
+    public function research_tools_are_served_by_the_you_server_under_their_own_names(): void
+    {
+        config(['services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp?profile=free']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody([
+            ['type' => 'mcp_call', 'server_label' => 'you', 'name' => 'you-search', 'output' => '{"results":{}}'],
+            [
+                'type' => 'mcp_call',
+                'server_label' => 'cronxtools',
+                'name' => 'spark__create-flint-digest',
+                'output' => json_encode(['event_id' => 'evt-created']),
+            ],
+        ]))]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        $result = app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+
+        $this->assertSame(['you__you-search', 'spark__create-flint-digest'], $result->toolsCalled);
+        Http::assertSent(function ($request) {
+            [$cronxTools, $you] = $request['tools'];
+            $this->assertCount(2, $request['tools']);
+            $this->assertSame('cronxtools', $cronxTools['server_label']);
+            $this->assertNotContains('you__you-search', $cronxTools['allowed_tools']);
+            $this->assertContains('spark__create-flint-digest', $cronxTools['allowed_tools']);
+            $this->assertSame('you', $you['server_label']);
+            $this->assertSame('https://api.you.com/mcp?profile=free', $you['server_url']);
+            $this->assertSame(['you-search'], $you['allowed_tools']);
+            $this->assertSame('never', $you['require_approval']);
+
+            return true;
+        });
+    }
+
+    #[Test]
+    public function a_skill_still_runs_without_research_when_no_you_url_is_configured(): void
+    {
+        config(['services.flint_routine.you_mcp_url' => null]);
+        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody())]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+
+        Http::assertSent(function ($request) {
+            $this->assertCount(1, $request['tools']);
+            $this->assertSame('cronxtools', $request['tools'][0]['server_label']);
+
+            return true;
+        });
+    }
+
+    #[Test]
+    public function a_skill_without_research_tools_never_connects_to_the_you_server(): void
+    {
+        config(['services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp?profile=free']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody())]);
+        $skill = app(SkillRegistry::class)->get('flint-topics');
+
+        try {
+            app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'topics']);
+        } catch (RuntimeException) {
+            // flint-topics has its own required tools; only the request shape matters here.
+        }
+
+        Http::assertSent(fn ($request) => count($request['tools']) === 1);
+    }
+
+    #[Test]
+    public function an_unlisted_you_tool_is_rejected(): void
+    {
+        config(['services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp?profile=free']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody([
+            ['type' => 'mcp_call', 'server_label' => 'you', 'name' => 'you-contents', 'output' => '{}'],
+        ]))]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('unapproved tool');
+
+        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+    }
+
+    #[Test]
+    public function a_you_tool_name_from_another_server_is_not_mistaken_for_research(): void
+    {
+        config(['services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp?profile=free']);
+        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody([
+            ['type' => 'mcp_call', 'server_label' => 'cronxtools', 'name' => 'you-search', 'output' => '{}'],
+        ]))]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        $this->expectException(RuntimeException::class);
+
+        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+    }
+
     /** @param array<int, array<string, mixed>>|null $output */
     private function completedBody(?array $output = null): array
     {

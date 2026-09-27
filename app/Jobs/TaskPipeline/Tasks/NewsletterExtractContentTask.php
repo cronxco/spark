@@ -41,6 +41,17 @@ class NewsletterExtractContentTask extends BaseTaskJob
                 $rawContent
             );
 
+            $event->createBlock([
+                'title' => 'Issue Content',
+                'block_type' => 'newsletter_content',
+                'time' => $event->time,
+                'metadata' => [
+                    'content' => $articleText,
+                    'word_count' => str_word_count($articleText),
+                    'extracted_at' => now()->toIso8601String(),
+                ],
+            ]);
+
             $metadata = $publication->metadata ?? [];
             $metadata['extracted_at'] = now()->toIso8601String();
 

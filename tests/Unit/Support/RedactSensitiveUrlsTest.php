@@ -32,6 +32,16 @@ class RedactSensitiveUrlsTest extends TestCase
     }
 
     #[Test]
+    public function it_redacts_a_keyed_you_mcp_url_too(): void
+    {
+        config(['services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp?api_key=you_secret_key']);
+
+        $redacted = redact_sensitive_urls('POST https://api.you.com/mcp?api_key=you_secret_key failed');
+
+        $this->assertStringNotContainsString('you_secret_key', $redacted);
+    }
+
+    #[Test]
     public function it_leaves_unrelated_text_alone(): void
     {
         $this->assertSame('nothing secret here', redact_sensitive_urls('nothing secret here'));

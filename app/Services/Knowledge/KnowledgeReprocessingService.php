@@ -162,7 +162,7 @@ class KnowledgeReprocessingService
             throw new InvalidArgumentException('Newsletter event does not have a publication target.');
         }
 
-        if ($mode === self::MODE_SUMMARY_ONLY && empty($publication->content)) {
+        if ($mode === self::MODE_SUMMARY_ONLY && empty($event->issueContent() ?? $publication->content)) {
             throw new InvalidArgumentException('Newsletter event has no extracted content to summarize.');
         }
 
