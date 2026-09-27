@@ -178,7 +178,7 @@ class CreateFlintDigestToolTest extends TestCase
                 'block_type' => 'flint_topic_task',
                 'title' => 'Book the hotel',
             ]],
-        ])->assertHasErrors(['block type']);
+        ])->assertHasErrors(['blocks.0.block_type']);
 
         $this->assertDatabaseMissing('blocks', ['block_type' => 'flint_topic_task']);
     }
