@@ -21,14 +21,6 @@ use Illuminate\Console\Command;
  */
 class BackfillNewsletterIssueContent extends Command
 {
-    protected $signature = 'newsletter:backfill-issue-content
-                            {--days=14 : How far back to look}
-                            {--limit=200 : Maximum events to queue}
-                            {--resummarise : Also regenerate each issue\'s summaries from its own text}
-                            {--dry-run : List matching events without queueing them}';
-
-    protected $description = 'Queue re-extraction for newsletter issues missing their own issue text';
-
     /** @var array<int, string> */
     private const SUMMARY_BLOCK_TYPES = [
         'newsletter_summary_tweet',
@@ -37,6 +29,13 @@ class BackfillNewsletterIssueContent extends Command
         'newsletter_key_takeaways',
         'newsletter_tldr',
     ];
+    protected $signature = 'newsletter:backfill-issue-content
+                            {--days=14 : How far back to look}
+                            {--limit=200 : Maximum events to queue}
+                            {--resummarise : Also regenerate each issue\'s summaries from its own text}
+                            {--dry-run : List matching events without queueing them}';
+
+    protected $description = 'Queue re-extraction for newsletter issues missing their own issue text';
 
     public function handle(): int
     {
