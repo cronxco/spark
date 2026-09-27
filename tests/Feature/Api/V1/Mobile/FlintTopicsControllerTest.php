@@ -199,22 +199,22 @@ class FlintTopicsControllerTest extends TestCase
     {
         $topic = $this->topic('Canada trip', kind: 'strategic');
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
-        $version = $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->json('data.version');
         $body = [
             'client_mutation_id' => (string) Str::uuid(),
             'title' => 'Book final Vancouver hotel night',
             'due_on' => '2027-08-01',
             'review_on' => '2027-07-15',
         ];
-        $first = $this->withHeader('If-Match', $version)
-            ->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", $body)
+        $first = $this->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", $body)
             ->assertCreated()
             ->assertJsonPath('data.due_on', '2027-08-01')
             ->assertJsonPath('data.review_on', '2027-07-15');
         $taskId = $first->json('data.id');
-        $this->withHeader('If-Match', $version)
-            ->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", $body)
+        $this->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", $body)
             ->assertJsonPath('data.id', $taskId);
+        $this->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", [
+            ...$body, 'review_on' => '2027-07-16',
+        ])->assertStatus(409);
         $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")
             ->assertJsonCount(1, 'data.tasks')
             ->assertJsonPath('data.tasks.0.id', $taskId)
