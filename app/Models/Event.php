@@ -146,7 +146,7 @@ class Event extends Model
     public function displayTargetContent(): ?string
     {
         if (! $this->hasFetchTargetSnapshot()) {
-            return $this->target?->content;
+            return $this->issueContent() ?? $this->target?->content;
         }
 
         $this->loadMissing('blocks');
@@ -156,6 +156,24 @@ class Event extends Model
             ?? $rawBlock?->metadata['text']
             ?? $this->target_metadata['excerpt']
             ?? $this->target?->content;
+    }
+
+    /**
+     * The text of this newsletter issue. A publication object is shared by
+     * every issue, so its own `content` only ever holds the latest one.
+     */
+    public function issueContent(): ?string
+    {
+        if ($this->service !== 'newsletter') {
+            return null;
+        }
+
+        $block = $this->relationLoaded('blocks')
+            ? $this->blocks->first(fn (Block $block) => $block->block_type === 'newsletter_content' && $block->deleted_at === null)
+            : $this->blocks()->where('block_type', 'newsletter_content')->whereNull('deleted_at')->first();
+        $content = $block?->metadata['content'] ?? null;
+
+        return is_string($content) && trim($content) !== '' ? $content : null;
     }
 
     public function scopeWithoutInternal(Builder $query): Builder

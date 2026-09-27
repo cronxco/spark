@@ -275,6 +275,141 @@ class CreateFlintDigestToolTest extends TestCase
             ->assertHasErrors(['structured news']);
     }
 
+    #[Test]
+    public function a_news_story_can_carry_key_points_and_linked_sources_without_a_summary(): void
+    {
+        $issueId = (string) Str::uuid();
+
+        SparkServer::actingAs($this->user)
+            ->tool(CreateFlintDigestTool::class, $this->newsPayload($this->story($issueId)))
+            ->assertOk();
+
+        $block = Block::query()->where('block_type', 'flint_news')->firstOrFail();
+        $news = $block->metadata['news'];
+        $this->assertSame('Iran offered a seven-day pause; Trump turned it down.', $block->metadata['content']);
+        $this->assertCount(3, $news['key_points']);
+        $this->assertSame('The Guardian and the NYT differ on whether strikes resume after the midterms.', $news['contested']);
+        $this->assertSame($issueId, $news['sources'][0]['event_id']);
+        $this->assertSame('feed', $news['sources'][0]['origin']);
+        $this->assertSame('https://www.nytimes.com/2026/09/26/us/politics/trump-iran-hormuz-strait.html', $news['sources'][1]['url']);
+        $this->assertArrayNotHasKey('summary', $news);
+    }
+
+    #[Test]
+    public function a_news_story_needs_either_key_points_or_a_summary(): void
+    {
+        $story = $this->story((string) Str::uuid());
+        unset($story['news']['key_points']);
+
+        SparkServer::actingAs($this->user)
+            ->tool(CreateFlintDigestTool::class, $this->newsPayload($story))
+            ->assertHasErrors(['key_points, or a summary']);
+    }
+
+    #[Test]
+    public function a_research_source_must_link_to_its_article(): void
+    {
+        $story = $this->story((string) Str::uuid());
+        unset($story['news']['sources'][1]['url']);
+
+        SparkServer::actingAs($this->user)
+            ->tool(CreateFlintDigestTool::class, $this->newsPayload($story))
+            ->assertHasErrors(['url']);
+    }
+
+    #[Test]
+    public function a_feed_source_must_point_at_an_event_the_block_references(): void
+    {
+        $story = $this->story((string) Str::uuid());
+        $story['news']['sources'][0]['event_id'] = (string) Str::uuid();
+
+        SparkServer::actingAs($this->user)
+            ->tool(CreateFlintDigestTool::class, $this->newsPayload($story))
+            ->assertHasErrors(['referenced_event_ids']);
+    }
+
+    #[Test]
+    public function a_feed_source_must_name_its_issue(): void
+    {
+        $story = $this->story((string) Str::uuid());
+        unset($story['news']['sources'][0]['event_id']);
+
+        SparkServer::actingAs($this->user)
+            ->tool(CreateFlintDigestTool::class, $this->newsPayload($story))
+            ->assertHasErrors(['event_id']);
+    }
+
+    #[Test]
+    public function a_key_points_story_needs_its_tldr(): void
+    {
+        $story = $this->story((string) Str::uuid());
+        $story['content'] = '  ';
+
+        SparkServer::actingAs($this->user)
+            ->tool(CreateFlintDigestTool::class, $this->newsPayload($story))
+            ->assertHasErrors(['TL;DR']);
+    }
+
+    #[Test]
+    public function key_points_are_limited_to_four(): void
+    {
+        $story = $this->story((string) Str::uuid());
+        $story['news']['key_points'] = ['One.', 'Two.', 'Three.', 'Four.', 'Five.'];
+
+        SparkServer::actingAs($this->user)
+            ->tool(CreateFlintDigestTool::class, $this->newsPayload($story))
+            ->assertHasErrors(['key_points']);
+    }
+
+    /** @return array<string, mixed> */
+    private function story(string $issueId): array
+    {
+        return [
+            'block_type' => 'flint_news',
+            'title' => 'Trump rejects Iran’s seven-day ceasefire',
+            'content' => 'Iran offered a seven-day pause; Trump turned it down.',
+            'news' => [
+                'key_points' => [
+                    'Hormuz would have reopened on the seventh day.',
+                    'Iran asked for the blockade to end and an oil-sanctions waiver.',
+                    'The NYT puts the frozen assets at $12bn or more.',
+                ],
+                'contested' => 'The Guardian and the NYT differ on whether strikes resume after the midterms.',
+                'sources' => [
+                    [
+                        'publication' => 'The Economist, World in Brief',
+                        'position' => 'Reported the rejection and the blockade claim.',
+                        'origin' => 'feed',
+                        'event_id' => $issueId,
+                    ],
+                    [
+                        'publication' => 'The New York Times',
+                        'position' => 'Set out the proposal’s terms.',
+                        'origin' => 'research',
+                        'url' => 'https://www.nytimes.com/2026/09/26/us/politics/trump-iran-hormuz-strait.html',
+                    ],
+                ],
+                'what_to_watch' => 'Iran’s formal response through mediators.',
+            ],
+            'referenced_event_ids' => [$issueId],
+        ];
+    }
+
+    /** @param array<string, mixed> $story @return array<string, mixed> */
+    private function newsPayload(array $story): array
+    {
+        return [
+            'title' => 'News roundup',
+            'period' => 'morning',
+            'date' => today()->toDateString(),
+            'run_token' => $this->runToken((string) Str::uuid(), 'news_roundup', 'flint-news-roundup'),
+            'blocks' => [
+                $story,
+                ['block_type' => 'flint_editorial_note', 'title' => 'Run notes', 'content' => 'Three sources.'],
+            ],
+        ];
+    }
+
     private function runToken(string $runUuid, string $routine, string $skill): string
     {
         return app(FlintRunToken::class)->issue([

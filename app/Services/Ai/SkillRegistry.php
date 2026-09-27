@@ -53,6 +53,7 @@ class SkillRegistry
         'spark__manage-flint-topic',
         'weather__get_forecast',
         'weather__get_weather_summary',
+        'you__you-search',
     ];
 
     /** @var array<string, SkillDefinition>|null */

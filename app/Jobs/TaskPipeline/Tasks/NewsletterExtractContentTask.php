@@ -41,13 +41,33 @@ class NewsletterExtractContentTask extends BaseTaskJob
                 $rawContent
             );
 
-            $metadata = $publication->metadata ?? [];
-            $metadata['extracted_at'] = now()->toIso8601String();
-
-            $publication->update([
-                'content' => $articleText,
-                'metadata' => $metadata,
+            $event->createBlock([
+                'title' => 'Issue Content',
+                'block_type' => 'newsletter_content',
+                'time' => $event->time,
+                'metadata' => [
+                    'content' => $articleText,
+                    'word_count' => str_word_count($articleText),
+                    'extracted_at' => now()->toIso8601String(),
+                ],
             ]);
+
+            // The publication keeps the text of its latest issue for older
+            // callers; re-extracting an earlier issue must not overwrite it.
+            $isLatestIssue = ! Event::query()
+                ->where('target_id', $publication->id)
+                ->where('service', 'newsletter')
+                ->where('time', '>', $event->time)
+                ->exists();
+            if ($isLatestIssue) {
+                $metadata = $publication->metadata ?? [];
+                $metadata['extracted_at'] = now()->toIso8601String();
+
+                $publication->update([
+                    'content' => $articleText,
+                    'metadata' => $metadata,
+                ]);
+            }
 
             ProcessTaskPipelineJob::dispatch(
                 model: $event->fresh(['target', 'integration']),

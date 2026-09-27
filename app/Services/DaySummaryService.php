@@ -728,8 +728,8 @@ class DaySummaryService
             $section['newsletters'] = $newsletters->map(function ($event) {
                 $newsletter = [
                     'event_id' => $event->id,
-                    'title' => $event->target?->title ?? 'Newsletter',
-                    'from' => $event->actor?->title ?? 'Unknown',
+                    'title' => $event->event_metadata['email_subject'] ?? $event->target?->title ?? 'Newsletter',
+                    'from' => $event->target?->title ?? $event->event_metadata['email_from_name'] ?? 'Unknown',
                 ];
 
                 $tldr = $event->blocks->firstWhere('block_type', 'newsletter_tldr');

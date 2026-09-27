@@ -19,7 +19,7 @@ class NewsletterGenerateSummariesTask extends BaseTaskJob
 
         $event = $this->model->loadMissing(['target', 'integration']);
         $publication = $event->target?->fresh();
-        $articleText = $publication?->content;
+        $articleText = $event->issueContent() ?? $publication?->content;
 
         if (! $publication) {
             throw new Exception('Newsletter event does not have a publication target.');
