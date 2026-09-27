@@ -38,13 +38,19 @@ writing unless a person would recognise it as something they have going on.
 | Kind | Horizon | Example | Ends when |
 |---|---|---|---|
 | `strategic` | Months to years | A 2027 Canada trip; a three-week work trip to Australia in November; moving house | It happens, or Will drops it |
-| `thematic` | Ongoing, no end date | Getting back to running; how much weight readiness should carry; managing sleep debt | It stops being live for months |
+| `thematic` | Ongoing, no end date | Work/life balance & resilience; getting back to running; how much weight readiness should carry | It stops being live for months |
 | `tactical` | Days to weeks | A boiler replacement; a long weekend away; an unfolding news story | It resolves |
 
 **All three kinds are meant to be used.** A topics list that is entirely `tactical` is
 not a sign of restraint — it means the job is only noticing things already in motion
 and missing the longer threads underneath them. If every live topic resolves inside a
 fortnight, Step 6 is being applied too narrowly; re-read it.
+
+Reassess existing kinds when the scope becomes clearer. An ongoing area of life
+without a completion date is thematic even when one dated action sits beneath
+it. A 2027 trip remains strategic; booking its last hotel night is a task on
+that trip, not a new tactical Topic. Will can change a Topic's kind in the app;
+respect that explicit choice unless he asks for a reclassification.
 
 ## Statuses
 
@@ -126,9 +132,21 @@ When the evidence names **a future date on which Will has to do something**, tha
 topic with a built-in review date, whichever kind it is. "The return leg gets added on
 24 September" is a commitment; so is a renewal, a deadline, a booking window opening.
 
-Create or update the topic with `next_review_at` set to that date. Nothing else in the
-system will remember it, and a commitment mentioned once in a digest and never again is
-a commitment that gets missed.
+Create a task block on the existing Topic with `due_on` for the date action is
+needed, or `review_on` for the date Flint should check its status. First call
+`spark__manage-flint-topic(operation: "list_tasks", id: "<topic id>")` so a
+repeated digest does not create a duplicate. Use `add_task` with a stable
+`client_mutation_id` UUID, `title`, optional `content`, and the appropriate
+date. Mark it complete only on explicit evidence, through `update_task` using
+the returned task ID and version. If a due date changes, edit the same task.
+Keep the Topic's `next_review_at` for a review of the overall thread; do not
+use it as a substitute for an individual task's date.
+
+For example, a final Vancouver hotel night and an Avios refund follow-up are
+two tasks on the Canada Topic. Will sometimes skips a recurring NWD: the
+specific next exception may be a dated task or note, while the recurring
+question of work/life balance and resilience belongs to a thematic Topic.
+Never infer a medical problem from a data-fetching error.
 
 ## Step 4: Wake, retire, and expire
 
@@ -153,11 +171,17 @@ correct.
 
 **Anything the evidence says has concluded** → `resolved`. An answered question
 that closes a thread, a booking made, a decision taken.
+Check open task blocks first. A completed booking can resolve one task while a
+refund or hotel night still keeps the wider Topic active.
 
 **A topic whose `next_review_at` is today or tomorrow** stays `active` and must be
 visible to the next briefing — that is the whole point of setting the date. Make sure
 its `content` says plainly what is due and when, in the first sentence, so the digest
 routine reading the topics list cannot miss it.
+
+Check task blocks separately. A due or review date is a reason to check progress,
+not proof the task happened. A dormant Topic with a pending dated task should
+become visible when the date approaches, without rewriting its long-term kind.
 
 ## Step 5: Touch the topics today's digest actually discussed
 

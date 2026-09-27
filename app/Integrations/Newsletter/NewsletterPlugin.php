@@ -167,7 +167,7 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
                 runOnCreate: true,
                 runOnUpdate: false,
                 shouldRun: fn (Event $event) => ! empty($event->event_metadata['raw_html'])
-                    && ! $event->blocks()->where('block_type', 'newsletter_content')->exists(),
+                    && ! $event->blocks()->where('block_type', 'newsletter_content')->whereNull('deleted_at')->exists(),
             ),
             new TaskDefinition(
                 key: 'newsletter_generate_summaries',

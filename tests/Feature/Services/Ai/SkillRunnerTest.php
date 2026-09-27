@@ -154,6 +154,28 @@ class SkillRunnerTest extends TestCase
     }
 
     #[Test]
+    public function a_you_api_key_travels_as_the_bearer_token_not_in_the_url(): void
+    {
+        config([
+            'services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp',
+            'services.flint_routine.you_mcp_key' => 'ydc-test-key',
+        ]);
+        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody())]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+
+        Http::assertSent(function ($request) {
+            $you = $request['tools'][1];
+            $this->assertSame('https://api.you.com/mcp', $you['server_url']);
+            $this->assertSame('ydc-test-key', $you['authorization']);
+            $this->assertArrayNotHasKey('authorization', $request['tools'][0]);
+
+            return true;
+        });
+    }
+
+    #[Test]
     public function a_skill_still_runs_without_research_when_no_you_url_is_configured(): void
     {
         config(['services.flint_routine.you_mcp_url' => null]);

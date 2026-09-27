@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
-use App\Services\Knowledge\KnowledgeReprocessingService;
 use Illuminate\Console\Command;
 
 /**
@@ -11,6 +11,11 @@ use Illuminate\Console\Command;
  * `newsletter_content` block. Until then an issue's text lived only on its
  * shared publication object, so every issue read back as the latest one and
  * its summaries may have been written against the wrong issue.
+ *
+ * Extraction is forced, because the pipeline otherwise skips a task that has
+ * already succeeded. Summaries are left alone: an issue was summarised while
+ * its own text was still the publication's latest, so re-summarising every
+ * issue would spend a model call apiece to change almost nothing.
  */
 class BackfillNewsletterIssueContent extends Command
 {
@@ -21,7 +26,7 @@ class BackfillNewsletterIssueContent extends Command
 
     protected $description = 'Queue re-extraction for newsletter issues missing their own issue text';
 
-    public function handle(KnowledgeReprocessingService $reprocessing): int
+    public function handle(): int
     {
         $days = max(1, (int) $this->option('days'));
         $limit = max(1, (int) $this->option('limit'));
@@ -32,7 +37,7 @@ class BackfillNewsletterIssueContent extends Command
             ->where('action', 'received_post')
             ->where('time', '>=', now()->subDays($days))
             ->whereNotNull('event_metadata->raw_html')
-            ->whereDoesntHave('blocks', fn ($query) => $query->where('block_type', 'newsletter_content'))
+            ->whereDoesntHave('blocks', fn ($query) => $query->where('block_type', 'newsletter_content')->whereNull('deleted_at'))
             ->orderByDesc('time')
             ->limit($limit)
             ->get();
@@ -54,7 +59,12 @@ class BackfillNewsletterIssueContent extends Command
         }
 
         foreach ($events as $event) {
-            $reprocessing->reprocess($event, KnowledgeReprocessingService::MODE_AUTO);
+            ProcessTaskPipelineJob::dispatch(
+                model: $event,
+                trigger: 'manual',
+                taskFilter: ['newsletter_extract_content'],
+                force: true,
+            );
         }
 
         $this->info("Queued {$events->count()} issue(s) for re-extraction.");

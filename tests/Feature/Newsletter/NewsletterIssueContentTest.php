@@ -85,7 +85,9 @@ class NewsletterIssueContentTest extends TestCase
         $this->artisan('newsletter:backfill-issue-content', ['--days' => 14])->assertSuccessful();
 
         Queue::assertPushed(ProcessTaskPipelineJob::class, 1);
-        Queue::assertPushed(ProcessTaskPipelineJob::class, fn ($job) => $job->model->is($missing));
+        Queue::assertPushed(ProcessTaskPipelineJob::class, fn ($job) => $job->model->is($missing)
+            && $job->force
+            && $job->taskFilter === ['newsletter_extract_content']);
     }
 
     private function issue(string $subject, ?string $content, ?Carbon $time = null): Event

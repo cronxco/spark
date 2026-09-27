@@ -65,7 +65,7 @@ class FlintDigestService
             'blocks.*.news.sources.*.publication' => ['required', 'string', 'max:255'],
             'blocks.*.news.sources.*.position' => ['required', 'string', 'max:1000'],
             'blocks.*.news.sources.*.url' => ['nullable', 'required_if:blocks.*.news.sources.*.origin,research', 'url', 'max:2048'],
-            'blocks.*.news.sources.*.event_id' => ['nullable', 'uuid'],
+            'blocks.*.news.sources.*.event_id' => ['nullable', 'required_if:blocks.*.news.sources.*.origin,feed', 'uuid'],
             'blocks.*.news.sources.*.origin' => ['nullable', 'in:feed,research'],
             'blocks.*.news.why_it_matters' => ['nullable', 'string', 'max:2000'],
             'blocks.*.news.what_to_watch' => ['required_with:blocks.*.news', 'string', 'max:2000'],
@@ -387,6 +387,14 @@ class FlintDigestService
             if ($unsummarised) {
                 throw ValidationException::withMessages([
                     'blocks' => 'Every flint_news block needs key_points, or a summary for older callers.',
+                ]);
+            }
+
+            $withoutTldr = $blocks->where('block_type', 'flint_news')
+                ->contains(fn (array $block) => ! empty($block['news']['key_points']) && trim((string) ($block['content'] ?? '')) === '');
+            if ($withoutTldr) {
+                throw ValidationException::withMessages([
+                    'blocks' => 'A flint_news block with key_points needs its TL;DR in content.',
                 ]);
             }
 

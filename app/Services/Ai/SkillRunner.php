@@ -154,6 +154,10 @@ class SkillRunner
                 'allowed_tools' => $you,
                 'require_approval' => 'never',
             ];
+            $youKey = config('services.flint_routine.you_mcp_key');
+            if (is_string($youKey) && $youKey !== '') {
+                $servers[array_key_last($servers)]['authorization'] = $youKey;
+            }
         }
 
         return $servers;

@@ -46,7 +46,9 @@ class NewsletterExtractContentTaskTest extends TestCase
         OpenAI::fake([$this->openAiResponse('# Monday issue'), $this->openAiResponse('# Tuesday issue')]);
 
         [$monday, $publication] = $this->newsletterEvent(rawHtml: '<html>Monday</html>');
+        $monday->update(['time' => now()->subDay()]);
         $tuesday = Event::factory()->create([
+            'time' => now(),
             'integration_id' => $monday->integration_id,
             'target_id' => $publication->id,
             'service' => 'newsletter',
@@ -62,6 +64,50 @@ class NewsletterExtractContentTaskTest extends TestCase
         $this->assertSame('# Monday issue', $monday->fresh()->displayTargetContent());
         $this->assertSame('# Tuesday issue', $tuesday->fresh()->issueContent());
         $this->assertSame('# Tuesday issue', $publication->refresh()->content);
+    }
+
+    #[Test]
+    public function re_extracting_an_older_issue_leaves_the_publications_latest_text_alone(): void
+    {
+        Queue::fake([ProcessTaskPipelineJob::class]);
+        OpenAI::fake([$this->openAiResponse('# Monday issue')]);
+
+        [$monday, $publication] = $this->newsletterEvent(rawHtml: '<html>Monday</html>');
+        $monday->update(['time' => now()->subDay()]);
+        $publication->update(['content' => '# Tuesday issue']);
+        Event::factory()->create([
+            'integration_id' => $monday->integration_id,
+            'target_id' => $publication->id,
+            'service' => 'newsletter',
+            'domain' => 'knowledge',
+            'action' => 'received_post',
+            'time' => now(),
+        ]);
+
+        (new NewsletterExtractContentTask($monday, $this->task()))->handle();
+
+        $this->assertSame('# Monday issue', $monday->fresh()->issueContent());
+        $this->assertSame('# Tuesday issue', $publication->refresh()->content);
+    }
+
+    #[Test]
+    public function a_soft_deleted_issue_block_is_neither_read_nor_counted_as_extracted(): void
+    {
+        [$event, $publication] = $this->newsletterEvent(rawHtml: '<html>Issue</html>');
+        $publication->update(['content' => '# Publication text']);
+        $event->createBlock([
+            'title' => 'Issue Content',
+            'block_type' => 'newsletter_content',
+            'time' => $event->time,
+            'metadata' => ['content' => '# Deleted text'],
+        ])->delete();
+
+        $definition = collect(NewsletterPlugin::getTaskDefinitions())
+            ->firstWhere('key', 'newsletter_extract_content');
+
+        $this->assertNull($event->fresh()->issueContent());
+        $this->assertNull($event->fresh()->load('blocks')->issueContent());
+        $this->assertTrue($definition->isApplicableTo($event->fresh()));
     }
 
     #[Test]

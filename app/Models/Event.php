@@ -169,8 +169,8 @@ class Event extends Model
         }
 
         $block = $this->relationLoaded('blocks')
-            ? $this->blocks->firstWhere('block_type', 'newsletter_content')
-            : $this->blocks()->where('block_type', 'newsletter_content')->first();
+            ? $this->blocks->first(fn (Block $block) => $block->block_type === 'newsletter_content' && $block->deleted_at === null)
+            : $this->blocks()->where('block_type', 'newsletter_content')->whereNull('deleted_at')->first();
         $content = $block?->metadata['content'] ?? null;
 
         return is_string($content) && trim($content) !== '' ? $content : null;

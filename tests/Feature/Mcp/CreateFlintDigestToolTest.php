@@ -329,6 +329,28 @@ class CreateFlintDigestToolTest extends TestCase
     }
 
     #[Test]
+    public function a_feed_source_must_name_its_issue(): void
+    {
+        $story = $this->story((string) Str::uuid());
+        unset($story['news']['sources'][0]['event_id']);
+
+        SparkServer::actingAs($this->user)
+            ->tool(CreateFlintDigestTool::class, $this->newsPayload($story))
+            ->assertHasErrors(['event_id']);
+    }
+
+    #[Test]
+    public function a_key_points_story_needs_its_tldr(): void
+    {
+        $story = $this->story((string) Str::uuid());
+        $story['content'] = '  ';
+
+        SparkServer::actingAs($this->user)
+            ->tool(CreateFlintDigestTool::class, $this->newsPayload($story))
+            ->assertHasErrors(['TL;DR']);
+    }
+
+    #[Test]
     public function key_points_are_limited_to_four(): void
     {
         $story = $this->story((string) Str::uuid());
