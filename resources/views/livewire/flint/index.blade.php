@@ -6,6 +6,7 @@ use App\Services\AgentWorkingMemoryService;
 use App\Services\Ai\AiUsageSummary;
 use App\Services\Flint\FlintScheduleSettings;
 use App\Services\FlintTopicService;
+use App\Services\FlintTopicTaskService;
 use App\Support\FlintDigestKind;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -201,6 +202,52 @@ new class extends Component
     public function topicMentions(EventObject $topic)
     {
         return app(FlintTopicService::class)->mentions($topic);
+    }
+
+    public string $newTaskTopicId = '';
+    public string $newTaskTitle = '';
+    public string $newTaskContent = '';
+    public ?string $newTaskDueOn = null;
+    public ?string $newTaskReviewOn = null;
+
+    public function topicTasks(EventObject $topic): array
+    {
+        return app(FlintTopicTaskService::class)->list(Auth::user(), (string) $topic->id);
+    }
+
+    public function addTopicTask(string $topicId): void
+    {
+        try {
+            $data = $this->validate([
+                'newTaskTitle' => ['required', 'string', 'max:255'],
+                'newTaskContent' => ['nullable', 'string', 'max:20000'],
+                'newTaskDueOn' => ['nullable', 'date_format:Y-m-d'],
+                'newTaskReviewOn' => ['nullable', 'date_format:Y-m-d'],
+            ]);
+            $task = app(FlintTopicTaskService::class)->create(Auth::user(), $topicId, [
+                'title' => $data['newTaskTitle'],
+                'client_mutation_id' => (string) \Illuminate\Support\Str::uuid(),
+                'content' => $data['newTaskContent'],
+                'due_on' => $data['newTaskDueOn'],
+                'review_on' => $data['newTaskReviewOn'],
+            ]);
+            if (! $task) {
+                $this->error('Topic not found.');
+                return;
+            }
+            $this->reset(['newTaskTopicId', 'newTaskTitle', 'newTaskContent', 'newTaskDueOn', 'newTaskReviewOn']);
+            $this->success('Task added.');
+        } catch (ValidationException $exception) {
+            $this->error($exception->validator->errors()->first());
+        }
+    }
+
+    public function toggleTopicTask(string $topicId, string $taskId, string $version, bool $completed): void
+    {
+        $task = app(FlintTopicTaskService::class)->update(Auth::user(), $topicId, $taskId, [
+            'completed' => $completed,
+        ], $version);
+        $task ? $this->success($completed ? 'Task completed.' : 'Task reopened.') : $this->error('Task not found.');
     }
 
     public function expandTopic(string $topicId): void
@@ -691,6 +738,38 @@ new class extends Component
                                 @endif
 
                                 @if ($expandedTopicId === $topic->id)
+                                    <div class="pt-3 border-t border-base-300 space-y-2">
+                                        <div class="text-xs font-semibold uppercase tracking-wider text-base-content/60">
+                                            {{ __('Tasks') }}
+                                        </div>
+                                        @foreach ($this->topicTasks($topic) as $task)
+                                            <div class="flex items-start gap-2 text-sm" wire:key="topic-task-{{ $task['id'] }}">
+                                                <button type="button"
+                                                    wire:click="toggleTopicTask('{{ $topic->id }}', '{{ $task['id'] }}', '{{ $task['version'] }}', {{ $task['completed_at'] ? 'false' : 'true' }})"
+                                                    aria-label="{{ $task['completed_at'] ? __('Reopen task') : __('Complete task') }}"
+                                                    class="btn btn-ghost btn-xs">{{ $task['completed_at'] ? '☑' : '□' }}</button>
+                                                <div>
+                                                    <div class="{{ $task['completed_at'] ? 'line-through opacity-60' : '' }}">{{ $task['title'] }}</div>
+                                                    @if ($task['content']) <p class="text-base-content/70">{{ $task['content'] }}</p> @endif
+                                                    <div class="text-xs text-base-content/60">
+                                                        @if ($task['due_on']) {{ __('Due') }} {{ $task['due_on'] }} @endif
+                                                        @if ($task['review_on']) {{ __('Review') }} {{ $task['review_on'] }} @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                        @if ($newTaskTopicId === $topic->id)
+                                            <x-input label="{{ __('Task') }}" wire:model="newTaskTitle" />
+                                            <x-textarea label="{{ __('Details') }}" wire:model="newTaskContent" rows="2" />
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <x-input type="date" label="{{ __('Due on') }}" wire:model="newTaskDueOn" />
+                                                <x-input type="date" label="{{ __('Review on') }}" wire:model="newTaskReviewOn" />
+                                            </div>
+                                            <x-button label="{{ __('Add task') }}" wire:click="addTopicTask('{{ $topic->id }}')" class="btn-primary btn-sm" />
+                                        @else
+                                            <x-button label="{{ __('Add task') }}" wire:click="$set('newTaskTopicId', '{{ $topic->id }}')" class="btn-ghost btn-sm" />
+                                        @endif
+                                    </div>
                                     @php $mentions = $this->topicMentions($topic); @endphp
                                     <div class="pt-3 border-t border-base-300">
                                         <div class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-2">

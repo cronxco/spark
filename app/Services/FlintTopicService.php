@@ -135,6 +135,7 @@ class FlintTopicService
         return $this->payload($topic) + [
             'version' => $this->versions->etag($topic),
             'mentions' => $this->mentions($topic)->all(),
+            'tasks' => app(FlintTopicTaskService::class)->list($user, $topic->id),
         ];
     }
 

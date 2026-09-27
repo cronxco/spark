@@ -362,6 +362,12 @@ spark__manage-flint-topic(operation: "list")
 
 Read all returned Topics and retain:
 
+- For Topics relevant to today's plans, call
+  `spark__manage-flint-topic(operation: "list_tasks", id: "<topic id>")`.
+  Surface due or review-due open tasks when they are actionable; a completed
+  task is not an outstanding reminder. A task's date is distinct from the
+  Topic's `next_review_at`, which governs the thread as a whole.
+
 - `id`
 - `title`
 - `content`
