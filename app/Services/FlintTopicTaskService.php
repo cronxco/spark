@@ -8,9 +8,9 @@ use App\Models\EventObject;
 use App\Models\User;
 use App\Services\Api\ResourceVersion;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Http\Exceptions\HttpResponseException;
 
 /**
  * Tasks are real blocks, each on a private Flint event targeting its Topic.
@@ -36,7 +36,7 @@ class FlintTopicTaskService
     }
 
     /** @param array<string, mixed> $data
-     *  @return array<string, mixed>|null
+     * @return array<string, mixed>|null
      */
     public function create(User $user, string $topicId, array $data): ?array
     {
@@ -54,6 +54,7 @@ class FlintTopicTaskService
                 if ($existing->target_id !== $topic->id) {
                     abort(409, 'This mutation ID belongs to another thread.');
                 }
+
                 return $this->payload($existing->blocks()->where('block_type', 'flint_topic_task')->firstOrFail());
             }
             $actor = EventObject::firstOrCreate(
@@ -88,13 +89,14 @@ class FlintTopicTaskService
     }
 
     /** @param array<string, mixed> $data
-     *  @return array<string, mixed>|null
+     * @return array<string, mixed>|null
      */
     public function update(User $user, string $topicId, string $taskId, array $data, ?string $etag): ?array
     {
         if (! $this->topic($user, $topicId)) {
             return null;
         }
+
         return DB::transaction(function () use ($user, $topicId, $taskId, $data, $etag): ?array {
             $block = $this->blocks($user, $topicId)->lockForUpdate()->find($taskId);
             if (! $block) {
