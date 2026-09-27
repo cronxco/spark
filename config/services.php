@@ -235,6 +235,15 @@ return [
         // See redact_sensitive_urls() in app/Support/helpers.php.
         'cronxtools_url' => env('FLINT_CRONXTOOLS_URL'),
 
+        // The You.com MCP endpoint a skill may search through when its
+        // manifest allows a `you__` tool. The free profile needs no key; a
+        // keyed URL would be a credential, so it is redacted like the above.
+        'you_mcp_url' => env('FLINT_YOU_MCP_URL', 'https://api.you.com/mcp?profile=free'),
+
+        // Optional You.com API key, sent as the MCP bearer token rather than
+        // in the URL. Leave unset for the free profile.
+        'you_mcp_key' => env('FLINT_YOU_MCP_KEY'),
+
         // How a routine is run: 'webhook' hands it to a Claude Code Routine,
         // 'openai' runs the vendored skill in-process. Individual routines may
         // override this, so the two can be compared on the same input.

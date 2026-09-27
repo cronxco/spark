@@ -124,6 +124,15 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
                 'accent_color' => 'info',
                 'hidden' => false,
             ],
+            'newsletter_content' => [
+                'icon' => 'fas.file-lines',
+                'display_name' => 'Issue Content',
+                'description' => 'The extracted text of this issue',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'accent_color' => 'info',
+                'hidden' => true,
+            ],
         ];
     }
 
@@ -158,7 +167,7 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
                 runOnCreate: true,
                 runOnUpdate: false,
                 shouldRun: fn (Event $event) => ! empty($event->event_metadata['raw_html'])
-                    && empty($event->target?->metadata['extracted_at']),
+                    && ! $event->blocks()->where('block_type', 'newsletter_content')->whereNull('deleted_at')->exists(),
             ),
             new TaskDefinition(
                 key: 'newsletter_generate_summaries',
@@ -170,7 +179,7 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
                 dependencies: ['newsletter_extract_content'],
                 runOnCreate: true,
                 runOnUpdate: false,
-                shouldRun: fn (Event $event) => ! empty($event->target?->content)
+                shouldRun: fn (Event $event) => ! empty($event->issueContent() ?? $event->target?->content)
                     && ! $event->blocks()->where('block_type', 'newsletter_tldr')
                         ->whereNotNull('metadata->content')
                         ->whereNull('deleted_at')

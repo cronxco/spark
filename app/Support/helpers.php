@@ -474,7 +474,7 @@ if (! function_exists('sensitive_log_keys')) {
         return [
             'password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key',
             'access_token', 'refresh_token', 'authorization', 'webhook_secret',
-            'server_url', 'cronxtools_url', 'cookies',
+            'server_url', 'cronxtools_url', 'you_mcp_url', 'you_mcp_key', 'cookies',
             // `plaintext` is the one-time Sanctum bearer token returned by
             // ApiTokensController::store.
             'plaintext', 'plain_text_token', 'bearer',
@@ -516,8 +516,20 @@ if (! function_exists('redact_sensitive_urls')) {
      */
     function redact_sensitive_urls(string $value): string
     {
-        $url = config('services.flint_routine.cronxtools_url');
+        foreach (['cronxtools_url', 'you_mcp_url'] as $key) {
+            $value = redact_sensitive_url($value, config("services.flint_routine.{$key}"));
+        }
 
+        return $value;
+    }
+}
+
+if (! function_exists('redact_sensitive_url')) {
+    /**
+     * Redact every appearance of one MCP server URL, plain or encoded.
+     */
+    function redact_sensitive_url(string $value, mixed $url): string
+    {
         if (! is_string($url) || $url === '') {
             return $value;
         }
