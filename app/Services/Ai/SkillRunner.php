@@ -14,6 +14,7 @@ class SkillRunner
 {
     /** The manifest namespace for tools served by the You.com MCP server. */
     public const YOU_NAMESPACE = 'you';
+
     private const ENDPOINT = 'https://api.openai.com/v1/responses';
 
     /** @param array<string, mixed> $payload */
