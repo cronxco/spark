@@ -242,11 +242,20 @@ new class extends Component
         }
     }
 
-    public function toggleTopicTask(string $topicId, string $taskId, string $version, bool $completed): void
+    public function toggleTopicTask(string $topicId, string $taskId, bool $completed): void
     {
-        $task = app(FlintTopicTaskService::class)->update(Auth::user(), $topicId, $taskId, [
+        $service = app(FlintTopicTaskService::class);
+        $current = collect($service->list(Auth::user(), $topicId))->firstWhere('id', $taskId);
+
+        if (! $current) {
+            $this->error('Task not found.');
+
+            return;
+        }
+
+        $task = $service->update(Auth::user(), $topicId, $taskId, [
             'completed' => $completed,
-        ], $version);
+        ], $current['version']);
         $task ? $this->success($completed ? 'Task completed.' : 'Task reopened.') : $this->error('Task not found.');
     }
 
@@ -745,7 +754,7 @@ new class extends Component
                                         @foreach ($this->topicTasks($topic) as $task)
                                             <div class="flex items-start gap-2 text-sm" wire:key="topic-task-{{ $task['id'] }}">
                                                 <button type="button"
-                                                    wire:click="toggleTopicTask('{{ $topic->id }}', '{{ $task['id'] }}', '{{ $task['version'] }}', {{ $task['completed_at'] ? 'false' : 'true' }})"
+                                                    wire:click="toggleTopicTask('{{ $topic->id }}', '{{ $task['id'] }}', {{ $task['completed_at'] ? 'false' : 'true' }})"
                                                     aria-label="{{ $task['completed_at'] ? __('Reopen task') : __('Complete task') }}"
                                                     class="btn btn-ghost btn-xs">{{ $task['completed_at'] ? '☑' : '□' }}</button>
                                                 <div>
