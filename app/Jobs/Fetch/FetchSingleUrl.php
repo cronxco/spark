@@ -10,6 +10,7 @@ use App\Jobs\Data\Fetch\ProcessFetchedContent;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Notifications\FetchMultipleFailures;
+use App\Services\Fetch\FetchMetadata;
 use App\Services\Fetch\UrlSafetyValidator;
 use App\Services\Media\MediaDownloadHelper;
 use App\Services\Notifications\NotificationIncidentResolver;
@@ -176,13 +177,13 @@ class FetchSingleUrl implements ShouldQueue
                             $html = $archiveResult['html'];
 
                             // Update metadata to track archive usage
-                            $metadata = $webpage->metadata ?? [];
-                            $metadata['last_archive_bypass'] = [
-                                'timestamp' => now()->toIso8601String(),
-                                'archive_url' => $archiveResult['archive_url'],
-                                'original_error' => $reason,
-                            ];
-                            $webpage->update(['metadata' => $metadata]);
+                            FetchMetadata::merge($webpage, [
+                                'last_archive_bypass' => [
+                                    'timestamp' => now()->toIso8601String(),
+                                    'archive_url' => $archiveResult['archive_url'],
+                                    'original_error' => $reason,
+                                ],
+                            ]);
 
                             // Update history with archive success
                             $engine->updateLastHistoryEntry($webpage, [
@@ -253,15 +254,7 @@ class FetchSingleUrl implements ShouldQueue
             $this->handleImages($webpage, $html, $screenshot);
 
             // Update webpage metadata with fetch method
-            $metadata = $webpage->metadata ?? [];
-            $metadata['last_fetch_method'] = $method;
-            $metadata['last_selected_fetch_method'] = $result['selected_method'] ?? $method;
-            $metadata['last_actual_fetch_method'] = $result['actual_method'] ?? $method;
-            $metadata['last_playwright_error'] = $result['playwright_error'] ?? null;
-            $metadata['last_playwright_reached_worker'] = $result['playwright_reached_worker'] ?? null;
-            $metadata['last_playwright_worker_status'] = $result['playwright_worker_status'] ?? null;
-            $metadata['last_fallback_status_code'] = $result['fallback_status_code'] ?? null;
-            $webpage->update(['metadata' => $metadata]);
+            FetchMetadata::merge($webpage, $this->fetchMethodMetadata($result, $method));
             app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
                 "fetch_multiple_failures:{$webpage->id}",
             ]);
@@ -459,10 +452,10 @@ class FetchSingleUrl implements ShouldQueue
             );
 
             if ($media) {
-                $metadata = $webpage->metadata ?? [];
-                $metadata['last_error_screenshot_media_uuid'] = $media->uuid;
-                $metadata['last_error_screenshot_at'] = now()->toIso8601String();
-                $webpage->update(['metadata' => $metadata]);
+                FetchMetadata::merge($webpage, [
+                    'last_error_screenshot_media_uuid' => $media->uuid,
+                    'last_error_screenshot_at' => now()->toIso8601String(),
+                ]);
             }
 
             Log::info('Fetch: Saved screenshot of failed fetch', [
@@ -524,12 +517,11 @@ class FetchSingleUrl implements ShouldQueue
                 'url' => $this->url,
             ]);
 
-            // Update webpage metadata
-            $metadata = $webpage->metadata ?? [];
-            $metadata['last_checked_at'] = now()->toIso8601String();
-            $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
-            $metadata['last_error'] = null;
-            $webpage->update(['metadata' => $metadata]);
+            FetchMetadata::mutate($webpage, fn (array $metadata): array => array_merge($metadata, [
+                'last_checked_at' => now()->toIso8601String(),
+                'fetch_count' => ($metadata['fetch_count'] ?? 0) + 1,
+                'last_error' => null,
+            ]));
             app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
                 "fetch_multiple_failures:{$webpage->id}",
             ]);
@@ -544,16 +536,27 @@ class FetchSingleUrl implements ShouldQueue
 
     private function updateWebpageError(EventObject $webpage, string $errorMessage): void
     {
-        $metadata = $webpage->metadata ?? [];
-        $metadata['last_checked_at'] = now()->toIso8601String();
-        $metadata['pipeline_status'] = 'failed';
-        $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
-        $consecutiveFailures = ($metadata['last_error']['consecutive_failures'] ?? 0) + 1;
-        $metadata['last_error'] = [
-            'message' => $errorMessage,
-            'timestamp' => now()->toIso8601String(),
-            'consecutive_failures' => $consecutiveFailures,
-        ];
+        $consecutiveFailures = 0;
+
+        FetchMetadata::mutate($webpage, function (array $metadata) use ($errorMessage, &$consecutiveFailures): array {
+            $consecutiveFailures = ($metadata['last_error']['consecutive_failures'] ?? 0) + 1;
+
+            $metadata['last_checked_at'] = now()->toIso8601String();
+            $metadata['pipeline_status'] = 'failed';
+            $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
+            $metadata['last_error'] = [
+                'message' => $errorMessage,
+                'timestamp' => now()->toIso8601String(),
+                'consecutive_failures' => $consecutiveFailures,
+            ];
+
+            // Auto-disable after 5 consecutive failures
+            if ($consecutiveFailures >= 5) {
+                $metadata['enabled'] = false;
+            }
+
+            return $metadata;
+        });
 
         // Send notification after 3 consecutive failures
         if ($consecutiveFailures === 3) {
@@ -568,16 +571,29 @@ class FetchSingleUrl implements ShouldQueue
             ]);
         }
 
-        // Auto-disable after 5 consecutive failures
         if ($consecutiveFailures >= 5) {
-            $metadata['enabled'] = false;
             Log::warning('Fetch: Auto-disabled URL after 5 failures', [
                 'url' => $this->url,
                 'webpage_id' => $webpage->id,
             ]);
         }
+    }
 
-        $webpage->update(['metadata' => $metadata]);
+    /**
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function fetchMethodMetadata(array $result, string $method): array
+    {
+        return [
+            'last_fetch_method' => $method,
+            'last_selected_fetch_method' => $result['selected_method'] ?? $method,
+            'last_actual_fetch_method' => $result['actual_method'] ?? $method,
+            'last_playwright_error' => $result['playwright_error'] ?? null,
+            'last_playwright_reached_worker' => $result['playwright_reached_worker'] ?? null,
+            'last_playwright_worker_status' => $result['playwright_worker_status'] ?? null,
+            'last_fallback_status_code' => $result['fallback_status_code'] ?? null,
+        ];
     }
 
     /**

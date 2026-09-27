@@ -973,6 +973,7 @@ new class extends Component
                     'domain' => $domain,
                     'fetch_integration_id' => $this->integration->id,
                     'subscription_source' => 'subscribed',
+                    'canonical_url' => \App\Services\Fetch\Links\UrlCanonicalizer::canonicalize($this->newUrl),
                     'fetch_mode' => 'recurring', // Subscribed URLs are fetched repeatedly
                     'subscribed_at' => now()->toIso8601String(),
                     'enabled' => true,
