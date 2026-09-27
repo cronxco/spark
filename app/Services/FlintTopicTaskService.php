@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\User;
 use App\Services\Api\ResourceVersion;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -45,47 +46,76 @@ class FlintTopicTaskService
             return null;
         }
 
-        return DB::transaction(function () use ($user, $topic, $data): array {
-            $integration = $this->digests->resolveIntegration($user);
-            $sourceId = 'flint_topic_task:' . ($data['client_mutation_id'] ?? Str::uuid());
-            $existing = Event::query()->where('integration_id', $integration->id)
-                ->where('source_id', $sourceId)->lockForUpdate()->first();
-            if ($existing) {
-                if ($existing->target_id !== $topic->id) {
-                    abort(409, 'This mutation ID belongs to another thread.');
+        $integration = $this->digests->resolveIntegration($user);
+        $sourceId = 'flint_topic_task:' . ($data['client_mutation_id'] ?? Str::uuid());
+        $requestHash = hash('sha256', json_encode([
+            'title' => $data['title'],
+            'content' => $data['content'] ?? null,
+            'due_on' => $data['due_on'] ?? null,
+            'review_on' => $data['review_on'] ?? null,
+        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+
+        try {
+            return DB::transaction(function () use ($user, $topic, $data, $integration, $sourceId, $requestHash): array {
+                $existing = Event::query()->where('integration_id', $integration->id)
+                    ->where('source_id', $sourceId)->lockForUpdate()->first();
+                if ($existing) {
+                    return $this->replayedTask($existing, $topic, $requestHash);
                 }
 
-                return $this->payload($existing->blocks()->where('block_type', 'flint_topic_task')->firstOrFail());
-            }
-            $actor = EventObject::firstOrCreate(
-                ['user_id' => $user->id, 'concept' => 'user', 'type' => 'user_profile', 'title' => $user->name],
-                ['time' => now()],
-            );
-            $event = Event::create([
-                'source_id' => $sourceId,
-                'integration_id' => $integration->id,
-                'actor_id' => $actor->id,
-                'target_id' => $topic->id,
-                'service' => 'flint',
-                'domain' => 'knowledge',
-                'action' => 'had_topic_task',
-                'time' => now(),
-                'event_metadata' => ['internal' => true],
-            ]);
-            $block = $event->createBlock([
-                'block_type' => 'flint_topic_task',
-                'title' => $data['title'],
-                'time' => now(),
-                'metadata' => [
-                    'content' => $data['content'] ?? null,
-                    'due_on' => $data['due_on'] ?? null,
-                    'review_on' => $data['review_on'] ?? null,
-                    'completed_at' => null,
-                ],
-            ]);
+                $actor = EventObject::firstOrCreate(
+                    ['user_id' => $user->id, 'concept' => 'user', 'type' => 'user_profile', 'title' => $user->name],
+                    ['time' => now()],
+                );
+                $event = Event::create([
+                    'source_id' => $sourceId,
+                    'integration_id' => $integration->id,
+                    'actor_id' => $actor->id,
+                    'target_id' => $topic->id,
+                    'service' => 'flint',
+                    'domain' => 'knowledge',
+                    'action' => 'had_topic_task',
+                    'time' => now(),
+                    'event_metadata' => ['internal' => true, 'request_hash' => $requestHash],
+                ]);
+                $block = $event->createBlock([
+                    'block_type' => 'flint_topic_task',
+                    'title' => $data['title'],
+                    'time' => now(),
+                    'metadata' => [
+                        'content' => $data['content'] ?? null,
+                        'due_on' => $data['due_on'] ?? null,
+                        'review_on' => $data['review_on'] ?? null,
+                        'completed_at' => null,
+                    ],
+                ]);
 
-            return $this->payload($block);
-        });
+                return $this->payload($block);
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            // The other request may have inserted the same mutation ID while
+            // this transaction waited on the events integration/source index.
+            $existing = Event::query()->where('integration_id', $integration->id)
+                ->where('source_id', $sourceId)->first();
+            if (! $existing) {
+                throw $exception;
+            }
+
+            return $this->replayedTask($existing, $topic, $requestHash);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function replayedTask(Event $existing, EventObject $topic, string $requestHash): array
+    {
+        if ($existing->target_id !== $topic->id) {
+            abort(409, 'This mutation ID belongs to another thread.');
+        }
+        if (! hash_equals((string) data_get($existing->event_metadata, 'request_hash', ''), $requestHash)) {
+            abort(409, 'The client mutation ID has already been used with different content.');
+        }
+
+        return $this->payload($existing->blocks()->where('block_type', 'flint_topic_task')->firstOrFail());
     }
 
     /** @param array<string, mixed> $data
