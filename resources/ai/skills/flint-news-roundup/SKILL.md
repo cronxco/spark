@@ -176,6 +176,11 @@ two means saying plainly that the day was thin, not stretching what there was.
 runs.** Selection is finished at this point, and writing it down first is what
 stops a search quietly reaching back to change it.
 
+**At most six feed sources across the three.** Step 6 reads every one of them,
+and six is its budget. When more of his feeds carried a story, keep the ones
+that report it most fully and cite only those; a source you did not read is not
+one you can name on the card.
+
 ## Step 6: Read the originals
 
 For each chosen story, open every feed source behind it:
@@ -192,7 +197,8 @@ came with "no terms" while the *World in Brief* text sitting behind that
 Trump expected the war to run past the midterms. Read the text before you write
 a word about it.
 
-At most six opens across the run. A newsletter's full text is in
+That is at most six opens, one per source written down in Step 5. A
+newsletter's full text is in
 `target.content`; `spark__get-block-tool` fetches a single block from an event
 you have already opened. Note what the original says that the summary did not,
 and anything it links to that the story turns on — a newsletter that only
@@ -500,7 +506,8 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 - [ ] a failed load reported as a failure naming the tool — never as a quiet day;
 - [ ] three stories chosen from Will's own feeds, written down before any search,
       and not all from one issue when another publication had a candidate;
-- [ ] the original of every feed source behind the three read before writing;
+- [ ] at most six feed sources across the three, and the original of every one
+      read before writing;
 - [ ] at most two searches per story, six in all, plus one UK sweep;
 - [ ] every story carries at least one useful fact his newsletters did not;
 - [ ] nothing from memory; web material only from the primary record or a
