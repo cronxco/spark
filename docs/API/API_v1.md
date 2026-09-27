@@ -619,6 +619,12 @@ rejected.
 `{"state": "captured|recaptured", "bookmark": {"id": "uuid", "url": "...", "title": "..."}}`
 (`201` when newly created, `200` when the URL already existed).
 
+When list detection is enabled and the page is a list of articles (a blog
+index, section front and so on), the state is `list_expanded` and the response
+adds `items_found`: the page is stored as a list and the articles it lists are
+bookmarked individually in the background. See
+[List pages & expansion](../Integrations/FETCH_INTEGRATION.md#list-pages--expansion).
+
 **Response `422`** — URL fails the safety validator, HTML exceeds 5 MB, or
 readable content cannot be extracted.
 

@@ -49,7 +49,11 @@ paths:
               schema:
                 type: object
                 properties:
-                  data: { type: array, items: { $ref: '#/components/schemas/CompactEvent' } }
+                  data:
+                    {
+                      type: array,
+                      items: { $ref: "#/components/schemas/CompactEvent" },
+                    }
                   next_cursor: { type: [string, "null"] }
                   has_more: { type: boolean }
 
@@ -59,10 +63,18 @@ paths:
       tags: [data]
       x-spark-ability: data:read
       summary: Single event with full embedded blocks
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactEvent' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactEvent" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /objects/{id}:
     get:
@@ -71,12 +83,28 @@ paths:
       x-spark-ability: data:read
       summary: Single EventObject, optionally with recent events
       parameters:
-        - { $ref: '#/components/parameters/EntityId' }
-        - { name: include_events, in: query, schema: { type: boolean, default: true } }
-        - { name: event_limit, in: query, schema: { type: integer, minimum: 1, maximum: 25, default: 5 } }
+        - { $ref: "#/components/parameters/EntityId" }
+        - {
+            name: include_events,
+            in: query,
+            schema: { type: boolean, default: true },
+          }
+        - {
+            name: event_limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 25, default: 5 },
+          }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactObject' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactObject" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /blocks/{id}:
     get:
@@ -84,10 +112,18 @@ paths:
       tags: [data]
       x-spark-ability: data:read
       summary: Single block by UUID
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactBlock' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactBlock" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /search:
     get:
@@ -97,7 +133,16 @@ paths:
       summary: Multi-mode search across events, objects, integrations, metrics
       parameters:
         - { name: q, in: query, schema: { type: string } }
-        - { name: mode, in: query, schema: { type: string, enum: [default, semantic, tag, metric, integration], default: default } }
+        - {
+            name: mode,
+            in: query,
+            schema:
+              {
+                type: string,
+                enum: [default, semantic, tag, metric, integration],
+                default: default,
+              },
+          }
         - { name: limit, in: query, schema: { type: integer, default: 10 } }
       responses:
         "200":
@@ -109,11 +154,28 @@ paths:
                 properties:
                   mode: { type: string }
                   query: { type: string }
-                  events: { type: array, items: { $ref: '#/components/schemas/CompactEvent' } }
-                  objects: { type: array, items: { $ref: '#/components/schemas/CompactObject' } }
-                  integrations: { type: array, items: { $ref: '#/components/schemas/CompactIntegration' } }
-                  metrics: { type: array, items: { $ref: '#/components/schemas/CompactMetric' } }
-        "422": { $ref: '#/components/responses/ValidationError' }
+                  events:
+                    {
+                      type: array,
+                      items: { $ref: "#/components/schemas/CompactEvent" },
+                    }
+                  objects:
+                    {
+                      type: array,
+                      items: { $ref: "#/components/schemas/CompactObject" },
+                    }
+                  integrations:
+                    {
+                      type: array,
+                      items:
+                        { $ref: "#/components/schemas/CompactIntegration" },
+                    }
+                  metrics:
+                    {
+                      type: array,
+                      items: { $ref: "#/components/schemas/CompactMetric" },
+                    }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /tags:
     get:
@@ -124,7 +186,11 @@ paths:
       parameters:
         - { name: q, in: query, schema: { type: string, maxLength: 255 } }
         - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 30 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, maximum: 100, default: 30 },
+          }
       responses:
         "200":
           description: OK
@@ -133,7 +199,8 @@ paths:
               schema:
                 type: object
                 properties:
-                  data: { type: array, items: { $ref: '#/components/schemas/Tag' } }
+                  data:
+                    { type: array, items: { $ref: "#/components/schemas/Tag" } }
                   next_cursor: { type: [string, "null"] }
                   has_more: { type: boolean }
 
@@ -145,9 +212,34 @@ paths:
       summary: Autocomplete tag suggestions
       parameters:
         - { name: q, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, maximum: 25, default: 10 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, maximum: 25, default: 10 },
+          }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Tag' } } } } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            data:
+                              {
+                                type: array,
+                                items: { $ref: "#/components/schemas/Tag" },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
 
   /tags/{id}:
     get:
@@ -158,10 +250,14 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
         - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, maximum: 100, default: 30 } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, maximum: 100, default: 30 },
+          }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /map/data:
     get:
@@ -170,10 +266,16 @@ paths:
       x-spark-ability: data:read
       summary: Geo-located events and places within a bounding box (clusters above 500 results)
       parameters:
-        - { name: bbox, in: query, required: true, schema: { type: string }, description: "swLat,swLng,neLat,neLng" }
+        - {
+            name: bbox,
+            in: query,
+            required: true,
+            schema: { type: string },
+            description: "swLat,swLng,neLat,neLng",
+          }
       responses:
         "200": { description: OK }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /places/{id}:
     get:
@@ -181,10 +283,18 @@ paths:
       tags: [data]
       x-spark-ability: data:read
       summary: A single place (EventObject with concept=place)
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactPlace' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactPlace" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /{kind}/{id}/relationships:
     get:
@@ -193,20 +303,42 @@ paths:
       x-spark-ability: data:read
       summary: List relationships attached to an owned entity
       parameters:
-        - { $ref: '#/components/parameters/EntityKind' }
-        - { $ref: '#/components/parameters/EntityId' }
+        - { $ref: "#/components/parameters/EntityKind" }
+        - { $ref: "#/components/parameters/EntityId" }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Relationship' } } } } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            data:
+                              {
+                                type: array,
+                                items:
+                                  { $ref: "#/components/schemas/Relationship" },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createRelationship
       tags: [data]
       x-spark-ability: data:write
       summary: Create a relationship from an owned entity to another
       parameters:
-        - { $ref: '#/components/parameters/EntityKind' }
-        - { $ref: '#/components/parameters/EntityId' }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - { $ref: "#/components/parameters/EntityKind" }
+        - { $ref: "#/components/parameters/EntityId" }
+        - { $ref: "#/components/parameters/IfMatch" }
       requestBody:
         content:
           application/json:
@@ -222,10 +354,18 @@ paths:
                 value_unit: { type: [string, "null"] }
                 metadata: { type: object }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Relationship' } } } }
-        "422": { $ref: '#/components/responses/ValidationError' }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/Relationship" } },
+              },
+          }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /relationships/{relationship}:
     delete:
@@ -234,13 +374,18 @@ paths:
       x-spark-ability: data:write
       summary: Delete an owned relationship
       parameters:
-        - { name: relationship, in: path, required: true, schema: { type: string, format: uuid } }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - {
+            name: relationship,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
+        - { $ref: "#/components/parameters/IfMatch" }
       responses:
         "204": { description: No content }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /{kind}/{id}:
     patch:
@@ -249,19 +394,23 @@ paths:
       x-spark-ability: data:write
       summary: Non-destructive update of an owned event, object, or block
       parameters:
-        - { $ref: '#/components/parameters/EntityKind' }
-        - { $ref: '#/components/parameters/EntityId' }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - { $ref: "#/components/parameters/EntityKind" }
+        - { $ref: "#/components/parameters/EntityId" }
+        - { $ref: "#/components/parameters/IfMatch" }
       requestBody:
         content:
           application/json:
-            schema: { type: object, description: "Allow-listed fields per kind — see API_v1.md" }
+            schema:
+              {
+                type: object,
+                description: "Allow-listed fields per kind — see API_v1.md",
+              }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationError' }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /events/{id}/note:
     patch:
@@ -269,15 +418,20 @@ paths:
       tags: [data]
       x-spark-ability: data:write
       summary: Set or clear an event's user-authored note
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { note: { type: [string, "null"] } } }
+            schema:
+              { type: object, properties: { note: { type: [string, "null"] } } }
       responses:
         "200": { description: OK }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /events/{id}/tags:
     post:
@@ -285,7 +439,11 @@ paths:
       tags: [data]
       x-spark-ability: data:write
       summary: Attach a tag to an owned event
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
@@ -297,10 +455,10 @@ paths:
                 type: { type: string }
       responses:
         "201": { description: Created }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationError' }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /events/{id}/tags/{tagId}:
     delete:
@@ -309,14 +467,14 @@ paths:
       x-spark-ability: data:write
       summary: Detach a tag from an owned event
       parameters:
-        - { $ref: '#/components/parameters/EntityId' }
+        - { $ref: "#/components/parameters/EntityId" }
         - { name: tagId, in: path, required: true, schema: { type: integer } }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - { $ref: "#/components/parameters/IfMatch" }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /objects/{id}/tags:
     post:
@@ -324,17 +482,30 @@ paths:
       tags: [data]
       x-spark-ability: data:write
       summary: Attach a tag to an owned object
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { tag_id: { type: integer }, name: { type: string }, type: { type: string } } }
+            schema:
+              {
+                type: object,
+                properties:
+                  {
+                    tag_id: { type: integer },
+                    name: { type: string },
+                    type: { type: string },
+                  },
+              }
       responses:
         "201": { description: Created }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationError' }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /objects/{id}/tags/{tagId}:
     delete:
@@ -343,14 +514,14 @@ paths:
       x-spark-ability: data:write
       summary: Detach a tag from an owned object
       parameters:
-        - { $ref: '#/components/parameters/EntityId' }
+        - { $ref: "#/components/parameters/EntityId" }
         - { name: tagId, in: path, required: true, schema: { type: integer } }
-        - { $ref: '#/components/parameters/IfMatch' }
+        - { $ref: "#/components/parameters/IfMatch" }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /bookmarks:
     post:
@@ -361,11 +532,17 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [url], properties: { url: { type: string, format: uri, maxLength: 2048 } } }
+            schema:
+              {
+                type: object,
+                required: [url],
+                properties:
+                  { url: { type: string, format: uri, maxLength: 2048 } },
+              }
       responses:
         "201": { description: Created }
         "200": { description: Already bookmarked }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /bookmarks/capture:
     post:
@@ -385,10 +562,16 @@ paths:
                 title: { type: [string, "null"], maxLength: 1000 }
                 html: { type: string, maxLength: 5242880 }
       responses:
-        "201": { description: Captured as a new bookmark }
-        "200": { description: Existing bookmark recaptured }
+        "201":
+          {
+            description: "Captured as a new bookmark (state captured), or as a new list page whose articles are being bookmarked (state list_expanded, with items_found)",
+          }
+        "200":
+          {
+            description: "Existing bookmark recaptured (state recaptured or list_expanded)",
+          }
         "403": { description: Token lacks bookmark:write }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /knowledge/events/{id}/reprocess:
     post:
@@ -396,17 +579,33 @@ paths:
       tags: [data]
       x-spark-ability: data:write
       summary: Queue AI reprocessing for a Fetch or Newsletter knowledge event
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { mode: { type: string, enum: [auto, summary_only, refetch], default: auto } } }
+            schema:
+              {
+                type: object,
+                properties:
+                  {
+                    mode:
+                      {
+                        type: string,
+                        enum: [auto, summary_only, refetch],
+                        default: auto,
+                      },
+                  },
+              }
       responses:
         "202": { description: Queued }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationError' }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /day-summary:
     get:
@@ -416,7 +615,12 @@ paths:
       summary: Compact, pre-aggregated daily summary with baseline comparison and anomaly detection
       parameters:
         - { name: date, in: query, schema: { type: string, default: today } }
-        - { name: domains, in: query, schema: { type: string }, description: "Comma-separated domain filter" }
+        - {
+            name: domains,
+            in: query,
+            schema: { type: string },
+            description: "Comma-separated domain filter",
+          }
       responses:
         "200": { description: OK }
 
@@ -427,7 +631,21 @@ paths:
       x-spark-ability: insights:read
       summary: All metric identifiers and metadata for the user
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/CompactMetric' } } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: array,
+                        items: { $ref: "#/components/schemas/CompactMetric" },
+                      },
+                  },
+              },
+          }
 
   /metrics/{metric}:
     get:
@@ -437,12 +655,16 @@ paths:
       summary: Metric trend with daily values, summary statistics, and baseline
       parameters:
         - { name: metric, in: path, required: true, schema: { type: string } }
-        - { name: range, in: query, schema: { type: string, enum: ["7d", "30d", "90d", "1y"] } }
+        - {
+            name: range,
+            in: query,
+            schema: { type: string, enum: ["7d", "30d", "90d", "1y"] },
+          }
         - { name: from, in: query, schema: { type: string } }
         - { name: to, in: query, schema: { type: string } }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /check-ins:
     get:
@@ -451,7 +673,12 @@ paths:
       x-spark-ability: insights:read
       summary: Morning/afternoon check-in status for a date
       parameters:
-        - { name: date, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: date,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
       responses:
         "200": { description: OK }
     post:
@@ -474,7 +701,15 @@ paths:
                 longitude: { type: number }
                 address: { type: string }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/CompactEvent' } } } }
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactEvent" } },
+              },
+          }
 
   /check-ins/history:
     get:
@@ -483,11 +718,21 @@ paths:
       x-spark-ability: insights:read
       summary: Check-in history for a date range (max 90 days)
       parameters:
-        - { name: from, in: query, required: true, schema: { type: string, format: date } }
-        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+        - {
+            name: from,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
+        - {
+            name: to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+          }
       responses:
         "200": { description: OK }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /up-to-speed:
     get:
@@ -518,7 +763,11 @@ paths:
                   items:
                     type: object
                     properties:
-                      type: { type: string, enum: [flint_digest, anomaly, news_summary] }
+                      type:
+                        {
+                          type: string,
+                          enum: [flint_digest, anomaly, news_summary],
+                        }
                       id: { type: string, format: uuid }
       responses:
         "200": { description: OK }
@@ -531,10 +780,14 @@ paths:
       summary: Curated fitness-first health dashboard
       parameters:
         - { name: date, in: query, schema: { type: string, default: today } }
-        - { name: range, in: query, schema: { type: string, enum: ["7d", "30d", "90d"], default: "7d" } }
+        - {
+            name: range,
+            in: query,
+            schema: { type: string, enum: ["7d", "30d", "90d"], default: "7d" },
+          }
       responses:
         "200": { description: OK }
-        "422": { $ref: '#/components/responses/ValidationError' }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /anomalies/{id}/acknowledge:
     post:
@@ -542,14 +795,22 @@ paths:
       tags: [insights]
       x-spark-ability: insights:write
       summary: Acknowledge a metric anomaly
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       requestBody:
         content:
           application/json:
-            schema: { type: object, properties: { note: { type: string, maxLength: 500 }, suppress_until: { type: string, format: date } } }
+            schema:
+              {
+                type: object,
+                properties:
+                  {
+                    note: { type: string, maxLength: 500 },
+                    suppress_until: { type: string, format: date },
+                  },
+              }
       responses:
         "200": { description: OK }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /integrations:
     get:
@@ -558,7 +819,31 @@ paths:
       x-spark-ability: integrations:read
       summary: All of the user's integrations
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/CompactIntegration' } } } } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            data:
+                              {
+                                type: array,
+                                items:
+                                  {
+                                    $ref: "#/components/schemas/CompactIntegration",
+                                  },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
 
   /integrations/{id}:
     get:
@@ -566,10 +851,20 @@ paths:
       tags: [integrations]
       x-spark-ability: integrations:read
       summary: A single integration
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CompactIntegration' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema: { $ref: "#/components/schemas/CompactIntegration" },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /integrations/{id}/sync:
     post:
@@ -577,7 +872,7 @@ paths:
       tags: [integrations]
       x-spark-ability: integrations:sync
       summary: Trigger an immediate fetch for one integration instance
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
         "200": { description: OK }
         "422": { description: Integration is paused }
@@ -591,7 +886,12 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [service], properties: { service: { type: string, maxLength: 100 } } }
+            schema:
+              {
+                type: object,
+                required: [service],
+                properties: { service: { type: string, maxLength: 100 } },
+              }
       responses:
         "200": { description: OK }
         "404": { description: No integrations found for that service }
@@ -603,12 +903,28 @@ paths:
       x-spark-ability: flint:read
       summary: Flint digest(s) for a date
       parameters:
-        - { name: date, in: query, schema: { type: string, format: date, default: today } }
-        - { name: period, in: query, schema: { type: string, enum: [morning, afternoon, evening] } }
+        - {
+            name: date,
+            in: query,
+            schema: { type: string, format: date, default: today },
+          }
+        - {
+            name: period,
+            in: query,
+            schema: { type: string, enum: [morning, afternoon, evening] },
+          }
         - { name: all, in: query, schema: { type: boolean, default: false } }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FlintDigest' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FlintDigest" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: createFlintDigest
       tags: [flint]
@@ -617,7 +933,19 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [title], properties: { title: { type: string }, period: { type: string }, date: { type: string, format: date }, summary: { type: string }, blocks: { type: array, items: { type: object } } } }
+            schema:
+              {
+                type: object,
+                required: [title],
+                properties:
+                  {
+                    title: { type: string },
+                    period: { type: string },
+                    date: { type: string, format: date },
+                    summary: { type: string },
+                    blocks: { type: array, items: { type: object } },
+                  },
+              }
       responses:
         "201": { description: Created }
 
@@ -627,10 +955,18 @@ paths:
       tags: [flint]
       x-spark-ability: flint:read
       summary: A single Flint digest
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/FlintDigest' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/FlintDigest" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /flint/questions/{block}/answer:
     post:
@@ -639,11 +975,25 @@ paths:
       x-spark-ability: flint:write
       summary: Record the user's answer to a flint_user_question block
       parameters:
-        - { name: block, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: block,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [answer], properties: { answer: { type: string, maxLength: 1000 }, answer_note: { type: string, maxLength: 1000 } } }
+            schema:
+              {
+                type: object,
+                required: [answer],
+                properties:
+                  {
+                    answer: { type: string, maxLength: 1000 },
+                    answer_note: { type: string, maxLength: 1000 },
+                  },
+              }
       responses:
         "200": { description: OK }
         "403": { description: Block does not belong to the caller }
@@ -656,7 +1006,29 @@ paths:
       x-spark-ability: finance:read
       summary: All non-archived accounts with latest balance
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/MoneyAccount' } } } } } } }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            data:
+                              {
+                                type: array,
+                                items:
+                                  { $ref: "#/components/schemas/MoneyAccount" },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
     post:
       operationId: createFinanceAccount
       tags: [finance]
@@ -670,7 +1042,21 @@ paths:
               required: [name, account_type, currency]
               properties:
                 name: { type: string, maxLength: 255 }
-                account_type: { type: string, enum: [current_account, savings_account, mortgage, investment_account, credit_card, loan, pension, other] }
+                account_type:
+                  {
+                    type: string,
+                    enum:
+                      [
+                        current_account,
+                        savings_account,
+                        mortgage,
+                        investment_account,
+                        credit_card,
+                        loan,
+                        pension,
+                        other,
+                      ],
+                  }
                 currency: { type: string, enum: [GBP, USD, EUR] }
                 provider: { type: string }
                 account_number: { type: string }
@@ -679,7 +1065,15 @@ paths:
                 start_date: { type: string, format: date }
                 is_negative_balance: { type: boolean }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MoneyAccount' } } } }
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/MoneyAccount" } },
+              },
+          }
 
   /finance/accounts/{id}:
     get:
@@ -687,36 +1081,56 @@ paths:
       tags: [finance]
       x-spark-ability: finance:read
       summary: A single finance account
-      parameters: [{ $ref: '#/components/parameters/EntityId' }]
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
-        "200": { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MoneyAccount' } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/MoneyAccount" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       operationId: updateFinanceAccount
       tags: [finance]
       x-spark-ability: finance:write
       summary: Update a manual finance account
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, description: "Same fields as create, all optional" }
+            schema:
+              {
+                type: object,
+                description: "Same fields as create, all optional",
+              }
       responses:
         "200": { description: OK }
         "422": { description: Account is not manual_account }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
     delete:
       operationId: archiveFinanceAccount
       tags: [finance]
       x-spark-ability: finance:write
       summary: Archive a manual finance account (writes a final zero balance, never hard-deletes)
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       responses:
         "200": { description: Archived }
         "422": { description: Account is not manual_account }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
   /finance/accounts/{id}/balances:
     get:
@@ -725,25 +1139,69 @@ paths:
       x-spark-ability: finance:read
       summary: Cursor-paginated balance history
       parameters:
-        - { $ref: '#/components/parameters/EntityId' }
+        - { $ref: "#/components/parameters/EntityId" }
         - { name: cursor, in: query, schema: { type: string } }
       responses:
-        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/BalanceEntry' } } } } } } }
-        "404": { $ref: '#/components/responses/NotFound' }
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            data:
+                              {
+                                type: array,
+                                items:
+                                  { $ref: "#/components/schemas/BalanceEntry" },
+                              },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
     post:
       operationId: addFinanceAccountBalance
       tags: [finance]
       x-spark-ability: finance:write
       summary: Add a balance entry
-      parameters: [{ $ref: '#/components/parameters/EntityId' }, { $ref: '#/components/parameters/IfMatch' }]
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
       requestBody:
         content:
           application/json:
-            schema: { type: object, required: [balance, date], properties: { balance: { type: number }, date: { type: string, format: date }, notes: { type: string, maxLength: 1000 } } }
+            schema:
+              {
+                type: object,
+                required: [balance, date],
+                properties:
+                  {
+                    balance: { type: number },
+                    date: { type: string, format: date },
+                    notes: { type: string, maxLength: 1000 },
+                  },
+              }
       responses:
-        "201": { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/BalanceEntry' } } } }
-        "428": { $ref: '#/components/responses/PreconditionRequired' }
-        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "201":
+          {
+            description: Created,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/BalanceEntry" } },
+              },
+          }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
 
 components:
   securitySchemes:
@@ -779,22 +1237,22 @@ components:
       description: Not found or not owned by the caller
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema: { $ref: "#/components/schemas/Error" }
     ValidationError:
       description: Validation failed
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema: { $ref: "#/components/schemas/Error" }
     PreconditionRequired:
       description: Missing If-Match header
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema: { $ref: "#/components/schemas/Error" }
     PreconditionFailed:
       description: Stale If-Match value
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+          schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
     Error:
@@ -823,7 +1281,8 @@ components:
         tldr: { type: string }
         note: { type: string }
         blocks_count: { type: integer }
-        blocks: { type: array, items: { $ref: '#/components/schemas/CompactBlock' } }
+        blocks:
+          { type: array, items: { $ref: "#/components/schemas/CompactBlock" } }
         display_name: { type: string }
         display_with_object: { type: boolean }
         hidden: { type: boolean }
@@ -947,7 +1406,7 @@ components:
         interest_rate: { type: [number, "null"] }
         start_date: { type: [string, "null"], format: date }
         integration_id: { type: [string, "null"] }
-        latest_balance: { $ref: '#/components/schemas/BalanceEntry' }
+        latest_balance: { $ref: "#/components/schemas/BalanceEntry" }
         updated_at: { type: [string, "null"], format: date-time }
 
     BalanceEntry:
