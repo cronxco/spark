@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Relationship;
+use App\Services\Fetch\Assessment\ListPageDetector;
 use App\Services\Fetch\BookmarkCreator;
 use App\Services\Fetch\Links\LinkCandidateExtractor;
 use App\Services\Fetch\Links\UrlCanonicalizer;
@@ -134,8 +135,16 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
         // integration scopes to the user; chunk to avoid loading all events.
         $events = Event::whereIn('integration_id', $monitoredIntegrationIds)
             ->lazyById(500);
+        $newsletterExpansion = Integration::whereIn('id', $monitoredIntegrationIds)
+            ->where('service', 'newsletter')
+            ->get()
+            ->mapWithKeys(fn (Integration $integration): array => [
+                (string) $integration->id => ListPageDetector::isEnabled() && (bool) ($integration->configuration['expand_links'] ?? true),
+            ]);
 
         foreach ($events as $event) {
+            $event->event_metadata = $this->scannableMetadata($event, $newsletterExpansion->get((string) $event->integration_id, false));
+
             // Check if event has a url field (EventObjects have url, but Events might in event_metadata)
             // We'll check event_metadata for a 'url' key at the top level
             if ($event->event_metadata && is_array($event->event_metadata) && isset($event->event_metadata['url'])) {
@@ -373,6 +382,30 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
             'created' => $createdCount,
             'monitored_integrations' => count($monitoredIntegrationIds),
         ]);
+    }
+
+    /**
+     * Event metadata with keys discovery must not scan: unsubscribe URLs are
+     * never fetched, and a newsletter's HTML is handled by digest link
+     * expansion when that is on.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function scannableMetadata(Event $event, bool $newsletterExpandsLinks): ?array
+    {
+        $metadata = $event->event_metadata;
+
+        if (! is_array($metadata)) {
+            return $metadata;
+        }
+
+        unset($metadata['list_unsubscribe']);
+
+        if ($newsletterExpandsLinks) {
+            unset($metadata['raw_html']);
+        }
+
+        return $metadata;
     }
 
     /**

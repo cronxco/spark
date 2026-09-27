@@ -132,7 +132,7 @@ class FetchPages
                 <table>
                     <tr><td><a href="https://news.example.com/view/123">View in browser</a></td></tr>
                     {$stories}
-                    <tr><td class="sponsor"><a href="https://tracking.example-mail.com/c/sponsor">Sponsor: Try Widgetly free for 30 days</a></td></tr>
+                    <tr><td class="sponsor"><a href="https://tracking.example-mail.com/c/7abc">Sponsor: Try Widgetly free for 30 days</a></td></tr>
                     <tr><td>
                         <a href="https://twitter.com/intent/tweet?text=hi">Share on Twitter</a>
                         <a href="https://news.example.com/refer?id=abc">Refer a friend</a>
