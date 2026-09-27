@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\User;
 use App\Services\FlintTopicService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -200,7 +201,7 @@ class FlintTopicsControllerTest extends TestCase
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
         $version = $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->json('data.version');
         $body = [
-            'client_mutation_id' => (string) \Illuminate\Support\Str::uuid(),
+            'client_mutation_id' => (string) Str::uuid(),
             'title' => 'Book final Vancouver hotel night',
             'due_on' => '2027-08-01',
             'review_on' => '2027-07-15',
@@ -234,7 +235,7 @@ class FlintTopicsControllerTest extends TestCase
         ]);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
         $this->postJson("/api/v1/mobile/flint/topics/{$foreign->id}/tasks", [
-            'client_mutation_id' => (string) \Illuminate\Support\Str::uuid(), 'title' => 'Intrusion',
+            'client_mutation_id' => (string) Str::uuid(), 'title' => 'Intrusion',
         ])->assertNotFound();
     }
 
