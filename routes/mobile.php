@@ -345,7 +345,7 @@ Route::patch('flint/topics/{id}', [FlintTopicsController::class, 'update'])
     ->middleware(['ability:ios:write', 'if-match:object'])
     ->name('flint.topics.update');
 Route::post('flint/topics/{id}/tasks', [FlintTopicsController::class, 'storeTask'])
-    ->middleware(['ability:ios:write', 'if-match:object'])
+    ->middleware('ability:ios:write')
     ->name('flint.topics.tasks.store');
 Route::patch('flint/topics/{id}/tasks/{taskId}', [FlintTopicsController::class, 'updateTask'])
     ->middleware('ability:ios:write')
