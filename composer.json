@@ -43,7 +43,7 @@
         "spatie/laravel-activitylog": "^4",
         "spatie/laravel-medialibrary": "^11.17",
         "spatie/laravel-tags": "^4.10",
-        "symfony/emoji": "^7.3",
+        "symfony/emoji": "^8.0",
         "willscottuk/monzo-php": "dev-master",
         "wire-elements/pro": "^4.0",
         "zbateson/mail-mime-parser": "^3.0"
