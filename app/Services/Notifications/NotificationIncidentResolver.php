@@ -22,8 +22,7 @@ class NotificationIncidentResolver
         $cutoff = CarbonImmutable::instance($recoveredAt ?? now());
         $resolved = 0;
         foreach ($user->notifications()->whereNull('archived_at')->whereIn('group_key', $groupKeys)->get() as $notification) {
-            if ($this->archiver->archive($notification, 'resolved', fn ($current) =>
-                $current->archived_at === null && NotificationOccurrence::last($current)->lte($cutoff)) !== null) {
+            if ($this->archiver->archive($notification, 'resolved', fn ($current) => $current->archived_at === null && NotificationOccurrence::last($current)->lte($cutoff)) !== null) {
                 $resolved++;
             }
         }
@@ -59,12 +58,6 @@ class NotificationIncidentResolver
         return $notifications->filter(fn ($notification) => $this->reconcile($notification, $dryRun, $entities))->count();
     }
 
-    private function entityId(DatabaseNotification $notification): string
-    {
-        return (string) ($notification->data['entity_id'] ?? data_get($notification->data, 'entity.id')
-            ?? Str::after((string) $notification->group_key, ':'));
-    }
-
     public function reconcile(DatabaseNotification $notification, bool $dryRun = false, ?array $entities = null): bool
     {
         $reason = $this->archiveReason($notification, $entities);
@@ -77,8 +70,7 @@ class NotificationIncidentResolver
 
         // Recheck under the row lock: a newer failure may have coalesced since
         // selection. A stale success must not clear that newer failure.
-        return $this->archiver->archive($notification, $reason, fn ($current) =>
-            $current->archived_at === null && $this->archiveReason($current) === $reason) !== null;
+        return $this->archiver->archive($notification, $reason, fn ($current) => $current->archived_at === null && $this->archiveReason($current) === $reason) !== null;
     }
 
     public function supersedeDigests(DatabaseNotification $latest): void
@@ -95,16 +87,20 @@ class NotificationIncidentResolver
             ->get()->each(function ($notification) use ($latest, $period, $occurredAt) {
                 if (($notification->data['period'] ?? null) === $period
                     && NotificationOccurrence::last($notification)->gt($occurredAt)) {
-                    $this->archiver->archive($latest, 'superseded', fn ($current) =>
-                        $current->archived_at === null
+                    $this->archiver->archive($latest, 'superseded', fn ($current) => $current->archived_at === null
                         && NotificationOccurrence::last($current)->lt(NotificationOccurrence::last($notification)));
 
                     return;
                 }
-                $this->archiver->archive($notification, 'superseded', fn ($current) =>
-                    $current->archived_at === null && ($current->data['period'] ?? null) === $period
+                $this->archiver->archive($notification, 'superseded', fn ($current) => $current->archived_at === null && ($current->data['period'] ?? null) === $period
                     && NotificationOccurrence::last($current)->lte($occurredAt));
             });
+    }
+
+    private function entityId(DatabaseNotification $notification): string
+    {
+        return (string) ($notification->data['entity_id'] ?? data_get($notification->data, 'entity.id')
+            ?? Str::after((string) $notification->group_key, ':'));
     }
 
     private function archiveReason(DatabaseNotification $notification, ?array $entities = null): ?string

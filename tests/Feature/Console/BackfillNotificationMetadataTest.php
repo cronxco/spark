@@ -79,4 +79,3 @@ class BackfillNotificationMetadataTest extends TestCase
         );
     }
 }
-

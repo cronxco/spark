@@ -390,4 +390,3 @@ class NotificationFeedService
         return str($redacted)->limit(2_000)->toString();
     }
 }
-

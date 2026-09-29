@@ -92,4 +92,3 @@ class MaintainNotificationHistory extends Command
         return self::SUCCESS;
     }
 }
-

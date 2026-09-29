@@ -264,4 +264,3 @@ abstract class SparkNotification extends Notification implements ShouldQueue
         return false;
     }
 }
-

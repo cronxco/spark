@@ -771,4 +771,3 @@ class FetchSingleUrl implements ShouldQueue
         }
     }
 }
-

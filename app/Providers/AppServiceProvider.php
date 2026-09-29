@@ -14,9 +14,9 @@ use App\Observers\BlockObserver;
 use App\Observers\EventObjectObserver;
 use App\Observers\EventObserver;
 use App\Observers\NotificationEntityObserver;
+use App\Services\EffectiveTimezoneResolver;
 use App\Services\Notifications\NotificationIncidentResolver;
 use App\Services\Notifications\NotificationOccurrence;
-use App\Services\EffectiveTimezoneResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
@@ -250,4 +250,3 @@ class AppServiceProvider extends ServiceProvider
         }
     }
 }
-

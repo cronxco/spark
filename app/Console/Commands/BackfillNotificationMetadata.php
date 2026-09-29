@@ -222,4 +222,3 @@ class BackfillNotificationMetadata extends Command
         return null;
     }
 }
-

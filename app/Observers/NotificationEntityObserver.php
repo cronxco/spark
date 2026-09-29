@@ -19,16 +19,15 @@ class NotificationEntityObserver
         }
     }
 
+    public function deleted(Integration|EventObject $entity): void
+    {
+        $this->afterCommit($entity);
+    }
+
     private function afterCommit(Integration|EventObject $entity): void
     {
         // Capture changes before another save mutates the model's change set.
         $snapshot = clone $entity;
-        $entity->getConnection()->afterCommit(fn () =>
-            app(NotificationIncidentResolver::class)->reconcileEntity($snapshot));
-    }
-
-    public function deleted(Integration|EventObject $entity): void
-    {
-        $this->afterCommit($entity);
+        $entity->getConnection()->afterCommit(fn () => app(NotificationIncidentResolver::class)->reconcileEntity($snapshot));
     }
 }
