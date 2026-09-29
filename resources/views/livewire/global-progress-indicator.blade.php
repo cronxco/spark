@@ -70,7 +70,7 @@ new class extends Component
     <a href="{{ route('notifications.index') }}" class="btn btn-ghost btn-sm sm:hidden" aria-label="Open notifications">
         <div class="indicator">
             @if ($badgeCount > 0)
-                <span class="indicator-item badge badge-xs {{ $counts['unresolved_attention'] ? 'badge-error' : 'badge-info' }}">{{ min($badgeCount, 99) }}</span>
+                <span class="indicator-item badge badge-xs {{ $counts['unresolved_attention'] ? 'badge-error' : 'badge-info' }}">{{ $badgeCount > 99 ? '99+' : $badgeCount }}</span>
             @endif
             <x-icon :name="$counts['active_activity'] ? 'o-arrow-path' : 'o-bell'" @class(['size-5', 'animate-spin' => $counts['active_activity']]) />
         </div>
@@ -85,7 +85,7 @@ new class extends Component
     >
         <div class="indicator">
             @if ($badgeCount > 0)
-                <span class="indicator-item badge badge-xs {{ $counts['unresolved_attention'] ? 'badge-error' : 'badge-info' }}">{{ min($badgeCount, 99) }}</span>
+                <span class="indicator-item badge badge-xs {{ $counts['unresolved_attention'] ? 'badge-error' : 'badge-info' }}">{{ $badgeCount > 99 ? '99+' : $badgeCount }}</span>
             @endif
             <x-icon :name="$counts['active_activity'] ? 'o-arrow-path' : 'o-bell'" @class(['size-5', 'animate-spin' => $counts['active_activity']]) />
         </div>
@@ -174,3 +174,4 @@ new class extends Component
         </footer>
     </section>
 </div>
+
