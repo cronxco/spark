@@ -8,10 +8,14 @@ use App\Jobs\Data\Receipt\FindReceiptForTransactionJob;
 use App\Models\Block;
 use App\Models\Event as EventModel;
 use App\Models\EventObject;
+use App\Models\Integration;
 use App\Notifications\SparkNotification;
 use App\Observers\BlockObserver;
 use App\Observers\EventObjectObserver;
 use App\Observers\EventObserver;
+use App\Observers\NotificationEntityObserver;
+use App\Services\Notifications\NotificationIncidentResolver;
+use App\Services\Notifications\NotificationOccurrence;
 use App\Services\EffectiveTimezoneResolver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\ScheduledTaskFailed;
@@ -59,6 +63,8 @@ class AppServiceProvider extends ServiceProvider
         EventModel::observe(EventObserver::class);
         Block::observe(BlockObserver::class);
         EventObject::observe(EventObjectObserver::class);
+        Integration::observe(NotificationEntityObserver::class);
+        EventObject::observe(NotificationEntityObserver::class);
 
         // Force HTTPS in development
         URL::forceScheme('https');
@@ -133,8 +139,10 @@ class AppServiceProvider extends ServiceProvider
             $notificationId = (string) ($event->notification->id ?? '');
 
             if ($event->response instanceof DatabaseNotification) {
+                $resolver = app(NotificationIncidentResolver::class);
+                $resolver->reconcile($event->response);
                 $groupKey = $payload['group_key'] ?? null;
-                if (is_string($groupKey) && $groupKey !== '') {
+                if ($event->response->fresh()?->archived_at === null && is_string($groupKey) && $groupKey !== '') {
                     $notificationId = DB::transaction(function () use ($event, $groupKey, $notifiable, $payload) {
                         DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', [
                             "notification:{$notifiable->getKey()}:{$groupKey}",
@@ -154,19 +162,26 @@ class AppServiceProvider extends ServiceProvider
                         }
 
                         $existingData = is_array($existing->data) ? $existing->data : [];
+                        $isNewer = NotificationOccurrence::last($event->response)->gte(NotificationOccurrence::last($existing));
+                        $existing->timestamps = false;
                         $existing->forceFill([
                             'data' => [
-                                ...$payload,
+                                ...($isNewer ? $payload : $existingData),
                                 'occurrence_count' => max(1, (int) ($existingData['occurrence_count'] ?? 1)) + 1,
                             ],
-                            'read_at' => null,
-                            'updated_at' => now(),
+                            'read_at' => $isNewer ? null : $existing->read_at,
+                            'updated_at' => $isNewer ? now() : $existing->updated_at,
                         ])->save();
                         $event->response->delete();
 
                         return (string) $existing->id;
                     });
                     $event->notification->id = $notificationId;
+                }
+                $stored = $notifiable->notifications()->find($notificationId);
+                if ($stored !== null) {
+                    $resolver->reconcile($stored);
+                    $resolver->supersedeDigests($stored->fresh());
                 }
             }
 
@@ -235,3 +250,4 @@ class AppServiceProvider extends ServiceProvider
         }
     }
 }
+
