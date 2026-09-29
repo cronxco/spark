@@ -9,6 +9,7 @@ use App\Notifications\NotificationCatalogue;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class NotificationIncidentResolver
@@ -36,18 +37,37 @@ class NotificationIncidentResolver
             ? ['integration_failed', 'integration_authentication_failed', 'migration_failed']
             : ['fetch_multiple_failures'];
         $keys = array_map(fn ($type) => "{$type}:{$entity->id}", $types);
-        $user = $entity->user;
-        if ($user === null) {
-            return;
-        }
-        foreach ($user->notifications()->whereNull('archived_at')->whereIn('group_key', $keys)->get() as $notification) {
+        foreach (DatabaseNotification::query()->where('notifiable_type', (new User)->getMorphClass())
+            ->where('notifiable_id', $entity->user_id)->whereNull('archived_at')->whereIn('group_key', $keys)->get() as $notification) {
             $this->reconcile($notification);
         }
     }
 
-    public function reconcile(DatabaseNotification $notification, bool $dryRun = false): bool
+    /** @param Collection<int, DatabaseNotification> $notifications */
+    public function reconcileBatch(Collection $notifications, bool $dryRun = false): int
     {
-        $reason = $this->archiveReason($notification);
+        $ids = $notifications->map(fn ($notification) => $this->entityId($notification))
+            ->filter(fn ($id) => Str::isUuid($id))->unique()->values();
+        $owners = $notifications->pluck('notifiable_id')->unique()->values();
+        $entities = [];
+        foreach ([Integration::class, EventObject::class] as $class) {
+            foreach ($class::withTrashed()->whereIn('user_id', $owners)->whereIn('id', $ids)->get() as $entity) {
+                $entities[$class . ':' . $entity->user_id . ':' . $entity->id] = $entity;
+            }
+        }
+
+        return $notifications->filter(fn ($notification) => $this->reconcile($notification, $dryRun, $entities))->count();
+    }
+
+    private function entityId(DatabaseNotification $notification): string
+    {
+        return (string) ($notification->data['entity_id'] ?? data_get($notification->data, 'entity.id')
+            ?? Str::after((string) $notification->group_key, ':'));
+    }
+
+    public function reconcile(DatabaseNotification $notification, bool $dryRun = false, ?array $entities = null): bool
+    {
+        $reason = $this->archiveReason($notification, $entities);
         if ($reason === null) {
             return false;
         }
@@ -72,14 +92,22 @@ class NotificationIncidentResolver
             ->where('notifiable_type', $latest->notifiable_type)
             ->where('notifiable_id', $latest->notifiable_id)
             ->where('type', 'daily_digest')->whereNull('archived_at')->whereKeyNot($latest->id)
-            ->get()->each(function ($notification) use ($period, $occurredAt) {
+            ->get()->each(function ($notification) use ($latest, $period, $occurredAt) {
+                if (($notification->data['period'] ?? null) === $period
+                    && NotificationOccurrence::last($notification)->gt($occurredAt)) {
+                    $this->archiver->archive($latest, 'superseded', fn ($current) =>
+                        $current->archived_at === null
+                        && NotificationOccurrence::last($current)->lt(NotificationOccurrence::last($notification)));
+
+                    return;
+                }
                 $this->archiver->archive($notification, 'superseded', fn ($current) =>
                     $current->archived_at === null && ($current->data['period'] ?? null) === $period
                     && NotificationOccurrence::last($current)->lte($occurredAt));
             });
     }
 
-    private function archiveReason(DatabaseNotification $notification): ?string
+    private function archiveReason(DatabaseNotification $notification, ?array $entities = null): ?string
     {
         if ($notification->archived_at !== null) {
             return null;
@@ -92,7 +120,7 @@ class NotificationIncidentResolver
             return 'expired';
         }
 
-        $id = $data['entity_id'] ?? data_get($data, 'entity.id') ?? Str::after((string) $notification->group_key, ':');
+        $id = $this->entityId($notification);
         if (! Str::isUuid($id)) {
             // Old domain-wide Fetch warnings cannot identify a tracked page.
             // Retain history without pretending recovery was verified.
@@ -101,7 +129,9 @@ class NotificationIncidentResolver
         }
 
         if (in_array($type, ['integration_failed', 'integration_authentication_failed', 'migration_failed'], true)) {
-            $integration = Integration::withTrashed()->where('user_id', $notification->notifiable_id)->find($id);
+            $integration = $entities === null
+                ? Integration::withTrashed()->where('user_id', $notification->notifiable_id)->find($id)
+                : ($entities[Integration::class . ':' . $notification->notifiable_id . ':' . $id] ?? null);
             if ($integration === null || $integration->trashed()) {
                 return 'entity_removed';
             }
@@ -112,7 +142,9 @@ class NotificationIncidentResolver
         }
 
         if ($type === 'fetch_multiple_failures') {
-            $object = EventObject::withTrashed()->where('user_id', $notification->notifiable_id)->find($id);
+            $object = $entities === null
+                ? EventObject::withTrashed()->where('user_id', $notification->notifiable_id)->find($id)
+                : ($entities[EventObject::class . ':' . $notification->notifiable_id . ':' . $id] ?? null);
             if ($object === null || $object->trashed()) {
                 return 'entity_removed';
             }

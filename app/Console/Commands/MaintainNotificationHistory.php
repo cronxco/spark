@@ -6,7 +6,6 @@ use App\Models\ActionProgress;
 use App\Services\Notifications\NotificationIncidentResolver;
 use Illuminate\Console\Command;
 use Illuminate\Notifications\DatabaseNotification;
-use Illuminate\Support\Facades\DB;
 
 class MaintainNotificationHistory extends Command
 {
@@ -39,11 +38,7 @@ class MaintainNotificationHistory extends Command
 
         $resolver = app(NotificationIncidentResolver::class);
         DatabaseNotification::query()->whereNull('archived_at')->chunkById(250, function ($notifications) use ($resolver, $dryRun, &$archived) {
-            foreach ($notifications as $notification) {
-                if ($resolver->reconcile($notification, $dryRun)) {
-                    $archived++;
-                }
-            }
+            $archived += $resolver->reconcileBatch($notifications, $dryRun);
         });
 
         $staleActivities = ActionProgress::query()

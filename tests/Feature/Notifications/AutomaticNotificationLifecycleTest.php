@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\DailyDigestReady;
 use App\Notifications\FetchMultipleFailures;
 use App\Notifications\IntegrationFailed;
+use App\Notifications\IntegrationAuthenticationFailed;
 use App\Services\Fetch\FetchMetadata;
 use App\Services\Notifications\NotificationFeedService;
 use App\Services\Notifications\NotificationIncidentResolver;
@@ -177,6 +178,39 @@ class AutomaticNotificationLifecycleTest extends TestCase
 
         $this->assertSame('superseded', $old->fresh()->data['archive_reason']);
         $this->assertSame(2, $user->notifications()->whereNull('archived_at')->count());
+    }
+
+    #[Test]
+    public function recovery_clears_authentication_alerts_but_not_failed_migrations(): void
+    {
+        $integration = Integration::factory()->create(['last_successful_update_at' => null]);
+        $user = $integration->user;
+        $user->notifyNow(new IntegrationAuthenticationFailed($integration, 'Expired token'), ['database']);
+        $auth = $user->notifications()->first();
+        $migration = $this->legacy($user, 'migration_failed', "migration_failed:{$integration->id}");
+        $this->travel(1)->minutes();
+
+        DB::transaction(fn () => $integration->markAsSuccessfullyUpdated());
+
+        $this->assertSame('resolved', $auth->fresh()->data['archive_reason']);
+        $this->assertNull($migration->fresh()->archived_at);
+    }
+
+    #[Test]
+    public function a_delayed_old_digest_cannot_supersede_the_newer_digest(): void
+    {
+        $user = User::factory()->create();
+        $object = EventObject::factory()->create(['user_id' => $user->id]);
+        $delayed = new DailyDigestReady($object, 'morning');
+        $delayed->via($user);
+        $this->travel(1)->minutes();
+        $new = EventObject::factory()->create(['user_id' => $user->id]);
+        $user->notifyNow(new DailyDigestReady($new, 'morning'), ['database']);
+        $user->notifyNow($delayed, ['database']);
+
+        $active = $user->notifications()->whereNull('archived_at')->get();
+        $this->assertCount(1, $active);
+        $this->assertSame((string) $new->id, $active->first()->data['entity_id']);
     }
 
     private function legacy(User $user, string $type, ?string $key = null): DatabaseNotification

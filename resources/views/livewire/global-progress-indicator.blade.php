@@ -59,6 +59,7 @@ new class extends Component
     $counts = $feed['counts'] ?? ['unread' => 0, 'unresolved_attention' => 0, 'active_activity' => 0];
     $items = $feed['data'] ?? [];
     $badgeCount = $counts['unresolved_attention'] ?: ($counts['active_activity'] ?: $counts['unread']);
+    $badgeLabel = $counts['unresolved_attention'] ? 'need attention' : ($counts['active_activity'] ? 'active operations' : 'unread');
 @endphp
 
 <div
@@ -67,7 +68,7 @@ new class extends Component
     class="relative"
     @if ($counts['active_activity'] > 0) wire:poll.3s="refreshFeed" @else wire:poll.30s="refreshFeed" @endif
 >
-    <a href="{{ route('notifications.index') }}" class="btn btn-ghost btn-sm sm:hidden" aria-label="Open notifications">
+    <a href="{{ route('notifications.index') }}" class="btn btn-ghost btn-sm sm:hidden" aria-label="Open notifications{{ $badgeCount ? ': ' . $badgeCount . ' ' . $badgeLabel : '' }}">
         <div class="indicator">
             @if ($badgeCount > 0)
                 <span class="indicator-item badge badge-xs {{ $counts['unresolved_attention'] ? 'badge-error' : 'badge-info' }}">{{ $badgeCount > 99 ? '99+' : $badgeCount }}</span>
@@ -81,7 +82,7 @@ new class extends Component
         @click="open = !open"
         :aria-expanded="open"
         class="btn btn-ghost btn-sm hidden sm:flex"
-        aria-label="Open notifications"
+        aria-label="Open notifications{{ $badgeCount ? ': ' . $badgeCount . ' ' . $badgeLabel : '' }}"
     >
         <div class="indicator">
             @if ($badgeCount > 0)

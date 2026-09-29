@@ -11,7 +11,10 @@ class NotificationEntityObserver
     public function updated(Integration|EventObject $entity): void
     {
         if (($entity instanceof Integration && $entity->wasChanged('last_successful_update_at'))
-            || ($entity instanceof EventObject && $entity->wasChanged('metadata'))) {
+            || ($entity instanceof EventObject && $entity->wasChanged('metadata')
+                && array_key_exists('last_checked_at', $entity->metadata ?? [])
+                && array_key_exists('last_error', $entity->metadata ?? [])
+                && $entity->metadata['last_error'] === null)) {
             $this->afterCommit($entity);
         }
     }
