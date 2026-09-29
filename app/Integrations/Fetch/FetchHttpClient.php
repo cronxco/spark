@@ -34,14 +34,14 @@ class FetchHttpClient
         $headers = $domainConfig['headers'] ?? [];
         $headers['User-Agent'] = $headers['User-Agent'] ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-        // Create Guzzle client
-        $client = new Client([
+        // Resolve the client so tests can supply a Guzzle mock handler.
+        $client = app(Client::class, ['config' => [
             'timeout' => 30,
             'allow_redirects' => $urlSafety->guzzleRedirectConfig(),
             'verify' => true,
             'cookies' => $cookieJar,
             'headers' => $headers,
-        ]);
+        ]]);
 
         // Log the request
         Log::debug('Fetch: HTTP request', [

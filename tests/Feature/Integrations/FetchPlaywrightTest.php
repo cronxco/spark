@@ -10,6 +10,10 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -118,8 +122,9 @@ class FetchPlaywrightTest extends TestCase
 
         Http::fake([
             '*/health' => Http::response(['status' => 'error', 'connected' => false], 500),
-            'https://example.com*' => Http::response($this->articleHtml('Fallback Page'), 200),
         ]);
+
+        $this->fakeFetchResponse($this->articleHtml('Fallback Page'));
 
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
@@ -299,11 +304,8 @@ class FetchPlaywrightTest extends TestCase
         // Fake the queue to prevent ProcessFetchedContent from dispatching
         Queue::fake([ProcessFetchedContent::class]);
 
-        // Fake HTTP responses
-        Http::fake([
-            'https://example.com*' => Http::response($this->articleHtml('Test Article Page'), 200),
-            '*' => Http::response('', 404),
-        ]);
+        // Fetch uses Guzzle directly, so fake its transport rather than Laravel HTTP.
+        $this->fakeFetchResponse($this->articleHtml('Test Article Page'));
 
         $user = User::factory()->create();
 
@@ -402,6 +404,14 @@ class FetchPlaywrightTest extends TestCase
         $this->assertEquals(1, $stats['requires_playwright']);
         $this->assertEquals(1, $stats['prefers_http']);
         $this->assertEquals(1, $stats['auto']);
+    }
+
+    private function fakeFetchResponse(string $html): void
+    {
+        $this->app->bind(Client::class, fn ($app, array $parameters): Client => new Client(array_merge(
+            $parameters['config'],
+            ['handler' => HandlerStack::create(new MockHandler([new Response(200, [], $html)]))],
+        )));
     }
 
     private function articleHtml(string $title): string
