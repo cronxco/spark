@@ -26,6 +26,9 @@ class FetchPlaywrightTest extends TestCase
     {
         parent::setUp();
 
+        // HTTP responses are fake; do not depend on live DNS for fixture URLs.
+        config(['fetch.url_safety.allowed_hosts' => ['example.com']]);
+
         // Store original config
         $this->originalPlaywrightEnabled = config('services.playwright.enabled');
     }
@@ -147,6 +150,7 @@ class FetchPlaywrightTest extends TestCase
         $history = $webpage->metadata['playwright_history'] ?? [];
         $last = end($history);
 
+        $this->assertArrayHasKey('last_fetch_method', $webpage->metadata, $webpage->metadata['last_error']['message'] ?? 'Fetch method was not recorded');
         $this->assertEquals('http (fallback)', $webpage->metadata['last_fetch_method']);
         $this->assertEquals('playwright', $webpage->metadata['last_selected_fetch_method']);
         $this->assertEquals('http_fallback', $webpage->metadata['last_actual_fetch_method']);
@@ -336,7 +340,7 @@ class FetchPlaywrightTest extends TestCase
         $webpage->refresh();
 
         // The job should have stored the fetch method
-        $this->assertArrayHasKey('last_fetch_method', $webpage->metadata);
+        $this->assertArrayHasKey('last_fetch_method', $webpage->metadata, $webpage->metadata['last_error']['message'] ?? 'Fetch method was not recorded');
         $this->assertEquals('http', $webpage->metadata['last_fetch_method']);
 
         // Verify ProcessFetchedContent was dispatched
