@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\ActionProgress;
-use App\Notifications\NotificationCatalogue;
+use App\Services\Notifications\NotificationIncidentResolver;
 use Illuminate\Console\Command;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
@@ -37,45 +37,14 @@ class MaintainNotificationHistory extends Command
         $deletedActivities = 0;
         $staleHours = max(1, (int) $this->option('stale-hours'));
 
-        foreach (NotificationCatalogue::all() as $type => $definition) {
-            $activeHours = $definition['active_hours'];
-            if ($activeHours === null) {
-                continue;
+        $resolver = app(NotificationIncidentResolver::class);
+        DatabaseNotification::query()->whereNull('archived_at')->chunkById(250, function ($notifications) use ($resolver, $dryRun, &$archived) {
+            foreach ($notifications as $notification) {
+                if ($resolver->reconcile($notification, $dryRun)) {
+                    $archived++;
+                }
             }
-
-            $query = DatabaseNotification::query()
-                ->where('type', $type)
-                ->whereNull('archived_at')
-                ->where('updated_at', '<=', now()->subHours($activeHours));
-
-            if ($dryRun) {
-                $archived += $query->count();
-
-                continue;
-            }
-
-            $query->chunkById(250, function ($notifications) use ($activeHours, &$archived) {
-                DB::transaction(function () use ($notifications, $activeHours, &$archived) {
-                    $cutoff = now()->subHours($activeHours);
-
-                    foreach ($notifications as $notification) {
-                        $current = DatabaseNotification::query()->lockForUpdate()->find($notification->id);
-                        if ($current === null
-                            || $current->archived_at !== null
-                            || $current->updated_at->gt($cutoff)) {
-                            continue;
-                        }
-
-                        $data = is_array($current->data) ? $current->data : [];
-                        $current->forceFill([
-                            'archived_at' => now(),
-                            'data' => [...$data, 'archive_reason' => 'expired'],
-                        ])->save();
-                        $archived++;
-                    }
-                });
-            });
-        }
+        });
 
         $staleActivities = ActionProgress::query()
             ->whereNull('completed_at')
@@ -128,3 +97,4 @@ class MaintainNotificationHistory extends Command
         return self::SUCCESS;
     }
 }
+
