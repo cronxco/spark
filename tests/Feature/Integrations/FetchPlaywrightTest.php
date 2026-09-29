@@ -115,7 +115,7 @@ class FetchPlaywrightTest extends TestCase
 
         Http::fake([
             '*/health' => Http::response(['status' => 'error', 'connected' => false], 500),
-            'https://example.com*' => Http::response('<html><head><title>Fallback Page</title></head><body><article><h1>Fallback Page</h1><p>This is fallback content with enough words for extraction to succeed. This paragraph exists so readability has a meaningful article body to parse during the fetch test.</p></article></body></html>', 200),
+            'https://example.com*' => Http::response($this->articleHtml('Fallback Page'), 200),
         ]);
 
         $user = User::factory()->create();
@@ -297,7 +297,7 @@ class FetchPlaywrightTest extends TestCase
 
         // Fake HTTP responses
         Http::fake([
-            'https://example.com*' => Http::response('<html><head><title>Test Page</title></head><body><article><h1>Test Page</h1><p>This is test content with enough text to pass the extraction requirements for the content extractor to work properly.</p></article></body></html>', 200),
+            'https://example.com*' => Http::response($this->articleHtml('Test Article Page'), 200),
             '*' => Http::response('', 404),
         ]);
 
@@ -398,5 +398,14 @@ class FetchPlaywrightTest extends TestCase
         $this->assertEquals(1, $stats['requires_playwright']);
         $this->assertEquals(1, $stats['prefers_http']);
         $this->assertEquals(1, $stats['auto']);
+    }
+    private function articleHtml(string $title): string
+    {
+        // These tests exercise successful fetches, so supply a real article
+        // body that Readability can extract rather than a short teaser.
+        $paragraph = '<p>The local library has expanded its opening hours following a year of renovation. Visitors can now use the reading rooms throughout the week, with additional space for studying and community activities.</p>';
+
+        return '<html><head><title>' . $title . '</title></head><body><article><h1>'
+            . $title . '</h1>' . str_repeat($paragraph, 8) . '</article></body></html>';
     }
 }
