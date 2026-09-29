@@ -399,6 +399,7 @@ class FetchPlaywrightTest extends TestCase
         $this->assertEquals(1, $stats['prefers_http']);
         $this->assertEquals(1, $stats['auto']);
     }
+
     private function articleHtml(string $title): string
     {
         // These tests exercise successful fetches, so supply a real article
