@@ -10,6 +10,9 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Services\Fetch\Assessment\ListPageDetector;
+use App\Services\Fetch\FetchMetadata;
+use App\Services\Fetch\Links\UrlCanonicalizer;
 use App\Services\PlaywrightHealthMetrics;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -619,10 +622,10 @@ new class extends Component
                 'playwright_history' => array_slice($metadata['playwright_history'] ?? [], -10), // Last 10 entries
                 'is_list' => ($metadata['list_detection']['kind'] ?? null) === 'list' && ! ($metadata['list_detection']['shadow'] ?? false),
                 'list_new_count' => $metadata['list_detection']['last_new_count'] ?? null,
-                'list_mode' => \App\Services\Fetch\Assessment\ListPageDetector::mode($obj),
-                'list_expandable' => \App\Services\Fetch\Assessment\ListPageDetector::isEnabled()
-                    && (\App\Services\Fetch\Assessment\ListPageDetector::isEligibleForListExpansion($obj)
-                        || \App\Services\Fetch\Assessment\ListPageDetector::mode($obj) === 'off'),
+                'list_mode' => ListPageDetector::mode($obj),
+                'list_expandable' => ListPageDetector::isEnabled()
+                    && (ListPageDetector::isEligibleForListExpansion($obj)
+                        || ListPageDetector::mode($obj) === 'off'),
             ];
         });
     }
@@ -980,7 +983,7 @@ new class extends Component
                     'domain' => $domain,
                     'fetch_integration_id' => $this->integration->id,
                     'subscription_source' => 'subscribed',
-                    'canonical_url' => \App\Services\Fetch\Links\UrlCanonicalizer::canonicalize($this->newUrl),
+                    'canonical_url' => UrlCanonicalizer::canonicalize($this->newUrl),
                     'fetch_mode' => 'recurring', // Subscribed URLs are fetched repeatedly
                     'subscribed_at' => now()->toIso8601String(),
                     'enabled' => true,
@@ -1038,7 +1041,7 @@ new class extends Component
             return;
         }
 
-        \App\Services\Fetch\FetchMetadata::mutate($eventObject, function (array $metadata) use ($mode): array {
+        FetchMetadata::mutate($eventObject, function (array $metadata) use ($mode): array {
             $listDetection = $metadata['list_detection'] ?? [];
             $listDetection['mode'] = $mode;
 
