@@ -200,10 +200,12 @@ class ManageFlintTopicToolTest extends TestCase
         $prefix = $connection->getTablePrefix();
         $tables = ['blocks', 'events', 'integrations'];
 
+        $connection->beginTransaction();
+
         try {
             foreach ($tables as $table) {
                 $source = $connection->getQueryGrammar()->wrapTable($table);
-                $connection->statement('CREATE TEMPORARY VIEW "task_test_' . $table . '" AS SELECT * FROM ' . $source);
+                $connection->statement('CREATE TEMPORARY VIEW "task_test_' . $table . '" AS SELECT *, xmin::text AS xmin FROM ' . $source);
             }
             $connection->setTablePrefix('task_test_');
 
@@ -215,9 +217,7 @@ class ManageFlintTopicToolTest extends TestCase
             );
         } finally {
             $connection->setTablePrefix($prefix);
-            foreach ($tables as $table) {
-                $connection->statement('DROP VIEW IF EXISTS "task_test_' . $table . '"');
-            }
+            $connection->rollBack();
         }
     }
 }

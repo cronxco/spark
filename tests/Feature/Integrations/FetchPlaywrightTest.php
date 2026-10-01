@@ -26,6 +26,8 @@ class FetchPlaywrightTest extends TestCase
     {
         parent::setUp();
 
+        config(['fetch.url_safety.allowed_hosts' => ['example.com', 'twitter.com']]);
+
         // Store original config
         $this->originalPlaywrightEnabled = config('services.playwright.enabled');
     }
@@ -144,6 +146,7 @@ class FetchPlaywrightTest extends TestCase
         (new FetchSingleUrl($integration, $webpage->id, $webpage->url))->handle();
 
         $webpage->refresh();
+        $this->assertNull($webpage->metadata['last_error'] ?? null, json_encode($webpage->metadata));
         $history = $webpage->metadata['playwright_history'] ?? [];
         $last = end($history);
 
@@ -297,7 +300,7 @@ class FetchPlaywrightTest extends TestCase
 
         // Fake HTTP responses
         Http::fake([
-            'https://example.com*' => Http::response('<html><head><title>Test Page</title></head><body><article><h1>Test Page</h1><p>This is test content with enough text to pass the extraction requirements for the content extractor to work properly.</p></article></body></html>', 200),
+            'https://example.com*' => Http::response('<html><head><title>Test Article Page</title></head><body><article><h1>Test Article Page</h1><p>This is test content with enough text to pass the extraction requirements for the content extractor to work properly.</p></article></body></html>', 200),
             '*' => Http::response('', 404),
         ]);
 
@@ -320,7 +323,7 @@ class FetchPlaywrightTest extends TestCase
             'concept' => 'bookmark',
             'type' => 'fetch_webpage',
             'url' => 'https://example.com',
-            'title' => 'Test Page',
+            'title' => 'Test Article Page',
             'metadata' => [
                 'enabled' => true,
                 'domain' => 'example.com',
@@ -334,6 +337,8 @@ class FetchPlaywrightTest extends TestCase
 
         // Reload webpage
         $webpage->refresh();
+
+        $this->assertNull($webpage->metadata['last_error'] ?? null, json_encode($webpage->metadata));
 
         // The job should have stored the fetch method
         $this->assertArrayHasKey('last_fetch_method', $webpage->metadata);
