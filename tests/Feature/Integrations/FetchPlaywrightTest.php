@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Fixtures\FetchPages;
 use Tests\TestCase;
 
 class FetchPlaywrightTest extends TestCase
@@ -26,7 +27,10 @@ class FetchPlaywrightTest extends TestCase
     {
         parent::setUp();
 
-        config(['fetch.url_safety.allowed_hosts' => ['example.com', 'twitter.com']]);
+        config([
+            'fetch.url_safety.allowed_hosts' => ['example.com', 'twitter.com'],
+            'fetch.list_detection.enabled' => false,
+        ]);
 
         // Store original config
         $this->originalPlaywrightEnabled = config('services.playwright.enabled');
@@ -117,7 +121,7 @@ class FetchPlaywrightTest extends TestCase
 
         Http::fake([
             '*/health' => Http::response(['status' => 'error', 'connected' => false], 500),
-            'https://example.com*' => Http::response('<html><head><title>Fallback Page</title></head><body><article><h1>Fallback Page</h1><p>This is fallback content with enough words for extraction to succeed. This paragraph exists so readability has a meaningful article body to parse during the fetch test.</p></article></body></html>', 200),
+            'https://example.com*' => Http::response(FetchPages::articleWithRelatedRail(), 200),
         ]);
 
         $user = User::factory()->create();
@@ -300,7 +304,7 @@ class FetchPlaywrightTest extends TestCase
 
         // Fake HTTP responses
         Http::fake([
-            'https://example.com*' => Http::response('<html><head><title>Test Article Page</title></head><body><article><h1>Test Article Page</h1><p>This is test content with enough text to pass the extraction requirements for the content extractor to work properly.</p></article></body></html>', 200),
+            'https://example.com*' => Http::response(FetchPages::articleWithRelatedRail(), 200),
             '*' => Http::response('', 404),
         ]);
 
