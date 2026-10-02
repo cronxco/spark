@@ -62,7 +62,7 @@ Schedule::command('queue:prune-failed --hours=720')
 
 // Keep the notification feed bounded while retaining 30 days of completed history.
 Schedule::command('notifications:maintain-history')
-    ->daily()
+    ->hourly()
     ->onOneServer()
     ->withoutOverlapping()
     ->sentryMonitor();

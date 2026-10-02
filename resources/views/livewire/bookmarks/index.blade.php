@@ -13,6 +13,7 @@ use App\Models\IntegrationGroup;
 use App\Services\Fetch\Assessment\ListPageDetector;
 use App\Services\Fetch\FetchMetadata;
 use App\Services\Fetch\Links\UrlCanonicalizer;
+use App\Services\Fetch\UrlSafetyValidator;
 use App\Services\PlaywrightHealthMetrics;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -946,7 +947,7 @@ new class extends Component
             'newUrl' => 'required|url|max:2048',
         ]);
 
-        if (! app(\App\Services\Fetch\UrlSafetyValidator::class)->isSafe($this->newUrl)) {
+        if (! app(UrlSafetyValidator::class)->isSafe($this->newUrl)) {
             $this->error('This URL is not allowed.');
 
             return;
@@ -1902,3 +1903,4 @@ new class extends Component
         </div>
     </div>
     @endif
+

@@ -657,10 +657,14 @@ class FetchSingleUrl implements ShouldQueue
         });
 
         // Send notification after 3 consecutive failures
-        if ($consecutiveFailures === 3) {
-            $this->integration->user->notify(
-                new FetchMultipleFailures($webpage, $consecutiveFailures, $errorMessage)
-            );
+        if ($consecutiveFailures >= 3) {
+            $notification = new FetchMultipleFailures($webpage, $consecutiveFailures, $errorMessage);
+            if ($consecutiveFailures === 3) {
+                $this->integration->user->notify($notification);
+            } else {
+                // Keep the incident current without sending another email/push.
+                $this->integration->user->notifyNow($notification, ['database']);
+            }
 
             Log::info('Fetch: Sent multiple failures notification', [
                 'url' => $this->url,
