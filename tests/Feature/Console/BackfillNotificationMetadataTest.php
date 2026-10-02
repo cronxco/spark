@@ -14,6 +14,30 @@ class BackfillNotificationMetadataTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
+    public function collapsing_duplicates_preserves_both_timestamps_and_the_latest_occurrence(): void
+    {
+        $user = User::factory()->create();
+        $entityId = (string) Str::uuid();
+        $items = collect([10, 5])->map(fn ($days) => $user->notifications()->create([
+            'id' => (string) Str::uuid(),
+            'type' => 'integration_failed',
+            'data' => ['entity_id' => $entityId],
+            'created_at' => now()->subDays($days),
+            'updated_at' => now()->subDays($days),
+        ]));
+        $timestamps = $items->mapWithKeys(fn ($item) => [$item->id => $item->fresh()->updated_at->toJSON()]);
+
+        $this->artisan('notifications:backfill-metadata')->assertSuccessful();
+
+        foreach ($items as $item) {
+            $this->assertSame($timestamps[$item->id], $item->fresh()->updated_at->toJSON());
+        }
+        $active = $user->notifications()->whereNull('archived_at')->first();
+        $this->assertSame(2, $active->data['occurrence_count']);
+        $this->assertSame($items->last()->fresh()->created_at->toJSON(), $active->data['last_occurred_at']);
+    }
+
+    #[Test]
     public function rerunning_the_backfill_does_not_reset_an_already_normalised_notifications_updated_at(): void
     {
         $user = User::factory()->create();

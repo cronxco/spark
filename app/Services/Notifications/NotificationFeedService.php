@@ -206,7 +206,7 @@ class NotificationFeedService
             'is_read' => $notification->read_at !== null,
             'occurrence_count' => max(1, (int) ($data['occurrence_count'] ?? 1)),
             'occurred_at' => $notification->created_at?->toJSON(),
-            'updated_at' => $notification->updated_at?->toJSON(),
+            'updated_at' => NotificationOccurrence::last($notification)->toJSON(),
             'archived_at' => $notification->archived_at === null
                 ? null
                 : CarbonImmutable::parse($notification->archived_at)->toJSON(),

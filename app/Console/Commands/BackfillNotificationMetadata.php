@@ -10,6 +10,7 @@ use App\Notifications\IntegrationFailed;
 use App\Notifications\MigrationCompleted;
 use App\Notifications\MigrationFailed;
 use App\Notifications\NotificationCatalogue;
+use App\Services\Notifications\NotificationOccurrence;
 use Illuminate\Console\Command;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
@@ -72,6 +73,7 @@ class BackfillNotificationMetadata extends Command
                     'severity' => NotificationCatalogue::severityFor($type),
                     'body' => $data['body'] ?? $data['message'] ?? $data['headline'] ?? null,
                     'occurrence_count' => max(1, (int) ($data['occurrence_count'] ?? 1)),
+                    'last_occurred_at' => NotificationOccurrence::last($notification)->toJSON(),
                 ];
 
                 if ($dryRun) {
@@ -105,6 +107,7 @@ class BackfillNotificationMetadata extends Command
                             ->first();
 
                         if ($existing !== null) {
+                            $existing->timestamps = false;
                             $existingData = is_array($existing->data) ? $existing->data : [];
                             $combinedCount = max(1, (int) ($existingData['occurrence_count'] ?? 1))
                                 + max(1, (int) ($payload['occurrence_count'] ?? 1));
@@ -115,9 +118,11 @@ class BackfillNotificationMetadata extends Command
                                     'data' => [...$existingData, 'archive_reason' => 'superseded'],
                                 ])->save();
                                 $payload['occurrence_count'] = $combinedCount;
+                                $payload['last_occurred_at'] = NotificationOccurrence::last($existing)->max(NotificationOccurrence::last($current))->toJSON();
                             } else {
                                 $existing->forceFill([
-                                    'data' => [...$existingData, 'occurrence_count' => $combinedCount],
+                                    'data' => [...$existingData, 'occurrence_count' => $combinedCount,
+                                        'last_occurred_at' => NotificationOccurrence::last($existing)->max(NotificationOccurrence::last($current))->toJSON()],
                                 ])->save();
                                 $payload['archive_reason'] = 'superseded';
                                 $current->forceFill(['archived_at' => now()]);

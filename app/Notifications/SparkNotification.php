@@ -16,6 +16,8 @@ abstract class SparkNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    private ?string $occurredAt = null;
+
     /**
      * Get the notification type identifier for preferences
      */
@@ -53,6 +55,8 @@ abstract class SparkNotification extends Notification implements ShouldQueue
      */
     public function via(User $notifiable): array
     {
+        $this->occurredAt ??= now()->toJSON();
+        $this->afterCommit();
         $channels = ['database'];
 
         if ($this->isPriority()) {
@@ -196,6 +200,7 @@ abstract class SparkNotification extends Notification implements ShouldQueue
             'group_key' => $this->getGroupKey(),
             'technical_detail' => $this->getTechnicalDetail(),
             'occurrence_count' => 1,
+            'last_occurred_at' => $this->occurredAt ??= now()->toJSON(),
             'priority' => $this->isPriority(),
         ];
     }
