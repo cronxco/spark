@@ -153,7 +153,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         $task = $this->taskDefinition();
         $store = app(TaskExecutionStore::class);
         $progress = $this->progress();
-        $selectedDriver = app(RoutineDriverManager::class)->driverName('digest', $this->driverOverride);
+        $selectedDriver = app(RoutineDriverManager::class)->driverName('digest', $this->driverOverride, $this->user);
 
         $store->recordStatus($integration, $task, 'pending', [
             'triggered_by' => $this->triggerReason,
@@ -183,7 +183,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
         }
 
         try {
-            $result = $driver->for('digest', $this->driverOverride)->run($this->user, 'digest', $payload, $progress);
+            $result = $driver->for('digest', $this->driverOverride, $this->user)->run($this->user, 'digest', $payload, $progress);
         } catch (Throwable $exception) {
             $store->recordStatus($integration, $task, 'retrying', [
                 'triggered_by' => $this->triggerReason,
@@ -259,7 +259,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             'run_uuid' => $this->runUuid,
             'local_date' => $this->localDate,
             'period' => $this->period,
-            'driver' => app(RoutineDriverManager::class)->driverName('digest', $this->driverOverride),
+            'driver' => app(RoutineDriverManager::class)->driverName('digest', $this->driverOverride, $this->user),
             'attempts' => $this->attempts(),
             'completed_at' => now()->toIso8601String(),
             'error' => redact_sensitive_urls($exception?->getMessage() ?? 'Flint routine failed.'),
@@ -354,7 +354,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             'run_uuid' => $this->runUuid,
             'local_date' => $this->localDate,
             'period' => $this->period,
-            'driver' => app(RoutineDriverManager::class)->driverName('digest', $this->driverOverride),
+            'driver' => app(RoutineDriverManager::class)->driverName('digest', $this->driverOverride, $this->user),
             'attempts' => self::MAX_SCHEDULED_ATTEMPTS,
             'completed_at' => now()->toIso8601String(),
             'error' => $message,

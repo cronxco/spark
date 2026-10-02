@@ -5,6 +5,7 @@ use App\Models\EventObject;
 use App\Services\AgentWorkingMemoryService;
 use App\Services\Ai\AiUsageSummary;
 use App\Services\Flint\FlintScheduleSettings;
+use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\FlintTopicService;
 use App\Services\FlintTopicTaskService;
 use App\Support\FlintDigestKind;
@@ -35,6 +36,10 @@ new class extends Component
     public string $topicsTime = '21:00';
     public string $readingListTime = '20:00';
     public string $newsRoundupTime = '07:00';
+    // An empty string means "not chosen here": the default falls back to the
+    // server's env value, and a routine falls back to the default.
+    public string $driver = '';
+    public array $drivers = ['digest' => '', 'topics' => '', 'reading_list' => '', 'news_roundup' => ''];
     public int $usageDays = 7;
     public string $usageScope = 'all';
 
@@ -79,6 +84,10 @@ new class extends Component
         $this->topicsTime = $settings['topics_time'] ?? config('services.flint_routine.topics_time');
         $this->readingListTime = $settings['reading_list_time'] ?? config('services.flint_routine.reading_list_time');
         $this->newsRoundupTime = $settings['news_roundup_time'] ?? config('services.flint_routine.news_roundup_time');
+        $this->driver = (string) ($settings['driver'] ?? '');
+        foreach (RoutineDriverManager::ROUTINES as $routine) {
+            $this->drivers[$routine] = (string) ($settings['drivers'][$routine] ?? '');
+        }
 
         // Every quarter hour — the dispatcher only wakes up on that cadence, so
         // finer-grained times would be misleading.
@@ -369,6 +378,15 @@ new class extends Component
         );
     }
 
+    /** @return array<string, string> */
+    public function driverLabels(): array
+    {
+        return [
+            'webhook' => __('Claude Code routine (webhook)'),
+            'openai' => __('OpenAI (runs in Spark)'),
+        ];
+    }
+
     public function save(): void
     {
         $this->validate([
@@ -379,6 +397,8 @@ new class extends Component
             'topicsTime' => ['required', 'date_format:H:i'],
             'readingListTime' => ['required', 'date_format:H:i'],
             'newsRoundupTime' => ['required', 'date_format:H:i'],
+            'driver' => ['nullable', 'in:' . implode(',', array_keys(RoutineDriverManager::DRIVERS))],
+            'drivers.*' => ['nullable', 'in:' . implode(',', array_keys(RoutineDriverManager::DRIVERS))],
         ]);
 
         $user = Auth::user();
@@ -407,6 +427,10 @@ new class extends Component
             'topics_time' => $this->topicsTime,
             'reading_list_time' => $this->readingListTime,
             'news_roundup_time' => $this->newsRoundupTime,
+            'driver' => $this->driver ?: null,
+            'drivers' => collect(RoutineDriverManager::ROUTINES)
+                ->mapWithKeys(fn (string $routine) => [$routine => ($this->drivers[$routine] ?? '') ?: null])
+                ->all(),
         ]);
 
         $user->settings = $settings;
@@ -966,6 +990,49 @@ new class extends Component
                                     <span class="font-medium text-sm">{{ $label }}</span>
                                     <input type="checkbox" class="toggle toggle-primary" wire:model="{{ $setting }}" />
                                 </label>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        @php
+                            $driverLabels = $this->driverLabels();
+                            $serverDefault = app(RoutineDriverManager::class)->configuredDriver();
+                        @endphp
+                        <h3 class="text-lg font-semibold mb-1">{{ __('How Flint runs') }}</h3>
+                        <p class="text-sm text-base-content/70 mb-4">
+                            {{ __('Choose whether each routine is handed to a Claude Code routine by webhook or run in Spark with OpenAI. Anything left on the default follows the server configuration.') }}
+                        </p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="form-control sm:col-span-2">
+                                <label class="label"><span class="label-text">{{ __('Default') }}</span></label>
+                                <select wire:model="driver" class="select select-bordered">
+                                    <option value="">{{ __('Server default (:driver)', ['driver' => $driverLabels[$serverDefault] ?? $serverDefault]) }}</option>
+                                    @foreach ($driverLabels as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @foreach ([
+                                'digest' => __('Morning and evening briefings'),
+                                'topics' => __('Topic review'),
+                                'reading_list' => __('Reading list'),
+                                'news_roundup' => __('News roundup'),
+                            ] as $routine => $label)
+                                <div class="form-control">
+                                    <label class="label"><span class="label-text">{{ $label }}</span></label>
+                                    <select wire:model="drivers.{{ $routine }}" class="select select-bordered">
+                                        <option value="">{{ __('Use default') }}</option>
+                                        @foreach ($driverLabels as $value => $driverLabel)
+                                            <option value="{{ $value }}">{{ $driverLabel }}</option>
+                                        @endforeach
+                                    </select>
+                                    @php $effective = app(RoutineDriverManager::class)->driverName($routine, user: Auth::user()); @endphp
+                                    <label class="label"><span class="label-text-alt">{{ __('Currently: :driver', ['driver' => $driverLabels[$effective] ?? $effective]) }}</span></label>
+                                </div>
                             @endforeach
                         </div>
                     </div>
