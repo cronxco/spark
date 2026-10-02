@@ -329,6 +329,38 @@ class FlintPageTest extends TestCase
     }
 
     #[Test]
+    public function saving_settings_stores_the_chosen_drivers(): void
+    {
+        Volt::test('flint.index')
+            ->set('driver', 'openai')
+            ->set('drivers.topics', 'webhook')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $settings = $this->user->refresh()->settings['flint'];
+
+        $this->assertSame('openai', $settings['driver']);
+        $this->assertSame('webhook', $settings['drivers']['topics']);
+        $this->assertNull($settings['drivers']['digest']);
+
+        Volt::test('flint.index')
+            ->assertSet('driver', 'openai')
+            ->assertSet('drivers.topics', 'webhook')
+            ->assertSet('drivers.digest', '');
+    }
+
+    #[Test]
+    public function an_unknown_driver_is_rejected(): void
+    {
+        Volt::test('flint.index')
+            ->set('drivers.digest', 'carrier-pigeon')
+            ->call('save')
+            ->assertHasErrors(['drivers.digest']);
+
+        $this->assertArrayNotHasKey('drivers', $this->user->refresh()->settings['flint'] ?? []);
+    }
+
+    #[Test]
     public function legacy_digest_setting_hydrates_all_independent_switches(): void
     {
         $this->user->update(['settings' => ['flint' => ['digests_enabled' => false]]]);

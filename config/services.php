@@ -258,7 +258,8 @@ return [
 
         // How a routine is run: 'webhook' hands it to a Claude Code Routine,
         // 'openai' runs the vendored skill in-process. Individual routines may
-        // override this, so the two can be compared on the same input.
+        // override this, so the two can be compared on the same input. Only a
+        // fallback: a driver chosen on the Flint settings tab wins.
         'driver' => env('FLINT_ROUTINE_DRIVER', 'webhook'),
 
         // Shared fallback bearer secret. Per-routine secrets below take

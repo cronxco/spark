@@ -61,7 +61,7 @@ class FlintRunDispatcher
         if (! in_array($period, ['morning', 'afternoon', 'evening'], true)) {
             throw new InvalidArgumentException('Period must be morning, afternoon, or evening.');
         }
-        $selectedDriver = $this->drivers->driverName($resolvedRoutine, $driverOverride);
+        $selectedDriver = $this->drivers->driverName($resolvedRoutine, $driverOverride, $user);
 
         $timezone = $this->timezones->timezoneFor($user);
         $localDate = $date ?: $this->timezones->today($user)->toDateString();

@@ -39,6 +39,44 @@ class RoutineDriverTest extends TestCase
     }
 
     #[Test]
+    public function a_driver_chosen_in_settings_beats_the_env_values(): void
+    {
+        config([
+            'services.flint_routine.driver' => 'webhook',
+            'services.flint_routine.routines.digest.driver' => 'webhook',
+            'services.flint_routine.routines.topics.driver' => 'openai',
+        ]);
+        $user = User::factory()->create(['settings' => ['flint' => [
+            'driver' => 'openai',
+            'drivers' => ['topics' => 'webhook', 'reading_list' => null],
+        ]]]);
+
+        $manager = new RoutineDriverManager;
+
+        $this->assertSame('openai', $manager->driverName('digest', user: $user));
+        $this->assertSame('webhook', $manager->driverName('topics', user: $user));
+        $this->assertSame('openai', $manager->driverName('reading_list', user: $user));
+        $this->assertInstanceOf(WebhookRoutineDriver::class, $manager->for('topics', user: $user));
+        // An explicit run override still wins over the saved choice.
+        $this->assertSame('openai', $manager->driverName('topics', 'openai', $user));
+    }
+
+    #[Test]
+    public function env_values_apply_when_the_user_has_not_chosen(): void
+    {
+        config([
+            'services.flint_routine.driver' => 'webhook',
+            'services.flint_routine.routines.news_roundup.driver' => 'openai',
+        ]);
+        $user = User::factory()->create(['settings' => ['flint' => ['driver' => 'bogus', 'drivers' => ['topics' => '']]]]);
+
+        $manager = new RoutineDriverManager;
+
+        $this->assertSame('webhook', $manager->driverName('topics', user: $user));
+        $this->assertSame('openai', $manager->driverName('news_roundup', user: $user));
+    }
+
+    #[Test]
     public function an_unconfigured_webhook_is_not_applicable_rather_than_a_failure(): void
     {
         config(['services.flint_routine.routines.topics.url' => null]);

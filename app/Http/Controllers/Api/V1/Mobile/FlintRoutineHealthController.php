@@ -32,7 +32,7 @@ class FlintRoutineHealthController extends Controller
         $routines = collect(['morning_digest', 'evening_digest', 'topics', 'reading_list', 'news_roundup'])
             ->map(function (string $routine) use ($user, $integration, $executionState, $schedule, $drivers): array {
                 $driverRoutine = str_ends_with($routine, '_digest') ? 'digest' : $routine;
-                $driver = $drivers->driverName($driverRoutine);
+                $driver = $drivers->driverName($driverRoutine, user: $user);
                 $enabled = $schedule->enabled($user, $routine);
                 $configured = $driver === 'webhook'
                     ? filled(RoutineConfig::url($driverRoutine))
