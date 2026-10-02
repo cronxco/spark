@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Fixtures\FetchPages;
 use Tests\TestCase;
 
 class FetchPlaywrightTest extends TestCase
@@ -30,8 +31,18 @@ class FetchPlaywrightTest extends TestCase
     {
         parent::setUp();
 
-        // HTTP responses are fake; do not depend on live DNS for fixture URLs.
-        config(['fetch.url_safety.allowed_hosts' => ['example.com']]);
+        config([
+            'fetch.url_safety.allowed_hosts' => ['example.com', 'twitter.com'],
+            'fetch.list_detection.enabled' => false,
+        ]);
+
+        $this->app->bind(Client::class, fn (): Client => new Client([
+            'handler' => HandlerStack::create(new MockHandler([
+                new Response(200, [], FetchPages::articleWithRelatedRail()),
+            ])),
+        ]));
+
+        Http::preventStrayRequests();
 
         // Store original config
         $this->originalPlaywrightEnabled = config('services.playwright.enabled');
@@ -51,9 +62,7 @@ class FetchPlaywrightTest extends TestCase
         config(['services.playwright.enabled' => false]);
 
         // Mock HTTP responses
-        Http::fake([
-            'https://example.com*' => Http::response('<html><body>Test</body></html>', 200),
-        ]);
+        Http::fake();
 
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
@@ -74,6 +83,7 @@ class FetchPlaywrightTest extends TestCase
         $result = $engine->fetch('https://example.com', $group, $webpage);
 
         $this->assertEquals('http', $result['method']);
+        $this->assertSame(FetchPages::articleWithRelatedRail(), $result['html']);
     }
 
     #[Test]
@@ -84,7 +94,6 @@ class FetchPlaywrightTest extends TestCase
         // Mock Playwright worker as unavailable
         Http::fake([
             '*/health' => Http::response(['status' => 'error'], 500),
-            'https://example.com*' => Http::response('<html><body>Test</body></html>', 200),
         ]);
 
         $user = User::factory()->create();
@@ -110,6 +119,7 @@ class FetchPlaywrightTest extends TestCase
         $this->assertContains($result['method'], ['http', 'http (fallback)']);
         $this->assertEquals('playwright', $result['selected_method']);
         $this->assertEquals('http_fallback', $result['actual_method']);
+        $this->assertSame(FetchPages::articleWithRelatedRail(), $result['html']);
         $this->assertFalse($result['playwright_reached_worker']);
         $this->assertNotEmpty($result['playwright_error']);
     }
@@ -152,6 +162,7 @@ class FetchPlaywrightTest extends TestCase
         (new FetchSingleUrl($integration, $webpage->id, $webpage->url))->handle();
 
         $webpage->refresh();
+        $this->assertNull($webpage->metadata['last_error'] ?? null, json_encode($webpage->metadata));
         $history = $webpage->metadata['playwright_history'] ?? [];
         $last = end($history);
 
@@ -225,7 +236,6 @@ class FetchPlaywrightTest extends TestCase
         // Mock HTTP responses
         Http::fake([
             '*/health' => Http::response(['status' => 'error'], 500),
-            'https://example.com*' => Http::response('<html><body>Test</body></html>', 200),
         ]);
 
         $user = User::factory()->create();
@@ -270,7 +280,6 @@ class FetchPlaywrightTest extends TestCase
         // Mock HTTP responses
         Http::fake([
             '*/health' => Http::response(['status' => 'error'], 500),
-            'https://twitter.com*' => Http::response('<html><body>Test Tweet</body></html>', 200),
         ]);
 
         $user = User::factory()->create();
@@ -326,7 +335,7 @@ class FetchPlaywrightTest extends TestCase
             'concept' => 'bookmark',
             'type' => 'fetch_webpage',
             'url' => 'https://example.com',
-            'title' => 'Test Page',
+            'title' => 'Test Article Page',
             'metadata' => [
                 'enabled' => true,
                 'domain' => 'example.com',
@@ -340,6 +349,8 @@ class FetchPlaywrightTest extends TestCase
 
         // Reload webpage
         $webpage->refresh();
+
+        $this->assertNull($webpage->metadata['last_error'] ?? null, json_encode($webpage->metadata));
 
         // The job should have stored the fetch method
         $this->assertArrayHasKey('last_fetch_method', $webpage->metadata, $webpage->metadata['last_error']['message'] ?? 'Fetch method was not recorded');

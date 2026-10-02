@@ -28,8 +28,8 @@ class FlintTopicTaskService
     public function list(User $user, string $topicId): array
     {
         return $this->blocks($user, $topicId)
-            ->orderByRaw("CASE WHEN blocks.metadata->>'completed_at' IS NULL THEN 0 ELSE 1 END")
-            ->orderByRaw("COALESCE(blocks.metadata->>'due_on', blocks.metadata->>'review_on', '9999-12-31')")
+            ->orderByRaw("CASE WHEN metadata->>'completed_at' IS NULL THEN 0 ELSE 1 END")
+            ->orderByRaw("COALESCE(metadata->>'due_on', metadata->>'review_on', '9999-12-31')")
             ->orderBy('blocks.created_at')
             ->get()
             ->map(fn (Block $block): array => $this->payload($block))
