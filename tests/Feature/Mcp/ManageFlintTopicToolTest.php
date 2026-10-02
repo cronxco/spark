@@ -10,6 +10,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use App\Services\Flint\FlintRunToken;
+use App\Services\FlintTopicTaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
@@ -161,5 +162,62 @@ class ManageFlintTopicToolTest extends TestCase
 
         $topic = EventObject::where('title', 'Routine output')->firstOrFail();
         $this->assertContains($runUuid, $topic->metadata['run_uuids']);
+    }
+
+    #[Test]
+    public function it_lists_tasks_with_a_table_prefix_in_completion_and_date_order(): void
+    {
+        $topic = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'flint',
+            'type' => 'topic',
+        ]);
+        $integration = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'flint']);
+        $tasks = [];
+        foreach ([
+            ['completed_at' => '2026-10-01T10:00:00Z', 'due_on' => '2026-09-01'],
+            [],
+            ['due_on' => '2026-10-04', 'review_on' => '2026-10-01'],
+            ['review_on' => '2026-10-03'],
+            ['due_on' => '2026-10-02'],
+            ['due_on' => '2026-10-02'],
+        ] as $index => $metadata) {
+            $event = Event::factory()->create([
+                'integration_id' => $integration->id,
+                'target_id' => $topic->id,
+                'service' => 'flint',
+                'action' => 'had_topic_task',
+            ]);
+            $tasks[] = Block::factory()->create([
+                'event_id' => $event->id,
+                'block_type' => 'flint_topic_task',
+                'metadata' => $metadata,
+                'created_at' => now()->subMinutes(10 - $index),
+            ]);
+        }
+
+        $connection = (new Block)->getConnection();
+        $prefix = $connection->getTablePrefix();
+        $tables = ['blocks', 'events', 'integrations'];
+
+        $connection->beginTransaction();
+
+        try {
+            foreach ($tables as $table) {
+                $source = $connection->getQueryGrammar()->wrapTable($table);
+                $connection->statement('CREATE TEMPORARY VIEW "task_test_' . $table . '" AS SELECT *, xmin::text AS xmin FROM ' . $source);
+            }
+            $connection->setTablePrefix('task_test_');
+
+            $result = app(FlintTopicTaskService::class)->list($this->user, $topic->id);
+
+            $this->assertSame(
+                array_map(fn (int $index): string => (string) $tasks[$index]->id, [4, 5, 3, 2, 1, 0]),
+                array_column($result, 'id'),
+            );
+        } finally {
+            $connection->setTablePrefix($prefix);
+            $connection->rollBack();
+        }
     }
 }
