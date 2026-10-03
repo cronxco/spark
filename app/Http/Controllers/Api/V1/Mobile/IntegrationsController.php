@@ -105,6 +105,14 @@ class IntegrationsController extends Controller
         }
 
         $jobsDispatched = (new DispatchIntegrationFetchJobs)->dispatch($integration);
+
+        if ($jobsDispatched === 0) {
+            return response()->json([
+                'message' => DispatchIntegrationFetchJobs::NOTHING_TO_DISPATCH,
+                'code' => 'nothing_to_dispatch',
+            ], 422);
+        }
+
         $integration->touch();
 
         return response()->json([
@@ -152,7 +160,11 @@ class IntegrationsController extends Controller
                 return ['integration_id' => $integration->id, 'status' => 'skipped', 'reason' => 'paused', 'jobs_dispatched' => 0];
             }
 
-            return ['integration_id' => $integration->id, 'status' => 'triggered', 'jobs_dispatched' => $dispatcher->dispatch($integration)];
+            $jobsDispatched = $dispatcher->dispatch($integration);
+
+            return $jobsDispatched === 0
+                ? ['integration_id' => $integration->id, 'status' => 'failed', 'reason' => 'nothing_to_dispatch', 'jobs_dispatched' => 0]
+                : ['integration_id' => $integration->id, 'status' => 'triggered', 'jobs_dispatched' => $jobsDispatched];
         });
 
         return response()->json(['service' => $data['service'], 'integrations' => $results, 'total_jobs_dispatched' => $results->sum('jobs_dispatched')]);

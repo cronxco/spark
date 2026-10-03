@@ -8,6 +8,7 @@ use App\Integrations\PluginRegistry;
 use App\Models\Integration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class IntegrationApiController extends Controller
 {
@@ -56,22 +57,31 @@ class IntegrationApiController extends Controller
             return response()->json(['error' => 'Plugin not found'], 404);
         }
 
-        $schema = $pluginClass::getConfigurationSchema();
+        // Validate against the instance type's schema, as web configuration
+        // does. The top-level schema is a different (and for several plugins
+        // smaller) field set.
+        $schema = $pluginClass::getInstanceTypes()[$integration->instance_type]['schema']
+            ?? $pluginClass::getConfigurationSchema();
 
         // Build validation rules
         $rules = $this->buildValidationRules($schema);
 
-        $validated = $request->validate($rules);
+        // Validate the configuration as it will be saved, so a request that
+        // changes one field need not resend every required one.
+        $current = $integration->configuration ?? [];
+        $validated = Validator::make(array_merge($current, $request->all()), $rules)->validate();
 
         // Process array fields that come as comma-separated strings
         foreach ($validated as $field => $value) {
-            if ($schema[$field]['type'] === 'array' && is_string($value)) {
+            if (($schema[$field]['type'] ?? null) === 'array' && is_string($value)) {
                 $validated[$field] = array_filter(array_map('trim', explode(',', $value)));
             }
         }
 
+        // Merge rather than replace: replacing dropped every key outside the
+        // schema, including `paused`, schedule settings and stored API keys.
         $integration->update([
-            'configuration' => $validated,
+            'configuration' => array_merge($current, $validated),
         ]);
 
         return response()->json([
@@ -92,6 +102,13 @@ class IntegrationApiController extends Controller
         }
 
         $jobsDispatched = (new DispatchIntegrationFetchJobs)->dispatch($integration);
+
+        if ($jobsDispatched === 0) {
+            return response()->json([
+                'error' => DispatchIntegrationFetchJobs::NOTHING_TO_DISPATCH,
+                'code' => 'nothing_to_dispatch',
+            ], 422);
+        }
 
         return response()->json([
             'message' => 'Integration update triggered.',
