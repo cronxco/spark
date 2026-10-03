@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use App\Events\Mobile\NewEventBroadcast;
 use App\Events\Mobile\NotificationReceived;
-use App\Jobs\Data\Receipt\FindReceiptForTransactionJob;
 use App\Models\Block;
 use App\Models\Event as EventModel;
 use App\Models\EventObject;
@@ -73,23 +72,6 @@ class AppServiceProvider extends ServiceProvider
         // This allows the use of Authelia for authentication via Socialite
         Event::listen(function (SocialiteWasCalled $event) {
             $event->extendSocialite('authelia', AutheliaProvider::class);
-        });
-
-        // Receipt reverse matching: When a transaction is created, look for matching receipts
-        // Skip during testing to avoid cascading errors with sync queue
-        EventModel::created(function (EventModel $event) {
-            if (app()->runningUnitTests()) {
-                return;
-            }
-
-            if (in_array($event->service, ['monzo', 'gocardless'])
-                && $event->domain === 'money'
-                && in_array($event->action, [
-                    'card_payment_to', 'payment_to', 'made_transaction',
-                    'card_refund_from', 'payment_from',
-                ])) {
-                FindReceiptForTransactionJob::dispatch($event);
-            }
         });
 
         // iOS broadcast on new Event creation. Throttled per-user via Redis to avoid
