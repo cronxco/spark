@@ -94,11 +94,12 @@ class FlintDigestService
                 . implode(', ', $digestBlockTypes) . '.',
         ])->validate();
 
-        $date = Carbon::parse(
-            $data['date'] ?? now($user->getTimezone())->toDateString(),
-            $user->getTimezone(),
-        )->startOfDay();
-        $period = $data['period'] ?? $this->inferPeriod();
+        // The same effective (acknowledged travel) timezone the scheduler fired
+        // the run in, so a digest written abroad lands on the day it was for.
+        $timezones = app(EffectiveTimezoneResolver::class);
+        $localDate = $data['date'] ?? $timezones->today($user)->toDateString();
+        $date = Carbon::parse($localDate, $timezones->timezoneForDate($user, $localDate))->startOfDay();
+        $period = $data['period'] ?? $this->inferPeriod($timezones->now($user));
         $run = isset($data['run_token'])
             ? app(FlintRunToken::class)->verify($data['run_token'], $user, $date->toDateString(), $period)
             : null;
@@ -320,11 +321,11 @@ class FlintDigestService
         ];
     }
 
-    private function inferPeriod(): string
+    private function inferPeriod(Carbon $localNow): string
     {
         return match (true) {
-            now()->hour <= 11 && now()->hour >= 5 => 'morning',
-            now()->hour <= 16 => 'afternoon',
+            $localNow->hour <= 11 && $localNow->hour >= 5 => 'morning',
+            $localNow->hour <= 16 => 'afternoon',
             default => 'evening',
         };
     }
