@@ -152,12 +152,24 @@ class FlintDigestService
         return $result;
     }
 
+    /**
+     * The user's one Flint integration (decision D-F4): the plugin's
+     * `assistant` instance, oldest first, created on first use.
+     */
     public function resolveIntegration(User $user): Integration
     {
-        return Integration::firstOrCreate(
-            ['user_id' => $user->id, 'service' => 'flint', 'instance_type' => 'digest'],
-            ['name' => 'Flint Digest'],
-        );
+        return Integration::query()
+            ->where('user_id', $user->id)
+            ->where('service', 'flint')
+            ->orderByRaw("CASE WHEN instance_type = 'assistant' THEN 0 ELSE 1 END")
+            ->oldest()
+            ->first()
+            ?? Integration::create([
+                'user_id' => $user->id,
+                'service' => 'flint',
+                'instance_type' => 'assistant',
+                'name' => 'Flint',
+            ]);
     }
 
     /**
