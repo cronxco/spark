@@ -27,7 +27,7 @@ class AssistantContextControllerTest extends TestCase
     public function returns_404_if_flint_not_configured()
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['flint:read']);
 
         $response = $this->getJson('/api/assistant/context');
 
@@ -39,7 +39,7 @@ class AssistantContextControllerTest extends TestCase
     public function returns_context_json_for_authenticated_user()
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['flint:read']);
 
         // Create Flint integration
         $group = IntegrationGroup::factory()->create([
@@ -136,7 +136,7 @@ class AssistantContextControllerTest extends TestCase
         ]);
 
         // User1 should only see their own events
-        Sanctum::actingAs($user1);
+        Sanctum::actingAs($user1, ['flint:read']);
         $response = $this->getJson('/api/assistant/context');
 
         $response->assertStatus(200);
@@ -147,7 +147,7 @@ class AssistantContextControllerTest extends TestCase
     public function respects_timeframe_configuration()
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['flint:read']);
 
         $group = IntegrationGroup::factory()->create([
             'user_id' => $user->id,
@@ -187,7 +187,7 @@ class AssistantContextControllerTest extends TestCase
     public function response_includes_proper_group_structure()
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['flint:read']);
 
         $group = IntegrationGroup::factory()->create([
             'user_id' => $user->id,

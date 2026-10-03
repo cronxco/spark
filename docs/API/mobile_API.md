@@ -2366,7 +2366,7 @@ and 20 distinct strings, each of which must appear in
 
 `bookmark:write`, `data:image`, `data:read`, `data:write`, `finance:read`,
 `finance:write`, `flint:read`, `flint:run`, `flint:write`, `insights:read`,
-`insights:write`, `integrations:read`, `integrations:sync`, `tokens:manage`
+`insights:write`, `integrations:manage`, `integrations:read`, `integrations:sync`, `tokens:manage`
 
 Authority attenuates: a token-authenticated caller may only request
 capabilities its own credential already holds. `ios:read`, `ios:write` and

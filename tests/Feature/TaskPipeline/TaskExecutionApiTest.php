@@ -26,7 +26,7 @@ class TaskExecutionApiTest extends TestCase
         TaskExecution::factory()->create(['user_id' => $user->id, 'status' => 'success']);
         TaskExecution::factory()->create(['user_id' => $otherUser->id, 'status' => 'failed']);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['data:read']);
 
         $response = $this->getJson('/api/task-executions?status=failed&task_key=generate_embedding&per_page=10');
 
@@ -42,7 +42,7 @@ class TaskExecutionApiTest extends TestCase
         $otherUser = User::factory()->create();
         $execution = TaskExecution::factory()->create(['user_id' => $otherUser->id]);
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['data:read']);
 
         $this->getJson("/api/task-executions/{$execution->id}")->assertNotFound();
     }

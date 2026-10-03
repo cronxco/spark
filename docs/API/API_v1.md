@@ -37,7 +37,7 @@ Abilities are checked by the `spark.ability:<name>` middleware
 (`App\Http\Middleware\RequireSparkAbility` → `App\Support\SparkAbility::allows`),
 the same class MCP tools use via `RequiresSparkAbility`. Available abilities:
 `data:read`, `data:write`, `insights:read`, `insights:write`,
-`integrations:read`, `integrations:sync`, `flint:read`, `flint:write`,
+`integrations:read`, `integrations:sync`, `integrations:manage` (legacy `/api` only), `flint:read`, `flint:write`,
 `finance:read`, `finance:write`, `bookmark:write`. There is no Policy or Gate
 involved — it is this one middleware everywhere. Tokens carrying only the legacy `mcp:read`
 ability still satisfy `data:read`, `insights:read`, `integrations:read`, and
@@ -893,12 +893,31 @@ history yet.
 
 ## Legacy `/api` reference
 
-Predates the ability system and the `/api/v1` capability model: these
-routes require only `auth:sanctum` (no `spark.ability` gate, except the one
-route noted below), have no `etag` middleware, and mostly return raw
-Eloquent models rather than Resource classes — no Form Request classes
-exist anywhere in the app, so all validation is inline. Treated as a
-maintained but non-primary surface; use `/api/v1` for new integrations.
+Predates the `/api/v1` capability model: these routes have no `etag`
+middleware and mostly return raw Eloquent models rather than Resource
+classes — no Form Request classes exist anywhere in the app, so all
+validation is inline. Treated as a maintained but non-primary surface; use
+`/api/v1` for new integrations.
+
+Since October 2026 every legacy route except `/api/user` and the OAuth
+exchange also requires a capability, checked by the same `spark.ability`
+middleware as `/api/v1` (so `mcp:read` tokens keep their read aliases and
+wildcard tokens still pass):
+
+| Capability            | Legacy routes                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `data:read`           | `GET /api/events[/{event}]`, all `POST /api/search*`, `GET /api/task-executions[/{id}]`    |
+| `data:write`          | `POST /api/events`, `PUT/PATCH/DELETE /api/events/{event}`                                 |
+| `tokens:manage`       | `POST /api/tokens/create`, `GET /api/tokens`, `DELETE /api/tokens/{token}`                 |
+| `integrations:read`   | `GET /api/integrations[/{integration}]`                                                    |
+| `integrations:sync`   | `POST /api/integrations/{integration}/trigger`                                             |
+| `integrations:manage` | `POST /api/integrations/{integration}/configure`, `DELETE /api/integrations/{integration}` |
+| `flint:read`          | `GET /api/assistant/context`                                                               |
+| `flint:write`         | `POST /api/flint/questions/{block}/answer`                                                 |
+| `bookmark:write`      | `POST /api/fetch/bookmarks`                                                                |
+
+`integrations:manage` exists only for these two legacy routes; `/api/v1`
+has no integration configure or delete endpoint.
 
 | Method              | Path                                              | Controller / action                                    | Description                                                                                                                                                                                  | `/api/v1` equivalent                                                |
 | ------------------- | ------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |

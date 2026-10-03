@@ -35,6 +35,7 @@ final class SparkAbility
         'flint:write',
         'insights:read',
         'insights:write',
+        'integrations:manage',
         'integrations:read',
         'integrations:sync',
         'tokens:manage',

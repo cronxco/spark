@@ -24,8 +24,9 @@ Use least-privilege Sanctum abilities per operation. `App\Support\SparkAbility::
 is the authoritative list of what a personal access token may be granted:
 `bookmark:write`, `data:image`, `data:read`, `data:write`, `finance:read`,
 `finance:write`, `flint:read`, `flint:run`, `flint:write`, `insights:read`,
-`insights:write`, `integrations:read`, `integrations:sync`, and
-`tokens:manage`. `web:fetch` is a separate, MCP-only capability because it can
+`insights:write`, `integrations:manage`, `integrations:read`,
+`integrations:sync`, and `tokens:manage`. `integrations:manage` gates only the
+legacy `/api` integration configure and delete routes. `web:fetch` is a separate, MCP-only capability because it can
 use saved browser cookies. Existing `mcp:read` tokens are accepted as a
 read-only compatibility alias for `data:read`, `insights:read`,
 `integrations:read`, and `flint:read` during migration, but are no longer
