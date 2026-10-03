@@ -32,7 +32,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_can_list_events()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         // Create test events
         $event1 = Event::factory()->create([
@@ -75,7 +75,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_can_filter_events_by_service()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         Event::factory()->create([
             'integration_id' => $this->integration->id,
@@ -97,7 +97,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_can_filter_events_by_domain()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         Event::factory()->create([
             'integration_id' => $this->integration->id,
@@ -119,7 +119,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_can_get_specific_event()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         $event = Event::factory()->create([
             'integration_id' => $this->integration->id,
@@ -137,7 +137,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_cannot_access_other_users_event()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         $otherUser = User::factory()->create();
         $otherIntegration = Integration::factory()->create([
@@ -156,7 +156,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_can_update_event()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         $event = Event::factory()->create([
             'integration_id' => $this->integration->id,
@@ -187,7 +187,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_cannot_update_other_users_event()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         $otherUser = User::factory()->create();
         $otherIntegration = Integration::factory()->create([
@@ -208,7 +208,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_can_delete_event()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         $event = Event::factory()->create([
             'integration_id' => $this->integration->id,
@@ -239,7 +239,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_cannot_delete_other_users_event()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         $otherUser = User::factory()->create();
         $otherIntegration = Integration::factory()->create([
@@ -276,7 +276,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function events_are_paginated()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         // Create more than the default per_page (15)
         Event::factory()->count(20)->create([
@@ -301,7 +301,7 @@ class EventApiExtendedTest extends TestCase
     #[Test]
     public function user_can_specify_per_page()
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['data:read', 'data:write']);
 
         Event::factory()->count(10)->create([
             'integration_id' => $this->integration->id,

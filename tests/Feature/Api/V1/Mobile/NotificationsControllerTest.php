@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 use App\Models\ActionProgress;
 use App\Models\User;
 use App\Services\Api\ResourceVersion;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
@@ -40,7 +41,7 @@ class NotificationsControllerTest extends TestCase
         $this->notification(['title' => 'Second', 'message' => 'Older'], Carbon::now()->subMinute());
         $this->notification(['title' => 'Other user'], Carbon::now(), User::factory()->create());
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/notifications?limit=1')
             ->assertOk()
@@ -78,7 +79,7 @@ class NotificationsControllerTest extends TestCase
             100,
         );
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/notifications/feed?limit=10')
             ->assertOk()
@@ -106,7 +107,7 @@ class NotificationsControllerTest extends TestCase
     public function feed_and_show_responses_are_never_cached(): void
     {
         $notification = $this->notification(['title' => 'Not cacheable'], Carbon::now());
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // Symfony's Response::prepare() appends its own "private" directive
         // alongside ours, so assert the directive we actually care about is
@@ -127,7 +128,7 @@ class NotificationsControllerTest extends TestCase
             'body' => 'Your digest is ready.',
         ], Carbon::now(), storedType: 'daily_digest');
         $notification->markAsRead();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/notifications/{$notification->id}/unread")
             ->assertNoContent();
@@ -149,7 +150,7 @@ class NotificationsControllerTest extends TestCase
     {
         $this->notification(['title' => 'First'], Carbon::now());
         $this->notification(['title' => 'Second'], Carbon::now()->subMinute());
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $first = $this->getJson('/api/v1/mobile/notifications?limit=1')->assertOk();
         $cursor = $first->json('next_cursor');
@@ -173,7 +174,7 @@ class NotificationsControllerTest extends TestCase
             'entity_id' => $entityId,
         ], Carbon::now());
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/notifications')
             ->assertOk()
@@ -186,7 +187,7 @@ class NotificationsControllerTest extends TestCase
     public function mark_read_requires_ios_write_ability(): void
     {
         $notification = $this->notification(['title' => 'Unread'], Carbon::now());
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson("/api/v1/mobile/notifications/{$notification->id}/read")
             ->assertStatus(403);
@@ -196,7 +197,7 @@ class NotificationsControllerTest extends TestCase
     public function marks_a_notification_as_read(): void
     {
         $notification = $this->notification(['title' => 'Unread'], Carbon::now());
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/notifications/{$notification->id}/read", [], $this->ifMatch($notification))
             ->assertNoContent();
@@ -210,7 +211,7 @@ class NotificationsControllerTest extends TestCase
         $this->notification(['title' => 'One'], Carbon::now());
         $this->notification(['title' => 'Two'], Carbon::now()->subMinute());
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/notifications/read-all', [], $this->ifMatchUser())
             ->assertNoContent();
@@ -222,7 +223,7 @@ class NotificationsControllerTest extends TestCase
     public function deletes_a_notification(): void
     {
         $notification = $this->notification(['title' => 'Remove me'], Carbon::now());
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->deleteJson("/api/v1/mobile/notifications/{$notification->id}", [], $this->ifMatch($notification))
             ->assertNoContent();
@@ -233,7 +234,7 @@ class NotificationsControllerTest extends TestCase
     #[Test]
     public function api_route_404s_are_sanitized_json(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/not-a-route')
             ->assertStatus(404)

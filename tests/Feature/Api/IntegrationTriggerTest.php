@@ -34,7 +34,7 @@ class IntegrationTriggerTest extends TestCase
         Queue::fake();
 
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['integrations:sync']);
 
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
@@ -59,7 +59,7 @@ class IntegrationTriggerTest extends TestCase
         Queue::fake();
 
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['integrations:sync']);
 
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
@@ -82,7 +82,7 @@ class IntegrationTriggerTest extends TestCase
 
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['integrations:sync']);
 
         $integration = Integration::factory()->create([
             'user_id' => $otherUser->id,

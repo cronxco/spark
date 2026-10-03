@@ -21,10 +21,23 @@ The Mobile API uses Laravel Sanctum personal access tokens with scoped abilities
 
 ### Token Abilities
 
-| Ability     | Required for                        |
-| ----------- | ----------------------------------- |
-| `ios:read`  | All GET endpoints                   |
-| `ios:write` | All POST / PATCH / DELETE endpoints |
+Each route names one action-scoped capability (decision D-API-3). The app's
+session token holds all of them (`SparkAbility::MOBILE_SESSION`):
+
+| Area                                                         | Read                 | Write                 |
+| ------------------------------------------------------------ | -------------------- | --------------------- |
+| Events, objects, blocks, search, tags, places, map, captures | `data:read`          | `data:write`          |
+| Briefing, metrics, widgets, check-ins, Up to Speed           | `insights:read`      | `insights:write`      |
+| Money accounts, net worth, spend widget                      | `finance:read`       | `finance:write`       |
+| Integrations                                                 | `integrations:read`  | `integrations:sync` (sync), `integrations:manage` (pause, OAuth start) |
+| Flint                                                        | `flint:read`         | `flint:write`         |
+| Notifications, devices, Live Activities, notification settings | `notifications:read` | `notifications:write` |
+| API tokens                                                   | `mobile:session`     | `tokens:revoke` (create needs `tokens:manage`) |
+
+`ping`, `me` and `logout` need only a valid token. The old `ios:read` /
+`ios:write` scopes open nothing: a token that holds only those gets **`401`**
+with `"reason": "session_upgrade_required"`, and the app's normal refresh
+issues a token with the capabilities above.
 
 Tokens are obtained via OAuth PKCE (see [Token Exchange](#token-exchange)). All authenticated requests must include:
 
@@ -270,7 +283,7 @@ Carries a strong `ETag` for the user resource. This is the value to echo as
 Ends the calling session server-side: revokes the paired OAuth refresh token
 and deletes the access token presenting the request.
 
-Requires only `ios:read`, so a read-only session can still sign itself out, and
+Needs no capability, so a read-only session can still sign itself out, and
 carries **no `If-Match`** — signing out must never be blocked by a
 precondition.
 
@@ -1716,7 +1729,7 @@ N+1 requests for two numbers.
 
 ## Write Endpoints
 
-All write endpoints require `ios:write` ability.
+All write endpoints require the area's write capability (see [Token Abilities](#token-abilities)).
 
 ### Summary
 
@@ -2121,7 +2134,7 @@ service as the legacy `POST /api/fetch/bookmarks` endpoint.
 
 Captures content rendered in Safari and supplied by the iOS Share extension.
 Uses the same capture service as `POST /api/v1/bookmarks/capture`, but accepts
-the iOS session's `ios:write` ability.
+the iOS session's `data:write` capability.
 
 **Request Body**:
 `{"url": "https://example.com/article", "title": "Article title", "html": "<!doctype html>..."}`.
@@ -2320,7 +2333,7 @@ authenticated user.
 
 Lists the user's personal access tokens for use outside the app (e.g.
 against the general REST API or MCP). Never returns plaintext secrets, and
-never includes the app's own `ios:read`/`ios:write` session tokens — this
+never includes the app's own session tokens (marked `mobile:session`) — this
 endpoint can't be used to inspect or revoke the mobile app's own session.
 **Mobile-only** — API-token administration is otherwise web-settings-only
 (see [README.md](README.md)); it is not exposed on `/api/v1` or MCP.
@@ -2346,7 +2359,7 @@ endpoint can't be used to inspect or revoke the mobile app's own session.
 Creates a personal access token and returns its one-time plaintext secret.
 
 > **Requires `tokens:manage`.** An iOS OAuth session is only ever issued
-> `ios:read`/`ios:write` (see `OAuthController::scopeToAbilities`), so this
+> the capabilities in `SparkAbility::MOBILE_SESSION`, which exclude `tokens:manage` (see `OAuthController::scopeToAbilities`), so this
 > endpoint is **not reachable from the app** and returns `403`. Token
 > administration is a web-settings journey. The route remains registered so a
 > non-mobile credential holding `tokens:manage` can use it.
@@ -2366,10 +2379,10 @@ and 20 distinct strings, each of which must appear in
 
 `bookmark:write`, `data:image`, `data:read`, `data:write`, `finance:read`,
 `finance:write`, `flint:read`, `flint:run`, `flint:write`, `insights:read`,
-`insights:write`, `integrations:read`, `integrations:sync`, `tokens:manage`
+`insights:write`, `integrations:manage`, `integrations:read`, `integrations:sync`, `tokens:manage`
 
 Authority attenuates: a token-authenticated caller may only request
-capabilities its own credential already holds. `ios:read`, `ios:write` and
+capabilities its own credential already holds. `mobile:session`, `tokens:revoke`, the retired `ios:read`/`ios:write` and
 `mcp:read` are never delegable — `mcp:read` remains accepted on existing
 tokens as a legacy alias, but new tokens must name the capability they need.
 
@@ -2402,7 +2415,7 @@ Revokes a personal access token.
 **Response `204`** — No content.
 
 **Response `404`** — Token not found, or it's one of the app's own
-`ios:read`/`ios:write` session tokens (not revocable through this endpoint).
+session tokens (not revocable through this endpoint).
 
 ---
 

@@ -87,7 +87,7 @@ class ApiTokenTest extends TestCase
     public function user_can_list_their_tokens()
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['tokens:manage']);
 
         // Create a token first
         $user->createToken('Test Token');
@@ -118,7 +118,7 @@ class ApiTokenTest extends TestCase
     public function user_can_revoke_token()
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['tokens:manage']);
 
         // Create a token
         $token = $user->createToken('Test Token');
@@ -140,7 +140,7 @@ class ApiTokenTest extends TestCase
     public function user_cannot_revoke_nonexistent_token()
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['tokens:manage']);
 
         $response = $this->deleteJson('/api/tokens/999');
 

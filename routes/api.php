@@ -52,20 +52,28 @@ use Illuminate\Validation\Rule;
 Route::middleware('sentry.api.logging')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         // Events API
-        Route::apiResource('events', EventApiController::class)->names([
-            'index' => 'api.events.index',
-            'show' => 'api.events.show',
-            'store' => 'api.events.store',
-            'update' => 'api.events.update',
-            'destroy' => 'api.events.destroy',
-        ]);
+        Route::apiResource('events', EventApiController::class)->only(['index', 'show'])
+            ->middleware('spark.ability:data:read')
+            ->names([
+                'index' => 'api.events.index',
+                'show' => 'api.events.show',
+            ]);
+        Route::apiResource('events', EventApiController::class)->only(['store', 'update', 'destroy'])
+            ->middleware('spark.ability:data:write')
+            ->names([
+                'store' => 'api.events.store',
+                'update' => 'api.events.update',
+                'destroy' => 'api.events.destroy',
+            ]);
 
         // Semantic Search API
-        Route::post('search/events', [SearchApiController::class, 'searchEvents'])->name('api.search.events');
-        Route::post('search/blocks', [SearchApiController::class, 'searchBlocks'])->name('api.search.blocks');
-        Route::post('search/objects', [SearchApiController::class, 'searchObjects'])->name('api.search.objects');
-        Route::post('search', [SearchApiController::class, 'searchAll'])->name('api.search.all');
-        Route::post('search/semantic', [SemanticSearchController::class, 'search'])->name('api.search.semantic');
+        Route::middleware('spark.ability:data:read')->group(function (): void {
+            Route::post('search/events', [SearchApiController::class, 'searchEvents'])->name('api.search.events');
+            Route::post('search/blocks', [SearchApiController::class, 'searchBlocks'])->name('api.search.blocks');
+            Route::post('search/objects', [SearchApiController::class, 'searchObjects'])->name('api.search.objects');
+            Route::post('search', [SearchApiController::class, 'searchAll'])->name('api.search.all');
+            Route::post('search/semantic', [SemanticSearchController::class, 'search'])->name('api.search.semantic');
+        });
 
         // Generate API token
         Route::post('tokens/create', function (Request $request) {
@@ -111,7 +119,7 @@ Route::middleware('sentry.api.logging')->group(function () {
                     ];
                 }),
             ]);
-        })->name('api.tokens.index');
+        })->middleware('spark.ability:tokens:manage')->name('api.tokens.index');
 
         // Revoke a token
         Route::delete('tokens/{token}', function (Request $request, $token) {
@@ -124,16 +132,18 @@ Route::middleware('sentry.api.logging')->group(function () {
             $personalAccessToken->delete();
 
             return response()->json(['message' => 'Token revoked successfully']);
-        })->name('api.tokens.destroy');
+        })->middleware('spark.ability:tokens:manage')->name('api.tokens.destroy');
 
         // Integrations API
-        Route::apiResource('integrations', IntegrationApiController::class)->only(['index', 'show'])->names([
-            'index' => 'api.integrations.index',
-            'show' => 'api.integrations.show',
-        ]);
-        Route::post('integrations/{integration}/configure', [IntegrationApiController::class, 'configure'])->name('api.integrations.configure');
-        Route::post('integrations/{integration}/trigger', [IntegrationApiController::class, 'trigger'])->name('api.integrations.trigger');
-        Route::delete('integrations/{integration}', [IntegrationApiController::class, 'destroy'])->name('api.integrations.destroy');
+        Route::apiResource('integrations', IntegrationApiController::class)->only(['index', 'show'])
+            ->middleware('spark.ability:integrations:read')
+            ->names([
+                'index' => 'api.integrations.index',
+                'show' => 'api.integrations.show',
+            ]);
+        Route::post('integrations/{integration}/configure', [IntegrationApiController::class, 'configure'])->middleware('spark.ability:integrations:manage')->name('api.integrations.configure');
+        Route::post('integrations/{integration}/trigger', [IntegrationApiController::class, 'trigger'])->middleware('spark.ability:integrations:sync')->name('api.integrations.trigger');
+        Route::delete('integrations/{integration}', [IntegrationApiController::class, 'destroy'])->middleware('spark.ability:integrations:manage')->name('api.integrations.destroy');
 
         // Fetch API
         Route::post('fetch/bookmarks', [FetchApiController::class, 'bookmarkUrl'])
@@ -141,14 +151,16 @@ Route::middleware('sentry.api.logging')->group(function () {
             ->name('api.fetch.bookmarks.store');
 
         // Assistant Context API
-        Route::get('assistant/context', [AssistantContextController::class, 'index'])->name('api.assistant.context');
+        Route::get('assistant/context', [AssistantContextController::class, 'index'])->middleware('spark.ability:flint:read')->name('api.assistant.context');
 
         // Flint Questions API
-        Route::post('flint/questions/{block}/answer', [FlintQuestionsController::class, 'answer'])->name('api.flint.questions.answer');
+        Route::post('flint/questions/{block}/answer', [FlintQuestionsController::class, 'answer'])->middleware('spark.ability:flint:write')->name('api.flint.questions.answer');
 
         // Task Executions API
-        Route::get('task-executions', [TaskExecutionController::class, 'index'])->name('api.task-executions.index');
-        Route::get('task-executions/{taskExecution}', [TaskExecutionController::class, 'show'])->name('api.task-executions.show');
+        Route::middleware('spark.ability:data:read')->group(function (): void {
+            Route::get('task-executions', [TaskExecutionController::class, 'index'])->name('api.task-executions.index');
+            Route::get('task-executions/{taskExecution}', [TaskExecutionController::class, 'show'])->name('api.task-executions.show');
+        });
 
         /*
          * `POST clear-card-cache` was removed: it ignored its own per-user key
@@ -255,6 +267,6 @@ Route::prefix('v1')
 // invisible in production until the iOS client is ready to ship. Default
 // ability is `ios:read`; write-side endpoints override to `ios:write`.
 Route::prefix('v1/mobile')
-    ->middleware(['ios.enabled', 'sentry.mobile.logging', 'auth:sanctum', 'ability:ios:read', 'etag'])
+    ->middleware(['ios.enabled', 'sentry.mobile.logging', 'auth:sanctum', 'mobile.session', 'etag'])
     ->name('api.v1.mobile.')
     ->group(base_path('routes/mobile.php'));

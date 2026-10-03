@@ -7,6 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Relationship;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -26,7 +27,7 @@ class FlintNotesControllerTest extends TestCase
         config(['ios.mobile_api_enabled' => true, 'app.enable_task_pipeline' => false]);
         $this->user = User::factory()->create();
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
     }
 
     #[Test]

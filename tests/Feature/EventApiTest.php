@@ -44,7 +44,7 @@ class EventApiTest extends TestCase
     public function authenticated_user_can_create_event_with_objects_and_blocks()
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['data:write']);
         $integration = Integration::factory()->create(['user_id' => $user->id]);
         $payload = $this->eventPayload($integration->id);
         $payload['blocks'][] = [
@@ -75,7 +75,7 @@ class EventApiTest extends TestCase
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['data:write']);
 
         $integration = Integration::factory()->create(['user_id' => $user->id]);
         $otherIntegration = Integration::factory()->create(['user_id' => $otherUser->id]);
@@ -108,7 +108,7 @@ class EventApiTest extends TestCase
     {
         $user = User::factory()->create();
         $otherUser = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['data:write']);
 
         $otherIntegration = Integration::factory()->create(['user_id' => $otherUser->id]);
         $foreignPayload = $this->eventPayload($otherIntegration->id);
@@ -137,7 +137,7 @@ class EventApiTest extends TestCase
     public function event_creation_requires_an_integration_id(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['data:write']);
 
         $payload = $this->eventPayload('00000000-0000-4000-8000-000000000000');
         unset($payload['event']['integration_id']);

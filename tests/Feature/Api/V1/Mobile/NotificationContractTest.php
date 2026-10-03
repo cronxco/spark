@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 use App\Models\User;
 use App\Notifications\NotificationCatalogue;
 use App\Notifications\SystemMaintenance;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -38,7 +39,7 @@ class NotificationContractTest extends TestCase
     public function marking_one_notification_read_no_longer_requires_if_match(): void
     {
         $id = $this->notifyUser();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/notifications/{$id}/read")
             ->assertSuccessful();
@@ -50,7 +51,7 @@ class NotificationContractTest extends TestCase
     public function marking_all_read_no_longer_requires_if_match(): void
     {
         $this->notifyUser();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/notifications/read-all')
             ->assertSuccessful();
@@ -62,7 +63,7 @@ class NotificationContractTest extends TestCase
     public function the_list_payload_exposes_the_version_delete_requires(): void
     {
         $this->notifyUser();
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $response = $this->getJson('/api/v1/mobile/notifications')->assertOk();
 
@@ -76,7 +77,7 @@ class NotificationContractTest extends TestCase
     public function delete_succeeds_with_the_version_from_the_list(): void
     {
         $id = $this->notifyUser();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $version = $this->getJson('/api/v1/mobile/notifications')->json('data.0.version');
 
@@ -91,7 +92,7 @@ class NotificationContractTest extends TestCase
     public function delete_still_refuses_a_missing_precondition(): void
     {
         $id = $this->notifyUser();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // Deletion is destructive, so it keeps its precondition.
         $this->deleteJson("/api/v1/mobile/notifications/{$id}")->assertStatus(428);
@@ -100,7 +101,7 @@ class NotificationContractTest extends TestCase
     #[Test]
     public function the_profile_endpoint_emits_the_strong_user_version(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $etag = $this->getJson('/api/v1/mobile/me')->assertOk()->headers->get('ETag');
 
@@ -115,7 +116,7 @@ class NotificationContractTest extends TestCase
     #[Test]
     public function updating_notification_preferences_succeeds_with_the_user_version(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $etag = $this->getJson('/api/v1/mobile/settings/notifications')->assertOk()->headers->get('ETag');
 
@@ -129,7 +130,7 @@ class NotificationContractTest extends TestCase
     #[Test]
     public function updating_notification_preferences_without_a_precondition_is_still_refused(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // Preferences are a genuine last-write-wins surface, so this one keeps
         // its precondition — the fix was making the ETag obtainable, not
@@ -215,7 +216,7 @@ class NotificationContractTest extends TestCase
     #[Test]
     public function the_preferences_endpoint_offers_the_real_types(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $categories = $this->getJson('/api/v1/mobile/settings/notifications')->assertOk()->json('categories');
 
@@ -227,7 +228,7 @@ class NotificationContractTest extends TestCase
     #[Test]
     public function the_retired_categories_are_no_longer_offered(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $categories = $this->getJson('/api/v1/mobile/settings/notifications')->assertOk()->json('categories');
 
@@ -239,7 +240,7 @@ class NotificationContractTest extends TestCase
     #[Test]
     public function a_toggle_saved_over_the_api_actually_gates_delivery(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $etag = $this->getJson('/api/v1/mobile/settings/notifications')->headers->get('ETag');
 

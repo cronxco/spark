@@ -56,7 +56,7 @@ class FlintQuestionsControllerTest extends TestCase
     #[Test]
     public function stores_answer_in_block_metadata(): void
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['flint:write']);
 
         $response = $this->postJson("/api/flint/questions/{$this->questionBlock->id}/answer", [
             'answer' => 'Yes',
@@ -73,7 +73,7 @@ class FlintQuestionsControllerTest extends TestCase
     #[Test]
     public function stores_answer_note_when_provided(): void
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['flint:write']);
 
         $response = $this->postJson("/api/flint/questions/{$this->questionBlock->id}/answer", [
             'answer' => 'No',
@@ -91,7 +91,7 @@ class FlintQuestionsControllerTest extends TestCase
     public function returns_403_for_block_owned_by_other_user(): void
     {
         $otherUser = User::factory()->create();
-        Sanctum::actingAs($otherUser);
+        Sanctum::actingAs($otherUser, ['flint:write']);
 
         $response = $this->postJson("/api/flint/questions/{$this->questionBlock->id}/answer", [
             'answer' => 'Yes',
@@ -103,7 +103,7 @@ class FlintQuestionsControllerTest extends TestCase
     #[Test]
     public function returns_422_for_wrong_block_type(): void
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['flint:write']);
 
         $event = Event::factory()->create([
             'integration_id' => $this->questionBlock->event->integration_id,
@@ -136,7 +136,7 @@ class FlintQuestionsControllerTest extends TestCase
     #[Test]
     public function validates_answer_is_required(): void
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['flint:write']);
 
         $response = $this->postJson("/api/flint/questions/{$this->questionBlock->id}/answer", []);
 
@@ -147,7 +147,7 @@ class FlintQuestionsControllerTest extends TestCase
     #[Test]
     public function validates_answer_max_length(): void
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['flint:write']);
 
         $response = $this->postJson("/api/flint/questions/{$this->questionBlock->id}/answer", [
             'answer' => str_repeat('x', 1001),
@@ -164,7 +164,7 @@ class FlintQuestionsControllerTest extends TestCase
         $metadata['question_status'] = 'skipped';
         $metadata['skipped_at'] = now()->toIso8601String();
         $this->questionBlock->update(['metadata' => $metadata]);
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['flint:write']);
 
         $this->postJson("/api/flint/questions/{$this->questionBlock->id}/answer", ['answer' => 'Yes'])
             ->assertUnprocessable()

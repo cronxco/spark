@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\EventObject;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -33,7 +34,7 @@ class PlacesControllerTest extends TestCase
     public function returns_place_shape(): void
     {
         $place = $this->createPlace();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/places/{$place->id}")
             ->assertOk()
@@ -51,7 +52,7 @@ class PlacesControllerTest extends TestCase
             'user_id' => $this->user->id,
             'concept' => 'merchant',
         ]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/places/{$object->id}")->assertStatus(404);
     }
@@ -59,7 +60,7 @@ class PlacesControllerTest extends TestCase
     #[Test]
     public function returns_404_for_malformed_id(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/places/not-a-uuid')->assertStatus(404);
     }
@@ -69,7 +70,7 @@ class PlacesControllerTest extends TestCase
     {
         $place = $this->createPlace();
         $other = User::factory()->create();
-        Sanctum::actingAs($other, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($other, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/places/{$place->id}")->assertStatus(404);
     }
