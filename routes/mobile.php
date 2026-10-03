@@ -149,6 +149,8 @@ Route::get('places/{id}', [PlacesController::class, 'show'])->name('places.show'
 
 Route::get('map/data', [MapController::class, 'data'])->name('map.data');
 
+Route::get('relationship-types', [EntityMutationsController::class, 'relationshipTypes'])
+    ->name('relationship-types.index');
 Route::get('{kind}/{id}/relationships', [EntityMutationsController::class, 'relationships'])
     ->whereIn('kind', ['events', 'objects', 'blocks'])
     ->name('relationships.index');

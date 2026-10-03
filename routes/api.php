@@ -193,6 +193,7 @@ Route::prefix('v1')
             Route::get('tags/{id}', [V1TagsController::class, 'show'])->whereNumber('id')->name('tags.show');
             Route::get('map/data', [V1MapController::class, 'data'])->name('map.data');
             Route::get('places/{id}', [V1PlacesController::class, 'show'])->name('places.show');
+            Route::get('relationship-types', [V1EntityMutationsController::class, 'relationshipTypes'])->name('relationship-types.index');
             Route::get('{kind}/{id}/relationships', [V1EntityMutationsController::class, 'relationships'])->whereIn('kind', ['events', 'objects', 'blocks'])->name('relationships.index');
         });
 
