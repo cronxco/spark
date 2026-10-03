@@ -77,18 +77,13 @@ class SpotlightCommandsTest extends TestCase
     #[Test]
     public function global_commands_only_dispatch_events_that_have_a_global_listener(): void
     {
-        $this->actingAs(User::factory()->create());
-
-        $results = (GlobalActionsQuery::make()->getCallback())('');
         $globallyHandled = ['trigger-all-integrations', 'run-flint-routine'];
+        $events = collect(GlobalActionsQuery::actions())->pluck('event')->filter();
 
-        $this->assertNotEmpty($results);
+        $this->assertNotEmpty($events);
 
-        foreach ($results as $result) {
-            $action = $result->attributes['setAction'] ?? null;
-            if (($action[0] ?? null) === 'dispatch_event') {
-                $this->assertContains($action[1]['name'], $globallyHandled);
-            }
+        foreach ($events as $event) {
+            $this->assertContains($event, $globallyHandled);
         }
     }
 
