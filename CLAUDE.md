@@ -694,7 +694,7 @@ public function it_does_the_thing(): void { ... }
 ```
 
 - A method marked only with `@test` and not prefixed `test` is **silently not discovered** — it does not fail, it simply never runs, and `artisan test` reports "No tests found" for that file. Treat "No tests found" as a bug in the test file, never as a passing result.
-- A large number of older test files in this repo still use `@test` only and are therefore not running. Converting them is a deliberate, separate piece of work — do not fold it into an unrelated change.
+- Every test in the repo now uses `#[Test]` (the old `@test` files were converted in October 2026). CI fails on a zero-test run and on any non-zero PHPUnit exit, so a crash or bootstrap error no longer reads as green.
 - Every time a test has been updated, run that singular test.
 - When the tests relating to your feature are passing, ask the user if they would like to also run the entire test suite to make sure everything is still passing.
 - Tests should test all of the happy paths, failure paths, and weird paths.

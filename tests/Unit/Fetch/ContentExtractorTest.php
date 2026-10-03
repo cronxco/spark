@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 class ContentExtractorTest extends TestCase
 {
-    /** @test */
+    #[Test]
     public function it_extracts_content_from_valid_html()
     {
         $html = '
@@ -37,7 +37,7 @@ class ContentExtractorTest extends TestCase
         $this->assertNotEmpty($result['data']['text_content']);
     }
 
-    /** @test */
+    #[Test]
     public function it_fails_on_missing_title()
     {
         $html = '
@@ -55,7 +55,7 @@ class ContentExtractorTest extends TestCase
         $this->assertStringContainsString('title', strtolower($result['reason']));
     }
 
-    /** @test */
+    #[Test]
     public function it_fails_on_insufficient_content()
     {
         $html = '
@@ -74,7 +74,7 @@ class ContentExtractorTest extends TestCase
         $this->assertStringContainsString('content', strtolower($result['reason']));
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_robot_check_in_title()
     {
         $html = '
@@ -93,7 +93,7 @@ class ContentExtractorTest extends TestCase
         $this->assertStringContainsString('robot', strtolower($result['reason']));
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_paywall()
     {
         $html = '
@@ -137,7 +137,7 @@ class ContentExtractorTest extends TestCase
         $this->assertStringContainsString('full article content', $browserCapture['data']['text_content']);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_consistent_content_hash()
     {
         $content1 = 'This is test content for hashing';
@@ -153,7 +153,7 @@ class ContentExtractorTest extends TestCase
         $this->assertEquals(64, strlen($hash1)); // SHA256 produces 64 char hex string
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_paywall_from_common_indicators()
     {
         $paywallIndicators = [
@@ -227,7 +227,7 @@ class ContentExtractorTest extends TestCase
         $this->assertFalse($detected, 'Ignored domains must never be flagged as paywalled');
     }
 
-    /** @test */
+    #[Test]
     public function it_extracts_author_information()
     {
         $html = '
@@ -252,7 +252,7 @@ class ContentExtractorTest extends TestCase
         $this->assertArrayHasKey('author', $result['data']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_malformed_html_gracefully()
     {
         $html = '<html><body><p>Unclosed paragraph and broken HTML structure';
@@ -264,7 +264,7 @@ class ContentExtractorTest extends TestCase
         $this->assertArrayHasKey('reason', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_allows_pages_with_recaptcha_library_but_substantial_content()
     {
         // Simulate NYTimes-like page: has reCAPTCHA library loaded (for comments)
@@ -305,7 +305,7 @@ class ContentExtractorTest extends TestCase
         $this->assertGreaterThan(500, strlen($result['data']['text_content']));
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_actual_recaptcha_challenge_page()
     {
         // This simulates an actual CAPTCHA challenge page with minimal content
