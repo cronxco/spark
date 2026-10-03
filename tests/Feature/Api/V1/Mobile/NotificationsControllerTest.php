@@ -133,7 +133,7 @@ class NotificationsControllerTest extends TestCase
             ->assertNoContent();
         $this->assertNull($notification->fresh()->read_at);
 
-        $this->postJson("/api/v1/mobile/notifications/{$notification->id}/archive", [], $this->ifMatch($notification))
+        $this->postJson("/api/v1/mobile/notifications/{$notification->id}/archive")
             ->assertNoContent();
 
         $this->assertNotNull($notification->fresh()->archived_at);
@@ -142,6 +142,26 @@ class NotificationsControllerTest extends TestCase
         $this->getJson('/api/v1/mobile/notifications/feed?scope=history')
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.state', 'archived');
+    }
+
+    #[Test]
+    public function archive_needs_no_precondition_and_is_scoped_to_the_owner(): void
+    {
+        $notification = $this->notification(['title' => 'Archive me'], Carbon::now());
+        $someoneElse = User::factory()->create();
+        Sanctum::actingAs($someoneElse, ['ios:read', 'ios:write']);
+
+        $this->postJson("/api/v1/mobile/notifications/{$notification->id}/archive")->assertNotFound();
+        $this->assertNull($notification->fresh()->archived_at);
+
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        // The iOS client archives without If-Match, as it does for read.
+        $this->postJson("/api/v1/mobile/notifications/{$notification->id}/archive")->assertNoContent();
+        $this->assertNotNull($notification->fresh()->archived_at);
+
+        // A second archive finds no active row.
+        $this->postJson("/api/v1/mobile/notifications/{$notification->id}/archive")->assertNotFound();
     }
 
     #[Test]

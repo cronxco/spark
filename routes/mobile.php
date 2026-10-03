@@ -189,6 +189,11 @@ Route::delete('devices/{id}', [DevicesController::class, 'destroy'])->middleware
  * per-notification version and there is no `GET /notifications/{id}`, so no
  * client could obtain the strong ETag the middleware demanded.
  *
+ * Archiving is the same: it is reversible from History, so it carries no
+ * precondition either. It briefly required one, which the iOS client (by
+ * design) never sends, so every native archive answered 428 and the row came
+ * back.
+ *
  * Deletion is destructive and keeps its precondition; CompactNotificationResource
  * now emits `version` so a client can satisfy it.
  */
@@ -205,7 +210,7 @@ Route::post('notifications/{id}/unread', [NotificationsController::class, 'markU
     ->name('notifications.unread');
 
 Route::post('notifications/{id}/archive', [NotificationsController::class, 'archive'])
-    ->middleware(['ability:ios:write', 'if-match:notification'])
+    ->middleware('ability:ios:write')
     ->name('notifications.archive');
 
 Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
