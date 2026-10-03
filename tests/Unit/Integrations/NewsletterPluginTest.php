@@ -6,6 +6,7 @@ use App\Integrations\Newsletter\NewsletterPlugin;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class NewsletterPluginTest extends TestCase
@@ -30,7 +31,7 @@ class NewsletterPluginTest extends TestCase
         $this->plugin = new NewsletterPlugin;
     }
 
-    /** @test */
+    #[Test]
     public function it_has_correct_metadata()
     {
         $this->assertEquals('Newsletter', $this->plugin->getDisplayName());
@@ -39,7 +40,7 @@ class NewsletterPluginTest extends TestCase
         $this->assertNotEmpty($this->plugin->getDescription());
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_newsletter_action_types()
     {
         $actionTypes = $this->plugin->getActionTypes();
@@ -52,7 +53,7 @@ class NewsletterPluginTest extends TestCase
         $this->assertTrue($newsletterAction['display_with_object']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_block_types()
     {
         $blockTypes = $this->plugin->getBlockTypes();
@@ -70,7 +71,7 @@ class NewsletterPluginTest extends TestCase
         $this->assertEquals('info', $tweetBlock['accent_color']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_object_types()
     {
         $objectTypes = $this->plugin->getObjectTypes();
@@ -88,7 +89,7 @@ class NewsletterPluginTest extends TestCase
         $this->assertTrue($user['hidden']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_instance_types()
     {
         $instanceTypes = $this->plugin->getInstanceTypes();
@@ -99,19 +100,19 @@ class NewsletterPluginTest extends TestCase
         $this->assertEquals('Newsletters', $newsletters['label']);
     }
 
-    /** @test */
+    #[Test]
     public function it_supports_webhook_service_type()
     {
         $this->assertEquals('webhook', $this->plugin->getServiceType());
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_correct_identifier()
     {
         $this->assertEquals('newsletter', $this->plugin->getIdentifier());
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_info_accent_color()
     {
         $this->assertEquals('info', $this->plugin->getAccentColor());

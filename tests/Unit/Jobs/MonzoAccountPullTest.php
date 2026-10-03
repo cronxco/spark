@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MonzoAccountPullTest extends TestCase
@@ -40,9 +41,7 @@ class MonzoAccountPullTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function fetch_accounts_success()
     {
         Queue::fake();
@@ -67,9 +66,7 @@ class MonzoAccountPullTest extends TestCase
         $this->assertEquals($mockResponse['accounts'], $result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function dispatch_processing_jobs()
     {
         Queue::fake();
@@ -91,9 +88,7 @@ class MonzoAccountPullTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_metadata()
     {
         $job = $this->createTestableJob();

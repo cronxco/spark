@@ -3,11 +3,12 @@
 namespace Tests\Unit\Fetch;
 
 use App\Integrations\Fetch\CookieParser;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 class CookieParserTest extends TestCase
 {
-    /** @test */
+    #[Test]
     public function it_parses_standard_format_with_expiry()
     {
         $json = json_encode([
@@ -24,7 +25,7 @@ class CookieParserTest extends TestCase
         $this->assertEquals('2025-01-01T00:00:00+00:00', $result['expires_at']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_simple_key_value_format()
     {
         $json = json_encode([
@@ -41,7 +42,7 @@ class CookieParserTest extends TestCase
         $this->assertNull($result['expires_at']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_har_format()
     {
         $json = json_encode([
@@ -57,7 +58,7 @@ class CookieParserTest extends TestCase
         $this->assertEquals('2025-01-01T00:00:00+00:00', $result['expires_at']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_invalid_json()
     {
         $result = CookieParser::parse('not valid json');
@@ -66,7 +67,7 @@ class CookieParserTest extends TestCase
         $this->assertStringContainsString('Invalid JSON', $result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_empty_json()
     {
         $result = CookieParser::parse('{}');
@@ -75,7 +76,7 @@ class CookieParserTest extends TestCase
         $this->assertStringContainsString('No cookies found', $result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_unsupported_format()
     {
         $json = json_encode(['invalid' => 'format']);
@@ -86,7 +87,7 @@ class CookieParserTest extends TestCase
         $this->assertStringContainsString('Unsupported cookie format', $result['error']);
     }
 
-    /** @test */
+    #[Test]
     public function it_formats_for_storage_correctly()
     {
         $parsed = [
@@ -109,7 +110,7 @@ class CookieParserTest extends TestCase
         $this->assertArrayHasKey('User-Agent', $formatted['headers']);
     }
 
-    /** @test */
+    #[Test]
     public function it_calculates_expiry_status_correctly()
     {
         $now = now();
@@ -134,7 +135,7 @@ class CookieParserTest extends TestCase
         $this->assertEquals('gray', CookieParser::getExpiryStatus(null));
     }
 
-    /** @test */
+    #[Test]
     public function it_extracts_earliest_expiry_from_multiple_cookies()
     {
         $json = json_encode([
@@ -150,7 +151,7 @@ class CookieParserTest extends TestCase
         $this->assertEquals('2024-01-01T00:00:00+00:00', $result['expires_at']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_mixed_expiry_formats()
     {
         $json = json_encode([

@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GoodreadsProgressDataTest extends TestCase
@@ -44,9 +45,7 @@ class GoodreadsProgressDataTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function processes_progress_update()
     {
         // Create a book first
@@ -91,9 +90,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertEquals(23, $book->metadata['current_progress']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function skips_progress_update_if_less_than_5_percent_within_6_hours()
     {
         // Create a book
@@ -158,9 +155,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertEquals(0, $eventCount);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function allows_progress_update_if_5_percent_or_more_increase()
     {
         // Create a book
@@ -225,9 +220,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertEquals(28, $event->value);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function allows_progress_update_if_more_than_6_hours_since_last()
     {
         // Create a book
@@ -291,9 +284,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertNotNull($event);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function skips_progress_update_if_book_not_found()
     {
         $rawData = [
@@ -319,9 +310,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertEquals(0, $eventCount);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function finds_book_by_full_title_in_metadata()
     {
         // Create a book with series info
@@ -363,9 +352,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertEquals($book->id, $event->target->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function stores_reading_started_at_from_start_reading_item()
     {
         // Create a book first
@@ -402,9 +389,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertStringContainsString('2025-11-29', $book->metadata['reading_started_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function does_not_overwrite_existing_reading_started_at()
     {
         // Create a book with existing reading_started_at
@@ -441,9 +426,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertEquals($originalDate, $book->metadata['reading_started_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function corrects_existing_is_reading_event_time()
     {
         // Create a book
@@ -505,9 +488,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertStringContainsString('2025-11-29', $event->time->toDateTimeString());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function does_not_correct_event_if_times_already_match()
     {
         // Create a book with correct start date
@@ -574,9 +555,7 @@ class GoodreadsProgressDataTest extends TestCase
         $this->assertEquals($originalUpdatedAt->timestamp, $event->updated_at->timestamp);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function existing_progress_update_logic_still_works_with_type_field()
     {
         // Create a book

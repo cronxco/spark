@@ -3,13 +3,14 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ApiWebhookLoggingSimpleTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function it_creates_per_instance_log_files_automatically()
     {
         // Act - Use the logging helper function directly
@@ -36,7 +37,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         $this->assertStringContainsString('[REDACTED]', $logContent); // Sensitive data redacted
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_per_service_log_files_automatically()
     {
         // Act - Use per-service logging
@@ -61,7 +62,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         $this->assertStringContainsString('test_auto_service', $logContent);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_empty_integration_ids_gracefully()
     {
         // Act - Empty integration ID should fall back to per-service
@@ -81,7 +82,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         $this->assertTrue(file_exists($logPath));
     }
 
-    /** @test */
+    #[Test]
     public function it_sanitizes_sensitive_data_automatically()
     {
         // Act - Include various sensitive data
@@ -120,7 +121,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         $this->assertStringContainsString('"normal_field":"safe_value"', $logContent);
     }
 
-    /** @test */
+    #[Test]
     public function it_logs_different_message_types_correctly()
     {
         // Act - Test all three logging functions
@@ -144,7 +145,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         $this->assertStringContainsString('Webhook Payload', $logContent);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_helper_functions_exist()
     {
         // Test that all required helper functions exist
@@ -156,7 +157,7 @@ class ApiWebhookLoggingSimpleTest extends TestCase
         $this->assertTrue(function_exists('get_integration_log_channel'));
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_multiple_unique_log_files()
     {
         // Act - Create logs for multiple different integrations

@@ -4,15 +4,14 @@ namespace Tests\Feature\Integrations\BlueSky;
 
 use App\Integrations\BlueSky\BlueSkyPlugin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BlueSkyPluginTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_has_correct_metadata(): void
     {
         $this->assertEquals('bluesky', BlueSkyPlugin::getIdentifier());
@@ -25,9 +24,7 @@ class BlueSkyPluginTest extends TestCase
         $this->assertStringContainsString('bookmarks', $description);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_has_configuration_schema(): void
     {
         $schema = BlueSkyPlugin::getConfigurationSchema();
@@ -39,9 +36,7 @@ class BlueSkyPluginTest extends TestCase
         $this->assertArrayHasKey('track_reposts', $schema);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_has_action_types(): void
     {
         $actionTypes = BlueSkyPlugin::getActionTypes();
@@ -55,9 +50,7 @@ class BlueSkyPluginTest extends TestCase
         $this->assertEquals('Reposted', $actionTypes['reposted']['display_name']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_has_block_types(): void
     {
         $blockTypes = BlueSkyPlugin::getBlockTypes();
@@ -70,9 +63,7 @@ class BlueSkyPluginTest extends TestCase
         $this->assertArrayHasKey('link_preview', $blockTypes);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_has_object_types(): void
     {
         $objectTypes = BlueSkyPlugin::getObjectTypes();
@@ -81,17 +72,13 @@ class BlueSkyPluginTest extends TestCase
         $this->assertArrayHasKey('bluesky_post', $objectTypes);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_supports_migration(): void
     {
         $this->assertTrue(BlueSkyPlugin::supportsMigration());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_has_instance_types(): void
     {
         $instanceTypes = BlueSkyPlugin::getInstanceTypes();

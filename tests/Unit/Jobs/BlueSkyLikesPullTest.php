@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BlueSkyLikesPullTest extends TestCase
@@ -42,9 +43,7 @@ class BlueSkyLikesPullTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation(): void
     {
         $job = new BlueSkyLikesPull($this->integration);
@@ -54,9 +53,7 @@ class BlueSkyLikesPullTest extends TestCase
         $this->assertEquals(3, $job->tries);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unique_id_generation(): void
     {
         $job = new BlueSkyLikesPull($this->integration);
@@ -66,9 +63,7 @@ class BlueSkyLikesPullTest extends TestCase
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unique_id_differs_from_bookmarks(): void
     {
         $likesJob = new BlueSkyLikesPull($this->integration);
@@ -77,9 +72,7 @@ class BlueSkyLikesPullTest extends TestCase
         $this->assertNotEquals($likesJob->uniqueId(), $bookmarksJob->uniqueId());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_integration_correctly(): void
     {
         $job = new BlueSkyLikesPull($this->integration);
