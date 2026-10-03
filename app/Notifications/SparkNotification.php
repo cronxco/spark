@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\User;
 use App\Notifications\Channels\ApnsChannel;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -65,10 +66,11 @@ abstract class SparkNotification extends Notification implements ShouldQueue
             return array_merge($channels, $this->pushChannelsFor($notifiable));
         }
 
-        if ($notifiable->hasEmailNotificationsEnabled($this->getNotificationType())) {
-            if (! $this->shouldDelayEmail($notifiable)) {
-                $channels[] = 'mail';
-            }
+        // A daily-digest user's email goes out in SendNotificationDigests;
+        // a work-hours user's is queued with a delay (see withDelay()).
+        if ($notifiable->hasEmailNotificationsEnabled($this->getNotificationType())
+            && $notifiable->getDelayedSendingMode() !== 'daily_digest') {
+            $channels[] = 'mail';
         }
 
         if ($notifiable->hasPushNotificationsEnabledForType($this->getNotificationType())) {
@@ -205,6 +207,22 @@ abstract class SparkNotification extends Notification implements ShouldQueue
         ];
     }
 
+    /**
+     * Per-channel queue delay.
+     *
+     * Outside a work-hours user's window, non-priority email waits for the
+     * window to open. It used to be dropped from the channel list instead, so
+     * "Delay non-urgent notifications until your work hours" sent nothing.
+     */
+    public function withDelay(User $notifiable, string $channel): ?Carbon
+    {
+        if ($channel !== 'mail' || $this->isPriority()) {
+            return null;
+        }
+
+        return $this->nextWorkHoursStart($notifiable);
+    }
+
     protected function sanitiseTechnicalDetail(string $detail): string
     {
         $redacted = redact_sensitive_urls(strip_tags($detail));
@@ -240,27 +258,23 @@ abstract class SparkNotification extends Notification implements ShouldQueue
     }
 
     /**
-     * Determine if email should be delayed based on user preferences
+     * When the user's next work-hours window opens, or null if email should
+     * go now (immediate mode, work hours disabled, or already in the window).
      */
-    protected function shouldDelayEmail(User $notifiable): bool
+    protected function nextWorkHoursStart(User $notifiable): ?Carbon
     {
-        $mode = $notifiable->getDelayedSendingMode();
-
-        // Always send immediately
-        if ($mode === 'immediate') {
-            return false;
+        if ($notifiable->getDelayedSendingMode() !== 'work_hours' || $notifiable->isInWorkHours()) {
+            return null;
         }
 
-        // Send in daily digest
-        if ($mode === 'daily_digest') {
-            return true;
+        $workHours = $notifiable->getNotificationPreferences()['work_hours'];
+        $now = now()->timezone($workHours['timezone'] ?? 'UTC');
+        $start = $now->copy()->setTimeFromTimeString($workHours['start'] ?? '09:00');
+
+        if ($start->lte($now)) {
+            $start->addDay();
         }
 
-        // Send only during work hours
-        if ($mode === 'work_hours') {
-            return ! $notifiable->isInWorkHours();
-        }
-
-        return false;
+        return $start->utc();
     }
 }
