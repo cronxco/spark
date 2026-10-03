@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -51,7 +52,7 @@ class SearchControllerTest extends TestCase
     #[Test]
     public function rejects_invalid_mode(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/search?q=hello&mode=bogus')
             ->assertStatus(422)
@@ -80,7 +81,7 @@ class SearchControllerTest extends TestCase
             'target_id' => $target->id,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/search?q=Tesco&mode=default')->assertOk();
 
@@ -91,7 +92,7 @@ class SearchControllerTest extends TestCase
     #[Test]
     public function integration_mode_returns_matching_integrations(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/search?q=monzo&mode=integration')
             ->assertOk()
@@ -110,7 +111,7 @@ class SearchControllerTest extends TestCase
             'value_unit' => 'percent',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/search?q=sleep&mode=metric')
             ->assertOk()
@@ -140,7 +141,7 @@ class SearchControllerTest extends TestCase
 
         $event->attachTag('groceries');
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/search?q=groceries&mode=tag')
             ->assertOk()

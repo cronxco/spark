@@ -6,6 +6,7 @@ use App\Integrations\Financial\FinancialPlugin;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -32,7 +33,7 @@ class NetWorthControllerTest extends TestCase
     public function sums_current_balances_and_compares_against_the_window(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_READ);
 
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'manual_account']);
         $integration = Integration::factory()->create([
@@ -79,7 +80,7 @@ class NetWorthControllerTest extends TestCase
     public function excludes_accounts_without_history_spanning_the_window_from_both_sides(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_READ);
 
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'manual_account']);
         $integration = Integration::factory()->create([
@@ -115,7 +116,7 @@ class NetWorthControllerTest extends TestCase
     public function excludes_accounts_in_a_different_currency(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_READ);
 
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'manual_account']);
         $integration = Integration::factory()->create([
@@ -146,7 +147,7 @@ class NetWorthControllerTest extends TestCase
     #[Test]
     public function rejects_an_unknown_compare_window(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/money/net-worth?compare=2days')->assertStatus(422);
     }

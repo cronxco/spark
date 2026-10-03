@@ -267,6 +267,6 @@ Route::prefix('v1')
 // invisible in production until the iOS client is ready to ship. Default
 // ability is `ios:read`; write-side endpoints override to `ios:write`.
 Route::prefix('v1/mobile')
-    ->middleware(['ios.enabled', 'sentry.mobile.logging', 'auth:sanctum', 'ability:ios:read', 'etag'])
+    ->middleware(['ios.enabled', 'sentry.mobile.logging', 'auth:sanctum', 'mobile.session', 'etag'])
     ->name('api.v1.mobile.')
     ->group(base_path('routes/mobile.php'));

@@ -7,6 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -70,7 +71,7 @@ class ObjectsControllerTest extends TestCase
             'target_id' => $object->id,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/objects/{$object->id}")
             ->assertOk()
@@ -83,7 +84,7 @@ class ObjectsControllerTest extends TestCase
     public function can_exclude_recent_events(): void
     {
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/objects/{$object->id}?include_events=0")
             ->assertOk()
@@ -95,7 +96,7 @@ class ObjectsControllerTest extends TestCase
     {
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
         $otherUser = User::factory()->create();
-        Sanctum::actingAs($otherUser, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($otherUser, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/objects/{$object->id}")->assertStatus(404);
     }
@@ -103,7 +104,7 @@ class ObjectsControllerTest extends TestCase
     #[Test]
     public function returns_404_for_malformed_id(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
         $this->getJson('/api/v1/mobile/objects/not-a-uuid')->assertStatus(404);
     }
 
@@ -129,7 +130,7 @@ class ObjectsControllerTest extends TestCase
 
         $event->forceFill(['updated_at' => Carbon::parse('2024-01-02 12:00:00')])->saveQuietly();
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson("/api/v1/mobile/objects/{$object->id}");
 
@@ -161,7 +162,7 @@ class ObjectsControllerTest extends TestCase
             ]);
         }
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // Over the max of 25 — should be clamped to 25.
         $response = $this->getJson("/api/v1/mobile/objects/{$object->id}?event_limit=100");
@@ -178,7 +179,7 @@ class ObjectsControllerTest extends TestCase
     public function etag_returns_304_on_match(): void
     {
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $first = $this->getJson("/api/v1/mobile/objects/{$object->id}")->assertOk();
         $etag = $first->headers->get('ETag');

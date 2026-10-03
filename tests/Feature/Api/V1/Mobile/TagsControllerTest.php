@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
@@ -53,7 +54,7 @@ class TagsControllerTest extends TestCase
         $otherObject = EventObject::factory()->create(['user_id' => $other->id]);
         $otherObject->attachTags([$hidden]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/tags')
             ->assertOk()
@@ -72,7 +73,7 @@ class TagsControllerTest extends TestCase
         $tagged->attachTags([$tag]);
         $this->createEvent('Coffee appears in text but is not tagged');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson("/api/v1/mobile/tags/{$tag->id}")
             ->assertOk()
@@ -94,7 +95,7 @@ class TagsControllerTest extends TestCase
             'taggable_type' => Block::class,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/tags')
             ->assertOk()
@@ -115,7 +116,7 @@ class TagsControllerTest extends TestCase
         $event = $this->createEvent('Tagged');
         $event->attachTags([$exact, $prefix]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/tags/suggest?q=coffee')
             ->assertOk()
@@ -126,7 +127,7 @@ class TagsControllerTest extends TestCase
     public function write_endpoints_create_attach_remove_and_log_tags(): void
     {
         $event = $this->createEvent('Tagged');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $created = $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'name' => 'new tag',
@@ -163,7 +164,7 @@ class TagsControllerTest extends TestCase
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
         $tag = Tag::findOrCreate('person', 'spark');
         $this->createEvent('Tagged')->attachTags([$tag]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/objects/{$object->id}/tags", [
             'tag_id' => (string) $tag->id,
@@ -183,7 +184,7 @@ class TagsControllerTest extends TestCase
         $otherObject = EventObject::factory()->create(['user_id' => User::factory()->create()->id]);
         $otherObject->attachTags([$hidden]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'tag_id' => $hidden->id,
@@ -194,7 +195,7 @@ class TagsControllerTest extends TestCase
     public function writes_require_the_write_ability(): void
     {
         $event = $this->createEvent('Tagged');
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'name' => 'nope',
@@ -216,7 +217,7 @@ class TagsControllerTest extends TestCase
         ]);
         $event = Event::factory()->create(['integration_id' => $integration->id]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'name' => 'nope',

@@ -43,8 +43,8 @@ involved — it is this one middleware everywhere. Tokens carrying only the lega
 ability still satisfy `data:read`, `insights:read`, `integrations:read`, and
 `flint:read` (never a `:write` ability, and never `finance:read`).
 
-`/api/v1` does **not** require the `ios.enabled` feature flag or
-`ios:read`/`ios:write` abilities — those are mobile-only, applied separately
+`/api/v1` does **not** require the `ios.enabled` feature flag or the iOS
+session's `mobile:session` marker — those are mobile-only, applied separately
 to `/api/v1/mobile` (see [mobile_API.md](mobile_API.md)).
 
 ---

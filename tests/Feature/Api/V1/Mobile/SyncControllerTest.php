@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -35,7 +36,7 @@ class SyncControllerTest extends TestCase
     #[Test]
     public function delta_returns_empty_arrays_when_nothing_changed(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $cursor = now()->addMinute()->toIso8601String();
 
@@ -49,7 +50,7 @@ class SyncControllerTest extends TestCase
     #[Test]
     public function delta_returns_created_events_after_cursor(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $cursor = now()->subMinute();
         $event = Event::factory()->create([
@@ -67,7 +68,7 @@ class SyncControllerTest extends TestCase
     #[Test]
     public function delta_reports_deleted_events_with_their_ids(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $event = Event::factory()->create([
             'integration_id' => $this->integration->id,

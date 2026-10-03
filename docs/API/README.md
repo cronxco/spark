@@ -37,8 +37,8 @@ issues `["*"]`: a wildcard satisfies every `tokenCan()` check in the
 application, so it is an escape from the capability system rather than a point
 within it. Every token names its capabilities explicitly, drawn from the list
 above, and a token-authenticated caller may only request capabilities its own
-credential already holds. `ios:read` and `ios:write` are session scopes and are
-never delegable.
+credential already holds. `mobile:session` and `tokens:revoke` belong to the iOS session and are never
+delegable; the retired `ios:read` and `ios:write` scopes open nothing.
 
 Public API and MCP calls require a Sanctum bearer token; cookie sessions are
 not capability credentials (`SparkAbility::allows()` only grants access to a
@@ -86,12 +86,12 @@ and manual finance account/balance management, including archival.
 
 | Feature                                                          | General REST               | Mobile adapter                | MCP                           | Boundary                                                      |
 | ---------------------------------------------------------------- | -------------------------- | ----------------------------- | ----------------------------- | ------------------------------------------------------------- |
-| User data, insights, integrations, Flint and finance             | Yes, granular capabilities | Yes, `ios:read` / `ios:write` | Yes, granular capabilities    | Shared services where available                               |
+| User data, insights, integrations, Flint and finance             | Yes, granular capabilities | Yes, same capabilities       | Yes, granular capabilities    | Shared services where available                               |
 | Entity edits, relationships and locations                        | Yes where listed           | Yes                           | Entity/relationship MCP tools | Owned resources only                                          |
 | Device/APNs, HealthKit ingestion, Live Activities, OAuth handoff | No                         | Yes                           | No                            | iOS lifecycle transport only                                  |
 | API-token administration                                         | No                         | List/revoke only              | No                            | Creation requires `tokens:manage`, which no iOS session holds |
-| URL-only bookmark creation                                       | Yes, `data:write`          | Yes, `ios:write`              | Yes, `bookmark:write`         | Shared dedupe and fetch pipeline                              |
-| Supplied webpage-content capture                                 | Yes, `bookmark:write`      | Yes, `ios:write`              | Yes, `bookmark:write`         | Caller supplies HTML; no site cookies leave the caller        |
+| URL-only bookmark creation                                       | Yes, `data:write`          | Yes, `data:write`             | Yes, `bookmark:write`         | Shared dedupe and fetch pipeline                              |
+| Supplied webpage-content capture                                 | Yes, `bookmark:write`      | Yes, `data:write`             | Yes, `bookmark:write`         | Caller supplies HTML; no site cookies leave the caller        |
 | Browser HTML fetch with saved cookies                            | No                         | No                            | Yes, `web:fetch`              | MCP-only                                                      |
 | Admin and task-pipeline operations                               | No                         | No                            | No                            | Internal/web administration                                   |
 
@@ -146,8 +146,8 @@ available through REST or mobile because it can use saved browser cookies.
 
 ### Mobile API parity
 
-The `/api/v1/mobile` adapter retains `ios:read` and `ios:write` scopes for
-iOS-client compatibility. It includes the shared event/object/block edits,
+The `/api/v1/mobile` adapter checks the same action-scoped capabilities as
+the REST API (decision D-API-3; see `docs/API/mobile_API.md`). It includes the shared event/object/block edits,
 relationship management, Flint digest creation, integration sync by instance
 or service, and metric baseline discovery, alongside its existing user profile,
 feed, widgets, notifications, check-ins, finance, map, delta-sync, and
