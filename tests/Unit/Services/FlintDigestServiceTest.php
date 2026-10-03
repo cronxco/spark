@@ -338,73 +338,20 @@ class FlintDigestServiceTest extends TestCase
         $this->assertFalse($roundup['deduplicated']);
     }
 
+    /** Question length and shape are editorial guidance for the skill, not a Spark gate. */
     #[Test]
-    public function keeps_a_question_of_exactly_thirty_words(): void
+    public function keeps_a_long_question_that_asks_two_things(): void
     {
+        $text = 'Was the late finish on Thursday the planned deadline push you mentioned last week, or did something new land, and is it likely to repeat this week?';
+
         $result = $this->service->create($this->user, [
             'title' => 'Morning Digest',
             'period' => 'morning',
-            'blocks' => [$this->question($this->words(29) . ' ok?')],
+            'blocks' => [['block_type' => 'flint_user_question', 'title' => 'Question', 'question' => $text]],
         ]);
 
         $this->assertSame(1, $result['block_count']);
-        $this->assertSame([], $result['questions_dropped']);
-    }
-
-    #[Test]
-    public function drops_a_question_over_thirty_words_and_keeps_the_rest_of_the_digest(): void
-    {
-        $result = $this->service->create($this->user, [
-            'title' => 'Morning Digest',
-            'period' => 'morning',
-            'blocks' => [
-                ['block_type' => 'flint_insight', 'title' => 'An insight', 'content' => 'Noted.'],
-                $this->question($this->words(30) . ' ok?'),
-            ],
-        ]);
-
-        $event = Event::findOrFail($result['event_id']);
-
-        $this->assertSame(1, $result['block_count']);
-        $this->assertSame([['index' => 1, 'reasons' => ['over_word_limit']]], $result['questions_dropped']);
-        $this->assertSame(0, $event->blocks()->where('block_type', 'flint_user_question')->count());
-        $this->assertStringNotContainsString('word1', json_encode($event->event_metadata));
-    }
-
-    #[Test]
-    public function drops_a_question_that_asks_two_things(): void
-    {
-        $result = $this->service->create($this->user, [
-            'title' => 'Morning Digest',
-            'period' => 'morning',
-            'blocks' => [$this->question('Did the run feel hard? And was it planned?')],
-        ]);
-
-        $this->assertSame(0, $result['block_count']);
-        $this->assertSame(['multiple_asks'], $result['questions_dropped'][0]['reasons']);
-    }
-
-    /**
-     * A digest routine must normally explain a questionless digest. When the
-     * only question was dropped by the gate the gate is the explanation, and
-     * failing the whole digest over it would lose everything else.
-     */
-    #[Test]
-    public function a_routine_digest_whose_question_was_dropped_still_saves(): void
-    {
-        $result = $this->service->create($this->user, [
-            'title' => 'Morning Digest',
-            'period' => 'morning',
-            'run_token' => $this->runTokenFor('digest', 'morning'),
-            'blocks' => [
-                ['block_type' => 'flint_day_context', 'title' => 'Today', 'day_context' => []],
-                $this->question($this->words(40) . '?'),
-                ['block_type' => 'flint_editorial_note', 'title' => 'Run notes', 'content' => 'Ran fine.'],
-            ],
-        ]);
-
-        $this->assertSame(2, $result['block_count']);
-        $this->assertCount(1, $result['questions_dropped']);
+        $this->assertSame($text, Block::findOrFail($result['block_ids'][0])->metadata['question']);
     }
 
     /**
@@ -430,16 +377,6 @@ class FlintDigestServiceTest extends TestCase
             $this->assertSame('2026-06-14', $result['date']);
             $this->assertSame('evening', $result['period']);
         });
-    }
-
-    private function question(string $text): array
-    {
-        return ['block_type' => 'flint_user_question', 'title' => 'Question', 'question' => $text];
-    }
-
-    private function words(int $count): string
-    {
-        return implode(' ', array_map(fn (int $i) => "word{$i}", range(1, $count)));
     }
 
     private function runTokenFor(string $routine, string $period): string

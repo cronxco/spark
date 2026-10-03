@@ -23,9 +23,6 @@ use Illuminate\Validation\ValidationException;
 /** Creates the same Flint digest payload for REST and MCP callers. */
 class FlintDigestService
 {
-    /** The most words a Flint question may use (ratified decision D14). */
-    public const QUESTION_WORD_LIMIT = 30;
-
     /** @return array<string, mixed> */
     public function create(User $user, array $input): array
     {
@@ -106,9 +103,6 @@ class FlintDigestService
         $run = isset($data['run_token'])
             ? app(FlintRunToken::class)->verify($data['run_token'], $user, $date->toDateString(), $period)
             : null;
-        if (isset($data['blocks'])) {
-            [$data['blocks'], $data['question_gate']] = $this->applyQuestionGate($data['blocks']);
-        }
         $this->validateRoutineContract($data, $run);
         // Without a run token there is no run to key on, and a fresh uuid made
         // every retry write another digest. The natural key is what a person
@@ -246,7 +240,6 @@ class FlintDigestService
             'local_date' => $date->toDateString(),
             'note_ids_used' => $data['note_ids_used'] ?? null,
             'question_omission' => $data['question_omission'] ?? null,
-            'question_gate' => $data['question_gate'] ?? null,
         ], fn (mixed $value) => $value !== null);
 
         $event = Event::create([
@@ -325,7 +318,6 @@ class FlintDigestService
             'block_count' => $event->blocks->count(),
             'block_ids' => $event->blocks->pluck('id')->values()->all(),
             'deduplicated' => $deduplicated,
-            'questions_dropped' => data_get($event->event_metadata, 'question_gate.dropped', []),
         ];
     }
 
@@ -339,46 +331,6 @@ class FlintDigestService
     }
 
     /** @param array<string, mixed> $data @param array<string, mixed>|null $run */
-    /**
-     * The editorial contract for a Flint question: one ask, at most
-     * QUESTION_WORD_LIMIT words. A question that breaks it is dropped rather
-     * than failing the whole digest, and the drop is recorded by position and
-     * reason only, never with the question's prose.
-     *
-     * @param  array<int, array<string, mixed>>  $blocks
-     * @return array{0: array<int, array<string, mixed>>, 1: array{dropped: array<int, array{index: int, reasons: array<int, string>}>}|null}
-     */
-    private function applyQuestionGate(array $blocks): array
-    {
-        $kept = [];
-        $dropped = [];
-
-        foreach (array_values($blocks) as $index => $block) {
-            if ($block['block_type'] !== 'flint_user_question') {
-                $kept[] = $block;
-
-                continue;
-            }
-
-            $text = trim((string) ($block['question'] ?? $block['title']));
-            $reasons = [];
-            if (count(preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY)) > self::QUESTION_WORD_LIMIT) {
-                $reasons[] = 'over_word_limit';
-            }
-            if (substr_count($text, '?') > 1) {
-                $reasons[] = 'multiple_asks';
-            }
-
-            if ($reasons === []) {
-                $kept[] = $block;
-            } else {
-                $dropped[] = ['index' => $index, 'reasons' => $reasons];
-            }
-        }
-
-        return [$kept, $dropped === [] ? null : ['dropped' => $dropped]];
-    }
-
     private function validateRoutineContract(array $data, ?array $run): void
     {
         if ($run === null) {
@@ -403,8 +355,7 @@ class FlintDigestService
             }
 
             $questions = $types->filter(fn (string $type) => $type === 'flint_user_question')->count();
-            $gated = ! empty($data['question_gate']);
-            if ($questions === 0 && ! $gated && ! isset($data['question_omission'])) {
+            if ($questions === 0 && ! isset($data['question_omission'])) {
                 throw ValidationException::withMessages([
                     'question_omission' => 'A questionless digest must explain the omission and list at least three rejected candidates.',
                 ]);
