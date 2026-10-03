@@ -8,6 +8,7 @@ use App\Jobs\OAuth\ManualLog\VivinoEnrichmentPull;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -21,6 +22,12 @@ use InvalidArgumentException;
  */
 class ManualLogPlugin extends ManualPlugin
 {
+    /**
+     * Things shared into Spark (decision C-5). Free text lands on the user's
+     * Inbox object for later sorting; an image gets an object of its own.
+     */
+    public const CAPTURE_ACTIONS = ['captured_text', 'captured_image'];
+
     /**
      * Per-action target object shape and event domain. Keys must match
      * getActionTypes(). Not part of the IntegrationPlugin contract - this is
@@ -77,6 +84,50 @@ class ManualLogPlugin extends ManualPlugin
         return 'media';
     }
 
+    /**
+     * The activities a person picks from on the Manual Log page. Captures are
+     * made by Share, not logged by hand, so they are left out.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function loggableActionTypes(): array
+    {
+        return array_intersect_key(self::getActionTypes(), self::ACTIVITY_TARGETS);
+    }
+
+    /**
+     * The one shared Manual Log integration for a user.
+     */
+    public static function resolveIntegration(int|string $userId): Integration
+    {
+        $integrationGroup = IntegrationGroup::firstOrCreate(
+            [
+                'user_id' => $userId,
+                'service' => 'manual_log',
+            ],
+            [
+                'account_id' => null,
+                'access_token' => null,
+                'refresh_token' => null,
+                'expiry' => null,
+                'refresh_expiry' => null,
+            ]
+        );
+
+        return Integration::firstOrCreate(
+            [
+                'user_id' => $userId,
+                'integration_group_id' => $integrationGroup->id,
+                'service' => 'manual_log',
+                'instance_type' => 'log',
+            ],
+            [
+                'name' => 'Manual Log',
+                'configuration' => [],
+            ]
+        );
+    }
+
     public static function getActionTypes(): array
     {
         return [
@@ -102,6 +153,22 @@ class ManualLogPlugin extends ManualPlugin
                 'description' => 'A board game session',
                 'display_with_object' => true,
                 'value_unit' => '/5',
+                'hidden' => false,
+            ],
+            'captured_text' => [
+                'icon' => 'fas.inbox',
+                'display_name' => 'Captured Text',
+                'description' => 'Text shared into Spark, waiting in the Inbox',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'captured_image' => [
+                'icon' => 'fas.image',
+                'display_name' => 'Captured Image',
+                'description' => 'An image shared into Spark',
+                'display_with_object' => true,
+                'value_unit' => null,
                 'hidden' => false,
             ],
         ];
@@ -154,6 +221,18 @@ class ManualLogPlugin extends ManualPlugin
                 'icon' => 'fas.dice',
                 'display_name' => 'Board Game',
                 'description' => 'A board game played',
+                'hidden' => false,
+            ],
+            'capture_inbox' => [
+                'icon' => 'fas.inbox',
+                'display_name' => 'Inbox',
+                'description' => 'Captured text waiting to be sorted',
+                'hidden' => false,
+            ],
+            'captured_image' => [
+                'icon' => 'fas.image',
+                'display_name' => 'Captured Image',
+                'description' => 'An image shared into Spark',
                 'hidden' => false,
             ],
         ];
