@@ -67,6 +67,31 @@ class HealthDashboardControllerTest extends TestCase
     }
 
     #[Test]
+    public function day_is_resolved_and_bounded_in_the_users_timezone(): void
+    {
+        // 19:30 UTC on 18 May is already 04:30 on 19 May in Tokyo.
+        $this->user->update(['settings' => ['timezone' => 'Asia/Tokyo']]);
+        $tokyoMorning = $this->event('apple_health', 'did_workout', 100, 'kcal', '2026-05-18 22:00:00', [
+            'duration_seconds' => 900,
+        ], targetTitle: 'Run');
+        $this->event('apple_health', 'did_workout', 90, 'kcal', '2026-05-18 14:30:00', [
+            'duration_seconds' => 600,
+        ], targetTitle: 'Walk');
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/health/dashboard')
+            ->assertOk()
+            ->assertJsonPath('date', '2026-05-19');
+
+        // 22:00 UTC on 18 May is 07:00 on 19 May in Tokyo; 14:30 UTC is 23:30 on 18 May.
+        $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-19')
+            ->assertOk()
+            ->assertJsonCount(1, 'fitness.workouts')
+            ->assertJsonPath('fitness.workouts.0.event_id', $tokyoMorning->id);
+    }
+
+    #[Test]
     public function empty_data_returns_stable_shape(): void
     {
         Sanctum::actingAs($this->user, ['ios:read']);

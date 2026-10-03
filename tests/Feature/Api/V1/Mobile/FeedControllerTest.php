@@ -309,6 +309,29 @@ class FeedControllerTest extends TestCase
     }
 
     #[Test]
+    public function date_parameter_is_bounded_by_the_users_local_day(): void
+    {
+        Carbon::setTestNow('2026-07-03 12:00:00 UTC');
+        $this->user->update(['settings' => ['timezone' => 'Asia/Tokyo']]);
+
+        // 20:00 UTC on 1 July is 05:00 on 2 July in Tokyo.
+        $this->seedEventsAtTime(1, Carbon::parse('2026-07-01 20:00:00', 'UTC'));
+        // 14:30 UTC on 1 July is 23:30 on 1 July in Tokyo.
+        $this->seedEventsAtTime(1, Carbon::parse('2026-07-01 14:30:00', 'UTC'));
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $second = $this->getJson('/api/v1/mobile/feed?date=2026-07-02')->assertOk();
+        $this->assertCount(1, $second->json('data'));
+        $this->assertSame('2026-07-01 20:00', Carbon::parse($second->json('data.0.time'))->utc()->format('Y-m-d H:i'));
+
+        $first = $this->getJson('/api/v1/mobile/feed?date=2026-07-01')->assertOk();
+        $this->assertCount(1, $first->json('data'));
+        $this->assertSame('2026-07-01 14:30', Carbon::parse($first->json('data.0.time'))->utc()->format('Y-m-d H:i'));
+
+        Carbon::setTestNow();
+    }
+
+    #[Test]
     public function rejects_invalid_date_format(): void
     {
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
