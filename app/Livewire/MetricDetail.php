@@ -81,9 +81,7 @@ class MetricDetail extends Component
 
     public function calculateMetricStatistics(): void
     {
-        // Dispatch job to calculate statistics for all metrics
-        // Note: The job recalculates all metrics, including this one
-        CalculateMetricStatisticsJob::dispatch();
+        CalculateMetricStatisticsJob::dispatch(Auth::id());
 
         $this->dispatch('statistics-calculation-started');
     }
@@ -117,7 +115,10 @@ class MetricDetail extends Component
         $chartData = [];
 
         // Get events for the selected time range
-        $events = Event::where('service', $this->metric->service)
+        $events = Event::query()
+            ->withoutInternal()
+            ->whereHas('integration', fn ($query) => $query->where('user_id', $user->id))
+            ->where('service', $this->metric->service)
             ->where('action', $this->metric->action)
             ->where('value_unit', $this->metric->value_unit)
             ->where('time', '>=', now()->subDays($this->timeRange))
