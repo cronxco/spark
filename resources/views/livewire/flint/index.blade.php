@@ -966,6 +966,11 @@ new class extends Component
             </div>
         </x-tab>
 
+        {{-- ============================== Review ============================== --}}
+        <x-tab name="review" label="Review" icon="o-clipboard-document-check">
+            <livewire:flint.review />
+        </x-tab>
+
         {{-- ============================== Settings ============================== --}}
         <x-tab name="settings" label="Settings" icon="o-cog-6-tooth">
             @php $feedback = $this->feedbackStats(); @endphp
