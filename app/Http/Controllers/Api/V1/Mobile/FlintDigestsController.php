@@ -95,7 +95,7 @@ class FlintDigestsController extends Controller
             ], 404);
         }
 
-        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $date, $integrationIds, $timezone));
+        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $integrationIds, $timezone));
 
         if ($all) {
             return response()->json([
@@ -155,7 +155,7 @@ class FlintDigestsController extends Controller
         }
 
         return response()->json(
-            $this->formatDigest($event, Carbon::parse($event->time, $timezone), $integrationIds, $timezone)
+            $this->formatDigest($event, $integrationIds, $timezone)
         );
     }
 
@@ -179,7 +179,7 @@ class FlintDigestsController extends Controller
             return response()->json(['error' => 'Digest not found.'], 404);
         }
 
-        return response()->json($this->formatDigest($event, Carbon::parse($event->time), $integrationIds, $timezone));
+        return response()->json($this->formatDigest($event, $integrationIds, $timezone));
     }
 
     /**
@@ -317,7 +317,7 @@ class FlintDigestsController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function formatDigest(Event $event, Carbon $date, mixed $integrationIds = null, ?string $timezone = null): array
+    private function formatDigest(Event $event, mixed $integrationIds = null, ?string $timezone = null): array
     {
         $eventMeta = $event->event_metadata ?? [];
 
@@ -331,7 +331,10 @@ class FlintDigestsController extends Controller
         return [
             'event_id' => $event->id,
             'digest_object_id' => $eventMeta['digest_object_id'] ?? null,
-            'date' => $date->toDateString(),
+            // The local day the digest was written for. `time` holds that
+            // day's midnight as a wall-clock value, so it is only the fallback
+            // for digests written before `local_date` was recorded.
+            'date' => $eventMeta['local_date'] ?? $event->time->toDateString(),
             'effective_timezone' => $timezone,
             'period' => $eventMeta['period'] ?? null,
             'kind' => FlintDigestKind::for($event, $eventMeta),

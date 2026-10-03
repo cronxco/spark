@@ -974,6 +974,12 @@ There is no synchronous pause. A worthwhile ambiguity becomes a
 - **0 questions** → exceptional. Use only when every plausible question is repetitive,
   low-value, already answered by available evidence, or pure curiosity.
 
+**Every question is one ask in at most 30 words.** No second question mark, no "and also",
+no narration of what Flint synced or checked, and no priority wording. Spark enforces the
+word limit and the single question mark: a question that breaks either is dropped and the
+rest of the digest is saved. `create-flint-digest` reports what it dropped in
+`questions_dropped`, so rewrite and shorten before writing rather than after.
+
 Do not ask because the digest needs a decorative ending. The point of favouring one
 question is to create a useful feedback loop between Flint's data and Will's lived
 context.

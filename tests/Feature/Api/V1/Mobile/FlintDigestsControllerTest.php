@@ -569,6 +569,22 @@ class FlintDigestsControllerTest extends TestCase
         $this->getJson('/api/v1/mobile/flint/digests/latest')->assertNotFound();
     }
 
+    /**
+     * `show` and `latest` used to read the date off the event's `time`; the
+     * digest's recorded `local_date` is the canonical day.
+     */
+    #[Test]
+    public function show_prefers_the_digests_recorded_local_date(): void
+    {
+        $event = $this->createDigestEvent('evening', Carbon::parse('2026-07-14'), ['local_date' => '2026-07-13']);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+            ->assertOk()
+            ->assertJsonPath('date', '2026-07-13');
+    }
+
     private function createDigestEvent(string $period = 'morning', ?Carbon $date = null, array $meta = [], array $overrides = []): Event
     {
         $date ??= Carbon::today();

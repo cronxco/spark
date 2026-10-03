@@ -4,6 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Event;
+use App\Services\EffectiveTimezoneResolver;
 use App\Support\FlintBlockPresenter;
 use App\Support\FlintDigestKind;
 use Carbon\Carbon;
@@ -49,7 +50,7 @@ class GetLatestFlintDigestTool extends Tool
         // anyone east or west of UTC is a different UTC calendar date — so a
         // timezone-aware date has to be paired with a UTC range, not
         // whereDate(). See UpToSpeedController::localDayRange().
-        $timezone = $user->getTimezone();
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($user);
         $date = $request->get('date', 'today');
         $parsedDate = $date === 'today'
             ? Carbon::today($timezone)
