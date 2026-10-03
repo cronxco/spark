@@ -18,12 +18,15 @@ class SearchController extends Controller
     /**
      * GET /api/v1/mobile/search?q=...&mode=default
      *
-     * `mode` ∈ default|semantic|tag|metric|integration. Unknown modes produce
-     * 422 so iOS clients never silently fall through to a less-targeted query.
+     * `mode` ∈ default|semantic|tag|metric|integration. The plural spellings
+     * shipped iOS builds send (`tags`, `metrics`, `integrations`) are accepted
+     * as aliases. Unknown modes produce 422 so iOS clients never silently fall
+     * through to a less-targeted query.
      */
     public function index(Request $request): JsonResponse
     {
         $mode = (string) $request->query('mode', 'default');
+        $mode = SearchDispatcher::MODE_ALIASES[$mode] ?? $mode;
         $query = (string) $request->query('q', '');
         $limit = (int) $request->query('limit', SearchDispatcher::DEFAULT_LIMIT);
 
