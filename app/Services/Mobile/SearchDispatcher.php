@@ -27,6 +27,14 @@ class SearchDispatcher
 
     public const MODES = ['default', 'semantic', 'tag', 'metric', 'integration'];
 
+    /**
+     * Plural mode names sent by shipped iOS builds, mapped to their canonical
+     * mode so those clients' Tags, Metrics and Integrations pills work.
+     *
+     * @var array<string, string>
+     */
+    public const MODE_ALIASES = ['tags' => 'tag', 'metrics' => 'metric', 'integrations' => 'integration'];
+
     public function __construct(protected ?EmbeddingClient $embeddingService = null) {}
 
     /**

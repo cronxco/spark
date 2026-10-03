@@ -15,18 +15,6 @@ class GlobalActionsQuery
         return SpotlightQuery::forMode('actions', function (string $query) {
             $actions = [
                 [
-                    'title' => 'Calculate Statistics',
-                    'subtitle' => 'Recalculate metric statistics for all metrics',
-                    'icon' => 'calculator',
-                    'event' => 'calculate-statistics',
-                ],
-                [
-                    'title' => 'Detect Trends',
-                    'subtitle' => 'Run trend detection on all metrics',
-                    'icon' => 'chart-bar',
-                    'event' => 'detect-trends',
-                ],
-                [
                     'title' => 'Trigger All Integration Updates',
                     'subtitle' => 'Fetch latest data from all integrations',
                     'icon' => 'arrow-path',
@@ -62,9 +50,9 @@ class GlobalActionsQuery
                 ],
                 [
                     'title' => 'Create New Tag',
-                    'subtitle' => 'Add a new tag to organize your data',
+                    'subtitle' => 'Open Tags to add a new tag',
                     'icon' => 'tag',
-                    'event' => 'open-create-tag-modal',
+                    'route' => 'tags.index',
                 ],
                 [
                     'title' => 'View Recent Activity',
