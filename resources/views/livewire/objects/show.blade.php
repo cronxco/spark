@@ -1313,7 +1313,7 @@ new class extends Component
                                 {!! json_encode($this->object->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
                             </script>
                             <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">
-                                {!! json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
+                                {!! json_encode(\App\Support\OwnedTagQuery::suggestionsFor(auth()->guard('web')->user())) !!}
                             </script>
                         </div>
                     </div>

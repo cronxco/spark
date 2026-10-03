@@ -214,6 +214,7 @@ Day-scoped payloads also **render** in that zone: every timestamp inside `GET /b
 | `GET`  | `/tags`                         | Cursor-paginated list of the user's tags                                        |
 | `GET`  | `/tags/suggest`                 | Autocomplete tag suggestions                                                    |
 | `GET`  | `/tags/{id}`                    | A single tag plus the items tagged with it                                      |
+| `GET`  | `/relationship-types`           | Relationship types the server accepts                                           |
 | `GET`  | `/{kind}/{id}/relationships`    | List relationships on an owned event, object, or block                          |
 | `GET`  | `/settings/notifications`       | Current notification preferences                                                |
 | `GET`  | `/check-ins`                    | Morning/afternoon check-in status for a date                                    |
@@ -1211,6 +1212,13 @@ objects, and blocks tagged with it, newest first.
 
 ---
 
+### `GET /relationship-types`
+
+Relationship types from `RelationshipTypeRegistry`. Identical to
+[API_v1.md](API_v1.md#get-apiv1relationship-types).
+
+---
+
 ### `GET /{kind}/{id}/relationships`
 
 Lists relationships attached to an owned event, object, or block. `{kind}` ∈
@@ -1913,9 +1921,10 @@ Requires `If-Match`. Prevents self-links and enforces registered
 relationship-type directionality — same rules as MCP's
 `manage-relationship` create operation.
 
-**Request Body**: `{"to_kind": "objects", "to_id": "uuid", "type": "linked_to", "value": null, "value_multiplier": null, "value_unit": null, "metadata": {}}`
+**Request Body**: `{"to_kind": "object", "to_id": "uuid", "type": "linked_to", "value": null, "value_multiplier": null, "value_unit": null, "metadata": {}}`
 
-**Response `201`**: [Relationship](API_v1.md#relationship).
+**Response `201`**: [Relationship](API_v1.md#relationship), plus `versions`
+(the touched entities' new ETags) and an `ETag` header for the new edge.
 
 **Response `422`** — Invalid endpoints, unregistered type, or ownership mismatch.
 
@@ -1923,7 +1932,9 @@ relationship-type directionality — same rules as MCP's
 
 ### `DELETE /relationships/{relationship}`
 
-Deletes an owned relationship by UUID. Requires `If-Match`.
+Deletes an owned relationship by UUID. Requires `If-Match` with the
+relationship's own `etag` from the list or create response, not the parent
+entity's.
 
 **Response `204`** — No content. **Response `404`** — Not found or not owned.
 

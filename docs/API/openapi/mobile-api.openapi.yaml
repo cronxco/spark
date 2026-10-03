@@ -472,6 +472,14 @@ paths:
         "422":
           { description: Entity not found or address could not be geocoded }
 
+  /relationship-types:
+    get:
+      operationId: listRelationshipTypes
+      tags: [entities]
+      summary: Relationship types the server accepts
+      responses:
+        "200": { description: OK }
+
   /{kind}/{id}/relationships:
     get:
       operationId: listRelationships
@@ -504,7 +512,7 @@ paths:
                 required: [to_kind, to_id, type],
                 properties:
                   {
-                    to_kind: { type: string },
+                    to_kind: { type: string, enum: [event, object, block] },
                     to_id: { type: string, format: uuid },
                     type: { type: string },
                     value: { type: [number, "null"] },

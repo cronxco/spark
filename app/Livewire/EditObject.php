@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\EventObject;
+use App\Services\Api\EntityMutationService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -40,6 +41,12 @@ class EditObject extends Component
             'concept' => 'nullable|string|max:100',
             'url' => 'nullable|url|max:500',
         ]);
+
+        if ($this->object->isLocked() && $this->title !== $this->object->title) {
+            $this->addError('title', EntityMutationService::LOCKED_TITLE_MESSAGE);
+
+            return;
+        }
 
         $this->object->update([
             'title' => $this->title,

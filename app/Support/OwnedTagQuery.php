@@ -91,4 +91,45 @@ final class OwnedTagQuery
 
         return $query;
     }
+
+    /**
+     * Autocomplete suggestions drawn from the user's own tags only.
+     *
+     * @return array<int, array{value: string, type: string|null}>
+     */
+    public static function suggestionsFor(?User $user): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        return self::for($user)
+            ->get()
+            ->map(fn (Tag $tag) => [
+                'value' => (string) $tag->name,
+                'type' => $tag->type ? (string) $tag->type : null,
+            ])
+            ->sort(fn (array $a, array $b) => strnatcasecmp($a['value'], $b['value']))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Distinct tag types the user already uses.
+     *
+     * @return array<int, string>
+     */
+    public static function typesFor(?User $user): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        return self::for($user)
+            ->pluck('type')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
 }
