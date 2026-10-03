@@ -17,6 +17,14 @@ abstract class SparkNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    /** The local window in which an incident alert's push and email wait for morning (decision N-1). */
+    public const OVERNIGHT_START = '22:00';
+
+    public const OVERNIGHT_END = '07:00';
+
+    /** Set on a channel's copy when it was held overnight, so it is re-checked before sending. */
+    public bool $heldOvernight = false;
+
     private ?string $occurredAt = null;
 
     /**
@@ -77,7 +85,33 @@ abstract class SparkNotification extends Notification implements ShouldQueue
             $channels = array_merge($channels, $this->pushChannelsFor($notifiable));
         }
 
+        // A repeat of an incident that is still open only adds to the in-app
+        // record's occurrence count: no second push or email.
+        if ($this->isIncidentAlert() && $this->incidentIsOpen($notifiable)) {
+            return ['database'];
+        }
+
         return $channels;
+    }
+
+    /**
+     * Failure alerts whose push and email go out once per incident and never
+     * overnight (decision N-1). An incident is the open, unarchived
+     * notification sharing this group key; it closes when the failure
+     * resolves.
+     */
+    public function isIncidentAlert(): bool
+    {
+        return false;
+    }
+
+    /**
+     * An incident alert held overnight is dropped if the incident resolved
+     * before morning.
+     */
+    public function shouldSend(User $notifiable, string $channel): bool
+    {
+        return ! $this->heldOvernight || $this->incidentIsOpen($notifiable);
     }
 
     /**
@@ -216,11 +250,36 @@ abstract class SparkNotification extends Notification implements ShouldQueue
      */
     public function withDelay(User $notifiable, string $channel): ?Carbon
     {
-        if ($channel !== 'mail' || $this->isPriority()) {
+        if ($channel === 'database' || $this->isPriority()) {
             return null;
         }
 
-        return $this->nextWorkHoursStart($notifiable);
+        $overnightEnd = $this->isIncidentAlert() ? $this->overnightEnd($notifiable) : null;
+        $this->heldOvernight = $overnightEnd !== null;
+        $workHoursStart = $channel === 'mail' ? $this->nextWorkHoursStart($notifiable) : null;
+
+        return match (true) {
+            $overnightEnd === null => $workHoursStart,
+            $workHoursStart === null => $overnightEnd,
+            default => $overnightEnd->max($workHoursStart),
+        };
+    }
+
+    /** When the user's night ends, or null if it is daytime for them now. */
+    protected function overnightEnd(User $notifiable): ?Carbon
+    {
+        $now = now()->timezone($notifiable->getTimezone());
+        $time = $now->format('H:i');
+        if ($time >= self::OVERNIGHT_END && $time < self::OVERNIGHT_START) {
+            return null;
+        }
+
+        $end = $now->copy()->setTimeFromTimeString(self::OVERNIGHT_END);
+        if ($end->lte($now)) {
+            $end->addDay();
+        }
+
+        return $end->utc();
     }
 
     protected function sanitiseTechnicalDetail(string $detail): string
@@ -276,5 +335,15 @@ abstract class SparkNotification extends Notification implements ShouldQueue
         }
 
         return $start->utc();
+    }
+
+    private function incidentIsOpen(User $notifiable): bool
+    {
+        $groupKey = $this->getGroupKey();
+
+        return $groupKey !== null && $notifiable->notifications()
+            ->whereNull('archived_at')
+            ->where('group_key', $groupKey)
+            ->exists();
     }
 }
