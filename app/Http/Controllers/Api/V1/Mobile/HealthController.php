@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Services\EffectiveTimezoneResolver;
 use App\Services\Mobile\HealthDashboardService;
 use App\Services\Mobile\HealthSampleService;
 use Carbon\Carbon;
@@ -27,7 +29,7 @@ class HealthController extends Controller
             return response()->json(['message' => 'Invalid date.'], 422);
         }
 
-        $date = $this->resolveDate($rawDate);
+        $date = $this->resolveDate($rawDate, $request->user());
         if ($date === null) {
             return response()->json(['message' => 'Invalid date.'], 422);
         }
@@ -69,26 +71,34 @@ class HealthController extends Controller
         return response()->json(['results' => $results]);
     }
 
-    protected function resolveDate(?string $input): ?Carbon
+    /**
+     * Resolve the requested day in the user's effective timezone, as the
+     * briefing and web Day view do. Relative words use the timezone the user
+     * is in now; an ISO date uses the timezone they were in on that day.
+     */
+    protected function resolveDate(?string $input, ?User $user): ?Carbon
     {
+        $resolver = app(EffectiveTimezoneResolver::class);
+        $timezone = $resolver->timezoneFor($user);
+
         if ($input === null || $input === '') {
-            return Carbon::today();
+            return Carbon::today($timezone);
         }
 
         $input = strtolower(trim($input));
 
         return match ($input) {
-            'today' => Carbon::today(),
-            'yesterday' => Carbon::yesterday(),
-            'tomorrow' => Carbon::tomorrow(),
-            default => $this->parseIso($input),
+            'today' => Carbon::today($timezone),
+            'yesterday' => Carbon::yesterday($timezone),
+            'tomorrow' => Carbon::tomorrow($timezone),
+            default => $this->parseIso($input, $resolver->timezoneForDate($user, $input)),
         };
     }
 
-    protected function parseIso(string $input): ?Carbon
+    protected function parseIso(string $input, string $timezone = 'UTC'): ?Carbon
     {
         try {
-            $date = Carbon::createFromFormat('Y-m-d', $input);
+            $date = Carbon::createFromFormat('Y-m-d', $input, $timezone);
         } catch (Exception) {
             return null;
         }
