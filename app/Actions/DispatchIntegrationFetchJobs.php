@@ -3,6 +3,9 @@
 namespace App\Actions;
 
 use App\Jobs\Fetch\FetchScheduledUrls;
+use App\Jobs\OAuth\BlueSky\BlueSkyBookmarksPull;
+use App\Jobs\OAuth\BlueSky\BlueSkyLikesPull;
+use App\Jobs\OAuth\BlueSky\BlueSkyRepostsPull;
 use App\Jobs\OAuth\GitHub\GitHubActivityPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessAccountPull;
 use App\Jobs\OAuth\GoCardless\GoCardlessBalancePull;
@@ -46,9 +49,16 @@ use App\Models\Integration;
 class DispatchIntegrationFetchJobs
 {
     /**
+     * Shown when an integration has no fetch to run: a push or manual source,
+     * an unknown instance type, or every optional fetch switched off. Callers
+     * must treat zero dispatched jobs as this failure, never as "triggered".
+     */
+    public const NOTHING_TO_DISPATCH = 'This integration has nothing Spark can fetch on demand.';
+
+    /**
      * Dispatch the appropriate fetch jobs for the given integration.
      *
-     * Returns the number of jobs dispatched.
+     * Returns the number of jobs dispatched. Zero means nothing was queued.
      */
     public function dispatch(Integration $integration): int
     {
@@ -85,6 +95,7 @@ class DispatchIntegrationFetchJobs
             'goodreads' => $this->getGoodreadsFetchJobs($integration),
             'untappd' => $this->getUntappdFetchJobs($integration),
             'immich' => $this->getImmichFetchJobs($integration),
+            'bluesky' => $this->getBlueSkyFetchJobs($integration),
             default => [],
         };
     }
@@ -233,5 +244,25 @@ class DispatchIntegrationFetchJobs
         }
 
         return $jobs;
+    }
+
+    /**
+     * BlueSky had no arm here, so scheduled and manual updates queued nothing
+     * after the initial import. Honours the same toggles as
+     * BlueSkyActivityInitialization.
+     */
+    private function getBlueSkyFetchJobs(Integration $integration): array
+    {
+        if (($integration->instance_type ?: 'activity') !== 'activity') {
+            return [];
+        }
+
+        $config = $integration->configuration ?? [];
+
+        return array_values(array_filter([
+            ($config['track_bookmarks'] ?? true) ? BlueSkyBookmarksPull::class : null,
+            ($config['track_likes'] ?? true) ? BlueSkyLikesPull::class : null,
+            ($config['track_reposts'] ?? true) ? BlueSkyRepostsPull::class : null,
+        ]));
     }
 }

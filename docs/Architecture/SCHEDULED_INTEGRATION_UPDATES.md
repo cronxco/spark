@@ -4,16 +4,17 @@ This document explains how the automatic integration update system works in Spar
 
 ## Overview
 
-The application checks for due integrations every 30 seconds and dispatches background jobs to process them. Integrations can be configured to update at a fixed frequency or at specific scheduled times.
+The application checks for due integrations every minute and dispatches background jobs to process them. Integrations can be configured to update at a fixed frequency or at specific scheduled times.
 
 ## How It Works
 
 The `CheckIntegrationUpdates` job runs via Laravel's scheduler and:
 
-1. Determines due instances via `Integration::isDue()`
-2. Skips paused instances (`configuration.paused=true`)
-3. Skips instances currently processing or recently triggered
-4. Dispatches `ProcessIntegrationData` or `RunIntegrationTask` jobs
+1. Selects external OAuth instances with a token and API-key instances. Manual and webhook sources are not polled (Task instances are not selected yet; see the Integrations roadmap, INT-03)
+2. Determines due instances via `Integration::isDue()`
+3. Queues a `ProcessTaskPipelineJob` on `tasks` for each, filtered to the `run_integration_update` task
+4. `RunIntegrationUpdateTask` skips paused, processing or throttled instances (recorded `not_applicable`), then calls `DispatchIntegrationFetchJobs`, which queues the service's pull jobs
+5. If no pull job maps to the instance's `(service, instance_type)`, the task execution is recorded as failed rather than succeeding with nothing queued. Manual sync from web, REST, mobile and MCP reports the same case as an error
 
 ## Configuration Options
 
@@ -27,10 +28,11 @@ The `CheckIntegrationUpdates` job runs via Laravel's scheduler and:
 
 ## Job Configuration
 
-| Job                     | Timeout | Retries | Backoff      |
-| ----------------------- | ------- | ------- | ------------ |
-| CheckIntegrationUpdates | 1 min   | 1       | None         |
-| ProcessIntegrationData  | 5 min   | 3       | 1, 5, 10 min |
+| Job                      | Timeout | Retries | Backoff     |
+| ------------------------ | ------- | ------- | ----------- |
+| CheckIntegrationUpdates  | 1 min   | 1       | None        |
+| ProcessTaskPipelineJob   | 5 min   | 1       | None        |
+| RunIntegrationUpdateTask | –       | 3       | 30s, 2m, 5m |
 
 ## Setup
 
@@ -49,19 +51,16 @@ php artisan queue:work --daemon
 The scheduler is configured in `routes/console.php`:
 
 ```php
-Schedule::job(new CheckIntegrationUpdates())
-    ->everyThirtySeconds()
+Schedule::job(new CheckIntegrationUpdates)
+    ->everyMinute()
     ->withoutOverlapping()
-    ->onOneServer();
+    ->onOneServer()
+    ->sentryMonitor();
 ```
 
 ### Production Scheduler
 
-For true 30-second intervals, use the scheduler worker:
-
-```bash
-php artisan schedule:work
-```
+Run `php artisan schedule:run` from cron every minute, or `php artisan schedule:work` as a long-running process.
 
 ## Commands
 
