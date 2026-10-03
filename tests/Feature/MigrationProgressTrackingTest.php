@@ -16,9 +16,7 @@ class MigrationProgressTrackingTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function start_integration_migration_creates_progress_record(): void
     {
         Bus::fake();
@@ -50,9 +48,7 @@ class MigrationProgressTrackingTest extends TestCase
         $this->assertTrue($progress->isInProgress());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_progress_updates_during_processing(): void
     {
         $user = User::factory()->create();
@@ -90,9 +86,7 @@ class MigrationProgressTrackingTest extends TestCase
         $this->assertEquals(['service' => 'oura', 'instance_type' => 'activity'], $progress->details);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_progress_can_be_marked_completed(): void
     {
         $user = User::factory()->create();
@@ -127,9 +121,7 @@ class MigrationProgressTrackingTest extends TestCase
         $this->assertEquals(['items_processed' => 100, 'duration' => '2m 30s'], $progress->details);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_progress_can_be_marked_failed(): void
     {
         $user = User::factory()->create();

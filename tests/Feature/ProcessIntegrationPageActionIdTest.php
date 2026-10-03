@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -15,9 +16,7 @@ class ProcessIntegrationPageActionIdTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function generate_action_id_creates_unique_ids_for_different_job_types(): void
     {
         $user = User::factory()->create();
@@ -75,9 +74,7 @@ class ProcessIntegrationPageActionIdTest extends TestCase
         $this->assertStringStartsWith($expectedPrefix, $transactionsActionId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function different_transaction_windows_generate_different_action_ids(): void
     {
         $user = User::factory()->create();
@@ -120,9 +117,7 @@ class ProcessIntegrationPageActionIdTest extends TestCase
         $this->assertStringStartsWith($expectedPrefix, $window2ActionId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function processing_jobs_create_separate_progress_records(): void
     {
         $user = User::factory()->create();

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\GeocodingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MonzoLocationTest extends TestCase
@@ -45,9 +46,7 @@ class MonzoLocationTest extends TestCase
         $this->plugin = new MonzoPlugin;
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function online_transaction_skips_location(): void
     {
         $transaction = [
@@ -75,9 +74,7 @@ class MonzoLocationTest extends TestCase
         $this->assertNull($event->location_address);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function in_person_transaction_with_coordinates(): void
     {
         $transaction = [
@@ -114,9 +111,7 @@ class MonzoLocationTest extends TestCase
         $this->assertStringContainsString('123 High Street', $event->location_address);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function in_person_transaction_geocodes_address(): void
     {
         // Mock geocoding service
@@ -166,9 +161,7 @@ class MonzoLocationTest extends TestCase
         $this->assertEquals('geoapify', $event->location_source);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function transaction_inherits_location_from_counterparty(): void
     {
         // Create counterparty with location
@@ -205,9 +198,7 @@ class MonzoLocationTest extends TestCase
         $this->assertEquals('inherited', $event->location_source);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function transaction_creates_place_and_links_event(): void
     {
         $this->assertEquals(0, Place::count());
@@ -256,9 +247,7 @@ class MonzoLocationTest extends TestCase
         $this->assertEquals($place->id, $relationship->to_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function subsequent_transactions_at_same_place_reuse_existing_place(): void
     {
         $transaction1 = [

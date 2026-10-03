@@ -47,9 +47,7 @@ class SlackEventsHookTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation()
     {
         $job = new SlackEventsHook([], [], $this->integration);
@@ -58,9 +56,7 @@ class SlackEventsHookTest extends TestCase
         $this->assertEquals(3, $job->tries);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function url_verification_handling()
     {
         $payload = [
@@ -76,9 +72,7 @@ class SlackEventsHookTest extends TestCase
         $this->assertInstanceOf(SlackEventsHook::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function missing_event_data()
     {
         $payload = [
@@ -95,9 +89,7 @@ class SlackEventsHookTest extends TestCase
         $this->assertInstanceOf(SlackEventsHook::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function event_type_filtering()
     {
         // Test with message event (should be processed)
@@ -139,9 +131,7 @@ class SlackEventsHookTest extends TestCase
         $this->assertInstanceOf(SlackEventsHook::class, $job2);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function signature_verification()
     {
         $payload = [
@@ -181,9 +171,7 @@ class SlackEventsHookTest extends TestCase
         $this->assertInstanceOf(SlackEventsHook::class, $job2);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function event_data_conversion()
     {
         // Test message event conversion
@@ -225,9 +213,7 @@ class SlackEventsHookTest extends TestCase
         $this->assertInstanceOf(SlackEventsHook::class, $job2);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function configuration_handling()
     {
         // Test with empty configuration (should use defaults)
@@ -257,9 +243,7 @@ class SlackEventsHookTest extends TestCase
         $this->assertInstanceOf(SlackEventsHook::class, $job2);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_metadata()
     {
         $job = new SlackEventsHook([], [], $this->integration);

@@ -7,13 +7,12 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Services\TaskPipeline\TaskDefinition;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class TaskDefinitionTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function is_applicable_to_correct_model_type(): void
     {
         $task = new TaskDefinition(
@@ -33,9 +32,7 @@ class TaskDefinitionTest extends TestCase
         $this->assertFalse($task->isApplicableTo($object));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function checks_single_condition(): void
     {
         $task = new TaskDefinition(
@@ -56,9 +53,7 @@ class TaskDefinitionTest extends TestCase
         $this->assertFalse($task->isApplicableTo($event2));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function checks_array_condition(): void
     {
         $task = new TaskDefinition(
@@ -81,9 +76,7 @@ class TaskDefinitionTest extends TestCase
         $this->assertFalse($task->isApplicableTo($event3));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function checks_multiple_conditions(): void
     {
         $task = new TaskDefinition(
@@ -107,9 +100,7 @@ class TaskDefinitionTest extends TestCase
         $this->assertFalse($task->isApplicableTo($event3));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function checks_custom_should_run_callback(): void
     {
         $task = new TaskDefinition(
@@ -128,9 +119,7 @@ class TaskDefinitionTest extends TestCase
         $this->assertFalse($task->isApplicableTo($event2));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function combines_conditions_and_callback(): void
     {
         $task = new TaskDefinition(

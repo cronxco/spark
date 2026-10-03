@@ -55,9 +55,7 @@ class GoCardlessEuaExpiryDetectionTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function detects_eua_expiry_with_summary_field_in_transaction_pull(): void
     {
         Queue::fake();
@@ -99,9 +97,7 @@ class GoCardlessEuaExpiryDetectionTest extends TestCase
         Queue::assertPushed(HandleExpiredEuaJob::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function detects_eua_expiry_with_message_field_in_balance_pull(): void
     {
         Queue::fake();
@@ -141,9 +137,7 @@ class GoCardlessEuaExpiryDetectionTest extends TestCase
         Queue::assertPushed(HandleExpiredEuaJob::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function detects_eua_expiry_with_summary_field_in_account_pull(): void
     {
         Queue::fake();
@@ -186,9 +180,7 @@ class GoCardlessEuaExpiryDetectionTest extends TestCase
         Queue::assertPushed(HandleExpiredEuaJob::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function exception_extracts_eua_id_correctly(): void
     {
         $exception = new GoCardlessEuaExpiredException(
