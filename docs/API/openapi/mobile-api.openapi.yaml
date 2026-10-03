@@ -275,6 +275,76 @@ paths:
               schema: { type: string }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /notifications/receipts:
+    post:
+      operationId: recordNotificationReceipts
+      tags: [notifications]
+      summary: Report that notifications were shown, opened or tapped
+      description: >-
+        Operational telemetry from the iOS app (decision N-8), stored on the
+        notification's data under receipts.{event}. Idempotent per event: the
+        first occurred_at wins and repeats are no-ops. Receipts carry only the
+        id, event, time and action identifier; any other field is rejected
+        with 422, so message content is never stored. Receipts naming a
+        notification that is not the user's are counted as not_found and
+        never stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [receipts]
+              properties:
+                receipts:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items: { $ref: "#/components/schemas/NotificationReceipt" }
+      responses:
+        "200":
+          description: Counts of receipts recorded, already recorded and not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      recorded: { type: integer }
+                      unchanged: { type: integer }
+                      not_found: { type: integer }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /notifications/{id}/receipts:
+    post:
+      operationId: recordNotificationReceipt
+      tags: [notifications]
+      summary: Report one receipt for one notification
+      description: >-
+        As /notifications/receipts for a single notification named in the
+        path. Answers 404 for a notification that is not the user's.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [event, occurred_at]
+              properties:
+                event: { type: string, enum: [shown, opened, tapped] }
+                occurred_at: { type: string, format: date-time }
+                action: { type: [string, "null"], maxLength: 64 }
+      responses:
+        "204": { description: No content }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /notifications/{id}:
     delete:
       operationId: deleteNotification
@@ -2273,6 +2343,18 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
+    NotificationReceipt:
+      type: object
+      additionalProperties: false
+      required: [notification_id, event, occurred_at]
+      properties:
+        notification_id: { type: string, format: uuid }
+        event: { type: string, enum: [shown, opened, tapped] }
+        occurred_at: { type: string, format: date-time }
+        action:
+          type: [string, "null"]
+          maxLength: 64
+          description: The UNNotificationAction identifier when an action button was used.
     Error:
       type: object
       properties:

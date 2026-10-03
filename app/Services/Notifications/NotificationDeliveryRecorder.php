@@ -37,6 +37,18 @@ class NotificationDeliveryRecorder
     }
 
     /**
+     * The id of the in-app record a delivery belongs to, so a push names the
+     * notification the app can report receipts for (decision N-8). Falls back
+     * to the delivery's own id while the in-app record is still to be written.
+     */
+    public function storedNotificationId(User $notifiable, SparkNotification $notification): ?string
+    {
+        $stored = $this->storedNotification($notifiable, $notification, lock: false);
+
+        return $stored !== null ? (string) $stored->getKey() : $notification->id;
+    }
+
+    /**
      * @param  array<string, mixed>  $outcome
      */
     private function record(User $notifiable, SparkNotification $notification, string $channel, array $outcome): void
@@ -64,10 +76,10 @@ class NotificationDeliveryRecorder
      * folded into an earlier open notification with the same group key, so
      * the delivery's own id is not always the stored one.
      */
-    private function storedNotification(User $notifiable, SparkNotification $notification): ?DatabaseNotification
+    private function storedNotification(User $notifiable, SparkNotification $notification, bool $lock = true): ?DatabaseNotification
     {
         $stored = $notification->id
-            ? $notifiable->notifications()->whereKey($notification->id)->lockForUpdate()->first()
+            ? $notifiable->notifications()->whereKey($notification->id)->when($lock, fn ($query) => $query->lockForUpdate())->first()
             : null;
 
         $groupKey = $notification->getGroupKey();
@@ -76,7 +88,7 @@ class NotificationDeliveryRecorder
                 ->whereNull('archived_at')
                 ->where('group_key', $groupKey)
                 ->latest()
-                ->lockForUpdate()
+                ->when($lock, fn ($query) => $query->lockForUpdate())
                 ->first();
         }
 

@@ -174,6 +174,7 @@ class AppServiceProvider extends ServiceProvider
                             'data' => [
                                 ...($isNewer ? $payload : $existingData),
                                 'delivery' => $existingData['delivery'] ?? [],
+                                'receipts' => $existingData['receipts'] ?? [],
                                 'occurrence_count' => max(1, (int) ($existingData['occurrence_count'] ?? 1)) + 1,
                             ],
                             'read_at' => $isNewer ? null : $existing->read_at,
