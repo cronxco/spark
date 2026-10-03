@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\User;
 use App\Notifications\Channels\ApnsChannel;
+use App\Services\Notifications\NotificationDeliveryRecorder;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,6 +13,7 @@ use Illuminate\Support\Str;
 use NotificationChannels\Apn\ApnMessage;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
+use Throwable;
 
 abstract class SparkNotification extends Notification implements ShouldQueue
 {
@@ -24,6 +26,11 @@ abstract class SparkNotification extends Notification implements ShouldQueue
 
     /** Set on a channel's copy when it was held overnight, so it is re-checked before sending. */
     public bool $heldOvernight = false;
+
+    /** The channel and user a queued copy delivers to, so a failed job can be recorded (decision N-2). */
+    public ?string $deliveryChannel = null;
+
+    public int|string|null $deliveryUserId = null;
 
     private ?string $occurredAt = null;
 
@@ -250,6 +257,9 @@ abstract class SparkNotification extends Notification implements ShouldQueue
      */
     public function withDelay(User $notifiable, string $channel): ?Carbon
     {
+        $this->deliveryChannel = $channel;
+        $this->deliveryUserId = $notifiable->getKey();
+
         if ($channel === 'database' || $this->isPriority()) {
             return null;
         }
@@ -263,6 +273,24 @@ abstract class SparkNotification extends Notification implements ShouldQueue
             $workHoursStart === null => $overnightEnd,
             default => $overnightEnd->max($workHoursStart),
         };
+    }
+
+    /**
+     * Record a queued delivery that gave up on the in-app notification.
+     */
+    public function failed(Throwable $exception): void
+    {
+        $notifiable = $this->deliveryUserId !== null ? User::find($this->deliveryUserId) : null;
+        if ($notifiable === null || $this->deliveryChannel === null) {
+            return;
+        }
+
+        app(NotificationDeliveryRecorder::class)->failed(
+            $notifiable,
+            $this,
+            $this->deliveryChannel,
+            Str::limit($this->sanitiseTechnicalDetail(class_basename($exception) . ': ' . $exception->getMessage()), 300),
+        );
     }
 
     /** When the user's night ends, or null if it is daytime for them now. */
