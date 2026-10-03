@@ -24,15 +24,15 @@ The Mobile API uses Laravel Sanctum personal access tokens with scoped abilities
 Each route names one action-scoped capability (decision D-API-3). The app's
 session token holds all of them (`SparkAbility::MOBILE_SESSION`):
 
-| Area                                                         | Read                 | Write                 |
-| ------------------------------------------------------------ | -------------------- | --------------------- |
-| Events, objects, blocks, search, tags, places, map, captures | `data:read`          | `data:write`          |
-| Briefing, metrics, widgets, check-ins, Up to Speed           | `insights:read`      | `insights:write`      |
-| Money accounts, net worth, spend widget                      | `finance:read`       | `finance:write`       |
-| Integrations                                                 | `integrations:read`  | `integrations:sync` (sync), `integrations:manage` (pause, OAuth start) |
-| Flint                                                        | `flint:read`         | `flint:write`         |
-| Notifications, devices, Live Activities, notification settings | `notifications:read` | `notifications:write` |
-| API tokens                                                   | `mobile:session`     | `tokens:revoke` (create needs `tokens:manage`) |
+| Area                                                           | Read                 | Write                                                                  |
+| -------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------- |
+| Events, objects, blocks, search, tags, places, map, captures   | `data:read`          | `data:write`                                                           |
+| Briefing, metrics, widgets, check-ins, Up to Speed             | `insights:read`      | `insights:write`                                                       |
+| Money accounts, net worth, spend widget                        | `finance:read`       | `finance:write`                                                        |
+| Integrations                                                   | `integrations:read`  | `integrations:sync` (sync), `integrations:manage` (pause, OAuth start) |
+| Flint                                                          | `flint:read`         | `flint:write`                                                          |
+| Notifications, devices, Live Activities, notification settings | `notifications:read` | `notifications:write`                                                  |
+| API tokens                                                     | `mobile:session`     | `tokens:revoke` (create needs `tokens:manage`)                         |
 
 `ping`, `me` and `logout` need only a valid token. The old `ios:read` /
 `ios:write` scopes open nothing: a token that holds only those gets **`401`**
@@ -2120,7 +2120,8 @@ all return **`204`** without revealing ownership.
 ### `POST /bookmarks`
 
 Bookmarks a URL shared from the iOS share extension. Delegates to the same
-service as the legacy `POST /api/fetch/bookmarks` endpoint.
+service as `POST /api/v1/bookmarks`, and accepts the same optional
+`fetch_immediately`, `force_refresh` and `fetch_mode` fields.
 
 **Request Body**: `{"url": "https://example.com/article"}` (required, valid URL, max 2048 chars).
 

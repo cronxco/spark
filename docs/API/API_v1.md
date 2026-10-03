@@ -675,12 +675,21 @@ Same as the event variants, scoped to an owned object.
 
 ### `POST /api/v1/bookmarks`
 
-Bookmarks a URL (same service as the legacy `POST /api/fetch/bookmarks` and
-the mobile share-extension endpoint).
+Bookmarks a URL (same service as the mobile share-extension endpoint).
+Requires `bookmark:write`; `data:write` tokens are also accepted. This
+replaces the retired `POST /api/fetch/bookmarks`, so the bookmark tokens
+issued from the Bookmarks page work here unchanged.
 
-**Request body**: `{"url": "https://example.com/article"}` (required, valid URL, max 2048 chars).
+**Request body**:
 
-**Response `201`/`200`**: `{"state": "...", "bookmark": {"id": "uuid", "url": "..."}}`
+| Field               | Type    | Required | Notes                                           |
+| ------------------- | ------- | -------- | ----------------------------------------------- |
+| `url`               | string  | yes      | Valid URL, max 2048 chars                       |
+| `fetch_immediately` | boolean | no       | Queue a fetch now (default `true`)              |
+| `force_refresh`     | boolean | no       | Re-fetch an existing bookmark (default `false`) |
+| `fetch_mode`        | string  | no       | `once` (default) or `recurring`                 |
+
+**Response `201`/`200`**: `{"state": "...", "bookmark": {"id": "uuid", "url": "..."}, "job_dispatched": true}`
 (`201` when newly created, `200` when it already existed).
 
 **Response `422`** — URL fails the safety validator.
@@ -891,55 +900,29 @@ history yet.
 
 ---
 
-## Legacy `/api` reference
+## Retired legacy `/api` routes
 
-Predates the `/api/v1` capability model: these routes have no `etag`
-middleware and mostly return raw Eloquent models rather than Resource
-classes — no Form Request classes exist anywhere in the app, so all
-validation is inline. Treated as a maintained but non-primary surface; use
-`/api/v1` for new integrations.
+The pre-v1 routes were removed in October 2026 (decision D-API-4). Any
+request to `/api/events*`, `/api/search*`, `/api/tokens*`,
+`/api/integrations*`, `/api/fetch/bookmarks`, `/api/assistant/context`,
+`/api/flint/questions/*`, `/api/task-executions*` or `/api/user` now returns
+`410 Gone` with a pointer to `/api/v1`. Only the iOS OAuth exchange
+(`POST /api/oauth/token`, `POST /api/oauth/refresh`) remains outside `/api/v1`.
 
-Since October 2026 every legacy route except `/api/user` and the OAuth
-exchange also requires a capability, checked by the same `spark.ability`
-middleware as `/api/v1` (so `mcp:read` tokens keep their read aliases and
-wildcard tokens still pass):
-
-| Capability            | Legacy routes                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `data:read`           | `GET /api/events[/{event}]`, all `POST /api/search*`, `GET /api/task-executions[/{id}]`    |
-| `data:write`          | `POST /api/events`, `PUT/PATCH/DELETE /api/events/{event}`                                 |
-| `tokens:manage`       | `POST /api/tokens/create`, `GET /api/tokens`, `DELETE /api/tokens/{token}`                 |
-| `integrations:read`   | `GET /api/integrations[/{integration}]`                                                    |
-| `integrations:sync`   | `POST /api/integrations/{integration}/trigger`                                             |
-| `integrations:manage` | `POST /api/integrations/{integration}/configure`, `DELETE /api/integrations/{integration}` |
-| `flint:read`          | `GET /api/assistant/context`                                                               |
-| `flint:write`         | `POST /api/flint/questions/{block}/answer`                                                 |
-| `bookmark:write`      | `POST /api/fetch/bookmarks`                                                                |
-
-`integrations:manage` exists only for these two legacy routes; `/api/v1`
-has no integration configure or delete endpoint.
-
-| Method              | Path                                              | Controller / action                                    | Description                                                                                                                                                                                  | `/api/v1` equivalent                                                |
-| ------------------- | ------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| GET/POST/PUT/DELETE | `/api/events[/{event}]`                           | `EventApiController` (index/show/store/update/destroy) | Full event CRUD, including nested actor/target/blocks creation in one request                                                                                                                | `GET /events[/{id}]`, `PATCH /events/{id}` (no create/delete on v1) |
-| POST                | `/api/search/events`                              | `SearchApiController@searchEvents`                     | Keyword/semantic event search                                                                                                                                                                | `GET /search`                                                       |
-| POST                | `/api/search/blocks`                              | `SearchApiController@searchBlocks`                     | Block search                                                                                                                                                                                 | `GET /search`                                                       |
-| POST                | `/api/search/objects`                             | `SearchApiController@searchObjects`                    | Object search                                                                                                                                                                                | `GET /search`                                                       |
-| POST                | `/api/search`                                     | `SearchApiController@searchAll`                        | Combined search across events/objects                                                                                                                                                        | `GET /search`                                                       |
-| POST                | `/api/search/semantic`                            | `SemanticSearchController@search`                      | Pure semantic (embedding) search, 5-minute cached                                                                                                                                            | `GET /search?mode=semantic`                                         |
-| POST                | `/api/tokens/create`                              | inline closure                                         | Creates a Sanctum token. Requires an explicit `abilities` array drawn from `SparkAbility::DELEGABLE`; a caller may not request more than its own credential holds. Previously issued `['*']` | — (web settings only)                                               |
-| GET                 | `/api/tokens`                                     | inline closure                                         | Lists the caller's tokens                                                                                                                                                                    | —                                                                   |
-| DELETE              | `/api/tokens/{token}`                             | inline closure                                         | Revokes a token                                                                                                                                                                              | —                                                                   |
-| GET                 | `/api/integrations[/{integration}]`               | `IntegrationApiController@index/show`                  | List/show integrations                                                                                                                                                                       | `GET /integrations[/{id}]`                                          |
-| POST                | `/api/integrations/{integration}/configure`       | `IntegrationApiController@configure`                   | Update integration configuration                                                                                                                                                             | —                                                                   |
-| POST                | `/api/integrations/{integration}/trigger`         | `IntegrationApiController@trigger`                     | Trigger an immediate fetch                                                                                                                                                                   | `POST /integrations/{id}/sync`                                      |
-| DELETE              | `/api/integrations/{integration}`                 | `IntegrationApiController@destroy`                     | Remove an integration                                                                                                                                                                        | —                                                                   |
-| POST                | `/api/fetch/bookmarks` (`ability:bookmark:write`) | `FetchApiController@bookmarkUrl`                       | Bookmark a URL                                                                                                                                                                               | `POST /bookmarks`                                                   |
-| GET                 | `/api/assistant/context`                          | `AssistantContextController@index`                     | Assistant-oriented context payload                                                                                                                                                           | `GET /day-summary`, `GET /events/{id}` (no direct 1:1)              |
-| POST                | `/api/flint/questions/{block}/answer`             | `FlintQuestionsController@answer`                      | Answer a Flint user-question block                                                                                                                                                           | `POST /flint/questions/{block}/answer`                              |
-| GET                 | `/api/task-executions[/{taskExecution}]`          | `TaskExecutionController@index/show`                   | Task pipeline execution records (uses `TaskExecutionResource`)                                                                                                                               | —                                                                   |
-| GET                 | `/api/user`                                       | inline closure                                         | Returns the authenticated user model                                                                                                                                                         | —                                                                   |
-| POST                | `/api/oauth/token`, `/api/oauth/refresh`          | `Auth\OAuthController@token/refresh`                   | Unauthenticated iOS PKCE token exchange/refresh (`throttle:oauth`)                                                                                                                           | —                                                                   |
+| Retired route                                                            | Use instead                                                     |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `GET /api/events[/{event}]`                                              | `GET /api/v1/events[/{id}]`                                     |
+| `POST/PUT/PATCH/DELETE /api/events[/{event}]`                            | `PATCH /api/v1/events/{id}` (v1 has no event create/delete)     |
+| `POST /api/search*`                                                      | `GET /api/v1/search` (`mode=semantic` for embeddings only)      |
+| `POST /api/tokens/create`, `GET/DELETE /api/tokens*`                     | Web settings (`/settings/api-tokens`)                           |
+| `GET /api/integrations[/{integration}]`                                  | `GET /api/v1/integrations[/{id}]`                               |
+| `POST /api/integrations/{integration}/trigger`                           | `POST /api/v1/integrations/{id}/sync`                           |
+| `POST /api/integrations/{id}/configure`, `DELETE /api/integrations/{id}` | Web integration settings (no API equivalent)                    |
+| `POST /api/fetch/bookmarks`                                              | `POST /api/v1/bookmarks` (same body, including the fetch flags) |
+| `GET /api/assistant/context`                                             | `GET /api/v1/day-summary`                                       |
+| `POST /api/flint/questions/{block}/answer`                               | `POST /api/v1/flint/questions/{block}/answer`                   |
+| `GET /api/task-executions[/{id}]`                                        | — (admin pages only)                                            |
+| `GET /api/user`                                                          | —                                                               |
 
 ---
 
