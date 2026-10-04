@@ -9,12 +9,14 @@ use App\Models\Block;
 use App\Models\Event as EventModel;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\User;
 use App\Notifications\SparkNotification;
 use App\Observers\BlockObserver;
 use App\Observers\EventObjectObserver;
 use App\Observers\EventObserver;
 use App\Observers\NotificationEntityObserver;
 use App\Services\EffectiveTimezoneResolver;
+use App\Services\Notifications\NotificationDeliveryRecorder;
 use App\Services\Notifications\NotificationIncidentResolver;
 use App\Services\Notifications\NotificationOccurrence;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -122,11 +124,15 @@ class AppServiceProvider extends ServiceProvider
         // built-in NotificationSent event with channel='database' so the inbox
         // mirror in the app updates in real time alongside the database insert.
         Event::listen(function (NotificationSent $event) {
-            if ($event->channel !== 'database') {
+            if (! $event->notification instanceof SparkNotification) {
                 return;
             }
 
-            if (! $event->notification instanceof SparkNotification) {
+            if ($event->channel !== 'database') {
+                if ($event->notifiable instanceof User) {
+                    app(NotificationDeliveryRecorder::class)->sent($event->notifiable, $event->notification, $event->channel, $event->response);
+                }
+
                 return;
             }
 
@@ -167,6 +173,8 @@ class AppServiceProvider extends ServiceProvider
                         $existing->forceFill([
                             'data' => [
                                 ...($isNewer ? $payload : $existingData),
+                                'delivery' => $existingData['delivery'] ?? [],
+                                'receipts' => $existingData['receipts'] ?? [],
                                 'occurrence_count' => max(1, (int) ($existingData['occurrence_count'] ?? 1)) + 1,
                             ],
                             'read_at' => $isNewer ? null : $existing->read_at,
