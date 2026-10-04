@@ -101,7 +101,7 @@ class IntegrationApiConfigureTest extends TestCase
             'instance_type' => 'workouts',
             'configuration' => ['api_key' => 'hevy-key', 'units' => 'kg', 'update_frequency_minutes' => 60],
         ]);
-        $before = $integration->configuration;
+        $before = $integration->fresh()->configuration;
         Sanctum::actingAs($user, ['integrations:manage']);
 
         $this->withHeader('If-Match', app(ResourceVersion::class)->etag($integration))
