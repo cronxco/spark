@@ -3,6 +3,7 @@
 namespace Tests\Feature\Enrichment;
 
 use App\Integrations\Receipt\ReceiptTransactionMatcher;
+use App\Jobs\Receipt\ReviewUnmatchedReceiptJob;
 use App\Jobs\TaskPipeline\Tasks\FindReceiptForTransactionTask;
 use App\Jobs\TaskPipeline\Tasks\MatchReceiptToTransactionTask;
 use App\Models\Event;
@@ -11,10 +12,13 @@ use App\Models\Integration;
 use App\Models\Relationship;
 use App\Models\TaskExecution;
 use App\Models\User;
+use App\Services\Receipt\ReceiptMatchState;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use DateTimeInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Queue;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -119,6 +123,61 @@ class ReceiptMatchingPipelineTest extends TestCase
         }
 
         $this->assertFalse(Relationship::where('type', 'receipt_for')->exists());
+    }
+
+    #[Test]
+    public function a_receipt_cannot_gain_a_second_active_transaction_link(): void
+    {
+        $receipt = $this->receiptFor($this->alice, 1250, now(), 'Coffee Shop');
+        $first = $this->transactionFor($this->alice, 1250, now(), 'card_payment_to', 'Coffee Shop');
+        $second = $this->transactionFor($this->alice, 1250, now(), 'card_payment_to', 'Coffee Shop');
+        $matcher = app(ReceiptTransactionMatcher::class);
+
+        $link = $matcher->createReceiptRelationship($receipt, $first, 0.9, 'automatic');
+        $this->assertSame($link->id, $matcher->createReceiptRelationship($receipt, $first, 0.9, 'automatic')->id);
+
+        $this->expectException(InvalidArgumentException::class);
+        try {
+            $matcher->createReceiptRelationship($receipt, $second, 0.9, 'automatic');
+        } finally {
+            $this->assertSame(1, ReceiptMatchState::links()->where('from_id', $receipt->id)->count());
+        }
+    }
+
+    #[Test]
+    public function missing_hints_can_produce_suggestions_without_an_automatic_link(): void
+    {
+        $at = now()->subHour();
+        $receipt = $this->receiptFor($this->alice, 1250, $at, 'Coffee Shop');
+        $receipt->update(['event_metadata' => []]);
+        $this->transactionFor($this->alice, 1250, $at, 'card_payment_to', 'Coffee Shop');
+
+        $outcome = app(ReceiptTransactionMatcher::class)->matchReceipt($receipt);
+
+        $this->assertSame('review_required', $outcome);
+        $this->assertFalse(ReceiptMatchState::isMatched($receipt));
+        $this->assertNotEmpty(ReceiptMatchState::candidates($receipt->fresh()));
+    }
+
+    #[Test]
+    public function backfill_preview_is_read_only_and_dispatched_batch_only_makes_suggestions(): void
+    {
+        Queue::fake();
+        $at = now()->subHour();
+        $receipt = $this->receiptFor($this->alice, 1250, $at, 'Coffee Shop');
+        $this->transactionFor($this->alice, 1250, $at, 'card_payment_to', 'Coffee Shop');
+
+        $this->assertSame(0, Artisan::call('receipt-matching:backfill', ['--limit' => 1]));
+        $this->assertSame([], ReceiptMatchState::state($receipt->fresh()));
+        Queue::assertNotPushed(ReviewUnmatchedReceiptJob::class);
+
+        $this->assertSame(0, Artisan::call('receipt-matching:backfill', ['--dispatch' => true, '--limit' => 1]));
+        Queue::assertPushed(ReviewUnmatchedReceiptJob::class, 1);
+        $job = Queue::pushed(ReviewUnmatchedReceiptJob::class)->first();
+        $job->handle(app(ReceiptTransactionMatcher::class));
+
+        $this->assertSame('suggestions', ReceiptMatchState::status($receipt->fresh()));
+        $this->assertFalse(ReceiptMatchState::isMatched($receipt));
     }
 
     private function outcome(Event $event, string $taskKey): ?string

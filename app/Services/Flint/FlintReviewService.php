@@ -6,6 +6,7 @@ use App\Integrations\Receipt\ReceiptTransactionMatcher;
 use App\Models\Event;
 use App\Models\Relationship;
 use App\Models\User;
+use App\Services\Receipt\ReceiptMatchState;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -76,13 +77,14 @@ class FlintReviewService
     private function receiptSuggestions(User $user): Collection
     {
         return $this->receipts($user)
-            ->whereHas('target', fn (Builder $query) => $query->whereJsonContains('metadata->needs_review', true))
+            ->where('event_metadata->receipt_matching->status', 'suggestions')
+            ->whereNotIn('id', ReceiptMatchState::links()->select('from_id'))
             ->latest('time')
             ->limit(self::LIMIT)
             ->get()
             ->map(function (Event $receipt) use ($user): array {
-                $metadata = $receipt->target?->metadata ?? [];
-                $candidateIds = collect($metadata['candidate_matches'] ?? [])->pluck('transaction_id')->filter()->all();
+                $candidates = ReceiptMatchState::candidates($receipt);
+                $candidateIds = collect($candidates)->pluck('transaction_id')->filter()->all();
                 $owned = Event::forUser($user->id)->whereIn('id', $candidateIds)->with('target')->get()->keyBy('id');
 
                 return [
@@ -90,10 +92,10 @@ class FlintReviewService
                     'kind' => 'receipt_suggestion',
                     'title' => $receipt->target?->title ?? 'Receipt',
                     'summary' => 'Spark found possible transactions for this receipt but was not sure enough to link one.',
-                    'confidence' => isset($metadata['candidate_matches'][0]['confidence']) ? (float) $metadata['candidate_matches'][0]['confidence'] : null,
+                    'confidence' => isset($candidates[0]['confidence']) ? (float) $candidates[0]['confidence'] : null,
                     'created_at' => $receipt->time?->toIso8601String(),
                     'subject' => $this->eventSummary($receipt),
-                    'candidates' => collect($metadata['candidate_matches'] ?? [])
+                    'candidates' => collect($candidates)
                         ->filter(fn (array $candidate) => $owned->has($candidate['transaction_id'] ?? null))
                         ->map(fn (array $candidate) => [
                             ...$this->eventSummary($owned[$candidate['transaction_id']]),
@@ -184,22 +186,26 @@ class FlintReviewService
     private function actOnReceiptSuggestion(User $user, string $id, string $action, ?string $transactionId): void
     {
         $receipt = $this->receipts($user)
-            ->whereHas('target', fn (Builder $query) => $query->whereJsonContains('metadata->needs_review', true))
+            ->where('event_metadata->receipt_matching->status', 'suggestions')
+            ->whereNotIn('id', ReceiptMatchState::links()->select('from_id'))
             ->findOrFail($id);
 
         if ($action === 'confirm') {
-            $candidate = collect($receipt->target?->metadata['candidate_matches'] ?? [])->firstWhere('transaction_id', $transactionId);
+            $candidate = collect(ReceiptMatchState::candidates($receipt))->firstWhere('transaction_id', $transactionId);
             if ($candidate === null) {
                 throw new InvalidArgumentException('Choose one of the suggested transactions.');
             }
             $transaction = Event::forUser($user->id)->findOrFail($transactionId);
             app(ReceiptTransactionMatcher::class)->createReceiptRelationship($receipt, $transaction, (float) $candidate['confidence'], 'manual');
-        } elseif ($action !== 'dismiss') {
+        } elseif ($action === 'dismiss') {
+            ReceiptMatchState::update($receipt, [
+                'status' => 'dismissed',
+                'candidates' => [],
+                'dismissed_at' => now()->toIso8601String(),
+            ]);
+        } else {
             throw new InvalidArgumentException('A receipt suggestion can be confirmed or dismissed.');
         }
-
-        $object = $receipt->target->fresh();
-        $object->update(['metadata' => [...($object->metadata ?? []), 'needs_review' => false, 'reviewed_at' => now()->toIso8601String()]]);
     }
 
     private function actOnAutoDecision(User $user, string $kind, string $id, string $action): void
@@ -222,12 +228,9 @@ class FlintReviewService
         }
 
         if ($kind === 'receipt_auto_match') {
-            $receipt = Event::forUser($user->id)->with('target')->find($link->from_id);
-            $object = $receipt?->target;
-            if ($object) {
-                $metadata = $object->metadata ?? [];
-                unset($metadata['matched_transaction_id'], $metadata['matched_at']);
-                $object->update(['metadata' => [...$metadata, 'is_matched' => false, 'needs_review' => false]]);
+            $receipt = Event::forUser($user->id)->find($link->from_id);
+            if ($receipt) {
+                ReceiptMatchState::clear($receipt);
             }
         }
 

@@ -3,43 +3,46 @@
 namespace App\Integrations\Receipt;
 
 use App\Models\Event;
-use App\Models\EventObject;
 use App\Models\Relationship;
 use App\Services\CurrencyConversionService;
+use App\Services\Receipt\ReceiptMatchState;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 
 class ReceiptTransactionMatcher
 {
+    public const TRANSACTION_ACTIONS = [
+        'card_payment_to', 'pot_transfer_to', 'card_refund_from', 'salary_received_from',
+        'payment_to', 'payment_from', 'made_transaction',
+    ];
+
     /**
      * Find candidate transaction matches for a receipt event
      */
     public function findCandidateMatches(Event $receiptEvent): Collection
     {
         $hints = $receiptEvent->event_metadata['matching_hints'] ?? null;
-
-        if (
-            ! is_array($hints)
-            || ! isset($hints['suggested_amount'])
-            || ! is_array($hints['suggested_date_range'] ?? null)
-            || empty($hints['suggested_date_range']['start'])
-            || empty($hints['suggested_date_range']['end'])
-        ) {
-            Log::warning('Receipt: No matching hints available', [
-                'receipt_id' => $receiptEvent->id,
-            ]);
-
+        $hasHints = is_array($hints)
+            && isset($hints['suggested_amount'])
+            && ! empty($hints['suggested_date_range']['start'])
+            && ! empty($hints['suggested_date_range']['end']);
+        $hints = $hasHints ? $hints : [
+            'suggested_amount' => $receiptEvent->value,
+            'suggested_date_range' => [
+                'start' => $receiptEvent->time?->copy()->subHours(4)->toIso8601String(),
+                'end' => $receiptEvent->time?->copy()->addHours(4)->toIso8601String(),
+            ],
+        ];
+        if (! $receiptEvent->time || ! is_numeric($hints['suggested_amount'] ?? null)) {
             return collect();
         }
 
-        $start = $hints['suggested_date_range']['start'];
-        $end = $hints['suggested_date_range']['end'];
-
-        $startTime = Carbon::parse($start)->subHours(2);
-        $endTime = Carbon::parse($end)->addHours(2);
+        $startTime = Carbon::parse($hints['suggested_date_range']['start'])->subHours(2);
+        $endTime = Carbon::parse($hints['suggested_date_range']['end'])->addHours(2);
 
         Log::info('Receipt: Searching for transaction matches', [
             'receipt_id' => $receiptEvent->id,
@@ -63,21 +66,7 @@ class ReceiptTransactionMatcher
         $candidates = Event::forUser($ownerId)
             ->whereIn('service', ['monzo', 'gocardless'])
             ->where('domain', 'money')
-            ->where(function ($query) {
-                // Monzo payment actions
-                $query->whereIn('action', [
-                    'card_payment_to',
-                    'pot_transfer_to',
-                    'card_refund_from',
-                    'salary_received_from',
-                ])
-                    // GoCardless payment actions
-                    ->orWhereIn('action', [
-                        'payment_to',
-                        'payment_from',
-                        'made_transaction',
-                    ]);
-            })
+            ->whereIn('action', self::TRANSACTION_ACTIONS)
             ->whereBetween('time', [$startTime, $endTime])
             ->where(function ($q) use ($hints) {
                 // Match exact amount OR within 5% variance
@@ -91,10 +80,13 @@ class ReceiptTransactionMatcher
             })
             ->with(['target', 'integration'])
             ->get()
-            ->map(function ($txn) use ($receiptEvent) {
+            ->map(function ($txn) use ($receiptEvent, $hasHints) {
                 return [
                     'transaction' => $txn,
-                    'confidence' => $this->calculateMatchConfidence($receiptEvent, $txn),
+                    // Event-only fallback can suggest a pair, but never silently auto-link it.
+                    'confidence' => $hasHints
+                        ? $this->calculateMatchConfidence($receiptEvent, $txn)
+                        : min(0.79, $this->calculateReverseMatchConfidence($receiptEvent, $txn)),
                     'source' => $txn->service,
                 ];
             })
@@ -140,7 +132,7 @@ class ReceiptTransactionMatcher
     public function createReceiptRelationship(
         Event $receipt,
         Event $transaction,
-        float $confidence,
+        ?float $confidence,
         string $method
     ): Relationship {
         $ownerId = $receipt->integration?->user_id;
@@ -148,50 +140,64 @@ class ReceiptTransactionMatcher
         if ($ownerId === null || $ownerId !== $transaction->integration?->user_id) {
             throw new InvalidArgumentException('A receipt can only be linked to a transaction with the same owner.');
         }
-
-        $relationship = Relationship::findOrCreateRelationship(
-            // Lookup attributes (used for finding existing relationship)
-            [
-                'user_id' => $ownerId,
-                'from_type' => Event::class,
-                'from_id' => $receipt->id,
-                'to_type' => Event::class,
-                'to_id' => $transaction->id,
-                'type' => 'receipt_for',
-            ],
-            // Values to set when creating (not used for lookup to avoid JSON comparison)
-            [
-                'value' => $receipt->value,
-                'value_multiplier' => 100,
-                'value_unit' => $receipt->value_unit ?? 'GBP',
-                'metadata' => [
-                    'match_confidence' => $confidence,
-                    'match_method' => $method, // 'automatic' or 'manual'
-                    'matched_at' => now()->toIso8601String(),
-                ],
-            ]
-        );
-
-        // Update receipt merchant EventObject metadata
-        $receiptObject = $receipt->target;
-        if ($receiptObject) {
-            $metadata = $receiptObject->metadata ?? [];
-            $metadata['is_matched'] = true;
-            $metadata['matched_at'] = now()->toIso8601String();
-            $metadata['matched_transaction_id'] = $transaction->id;
-            $metadata['match_confidence'] = $confidence;
-            $metadata['match_method'] = $method;
-            $receiptObject->update(['metadata' => $metadata]);
+        if ($receipt->service !== 'receipt' || $receipt->action !== 'had_receipt_from'
+            || ! in_array($transaction->service, ['monzo', 'gocardless'], true)
+            || $transaction->domain !== 'money'
+            || ! in_array($transaction->action, self::TRANSACTION_ACTIONS, true)) {
+            throw new InvalidArgumentException('Choose an eligible receipt and bank transaction.');
         }
 
-        Log::info('Receipt: Created receipt_for relationship', [
-            'receipt_id' => $receipt->id,
-            'transaction_id' => $transaction->id,
-            'confidence' => $confidence,
-            'method' => $method,
-        ]);
+        return DB::transaction(function () use ($receipt, $transaction, $confidence, $method, $ownerId): Relationship {
+            // All receipt link writes take the same row lock. This prevents two
+            // application workers from selecting different transactions at once.
+            Event::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+            $existing = ReceiptMatchState::links()->where('from_id', $receipt->id)->first();
+            if ($existing) {
+                if ($existing->to_id === $transaction->id) {
+                    return $existing;
+                }
+                throw new InvalidArgumentException('This receipt is already linked to another transaction.');
+            }
 
-        return $relationship;
+            $relationship = Relationship::findOrCreateRelationship(
+                // Lookup attributes (used for finding existing relationship)
+                [
+                    'user_id' => $ownerId,
+                    'from_type' => Event::class,
+                    'from_id' => $receipt->id,
+                    'to_type' => Event::class,
+                    'to_id' => $transaction->id,
+                    'type' => 'receipt_for',
+                ],
+                // Values to set when creating (not used for lookup to avoid JSON comparison)
+                [
+                    'value' => $receipt->value,
+                    'value_multiplier' => 100,
+                    'value_unit' => $receipt->value_unit ?? 'GBP',
+                    'metadata' => [
+                        ...($method === 'automatic' ? ['match_confidence' => $confidence] : []),
+                        ...($method === 'manual' && $confidence !== null ? ['proposal_confidence' => $confidence] : []),
+                        'match_method' => $method, // 'automatic' or 'manual'
+                        'matched_at' => now()->toIso8601String(),
+                    ],
+                ]
+            );
+            ReceiptMatchState::update($receipt, [
+                'status' => 'matched',
+                'candidates' => [],
+                'reason' => null,
+                'matched_at' => now()->toIso8601String(),
+            ]);
+
+            Log::info('Receipt: Created receipt_for relationship', [
+                'receipt_id' => $receipt->id,
+                'transaction_id' => $transaction->id,
+                'confidence' => $confidence,
+                'method' => $method,
+            ]);
+
+            return $relationship;
+        });
     }
 
     /**
@@ -199,31 +205,100 @@ class ReceiptTransactionMatcher
      */
     public function flagForReview(Event $receipt, Collection $candidates): void
     {
-        $receiptObject = $receipt->target;
-        if (! $receiptObject) {
-            return;
-        }
-
-        $metadata = $receiptObject->metadata ?? [];
-        $metadata['is_matched'] = false;
-        $metadata['needs_review'] = true;
-        $metadata['candidate_matches'] = $candidates->map(function ($m) {
-            return [
-                'transaction_id' => $m['transaction']->id,
-                'confidence' => $m['confidence'],
-                'source' => $m['source'],
-                'merchant' => $m['transaction']->target->title ?? null,
-                'amount' => $m['transaction']->value,
-                'time' => $m['transaction']->time->toIso8601String(),
-            ];
-        })->toArray();
-
-        $receiptObject->update(['metadata' => $metadata]);
+        DB::transaction(function () use ($receipt, $candidates): void {
+            Event::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+            if (ReceiptMatchState::isMatched($receipt)) {
+                return;
+            }
+            ReceiptMatchState::update($receipt, [
+                'status' => 'suggestions',
+                'reason' => null,
+                'attempted_at' => now()->toIso8601String(),
+                'algorithm_version' => 1,
+                'candidates' => $candidates->map(function ($m) {
+                    return [
+                        'transaction_id' => $m['transaction']->id,
+                        'confidence' => $m['confidence'],
+                        'source' => $m['source'],
+                        'merchant' => $m['transaction']->target->title ?? null,
+                        'amount' => $m['transaction']->value,
+                        'time' => $m['transaction']->time->toIso8601String(),
+                    ];
+                })->values()->toArray(),
+            ]);
+        });
 
         Log::info('Receipt: Flagged for manual review', [
             'receipt_id' => $receipt->id,
             'candidate_count' => $candidates->count(),
         ]);
+    }
+
+    /** Run the same receipt decision path for intake, a late transaction, or a retry. */
+    public function matchReceipt(Event $receipt, ?Event $incomingTransaction = null, bool $allowAutomatic = true): string
+    {
+        if (ReceiptMatchState::isMatched($receipt)) {
+            return 'already_matched';
+        }
+        if ($incomingTransaction && in_array(ReceiptMatchState::status($receipt), ['dismissed', 'no_match'], true)) {
+            $allowAutomatic = false;
+        }
+
+        $candidates = $this->findCandidateMatches($receipt);
+        if ($incomingTransaction
+            && $incomingTransaction->integration?->user_id === $receipt->integration?->user_id
+            && in_array($incomingTransaction->action, self::TRANSACTION_ACTIONS, true)) {
+            $score = $this->calculateReverseMatchConfidence($receipt, $incomingTransaction);
+            if ($score > config('services.receipt.review_threshold', 0.5)
+                && ! $candidates->contains(fn (array $candidate) => $candidate['transaction']->id === $incomingTransaction->id)) {
+                $candidates->push([
+                    'transaction' => $incomingTransaction,
+                    'confidence' => $score,
+                    'source' => $incomingTransaction->service,
+                ]);
+            }
+        }
+        $candidates = $candidates->sortByDesc('confidence')->values();
+
+        if ($candidates->isEmpty()) {
+            $hasAmount = is_numeric($receipt->value) && $receipt->value > 0;
+            $status = $hasAmount && $receipt->time ? 'no_candidate' : 'needs_details';
+            $alreadyMatched = DB::transaction(function () use ($receipt, $status): bool {
+                Event::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+                if (ReceiptMatchState::isMatched($receipt)) {
+                    return true;
+                }
+                ReceiptMatchState::update($receipt, [
+                    'status' => $status,
+                    'reason' => $status === 'needs_details' ? 'missing_amount_or_time' : 'no_eligible_transaction',
+                    'attempted_at' => now()->toIso8601String(),
+                    'algorithm_version' => 1,
+                    'candidates' => [],
+                ]);
+
+                return false;
+            });
+
+            return $alreadyMatched ? 'already_matched' : $status;
+        }
+
+        $best = $candidates->first();
+        if ($allowAutomatic && $best['confidence'] >= config('services.receipt.auto_match_threshold', 0.8)) {
+            try {
+                $this->createReceiptRelationship($receipt, $best['transaction'], $best['confidence'], 'automatic');
+            } catch (InvalidArgumentException $exception) {
+                if (ReceiptMatchState::isMatched($receipt)) {
+                    return 'already_matched';
+                }
+                throw $exception;
+            }
+
+            return 'matched';
+        }
+
+        $this->flagForReview($receipt, $candidates->take(3));
+
+        return ReceiptMatchState::isMatched($receipt) ? 'already_matched' : 'review_required';
     }
 
     /**

@@ -2,13 +2,16 @@
 
 namespace Tests\Feature\Flint;
 
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Flint\FlintReviewService;
+use App\Services\Receipt\ReceiptMatchState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
@@ -55,7 +58,7 @@ class FlintReviewTest extends TestCase
         app(FlintReviewService::class)->act($this->user, 'receipt_suggestion', $receipt->id, 'confirm', ['transaction_id' => $transaction->id]);
 
         $this->assertTrue(Relationship::where('from_id', $receipt->id)->where('to_id', $transaction->id)->where('type', 'receipt_for')->exists());
-        $this->assertFalse($receipt->target->fresh()->metadata['needs_review']);
+        $this->assertSame('matched', ReceiptMatchState::status($receipt->fresh()));
         $this->assertSame([], app(FlintReviewService::class)->items($this->user));
     }
 
@@ -93,7 +96,7 @@ class FlintReviewTest extends TestCase
 
         $this->assertNotNull($keptLink->fresh()->metadata['reviewed_at']);
         $this->assertSoftDeleted($undoneLink);
-        $this->assertFalse($undoneReceipt->target->fresh()->metadata['is_matched']);
+        $this->assertFalse(ReceiptMatchState::isMatched($undoneReceipt));
     }
 
     #[Test]
@@ -217,6 +220,50 @@ class FlintReviewTest extends TestCase
         $this->assertFalse(Relationship::where('from_id', $receipt->id)->exists());
     }
 
+    #[Test]
+    public function shared_merchant_flags_do_not_change_each_receipts_link_state(): void
+    {
+        $first = $this->receipt('Coffee House');
+        $second = $this->receipt('Coffee House');
+        $second->update(['target_id' => $first->target_id]);
+        $first->target->update(['metadata' => ['is_matched' => true, 'needs_review' => true]]);
+        $this->receiptLink($first, $this->transaction('Coffee House'));
+
+        $this->assertTrue(ReceiptMatchState::isMatched($first));
+        $this->assertFalse(ReceiptMatchState::isMatched($second));
+
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
+        $this->getJson('/api/v1/mobile/flint/receipts/unmatched')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', (string) $second->id);
+        $this->getJson("/api/v1/mobile/flint/receipts/{$first->id}/match")
+            ->assertOk()->assertJsonPath('data.status', 'matched');
+        $this->getJson("/api/v1/mobile/flint/receipts/{$second->id}/match")
+            ->assertOk()->assertJsonPath('data.status', 'unmatched');
+    }
+
+    #[Test]
+    public function mobile_user_can_retry_search_link_and_unlink_an_unmatched_receipt(): void
+    {
+        Queue::fake();
+        $receipt = $this->receipt('Coffee House');
+        $transaction = $this->transaction('Coffee House');
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
+
+        $this->postJson("/api/v1/mobile/flint/receipts/{$receipt->id}/retry")
+            ->assertStatus(202)->assertJsonPath('data.status', 'searching');
+        Queue::assertPushed(ProcessTaskPipelineJob::class);
+        $this->getJson("/api/v1/mobile/flint/receipts/{$receipt->id}/transactions?q=Coffee")
+            ->assertOk()->assertJsonPath('data.0.id', (string) $transaction->id);
+        $this->getJson("/api/v1/mobile/flint/receipts/{$receipt->id}/transactions?q=4.50")
+            ->assertOk()->assertJsonPath('data.0.id', (string) $transaction->id);
+        $this->getJson("/api/v1/mobile/flint/receipts/{$receipt->id}/transactions?q={$transaction->time->toDateString()}")
+            ->assertOk()->assertJsonPath('data.0.id', (string) $transaction->id);
+        $this->postJson("/api/v1/mobile/flint/receipts/{$receipt->id}/link", ['transaction_id' => $transaction->id])
+            ->assertOk()->assertJsonPath('data.status', 'matched');
+        $this->deleteJson("/api/v1/mobile/flint/receipts/{$receipt->id}/match")
+            ->assertOk()->assertJsonPath('data.status', 'unmatched');
+    }
+
     private function transaction(string $merchant): Event
     {
         return Event::factory()->create([
@@ -245,8 +292,12 @@ class FlintReviewTest extends TestCase
                 'user_id' => $this->user->id,
                 'concept' => 'receipt',
                 'title' => "{$merchant} receipt",
-                'metadata' => $metadata,
+                'metadata' => [],
             ])->id,
+            'event_metadata' => ['receipt_matching' => [
+                'status' => ! empty($metadata['needs_review']) ? 'suggestions' : 'unmatched',
+                'candidates' => $metadata['candidate_matches'] ?? [],
+            ]],
         ]);
     }
 
