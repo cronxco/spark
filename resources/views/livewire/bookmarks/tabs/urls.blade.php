@@ -133,10 +133,6 @@
                     <x-badge value="selected {{ $url['last_selected_fetch_method'] }}" class="badge-ghost badge-sm" />
                     @endif
 
-                    @if ($url['is_list'])
-                    <x-badge value="List{{ $url['list_new_count'] !== null ? ' · ' . $url['list_new_count'] . ' new' : '' }}" class="badge-info badge-sm" />
-                    @endif
-
                     <!-- Actions Dropdown -->
                     <x-dropdown position="dropdown-end">
                         <x-slot:trigger>
@@ -158,27 +154,6 @@
                             title="Retry with HTTP"
                             icon="fas.globe"
                             wire:click="fetchNow('{{ $url['id'] }}', true, 'http')" />
-                        @if ($url['list_expandable'])
-                        <x-menu-separator />
-                        @if ($url['list_mode'] !== 'force')
-                        <x-menu-item
-                            title="Treat as list of articles"
-                            icon="fas.list"
-                            wire:click="setListDetectionMode('{{ $url['id'] }}', 'force')" />
-                        @endif
-                        @if ($url['list_mode'] !== 'off')
-                        <x-menu-item
-                            title="Always treat as one article"
-                            icon="fas.file-lines"
-                            wire:click="setListDetectionMode('{{ $url['id'] }}', 'off')" />
-                        @endif
-                        @if ($url['list_mode'] !== 'auto')
-                        <x-menu-item
-                            title="Detect lists automatically"
-                            icon="fas.wand-magic-sparkles"
-                            wire:click="setListDetectionMode('{{ $url['id'] }}', 'auto')" />
-                        @endif
-                        @endif
                         <x-menu-separator />
                         <x-menu-item
                             title="{{ $url['enabled'] ? 'Disable' : 'Enable' }}"

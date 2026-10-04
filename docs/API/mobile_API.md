@@ -649,7 +649,10 @@ evenly, keeping the first and last point. Accepts `ios:read` or `data:read`.
 
 ```json
 {
-    "points": [{ "lat": 51.5, "lng": -0.12 }, { "lat": 51.51, "lng": -0.13 }],
+    "points": [
+        { "lat": 51.5, "lng": -0.12 },
+        { "lat": 51.51, "lng": -0.13 }
+    ],
     "total_points": 2,
     "distance": 5.02,
     "distance_unit": "km",
@@ -2215,9 +2218,6 @@ the iOS session's `data:write` capability.
 
 **Response `201`/`200`**:
 `{"state": "captured|recaptured", "bookmark": {"id": "uuid", "url": "...", "title": "..."}}`.
-With list detection enabled, a page that is a list of articles returns
-`"state": "list_expanded"` plus `items_found`; its articles are bookmarked
-individually in the background.
 
 **Response `422`** — URL fails the safety validator or readable content cannot
 be extracted.

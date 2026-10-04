@@ -327,7 +327,12 @@ paths:
         As /notifications/receipts for a single notification named in the
         path. Answers 404 for a notification that is not the user's.
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
       requestBody:
         required: true
         content:
@@ -1753,14 +1758,8 @@ paths:
                 title: { type: [string, "null"], maxLength: 1000 }
                 html: { type: string, maxLength: 5242880 }
       responses:
-        "201":
-          {
-            description: "Captured as a new bookmark (state captured), or as a new list page whose articles are being bookmarked (state list_expanded, with items_found)",
-          }
-        "200":
-          {
-            description: "Existing bookmark recaptured (state recaptured or list_expanded)",
-          }
+        "201": { description: Captured as a new bookmark }
+        "200": { description: Existing bookmark recaptured }
         "403": { description: Token lacks ios:write }
         "422": { $ref: "#/components/responses/ValidationError" }
 
@@ -2618,7 +2617,15 @@ components:
             status:
               {
                 type: string,
-                enum: [requested, fetching, processing, up_to_date, partial, failed],
+                enum:
+                  [
+                    requested,
+                    fetching,
+                    processing,
+                    up_to_date,
+                    partial,
+                    failed,
+                  ],
               }
             requested_at: { type: [string, "null"], format: date-time }
             started_at: { type: [string, "null"], format: date-time }
