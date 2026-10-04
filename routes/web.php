@@ -115,7 +115,7 @@ Route::middleware(['auth'])->group(function () {
     // Plugin and integration instance detail routes
     Route::get('plugins/{service}', function (string $service) {
         $pluginClass = PluginRegistry::getPlugin($service);
-        if (! $pluginClass) {
+        if (! $pluginClass || ! PluginRegistry::isAvailableTo($pluginClass, Auth::user())) {
             abort(404);
         }
 

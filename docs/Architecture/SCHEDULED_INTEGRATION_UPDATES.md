@@ -10,18 +10,19 @@ The application checks for due integrations every minute and dispatches backgrou
 
 The `CheckIntegrationUpdates` job runs via Laravel's scheduler and:
 
-1. Selects external OAuth instances with a token and API-key instances. Manual and webhook sources are not polled (Task instances are not selected yet; see the Integrations roadmap, INT-03)
+1. Selects external OAuth instances with a token, API-key instances, and Task instances owned by an admin. Manual and webhook sources are not polled. A Task instance is only due once its `use_schedule` is explicitly `true`; a missing setting means off
 2. Determines due instances via `Integration::isDue()`
 3. Queues a `ProcessTaskPipelineJob` on `tasks` for each, filtered to the `run_integration_update` task
 4. `RunIntegrationUpdateTask` skips paused, processing or throttled instances (recorded `not_applicable`), then calls `DispatchIntegrationFetchJobs`, which queues the service's pull jobs
 5. If no pull job maps to the instance's `(service, instance_type)`, the task execution is recorded as failed rather than succeeding with nothing queued. Manual sync from web, REST, mobile and MCP reports the same case as an error
+6. The pull jobs are queued as one job batch (an integration run). Processing jobs a pull job dispatches join the same batch, and the run's state is kept in `configuration.last_run` (`requested` → `fetching` → `processing` → `up_to_date`, or `partial`/`failed`). The integration reads as Processing until the batch finishes, so Up to date means the data was processed, not just fetched. A run still in flight after 60 minutes is reported as `failed`
 
 ## Configuration Options
 
 | Setting                    | Description                                      |
 | -------------------------- | ------------------------------------------------ |
 | `update_frequency_minutes` | Update interval in minutes (default: 15)         |
-| `use_schedule`             | Enable schedule-based updates                    |
+| `use_schedule`             | Enable schedule-based updates (Task: required to run on schedule at all) |
 | `schedule_times`           | Array of HH:mm times (e.g., `["04:10","10:10"]`) |
 | `schedule_timezone`        | IANA timezone (defaults to app timezone)         |
 | `paused`                   | Prevents updates when `true`                     |
@@ -82,7 +83,7 @@ sail artisan schedule:list
 
 | State      | Condition                                                           |
 | ---------- | ------------------------------------------------------------------- |
-| Processing | `last_triggered_at` is more recent than `last_successful_update_at` |
+| Processing | `last_run` is still in flight, or `last_triggered_at` is more recent than `last_successful_update_at` |
 | Failed     | Exception occurred; `last_triggered_at` cleared for retry           |
 | Due        | Meets frequency or schedule requirements                            |
 

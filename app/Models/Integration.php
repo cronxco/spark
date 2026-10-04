@@ -159,6 +159,19 @@ class Integration extends Model
     }
 
     /**
+     * Whether the scheduler may run this Task instance. Task instances run on
+     * schedule only once `use_schedule` is explicitly switched on; a missing
+     * setting means off, so instances created before scheduling worked stay
+     * idle until someone opts each one in.
+     */
+    public function runsTaskOnSchedule(): bool
+    {
+        $useSchedule = ($this->configuration ?? [])['use_schedule'] ?? null;
+
+        return filter_var($useSchedule, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true;
+    }
+
+    /**
      * Whether this instance is paused
      */
     public function isPaused(): bool

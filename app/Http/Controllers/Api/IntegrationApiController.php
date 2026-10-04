@@ -17,7 +17,7 @@ class IntegrationApiController extends Controller
      */
     public function index(Request $request)
     {
-        $plugins = PluginRegistry::getAllPlugins()->map(function ($pluginClass) {
+        $plugins = PluginRegistry::getPluginsAvailableTo($request->user())->map(function ($pluginClass) {
             return [
                 'identifier' => $pluginClass::getIdentifier(),
                 'name' => $pluginClass::getDisplayName(),
