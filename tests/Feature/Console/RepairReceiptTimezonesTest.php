@@ -66,10 +66,12 @@ class RepairReceiptTimezonesTest extends TestCase
         $edited = $this->receipt();
         $edited->update(['time' => $edited->time->copy()->addMinute()]);
         $delayed = $this->receipt();
-        $delayed->update(['created_at' => Carbon::parse('2026-10-05T13:00:00Z')]);
+        $delayed->forceFill(['created_at' => Carbon::parse('2026-10-05T13:00:00Z')])->save();
+        $this->assertSame('2026-10-05T13:00:00+00:00', $delayed->fresh()->created_at->toIso8601String());
         $conflict = $this->receipt(['transaction_metadata' => ['transaction_date' => '2026-10-04T14:50:14Z', 'transaction_timezone' => 'America/New_York']]);
         $ambiguous = $this->receipt(['transaction_metadata' => ['transaction_date' => '2026-10-25T01:30:00Z']]);
-        $ambiguous->update(['time' => Carbon::parse('2026-10-25T01:30:00Z'), 'created_at' => Carbon::parse('2026-10-25T00:31:00Z')]);
+        $ambiguous->forceFill(['time' => Carbon::parse('2026-10-25T01:30:00Z'), 'created_at' => Carbon::parse('2026-10-25T00:31:00Z')])->save();
+        $this->assertSame('2026-10-25T00:31:00+00:00', $ambiguous->fresh()->created_at->toIso8601String());
         $events = [$offset, $normalized, $edited, $delayed, $conflict, $ambiguous];
         $before = collect($events)->mapWithKeys(fn ($event) => [$event->id => $event->fresh()->time->toIso8601String()]);
 
