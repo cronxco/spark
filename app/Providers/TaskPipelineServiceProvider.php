@@ -231,15 +231,7 @@ class TaskPipelineServiceProvider extends ServiceProvider
             runOnCreate: true,
             runOnUpdate: false,
             shouldRun: function ($model) {
-                // Only run for payment-related actions
-                $paymentActions = [
-                    'had_card_payment',
-                    'had_transaction',
-                    'had_account_debit',
-                    'had_faster_payment',
-                ];
-
-                return in_array($model->action, $paymentActions);
+                return in_array($model->action, FindReceiptForTransactionTask::TRANSACTION_ACTIONS, true);
             },
         ));
 

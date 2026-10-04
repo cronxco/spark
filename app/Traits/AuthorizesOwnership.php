@@ -2,6 +2,12 @@
 
 namespace App\Traits;
 
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use Illuminate\Database\Eloquent\Model;
+
 /**
  * Shared ownership guard for Livewire/Volt detail components.
  *
@@ -22,5 +28,19 @@ trait AuthorizesOwnership
     protected function authorizeOwner(int|string|null $ownerId): void
     {
         abort_if($ownerId === null || (string) $ownerId !== (string) auth()->id(), 403);
+    }
+
+    /**
+     * Abort with 403 unless the authenticated user owns the given record,
+     * resolving ownership for each kind of record a shared component accepts.
+     */
+    protected function authorizeModelOwner(Model $model): void
+    {
+        $this->authorizeOwner(match (true) {
+            $model instanceof Integration, $model instanceof EventObject => $model->user_id,
+            $model instanceof Event => $model->integration?->user_id,
+            $model instanceof Block => $model->event?->integration?->user_id,
+            default => null,
+        });
     }
 }

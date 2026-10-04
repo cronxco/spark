@@ -493,23 +493,9 @@ You should see:
 
 ---
 
-## Step 10: Optional - Schedule Cleanup Job
+## Step 10: Retention
 
-To automatically delete S3 emails older than 30 days, add this to `app/Console/Kernel.php`:
-
-```php
-use App\Jobs\Data\Receipt\CleanupOldReceiptEmailsJob;
-
-protected function schedule(Schedule $schedule): void
-{
-    // ... existing scheduled tasks ...
-
-    // Clean up old receipt emails from S3 (30 day retention)
-    $schedule->job(new CleanupOldReceiptEmailsJob)->daily();
-}
-```
-
-**Note:** The S3 lifecycle policy (Step 1.3) also handles deletion, so this is a backup.
+Raw emails are deleted only by the S3 lifecycle rule from Step 1.3. Spark has no cleanup job of its own. Once the rule removes an email, the structured receipt stays and its detail page says "Original email no longer kept".
 
 ---
 

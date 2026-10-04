@@ -7,7 +7,9 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Services\Ai\EmbeddingClient;
+use App\Services\Search\RecencyRanking;
 use Exception;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -58,25 +60,33 @@ class SemanticModeQuery
                     ]);
                 }
 
+                $ranking = app(RecencyRanking::class);
+
                 // In semantic mode, show more results and use looser threshold
                 // Search events (limit to top 10)
-                $events = Event::semanticSearch($embedding, threshold: 1.2, limit: 10, temporalWeight: 0.015)
-                    ->whereIn('integration_id', $userIntegrationIds)
-                    ->with(['actor', 'target', 'integration'])
-                    ->get();
+                $events = $ranking->orderBySemantic(
+                    Event::semanticSearch($embedding, threshold: 1.2, limit: 10, temporalWeight: 0)
+                        ->whereIn('integration_id', $userIntegrationIds)
+                        ->with(['actor', 'target', 'integration']),
+                    $embedding,
+                )->get();
 
                 // Search blocks (limit to top 10)
-                $blocks = Block::semanticSearch($embedding, threshold: 1.2, limit: 10, temporalWeight: 0.015)
-                    ->whereHas('event', function ($q) use ($userIntegrationIds) {
-                        $q->whereIn('integration_id', $userIntegrationIds);
-                    })
-                    ->with(['event.integration'])
-                    ->get();
+                $blocks = $ranking->orderBySemantic(
+                    Block::semanticSearch($embedding, threshold: 1.2, limit: 10, temporalWeight: 0)
+                        ->whereHas('event', function ($q) use ($userIntegrationIds) {
+                            $q->whereIn('integration_id', $userIntegrationIds);
+                        })
+                        ->with(['event.integration']),
+                    $embedding,
+                )->get();
 
                 // Search objects (limit to top 10)
-                $objects = EventObject::semanticSearch($embedding, threshold: 1.2, limit: 10, temporalWeight: 0.015)
-                    ->where('user_id', auth()->id())
-                    ->get();
+                $objects = $ranking->orderBySemantic(
+                    EventObject::semanticSearch($embedding, threshold: 1.2, limit: 10, temporalWeight: 0)
+                        ->where('user_id', auth()->id()),
+                    $embedding,
+                )->get();
 
                 // Combine results
                 $results = collect();

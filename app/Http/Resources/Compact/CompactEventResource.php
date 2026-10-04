@@ -4,6 +4,7 @@ namespace App\Http\Resources\Compact;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
+use App\Services\Mobile\EventRoute;
 use App\Support\MoneyDirection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -61,6 +62,11 @@ class CompactEventResource extends JsonResource
 
         if ($this->url) {
             $data['url'] = $this->url;
+        }
+
+        // Only present when true. The points themselves come from GET /events/{id}/route.
+        if (app(EventRoute::class)->hasRoute($this->resource)) {
+            $data['has_route'] = true;
         }
 
         if ($this->relationLoaded('actor') && $this->actor) {

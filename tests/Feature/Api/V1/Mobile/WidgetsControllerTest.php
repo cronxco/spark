@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -50,7 +51,7 @@ class WidgetsControllerTest extends TestCase
     #[Test]
     public function today_returns_widget_shape_and_stays_under_4kb(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/widgets/today')
             ->assertOk()
@@ -101,7 +102,7 @@ class WidgetsControllerTest extends TestCase
             ]);
         }
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/widgets/metrics/oura.sleep_score')
             ->assertOk()
@@ -111,7 +112,7 @@ class WidgetsControllerTest extends TestCase
     #[Test]
     public function metric_widget_returns_404_for_unknown_metric(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/widgets/metrics/bogus.metric')
             ->assertStatus(404);
@@ -125,7 +126,7 @@ class WidgetsControllerTest extends TestCase
         $this->createMonzoEvent('Greggs', 320);
         $this->createMonzoEvent('Shell', 6000);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/widgets/spend')
             ->assertOk()
@@ -152,7 +153,7 @@ class WidgetsControllerTest extends TestCase
         $this->createMonzoEvent('British Airways', 59900, Carbon::parse('2026-09-24T23:15:00Z'));
         $this->createMonzoEvent('Late dinner', 2500, Carbon::parse('2026-09-24T22:00:00Z'));
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/widgets/today')
             ->assertOk()

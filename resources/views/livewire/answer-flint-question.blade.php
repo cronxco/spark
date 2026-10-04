@@ -1,9 +1,15 @@
 <div>
     @php
         $answerOptions = $block->metadata['answer_options'] ?? null;
+        $canSkip = \App\Support\FlintQuestion::status($block) === 'open';
     @endphp
 
-    @if ($answered)
+    @if ($skipped)
+        <div class="flex items-center gap-2 text-sm text-base-content/60">
+            <x-icon name="o-minus-circle" class="w-4 h-4" />
+            <span>Marked not relevant</span>
+        </div>
+    @elseif ($answered && ! $editing)
         <div class="space-y-2">
             <div class="flex items-center gap-2">
                 <x-icon name="o-check-circle" class="w-4 h-4 text-success" />
@@ -15,6 +21,8 @@
             @if ($answer_note)
                 <div class="text-xs text-base-content/60 italic pl-1">{{ $answer_note }}</div>
             @endif
+            {{-- A correction is added to the history; the earlier answer is kept. --}}
+            <button type="button" wire:click="edit" class="btn btn-ghost btn-xs">Change answer</button>
         </div>
     @else
         <form wire:submit="submit" class="space-y-3">
@@ -23,7 +31,7 @@
                     @foreach ($answerOptions as $option)
                         <button
                             type="button"
-                            wire:click="$set('answer', '{{ $option }}')"
+                            wire:click="$set('answer', @js($option))"
                             class="btn btn-sm {{ $answer === $option ? 'btn-primary' : 'btn-outline' }}"
                         >
                             {{ $option }}
@@ -50,14 +58,23 @@
                 <div class="text-error text-xs">{{ $message }}</div>
             @enderror
 
-            <button
-                type="submit"
-                class="btn btn-primary btn-sm"
-                wire:loading.attr="disabled"
-            >
-                <span wire:loading.remove>Save Answer</span>
-                <span wire:loading>Saving…</span>
-            </button>
+            <div class="flex flex-wrap items-center gap-2">
+                <button
+                    type="submit"
+                    class="btn btn-primary btn-sm"
+                    wire:loading.attr="disabled"
+                >
+                    <span wire:loading.remove>{{ $answered ? 'Save correction' : 'Save Answer' }}</span>
+                    <span wire:loading>Saving…</span>
+                </button>
+                @if ($answered)
+                    <button type="button" wire:click="cancelEdit" class="btn btn-ghost btn-sm">Cancel</button>
+                @elseif ($canSkip)
+                    <button type="button" wire:click="skip" class="btn btn-ghost btn-sm" wire:loading.attr="disabled">
+                        Not relevant
+                    </button>
+                @endif
+            </div>
         </form>
     @endif
 </div>

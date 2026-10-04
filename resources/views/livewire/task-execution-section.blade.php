@@ -5,13 +5,18 @@ use App\Services\TaskPipeline\TaskExecutionStore;
 use Livewire\Volt\Component;
 use Illuminate\Database\Eloquent\Model;
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
+use App\Traits\AuthorizesOwnership;
 
 new class extends Component {
+    use AuthorizesOwnership;
+
     public Model $model;
     public bool $showNotApplicable = false;
 
     public function mount(Model $model): void
     {
+        $this->authorizeModelOwner($model);
+
         $this->model = $model;
     }
 
@@ -49,6 +54,8 @@ new class extends Component {
 
     public function rerunTask(string $taskKey): void
     {
+        $this->authorizeModelOwner($this->model);
+
         ProcessTaskPipelineJob::dispatch(
             model: $this->model,
             trigger: 'manual',
@@ -62,6 +69,8 @@ new class extends Component {
 
     public function rerunAllTasks(): void
     {
+        $this->authorizeModelOwner($this->model);
+
         ProcessTaskPipelineJob::dispatch(
             model: $this->model,
             trigger: 'manual',

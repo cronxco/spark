@@ -21,10 +21,23 @@ The Mobile API uses Laravel Sanctum personal access tokens with scoped abilities
 
 ### Token Abilities
 
-| Ability     | Required for                        |
-| ----------- | ----------------------------------- |
-| `ios:read`  | All GET endpoints                   |
-| `ios:write` | All POST / PATCH / DELETE endpoints |
+Each route names one action-scoped capability (decision D-API-3). The app's
+session token holds all of them (`SparkAbility::MOBILE_SESSION`):
+
+| Area                                                           | Read                 | Write                                                                  |
+| -------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------- |
+| Events, objects, blocks, search, tags, places, map, captures   | `data:read`          | `data:write`                                                           |
+| Briefing, metrics, widgets, check-ins, Up to Speed             | `insights:read`      | `insights:write`                                                       |
+| Money accounts, net worth, spend widget                        | `finance:read`       | `finance:write`                                                        |
+| Integrations                                                   | `integrations:read`  | `integrations:sync` (sync), `integrations:manage` (pause, OAuth start) |
+| Flint                                                          | `flint:read`         | `flint:write`                                                          |
+| Notifications, devices, Live Activities, notification settings | `notifications:read` | `notifications:write`                                                  |
+| API tokens                                                     | `mobile:session`     | `tokens:revoke` (create needs `tokens:manage`)                         |
+
+`ping`, `me` and `logout` need only a valid token. The old `ios:read` /
+`ios:write` scopes open nothing: a token that holds only those gets **`401`**
+with `"reason": "session_upgrade_required"`, and the app's normal refresh
+issues a token with the capabilities above.
 
 Tokens are obtained via OAuth PKCE (see [Token Exchange](#token-exchange)). All authenticated requests must include:
 
@@ -193,6 +206,7 @@ Day-scoped payloads also **render** in that zone: every timestamp inside `GET /b
 | `GET`  | `/feed`                         | Cursor-paginated reverse-chronological event feed                               |
 | `GET`  | `/notifications`                | Cursor-paginated notifications inbox                                            |
 | `GET`  | `/events/{id}`                  | Single event                                                                    |
+| `GET`  | `/events/{id}/route`            | GPS route of a workout event (only when `has_route` is true)                    |
 | `GET`  | `/objects/{id}`                 | Single object with optional recent events                                       |
 | `GET`  | `/blocks/{id}`                  | Single block                                                                    |
 | `GET`  | `/metrics`                      | All available metric identifiers and metadata                                   |
@@ -214,6 +228,7 @@ Day-scoped payloads also **render** in that zone: every timestamp inside `GET /b
 | `GET`  | `/tags`                         | Cursor-paginated list of the user's tags                                        |
 | `GET`  | `/tags/suggest`                 | Autocomplete tag suggestions                                                    |
 | `GET`  | `/tags/{id}`                    | A single tag plus the items tagged with it                                      |
+| `GET`  | `/relationship-types`           | Relationship types the server accepts                                           |
 | `GET`  | `/{kind}/{id}/relationships`    | List relationships on an owned event, object, or block                          |
 | `GET`  | `/settings/notifications`       | Current notification preferences                                                |
 | `GET`  | `/check-ins`                    | Morning/afternoon check-in status for a date                                    |
@@ -270,7 +285,7 @@ Carries a strong `ETag` for the user resource. This is the value to echo as
 Ends the calling session server-side: revokes the paired OAuth refresh token
 and deletes the access token presenting the request.
 
-Requires only `ios:read`, so a read-only session can still sign itself out, and
+Needs no capability, so a read-only session can still sign itself out, and
 carries **no `If-Match`** — signing out must never be blocked by a
 precondition.
 
@@ -618,6 +633,35 @@ Returns a single event by UUID. The response includes the full embedded `blocks`
 **Response `200`** — [CompactEvent](#compactevent)
 
 **Response `404`** — Event not found or belongs to another user.
+
+An event that carries a usable GPS route (Apple Health workouts) also has
+`"has_route": true`; the key is absent otherwise.
+
+---
+
+### `GET /events/{id}/route`
+
+Read-only GPS route for an owned event with `has_route`. Points without real
+coordinates are dropped, and routes longer than 1,000 points are thinned
+evenly, keeping the first and last point. Accepts `ios:read` or `data:read`.
+
+**Response `200`**
+
+```json
+{
+    "points": [{ "lat": 51.5, "lng": -0.12 }, { "lat": 51.51, "lng": -0.13 }],
+    "total_points": 2,
+    "distance": 5.02,
+    "distance_unit": "km",
+    "duration_seconds": 1500
+}
+```
+
+`total_points` counts the usable points before thinning. `distance`,
+`distance_unit` and `duration_seconds` are `null` when the source did not
+record them.
+
+**Response `404`** — No route, or the event is not found or not owned.
 
 ---
 
@@ -1211,6 +1255,13 @@ objects, and blocks tagged with it, newest first.
 
 ---
 
+### `GET /relationship-types`
+
+Relationship types from `RelationshipTypeRegistry`. Identical to
+[API_v1.md](API_v1.md#get-apiv1relationship-types).
+
+---
+
 ### `GET /{kind}/{id}/relationships`
 
 Lists relationships attached to an owned event, object, or block. `{kind}` ∈
@@ -1716,7 +1767,7 @@ N+1 requests for two numbers.
 
 ## Write Endpoints
 
-All write endpoints require `ios:write` ability.
+All write endpoints require the area's write capability (see [Token Abilities](#token-abilities)).
 
 ### Summary
 
@@ -1737,6 +1788,10 @@ All write endpoints require `ios:write` ability.
 | `DELETE` | `/notifications/{id}`              | Delete one notification                                                                    |
 | `PATCH`  | `/{kind}/{id}`                     | Non-destructive update of an owned event/object/block                                      |
 | `PATCH`  | `/events/{id}/note`                | Set or clear an event's note                                                               |
+| `DELETE` | `/events/{id}`                     | Soft-delete an owned event (`If-Match`)                                                    |
+| `POST`   | `/events/{id}/restore`             | Undo: restore a soft-deleted event                                                         |
+| `DELETE` | `/objects/{id}`                    | Soft-delete an owned object (`If-Match`)                                                   |
+| `POST`   | `/objects/{id}/restore`            | Undo: restore a soft-deleted object                                                        |
 | `PATCH`  | `/{kind}/{id}/location`            | Set a location on an owned event/object                                                    |
 | `DELETE` | `/{kind}/{id}/location`            | Clear a location                                                                           |
 | `POST`   | `/{kind}/{id}/location/geocode`    | Geocode an address and set it as the location                                              |
@@ -1783,7 +1838,10 @@ per kind.
 **Response `200`**: the updated entity in its Compact resource shape.
 
 **Response `404`** — Not found or not owned. **Response `422`** — Disallowed
-field or invalid value. **Response `428`/`412`** — Missing/stale `If-Match`.
+field or invalid value, or a change to a source field (object `title`,
+`concept`, `type`, `url`; block `title`, `block_type`, `url`) of an
+integration-sourced or locked item; `errors.{field}` says why. The event note
+stays editable. **Response `428`/`412`** — Missing/stale `If-Match`.
 
 ---
 
@@ -1791,6 +1849,30 @@ field or invalid value. **Response `428`/`412`** — Missing/stale `If-Match`.
 
 Sets or clears the user-authored note block on an event. Requires
 `If-Match`. Same behavior as MCP's `set-event-note`.
+
+---
+
+### `DELETE /events/{id}` · `DELETE /objects/{id}`
+
+Soft-deletes an owned event or object (`deleted_at` is set; nothing is
+removed). Deleting an object keeps its events, media and relationships.
+Requires `If-Match` with the entity's current `ETag`.
+
+**Response `200`**: `{"id": "uuid", "deleted_at": "ISO-8601"}`. A deleted
+event appears in `GET /sync/delta` under `deleted`.
+
+**Response `404`** — Not found or not owned. **Response `428`/`412`** —
+Missing/stale `If-Match`.
+
+### `POST /events/{id}/restore` · `POST /objects/{id}/restore`
+
+The app's Undo. Restores a soft-deleted owned event or object and returns it
+in its Compact shape with a fresh `ETag` (an object is returned without
+`recent_events`). Restoring an item that is not deleted returns it
+unchanged. No `If-Match`: a deleted row has no readable version and
+restoring is idempotent.
+
+**Response `404`** — Not found or not owned.
 
 ---
 
@@ -1913,9 +1995,10 @@ Requires `If-Match`. Prevents self-links and enforces registered
 relationship-type directionality — same rules as MCP's
 `manage-relationship` create operation.
 
-**Request Body**: `{"to_kind": "objects", "to_id": "uuid", "type": "linked_to", "value": null, "value_multiplier": null, "value_unit": null, "metadata": {}}`
+**Request Body**: `{"to_kind": "object", "to_id": "uuid", "type": "linked_to", "value": null, "value_multiplier": null, "value_unit": null, "metadata": {}}`
 
-**Response `201`**: [Relationship](API_v1.md#relationship).
+**Response `201`**: [Relationship](API_v1.md#relationship), plus `versions`
+(the touched entities' new ETags) and an `ETag` header for the new edge.
 
 **Response `422`** — Invalid endpoints, unregistered type, or ownership mismatch.
 
@@ -1923,7 +2006,9 @@ relationship-type directionality — same rules as MCP's
 
 ### `DELETE /relationships/{relationship}`
 
-Deletes an owned relationship by UUID. Requires `If-Match`.
+Deletes an owned relationship by UUID. Requires `If-Match` with the
+relationship's own `etag` from the list or create response, not the parent
+entity's.
 
 **Response `204`** — No content. **Response `404`** — Not found or not owned.
 
@@ -2107,7 +2192,8 @@ all return **`204`** without revealing ownership.
 ### `POST /bookmarks`
 
 Bookmarks a URL shared from the iOS share extension. Delegates to the same
-service as the legacy `POST /api/fetch/bookmarks` endpoint.
+service as `POST /api/v1/bookmarks`, and accepts the same optional
+`fetch_immediately`, `force_refresh` and `fetch_mode` fields.
 
 **Request Body**: `{"url": "https://example.com/article"}` (required, valid URL, max 2048 chars).
 
@@ -2121,7 +2207,7 @@ service as the legacy `POST /api/fetch/bookmarks` endpoint.
 
 Captures content rendered in Safari and supplied by the iOS Share extension.
 Uses the same capture service as `POST /api/v1/bookmarks/capture`, but accepts
-the iOS session's `ios:write` ability.
+the iOS session's `data:write` capability.
 
 **Request Body**:
 `{"url": "https://example.com/article", "title": "Article title", "html": "<!doctype html>..."}`.
@@ -2144,6 +2230,35 @@ wired up client-side, which is `spark-ios` work outside this repo. Documented
 here so the gap is visible rather than silent; if the share extension still
 isn't calling either endpoint by the next removal review, that's the point
 to reconsider.
+
+---
+
+### `POST /captures`
+
+One way in for anything shared into Spark: a URL, free text or an image.
+Requires `ios:write`. Captures are ordinary events on the user's Manual Log
+integration, so there is no capture table.
+
+**Request Body**: `kind` (`url`, `text` or `image`) and `idempotency_key`
+(letters, numbers, `.`, `:`, `_`, `-`; max 100) are required. Send exactly the
+field that matches `kind`:
+
+- `url`: a valid URL (max 2048). Becomes a bookmark, as with `POST /bookmarks`.
+- `text`: free text (max 20,000 chars). Lands on the user's **Inbox** object
+  as a `captured_text` event with `event_metadata.triage = "pending"`.
+- `image`: base64 JPEG, PNG, HEIC, GIF or WebP (max 15 MB decoded). Stored on
+  its own `captured_image` object.
+
+`title` is optional.
+
+**Response `201`/`200`**:
+`{"capture_receipt": {"id": "uuid", "kind": "text", "status": "accepted", "idempotency_key": "...", "destination": {"type": "event", "id": "uuid", "object_id": "uuid"}, "created_at": "..."}}`.
+A retry with the same `idempotency_key` returns the first receipt with `200`.
+For `url`, `destination.type` is `object` (the bookmark) and `state` is the
+bookmark state.
+
+**Response `422`**: a validation error, a URL that fails the safety
+validator, or an image that cannot be read or stored.
 
 ---
 
@@ -2320,7 +2435,7 @@ authenticated user.
 
 Lists the user's personal access tokens for use outside the app (e.g.
 against the general REST API or MCP). Never returns plaintext secrets, and
-never includes the app's own `ios:read`/`ios:write` session tokens — this
+never includes the app's own session tokens (marked `mobile:session`) — this
 endpoint can't be used to inspect or revoke the mobile app's own session.
 **Mobile-only** — API-token administration is otherwise web-settings-only
 (see [README.md](README.md)); it is not exposed on `/api/v1` or MCP.
@@ -2346,7 +2461,7 @@ endpoint can't be used to inspect or revoke the mobile app's own session.
 Creates a personal access token and returns its one-time plaintext secret.
 
 > **Requires `tokens:manage`.** An iOS OAuth session is only ever issued
-> `ios:read`/`ios:write` (see `OAuthController::scopeToAbilities`), so this
+> the capabilities in `SparkAbility::MOBILE_SESSION`, which exclude `tokens:manage` (see `OAuthController::scopeToAbilities`), so this
 > endpoint is **not reachable from the app** and returns `403`. Token
 > administration is a web-settings journey. The route remains registered so a
 > non-mobile credential holding `tokens:manage` can use it.
@@ -2366,10 +2481,10 @@ and 20 distinct strings, each of which must appear in
 
 `bookmark:write`, `data:image`, `data:read`, `data:write`, `finance:read`,
 `finance:write`, `flint:read`, `flint:run`, `flint:write`, `insights:read`,
-`insights:write`, `integrations:read`, `integrations:sync`, `tokens:manage`
+`insights:write`, `integrations:manage`, `integrations:read`, `integrations:sync`, `tokens:manage`
 
 Authority attenuates: a token-authenticated caller may only request
-capabilities its own credential already holds. `ios:read`, `ios:write` and
+capabilities its own credential already holds. `mobile:session`, `tokens:revoke`, the retired `ios:read`/`ios:write` and
 `mcp:read` are never delegable — `mcp:read` remains accepted on existing
 tokens as a legacy alias, but new tokens must name the capability they need.
 
@@ -2402,7 +2517,7 @@ Revokes a personal access token.
 **Response `204`** — No content.
 
 **Response `404`** — Token not found, or it's one of the app's own
-`ios:read`/`ios:write` session tokens (not revocable through this endpoint).
+session tokens (not revocable through this endpoint).
 
 ---
 
@@ -2827,14 +2942,29 @@ shapes.
     "paused": false,
     "last_sync_at": "2026-09-26T10:14:00+00:00",
     "next_update_at": "2026-09-26T11:14:00+00:00",
-    "schedule_summary": null
+    "schedule_summary": null,
+    "last_run": {
+        "status": "up_to_date",
+        "requested_at": "2026-09-26T10:12:00+00:00",
+        "started_at": "2026-09-26T10:12:03+00:00",
+        "finished_at": "2026-09-26T10:14:00+00:00",
+        "processed_jobs": 4,
+        "failed_jobs": 0,
+        "error": null
+    }
 }
 ```
 
 `status` is derived by `Integration::statusKey()` and is one of `paused`,
 `processing`, `stale`, `needs_update` or `up_to_date`. `stale` means a push or
 manual source has gone quiet; there is nothing to trigger, so clients should
-not present it as an error.
+not present it as an error. `status` stays `processing` until the latest run's
+processing jobs have finished, not just its fetch.
+
+`last_run` is the latest update run (the fetch jobs and the processing jobs
+they dispatch), or `null` before the first one. Its `status` is one of
+`requested`, `fetching`, `processing`, `up_to_date`, `partial` (some jobs
+failed) or `failed` (every job failed, or the run stalled for an hour).
 
 ### CompactMetric
 

@@ -7,6 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -38,7 +39,7 @@ class BriefingControllerTest extends TestCase
     #[Test]
     public function returns_summary_shape_for_today(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/briefing/today')
             ->assertOk()
@@ -52,7 +53,7 @@ class BriefingControllerTest extends TestCase
     {
         Carbon::setTestNow('2026-07-01 23:30:00 UTC');
         $user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/briefing/today')
             ->assertOk()
@@ -73,7 +74,7 @@ class BriefingControllerTest extends TestCase
             'action' => 'time_travel',
             'event_metadata' => ['timezone' => 'Pacific/Auckland', 'acknowledged_at' => '2026-09-24T10:00:00.000000Z'],
         ]);
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/briefing/today')
             ->assertOk()
@@ -88,7 +89,7 @@ class BriefingControllerTest extends TestCase
     #[Test]
     public function rejects_malformed_date(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/briefing/today?date=not-a-date')
             ->assertStatus(422);
@@ -97,7 +98,7 @@ class BriefingControllerTest extends TestCase
     #[Test]
     public function rejects_array_date_param(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/briefing/today?date[]=2024-01-01')
             ->assertStatus(422)
@@ -107,7 +108,7 @@ class BriefingControllerTest extends TestCase
     #[Test]
     public function rejects_array_domains_param(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/briefing/today?domains[]=health')
             ->assertStatus(422)
@@ -117,7 +118,7 @@ class BriefingControllerTest extends TestCase
     #[Test]
     public function rejects_sloppy_iso_date_format(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_SESSION);
 
         // Carbon::parse would accept these; createFromFormat('Y-m-d') must not.
         $this->getJson('/api/v1/mobile/briefing/today?date=2024-1-1')->assertStatus(422);
@@ -127,7 +128,7 @@ class BriefingControllerTest extends TestCase
     #[Test]
     public function etag_returns_304_on_match(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_SESSION);
 
         $first = $this->getJson('/api/v1/mobile/briefing/today')->assertOk();
         $etag = $first->headers->get('ETag');
@@ -142,7 +143,7 @@ class BriefingControllerTest extends TestCase
     public function sync_status_reports_stale_and_as_of_for_a_never_synced_service(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'oura']);
         Integration::factory()->create([
@@ -163,7 +164,7 @@ class BriefingControllerTest extends TestCase
     public function sync_status_is_fresh_when_the_integration_synced_within_its_cadence(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'oura']);
         Integration::factory()->create([
@@ -183,7 +184,7 @@ class BriefingControllerTest extends TestCase
     public function money_section_separates_spend_from_internal_transfers(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'monzo']);
         $integration = Integration::factory()->create([

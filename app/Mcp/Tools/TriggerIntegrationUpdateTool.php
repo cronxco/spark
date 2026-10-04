@@ -82,7 +82,9 @@ class TriggerIntegrationUpdateTool extends Tool
                 'integration_id' => $integration->id,
                 'service' => $integration->service,
                 'instance_type' => $integration->instance_type,
-                'status' => 'triggered',
+                ...($jobsDispatched === 0
+                    ? ['status' => 'failed', 'reason' => 'nothing_to_dispatch']
+                    : ['status' => 'triggered']),
                 'jobs_dispatched' => $jobsDispatched,
             ];
         }

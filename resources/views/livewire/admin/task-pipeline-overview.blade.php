@@ -4,10 +4,10 @@ use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
 use App\Models\TaskExecution;
 use App\Services\TaskPipeline\TaskRegistry;
+use App\Support\AdminTenant;
+use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -181,7 +181,7 @@ new class extends Component
     {
         $fromRegistry = $this->allTasks->map(fn ($task) => ['key' => $task->key, 'name' => $task->name]);
 
-        $fromExecutions = TaskExecution::forUser(Auth::id())
+        $fromExecutions = TaskExecution::forUser(AdminTenant::id())
             ->select('task_key', 'task_name')
             ->distinct()
             ->get()
@@ -196,23 +196,9 @@ new class extends Component
      */
     public function getEntityTypeFilterOptionsProperty(): Collection
     {
-        $fromExecutions = TaskExecution::forUser(Auth::id())->distinct()->pluck('entity_type');
+        $fromExecutions = TaskExecution::forUser(AdminTenant::id())->distinct()->pluck('entity_type');
 
         return collect($this->uniqueAppliesTo)->concat($fromExecutions)->unique()->sort()->values();
-    }
-
-    protected function windowStart(): \Carbon\Carbon
-    {
-        return match ($this->window) {
-            '7d' => now()->subDays(7),
-            '30d' => now()->subDays(30),
-            default => now()->subDay(),
-        };
-    }
-
-    protected function stuckThreshold(): \Carbon\Carbon
-    {
-        return now()->subMinutes($this->stuckAfterMinutes);
     }
 
     public function isStuck(TaskExecution $execution): bool
@@ -223,7 +209,7 @@ new class extends Component
 
     public function getActiveExecutionsProperty(): Collection
     {
-        return TaskExecution::forUser(Auth::id())
+        return TaskExecution::forUser(AdminTenant::id())
             ->whereIn('status', ['pending', 'running', 'waiting', 'blocked'])
             ->when($this->activeStatusFilter, fn ($q) => $q->where('status', $this->activeStatusFilter))
             ->latest('updated_at')
@@ -233,7 +219,7 @@ new class extends Component
 
     public function getRecentExecutionsProperty(): LengthAwarePaginator
     {
-        return TaskExecution::forUser(Auth::id())
+        return TaskExecution::forUser(AdminTenant::id())
             ->where('updated_at', '>=', $this->windowStart())
             ->when($this->execStatusFilter, fn ($q) => $q->where('status', $this->execStatusFilter))
             ->when($this->execTaskFilter, fn ($q) => $q->where('task_key', $this->execTaskFilter))
@@ -251,7 +237,7 @@ new class extends Component
 
     public function getRecentFailuresProperty(): LengthAwarePaginator
     {
-        return TaskExecution::forUser(Auth::id())
+        return TaskExecution::forUser(AdminTenant::id())
             ->where('status', 'failed')
             ->where('updated_at', '>=', $this->windowStart())
             ->latest('updated_at')
@@ -260,7 +246,7 @@ new class extends Component
 
     public function getStatsProperty(): array
     {
-        $liveCounts = TaskExecution::forUser(Auth::id())
+        $liveCounts = TaskExecution::forUser(AdminTenant::id())
             ->whereIn('status', ['pending', 'running', 'waiting', 'blocked'])
             ->selectRaw('status, count(*) as aggregate')
             ->groupBy('status')
@@ -271,12 +257,12 @@ new class extends Component
         $waiting = (int) ($liveCounts['waiting'] ?? 0);
         $blocked = (int) ($liveCounts['blocked'] ?? 0);
 
-        $stuck = TaskExecution::forUser(Auth::id())
+        $stuck = TaskExecution::forUser(AdminTenant::id())
             ->whereIn('status', ['pending', 'running'])
             ->where('updated_at', '<', $this->stuckThreshold())
             ->count();
 
-        $windowCounts = TaskExecution::forUser(Auth::id())
+        $windowCounts = TaskExecution::forUser(AdminTenant::id())
             ->whereIn('status', ['success', 'failed'])
             ->where('updated_at', '>=', $this->windowStart())
             ->selectRaw('status, count(*) as aggregate')
@@ -357,13 +343,13 @@ new class extends Component
     public function getSelectedExecutionProperty(): ?TaskExecution
     {
         return $this->selectedExecutionId
-            ? TaskExecution::forUser(Auth::id())->whereKey($this->selectedExecutionId)->first()
+            ? TaskExecution::forUser(AdminTenant::id())->whereKey($this->selectedExecutionId)->first()
             : null;
     }
 
     public function retryFailure(string $failureId): void
     {
-        $execution = TaskExecution::forUser(Auth::id())->whereKey($failureId)->first();
+        $execution = TaskExecution::forUser(AdminTenant::id())->whereKey($failureId)->first();
 
         if (! $execution) {
             $this->error('That task execution could not be found.');
@@ -377,7 +363,7 @@ new class extends Component
             return;
         }
 
-        $event = Event::forUser(Auth::id())->whereKey($execution->entity_id)->first();
+        $event = Event::forUser(AdminTenant::id())->whereKey($execution->entity_id)->first();
 
         if (! $event) {
             $this->error('The underlying event no longer exists.');
@@ -393,6 +379,20 @@ new class extends Component
         )->onQueue('tasks');
 
         $this->success('Task queued for retry.');
+    }
+
+    protected function windowStart(): Carbon
+    {
+        return match ($this->window) {
+            '7d' => now()->subDays(7),
+            '30d' => now()->subDays(30),
+            default => now()->subDay(),
+        };
+    }
+
+    protected function stuckThreshold(): Carbon
+    {
+        return now()->subMinutes($this->stuckAfterMinutes);
     }
 }; ?>
 

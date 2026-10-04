@@ -4,7 +4,9 @@ use App\Http\Middleware\CacheApiResponse;
 use App\Http\Middleware\EnsureIosMobileApiEnabled;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\ETag;
+use App\Http\Middleware\RecordOperatorAccess;
 use App\Http\Middleware\RequireIfMatch;
+use App\Http\Middleware\RequireMobileSession;
 use App\Http\Middleware\RequireSparkAbility;
 use App\Http\Middleware\SentryApiLogging;
 use App\Http\Middleware\SentryMobileApiLogging;
@@ -48,6 +50,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'ability' => CheckForAnyAbility::class,
             'admin' => EnsureUserIsAdmin::class,
             'spark.ability' => RequireSparkAbility::class,
+            'mobile.session' => RequireMobileSession::class,
+            'admin.operator.audit' => RecordOperatorAccess::class,
             'if-match' => RequireIfMatch::class,
         ]);
 

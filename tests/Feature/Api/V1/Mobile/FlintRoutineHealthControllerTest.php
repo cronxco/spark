@@ -6,6 +6,7 @@ use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Models\User;
 use App\Services\FlintDigestService;
 use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -45,7 +46,7 @@ class FlintRoutineHealthControllerTest extends TestCase
         $user->setTimezone('Europe/London');
         (new TriggerFlintRoutineJob($user, 'topics', '2026-09-14', 'Europe/London'))
             ->handle(app(FlintDigestService::class), app(TaskExecutionStore::class));
-        Sanctum::actingAs($user, ['ios:read']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_READ);
 
         $response = $this->getJson('/api/v1/mobile/flint/routines/health')->assertOk();
         $topics = collect($response->json('data'))->firstWhere('routine', 'topics');

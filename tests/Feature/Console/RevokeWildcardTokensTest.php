@@ -4,6 +4,7 @@ namespace Tests\Feature\Console;
 
 use App\Models\OAuthRefreshToken;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
 use PHPUnit\Framework\Attributes\Test;
@@ -68,7 +69,7 @@ class RevokeWildcardTokensTest extends TestCase
     {
         $user = User::factory()->create();
         $user->createToken('Legacy', ['*']);
-        $scoped = $user->createToken('iPad', ['ios:read', 'ios:write'])->accessToken;
+        $scoped = $user->createToken('iPad', SparkAbility::MOBILE_SESSION)->accessToken;
 
         $refresh = OAuthRefreshToken::create([
             'user_id' => $user->getKey(),
