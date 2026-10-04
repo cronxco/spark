@@ -8,6 +8,7 @@ use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class NotificationReceiptsTest extends TestCase
@@ -28,7 +29,7 @@ class NotificationReceiptsTest extends TestCase
     public function each_event_is_stored_once_and_the_first_time_wins(): void
     {
         $notification = $this->notification();
-        Sanctum::actingAs($this->user, ['ios:read', 'notifications:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'notifications:write']));
 
         foreach (['shown', 'opened', 'tapped'] as $event) {
             $this->postJson("/api/v1/mobile/notifications/{$notification->id}/receipts", [
@@ -54,7 +55,7 @@ class NotificationReceiptsTest extends TestCase
     public function a_batch_records_receipts_with_their_action_and_counts_repeats(): void
     {
         $notification = $this->notification();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson('/api/v1/mobile/notifications/receipts', ['receipts' => [
             ['notification_id' => $notification->id, 'event' => 'opened', 'occurred_at' => '2026-10-03T09:00:00Z', 'action' => 'VIEW'],
@@ -73,7 +74,7 @@ class NotificationReceiptsTest extends TestCase
     public function another_users_notification_is_not_found_and_never_written(): void
     {
         $theirs = $this->notification(User::factory()->create());
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson("/api/v1/mobile/notifications/{$theirs->id}/receipts", [
             'event' => 'shown',
@@ -96,7 +97,7 @@ class NotificationReceiptsTest extends TestCase
     public function an_unknown_event_is_rejected(): void
     {
         $notification = $this->notification();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson("/api/v1/mobile/notifications/{$notification->id}/receipts", [
             'event' => 'dismissed',
@@ -114,7 +115,7 @@ class NotificationReceiptsTest extends TestCase
     public function content_like_fields_are_rejected_and_not_stored(): void
     {
         $notification = $this->notification();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson("/api/v1/mobile/notifications/{$notification->id}/receipts", [
             'event' => 'shown',
@@ -147,7 +148,7 @@ class NotificationReceiptsTest extends TestCase
     public function reporting_needs_the_write_ability(): void
     {
         $notification = $this->notification();
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
 
         $this->postJson("/api/v1/mobile/notifications/{$notification->id}/receipts", [
             'event' => 'shown',

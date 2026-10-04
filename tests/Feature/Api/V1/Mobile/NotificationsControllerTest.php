@@ -11,6 +11,7 @@ use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class NotificationsControllerTest extends TestCase
@@ -149,12 +150,12 @@ class NotificationsControllerTest extends TestCase
     {
         $notification = $this->notification(['title' => 'Archive me'], Carbon::now());
         $someoneElse = User::factory()->create();
-        Sanctum::actingAs($someoneElse, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($someoneElse, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson("/api/v1/mobile/notifications/{$notification->id}/archive")->assertNotFound();
         $this->assertNull($notification->fresh()->archived_at);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         // The iOS client archives without If-Match, as it does for read.
         $this->postJson("/api/v1/mobile/notifications/{$notification->id}/archive")->assertNoContent();

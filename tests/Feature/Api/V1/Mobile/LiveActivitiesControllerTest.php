@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class LiveActivitiesControllerTest extends TestCase
@@ -163,7 +164,7 @@ class LiveActivitiesControllerTest extends TestCase
     #[Test]
     public function follow_up_calls_accept_the_row_id_that_shipped_builds_send(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $record = $this->postJson('/api/v1/mobile/live-activities', [
             'activity_id' => '00000000-0000-4000-8000-000000000006',
@@ -197,7 +198,7 @@ class LiveActivitiesControllerTest extends TestCase
             'starts_at' => now(),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->deleteJson('/api/v1/mobile/live-activities/' . $token->id)->assertNotFound();
         $this->assertNull($token->fresh()->ends_at);
