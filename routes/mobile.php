@@ -177,6 +177,7 @@ Route::get('places/{id}', [PlacesController::class, 'show'])->middleware('spark.
 Route::get('map/data', [MapController::class, 'data'])->middleware('spark.ability:data:read')->name('map.data');
 
 Route::get('relationship-types', [EntityMutationsController::class, 'relationshipTypes'])
+    ->middleware('spark.ability:data:read')
     ->name('relationship-types.index');
 Route::get('{kind}/{id}/relationships', [EntityMutationsController::class, 'relationships'])
     ->whereIn('kind', ['events', 'objects', 'blocks'])
