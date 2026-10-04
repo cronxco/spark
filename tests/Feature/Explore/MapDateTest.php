@@ -10,6 +10,7 @@ use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 /**
@@ -31,7 +32,7 @@ class MapDateTest extends TestCase
         $this->user = User::factory()->create();
         $this->user->setTimezone('Europe/London');
         $this->integration = Integration::factory()->create(['user_id' => $this->user->id]);
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
     }
 
     #[Test]
