@@ -275,6 +275,76 @@ paths:
               schema: { type: string }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /notifications/receipts:
+    post:
+      operationId: recordNotificationReceipts
+      tags: [notifications]
+      summary: Report that notifications were shown, opened or tapped
+      description: >-
+        Operational telemetry from the iOS app (decision N-8), stored on the
+        notification's data under receipts.{event}. Idempotent per event: the
+        first occurred_at wins and repeats are no-ops. Receipts carry only the
+        id, event, time and action identifier; any other field is rejected
+        with 422, so message content is never stored. Receipts naming a
+        notification that is not the user's are counted as not_found and
+        never stored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [receipts]
+              properties:
+                receipts:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items: { $ref: "#/components/schemas/NotificationReceipt" }
+      responses:
+        "200":
+          description: Counts of receipts recorded, already recorded and not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      recorded: { type: integer }
+                      unchanged: { type: integer }
+                      not_found: { type: integer }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /notifications/{id}/receipts:
+    post:
+      operationId: recordNotificationReceipt
+      tags: [notifications]
+      summary: Report one receipt for one notification
+      description: >-
+        As /notifications/receipts for a single notification named in the
+        path. Answers 404 for a notification that is not the user's.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [event, occurred_at]
+              properties:
+                event: { type: string, enum: [shown, opened, tapped] }
+                occurred_at: { type: string, format: date-time }
+                action: { type: [string, "null"], maxLength: 64 }
+      responses:
+        "204": { description: No content }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /notifications/{id}:
     delete:
       operationId: deleteNotification
@@ -292,6 +362,100 @@ paths:
       operationId: getEvent
       tags: [entities]
       summary: Single event with full embedded blocks
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactEvent" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteEvent
+      tags: [entities]
+      summary: Soft-delete an owned event (undo with restore)
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            id: { type: string, format: uuid },
+                            deleted_at: { type: string, format: date-time },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+
+  /events/{id}/route:
+    get:
+      operationId: getEventRoute
+      tags: [entities]
+      summary: Read-only GPS route of a workout event, thinned to at most 1000 points
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        required: [points, total_points],
+                        properties:
+                          {
+                            points:
+                              {
+                                type: array,
+                                items:
+                                  {
+                                    type: object,
+                                    properties:
+                                      {
+                                        lat: { type: number },
+                                        lng: { type: number },
+                                      },
+                                  },
+                              },
+                            total_points: { type: integer },
+                            distance: { type: [number, "null"] },
+                            distance_unit: { type: [string, "null"] },
+                            duration_seconds: { type: [number, "null"] },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{id}/restore:
+    post:
+      operationId: restoreEvent
+      tags: [entities]
+      summary: Restore a soft-deleted event (idempotent, no If-Match)
       parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
         "200":
@@ -342,6 +506,56 @@ paths:
             in: query,
             schema: { type: integer, minimum: 1, maximum: 25, default: 5 },
           }
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactObject" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteObject
+      tags: [entities]
+      summary: Soft-delete an owned object (undo with restore)
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            id: { type: string, format: uuid },
+                            deleted_at: { type: string, format: date-time },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+
+  /objects/{id}/restore:
+    post:
+      operationId: restoreObject
+      tags: [entities]
+      summary: Restore a soft-deleted object (idempotent, no If-Match)
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
         "200":
           {
@@ -472,6 +686,14 @@ paths:
         "422":
           { description: Entity not found or address could not be geocoded }
 
+  /relationship-types:
+    get:
+      operationId: listRelationshipTypes
+      tags: [entities]
+      summary: Relationship types the server accepts
+      responses:
+        "200": { description: OK }
+
   /{kind}/{id}/relationships:
     get:
       operationId: listRelationships
@@ -504,7 +726,7 @@ paths:
                 required: [to_kind, to_id, type],
                 properties:
                   {
-                    to_kind: { type: string },
+                    to_kind: { type: string, enum: [event, object, block] },
                     to_id: { type: string, format: uuid },
                     type: { type: string },
                     value: { type: [number, "null"] },
@@ -2273,6 +2495,18 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
+    NotificationReceipt:
+      type: object
+      additionalProperties: false
+      required: [notification_id, event, occurred_at]
+      properties:
+        notification_id: { type: string, format: uuid }
+        event: { type: string, enum: [shown, opened, tapped] }
+        occurred_at: { type: string, format: date-time }
+        action:
+          type: [string, "null"]
+          maxLength: 64
+          description: The UNNotificationAction identifier when an action button was used.
     Error:
       type: object
       properties:
@@ -2316,6 +2550,11 @@ components:
             description: "Money events only (domain=money, value set) — resolved server-side so the client never infers direction from the action-name suffix.",
           }
         url: { type: string }
+        has_route:
+          {
+            type: boolean,
+            description: "Present (true) only when GET /events/{id}/route has a route.",
+          }
         actor: { type: object }
         target: { type: object }
         tags: { type: array, items: { type: object } }
@@ -2373,6 +2612,20 @@ components:
         last_sync_at: { type: [string, "null"], format: date-time }
         next_update_at: { type: [string, "null"], format: date-time }
         schedule_summary: { type: [string, "null"] }
+        last_run:
+          type: [object, "null"]
+          properties:
+            status:
+              {
+                type: string,
+                enum: [requested, fetching, processing, up_to_date, partial, failed],
+              }
+            requested_at: { type: [string, "null"], format: date-time }
+            started_at: { type: [string, "null"], format: date-time }
+            finished_at: { type: [string, "null"], format: date-time }
+            processed_jobs: { type: integer }
+            failed_jobs: { type: integer }
+            error: { type: [string, "null"] }
 
     IntegrationDetail:
       type: object

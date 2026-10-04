@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Mobile\ApiTokensController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController;
 use App\Http\Controllers\Api\V1\Mobile\BookmarksController;
 use App\Http\Controllers\Api\V1\Mobile\BriefingController;
+use App\Http\Controllers\Api\V1\Mobile\CapturesController;
 use App\Http\Controllers\Api\V1\Mobile\CheckInsController;
 use App\Http\Controllers\Api\V1\Mobile\ContextController;
 use App\Http\Controllers\Api\V1\Mobile\DevicesController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Api\V1\Mobile\FeedController;
 use App\Http\Controllers\Api\V1\Mobile\FlintDigestsController;
 use App\Http\Controllers\Api\V1\Mobile\FlintNotesController;
 use App\Http\Controllers\Api\V1\Mobile\FlintQuestionsController;
+use App\Http\Controllers\Api\V1\Mobile\FlintReviewController;
 use App\Http\Controllers\Api\V1\Mobile\FlintRoutineHealthController;
 use App\Http\Controllers\Api\V1\Mobile\FlintTopicsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
@@ -90,6 +92,9 @@ Route::get('notifications/feed/{id}', [NotificationsController::class, 'show'])
     ->name('notifications.show');
 
 Route::get('events/{id}', [EventsController::class, 'show'])->middleware('spark.ability:data:read')->name('events.show');
+Route::get('events/{id}/route', [EventsController::class, 'route'])
+    ->middleware('spark.ability:data:read')
+    ->name('events.route');
 Route::patch('{kind}/{id}/location', [LocationsController::class, 'set'])->whereIn('kind', ['events', 'objects'])->middleware(['spark.ability:data:write', 'if-match:entity'])->name('locations.set');
 Route::delete('{kind}/{id}/location', [LocationsController::class, 'clear'])->whereIn('kind', ['events', 'objects'])->middleware(['spark.ability:data:write', 'if-match:entity'])->name('locations.clear');
 Route::post('{kind}/{id}/location/geocode', [LocationsController::class, 'geocode'])->whereIn('kind', ['events', 'objects'])->middleware(['spark.ability:data:write', 'if-match:entity'])->name('locations.geocode');
@@ -101,10 +106,29 @@ Route::patch('events/{id}/note', [EventsController::class, 'updateNote'])
     ->middleware(['spark.ability:data:write', 'if-match:event'])
     ->name('events.note.update');
 Route::get('objects/{id}', [ObjectsController::class, 'show'])->middleware('spark.ability:data:read')->name('objects.show');
+
+/*
+ * Soft delete takes the entity's If-Match like every destructive write.
+ * Restore is the client's Undo: the deleted row has no readable version, and
+ * restoring twice changes nothing, so it carries no precondition.
+ */
+Route::delete('events/{id}', [EventsController::class, 'destroy'])
+    ->middleware(['spark.ability:data:write', 'if-match:event'])
+    ->name('events.destroy');
+Route::post('events/{id}/restore', [EventsController::class, 'restore'])
+    ->middleware('spark.ability:data:write')
+    ->name('events.restore');
+Route::delete('objects/{id}', [ObjectsController::class, 'destroy'])
+    ->middleware(['spark.ability:data:write', 'if-match:object'])
+    ->name('objects.destroy');
+Route::post('objects/{id}/restore', [ObjectsController::class, 'restore'])
+    ->middleware('spark.ability:data:write')
+    ->name('objects.restore');
 Route::get('blocks/{id}', [BlocksController::class, 'show'])->middleware('spark.ability:data:read')->name('blocks.show');
 Route::get('metrics', [MetricsController::class, 'index'])->middleware('spark.ability:insights:read')->name('metrics.index');
 Route::get('metrics/baselines', [InsightDiscoveryController::class, 'baselines'])->middleware('spark.ability:insights:read')->name('metrics.baselines');
 Route::get('metrics/{metric}', [MetricsController::class, 'show'])->middleware('spark.ability:insights:read')->name('metrics.show');
+
 
 Route::get('widgets/today', [WidgetsController::class, 'today'])->middleware('spark.ability:insights:read')->name('widgets.today');
 Route::get('widgets/metrics/{metric}', [WidgetsController::class, 'metric'])->middleware('spark.ability:insights:read')->name('widgets.metric');
@@ -153,6 +177,8 @@ Route::get('places/{id}', [PlacesController::class, 'show'])->middleware('spark.
 
 Route::get('map/data', [MapController::class, 'data'])->middleware('spark.ability:data:read')->name('map.data');
 
+Route::get('relationship-types', [EntityMutationsController::class, 'relationshipTypes'])
+    ->name('relationship-types.index');
 Route::get('{kind}/{id}/relationships', [EntityMutationsController::class, 'relationships'])
     ->whereIn('kind', ['events', 'objects', 'blocks'])
     ->middleware('spark.ability:data:read')
@@ -195,12 +221,27 @@ Route::delete('devices/{id}', [DevicesController::class, 'destroy'])->middleware
  * per-notification version and there is no `GET /notifications/{id}`, so no
  * client could obtain the strong ETag the middleware demanded.
  *
+ * Archiving is the same: it is reversible from History, so it carries no
+ * precondition either. It briefly required one, which the iOS client (by
+ * design) never sends, so every native archive answered 428 and the row came
+ * back.
+ *
  * Deletion is destructive and keeps its precondition; CompactNotificationResource
  * now emits `version` so a client can satisfy it.
  */
 Route::post('notifications/read-all', [NotificationsController::class, 'markAllRead'])
     ->middleware('spark.ability:notifications:write')
     ->name('notifications.read-all');
+
+// Delivery receipts from the app (decision N-8): id, event, time and action
+// identifier only, never message content.
+Route::post('notifications/receipts', [NotificationsController::class, 'recordReceipts'])
+    ->middleware('spark.ability:notifications:write')
+    ->name('notifications.receipts');
+
+Route::post('notifications/{id}/receipts', [NotificationsController::class, 'recordReceipt'])
+    ->middleware('spark.ability:notifications:write')
+    ->name('notifications.receipt');
 
 Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead'])
     ->middleware('spark.ability:notifications:write')
@@ -211,7 +252,7 @@ Route::post('notifications/{id}/unread', [NotificationsController::class, 'markU
     ->name('notifications.unread');
 
 Route::post('notifications/{id}/archive', [NotificationsController::class, 'archive'])
-    ->middleware(['spark.ability:notifications:write', 'if-match:notification'])
+    ->middleware('spark.ability:notifications:write')
     ->name('notifications.archive');
 
 Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
@@ -272,6 +313,10 @@ Route::post('bookmarks', [BookmarksController::class, 'store'])
 Route::post('bookmarks/capture', [CapturedBookmarksController::class, 'store'])
     ->middleware('spark.ability:data:write')
     ->name('bookmarks.capture');
+
+Route::post('captures', [CapturesController::class, 'store'])
+    ->middleware('spark.ability:data:write')
+    ->name('captures.store');
 
 /*
 |--------------------------------------------------------------------------
@@ -375,6 +420,12 @@ Route::delete('flint/notes/{id}', [FlintNotesController::class, 'destroy'])->mid
 Route::get('flint/routines/health', FlintRoutineHealthController::class)
     ->middleware('spark.ability:flint:read')
     ->name('flint.routines.health');
+
+Route::get('flint/review', [FlintReviewController::class, 'index'])->middleware('spark.ability:flint:read')->name('flint.review.index');
+Route::post('flint/review/{kind}/{id}', [FlintReviewController::class, 'act'])
+    ->whereIn('kind', ['receipt_suggestion', 'receipt_auto_match', 'link_suggestion', 'auto_link'])
+    ->middleware('spark.ability:flint:write')
+    ->name('flint.review.act');
 
 /*
 |--------------------------------------------------------------------------

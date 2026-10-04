@@ -26,7 +26,8 @@ class FlintRoutineHealthController extends Controller
         $integration = Integration::query()
             ->where('user_id', $user->id)
             ->where('service', 'flint')
-            ->where('instance_type', 'digest')
+            ->orderByRaw("CASE WHEN instance_type = 'assistant' THEN 0 ELSE 1 END")
+            ->oldest()
             ->first();
         $executionState = $integration ? $executions->getTaskExecutions($integration) : [];
         $routines = collect(['morning_digest', 'evening_digest', 'topics', 'reading_list', 'news_roundup'])

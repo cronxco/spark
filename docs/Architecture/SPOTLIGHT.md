@@ -59,7 +59,6 @@ app/Spotlight/
 │       ├── MetricTrendsQuery.php
 │       ├── ObjectSearchQuery.php
 │       ├── SemanticModeQuery.php
-│       ├── SemanticSearchQuery.php
 │       └── TagSearchQuery.php
 └── Scopes/                     # Context-aware scopes (auto-apply tokens)
     ├── BlockDetailScope.php
@@ -385,7 +384,8 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'icon' => 'musical-note',
                 'action' => 'dispatch_event',
                 'actionParams' => [
-                    'name' => 'trigger-spotify-sync',
+                    'name' => 'trigger-all-integrations',
+                    'data' => ['service' => 'spotify'],
                     'close' => true,
                 ],
                 'priority' => 7,

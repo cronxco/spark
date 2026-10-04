@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Person;
+use App\Services\FlintDigestService;
 use Carbon\Carbon;
 
 /**
@@ -82,10 +83,7 @@ class HomeAssistantAttributionService
         $period = $this->inferPeriod();
         $today = Carbon::today();
 
-        $flintIntegration = Integration::firstOrCreate(
-            ['user_id' => $user->id, 'service' => 'flint', 'instance_type' => 'digest'],
-            ['name' => 'Flint Digest', 'active' => true]
-        );
+        $flintIntegration = app(FlintDigestService::class)->resolveIntegration($user);
 
         $digestTitle = $today->format('Y-m-d') . ' ' . match ($period) {
             'morning' => 'AM',

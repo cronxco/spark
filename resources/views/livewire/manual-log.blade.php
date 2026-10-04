@@ -2,8 +2,6 @@
 
 use App\Integrations\ManualLog\ManualLogPlugin;
 use App\Models\Event;
-use App\Models\Integration;
-use App\Models\IntegrationGroup;
 
 use function Livewire\Volt\computed;
 use function Livewire\Volt\state;
@@ -23,35 +21,10 @@ $integration = computed(function () {
         return null;
     }
 
-    $integrationGroup = IntegrationGroup::firstOrCreate(
-        [
-            'user_id' => $userId,
-            'service' => 'manual_log',
-        ],
-        [
-            'account_id' => null,
-            'access_token' => null,
-            'refresh_token' => null,
-            'expiry' => null,
-            'refresh_expiry' => null,
-        ]
-    );
-
-    return Integration::firstOrCreate(
-        [
-            'user_id' => $userId,
-            'integration_group_id' => $integrationGroup->id,
-            'service' => 'manual_log',
-            'instance_type' => 'log',
-        ],
-        [
-            'name' => 'Manual Log',
-            'configuration' => [],
-        ]
-    );
+    return ManualLogPlugin::resolveIntegration($userId);
 });
 
-$actionTypes = computed(fn () => ManualLogPlugin::getActionTypes());
+$actionTypes = computed(fn () => ManualLogPlugin::loggableActionTypes());
 
 $recentEntries = computed(function () {
     if (! $this->integration) {
@@ -59,6 +32,7 @@ $recentEntries = computed(function () {
     }
 
     return Event::where('integration_id', $this->integration->id)
+        ->whereIn('action', array_keys(ManualLogPlugin::loggableActionTypes()))
         ->with('target')
         ->orderByDesc('time')
         ->limit(10)

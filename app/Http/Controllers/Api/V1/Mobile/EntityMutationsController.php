@@ -58,7 +58,15 @@ class EntityMutationsController extends Controller
             return response()->json(['message' => 'Relationship endpoints, type, or ownership are invalid.'], 422);
         }
 
-        return response()->json($this->mutations->relationshipPayload($relationship), 201);
+        return response()->json([
+            ...$this->mutations->relationshipPayload($relationship),
+            'versions' => $this->mutations->relationshipVersions($relationship),
+        ], 201)->header('ETag', $this->versions->etag($relationship));
+    }
+
+    public function relationshipTypes(): JsonResponse
+    {
+        return response()->json(['data' => $this->mutations->relationshipTypes()]);
     }
 
     public function destroyRelationship(Request $request, string $relationship): JsonResponse

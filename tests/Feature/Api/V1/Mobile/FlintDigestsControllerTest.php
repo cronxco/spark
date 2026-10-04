@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class FlintDigestsControllerTest extends TestCase
@@ -568,6 +569,22 @@ class FlintDigestsControllerTest extends TestCase
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests/latest')->assertNotFound();
+    }
+
+    /**
+     * `show` and `latest` used to read the date off the event's `time`; the
+     * digest's recorded `local_date` is the canonical day.
+     */
+    #[Test]
+    public function show_prefers_the_digests_recorded_local_date(): void
+    {
+        $event = $this->createDigestEvent('evening', Carbon::parse('2026-07-14'), ['local_date' => '2026-07-13']);
+
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
+
+        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+            ->assertOk()
+            ->assertJsonPath('date', '2026-07-13');
     }
 
     private function createDigestEvent(string $period = 'morning', ?Carbon $date = null, array $meta = [], array $overrides = []): Event
