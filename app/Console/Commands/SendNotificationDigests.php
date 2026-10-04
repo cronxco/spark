@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Cache;
+use Throwable;
 
 class SendNotificationDigests extends Command
 {
@@ -56,13 +57,19 @@ class SendNotificationDigests extends Command
                     return;
                 }
 
-                $items = $this->itemsFor($user, $windowEnd->copy()->subDay()->utc(), $windowEnd->copy()->utc());
+                try {
+                    $items = $this->itemsFor($user, $windowEnd->copy()->subDay()->utc(), $windowEnd->copy()->utc());
 
-                if ($items === []) {
-                    return;
+                    if ($items === []) {
+                        return;
+                    }
+
+                    $user->notify(new NotificationDigest($items));
+                } catch (Throwable $exception) {
+                    Cache::forget($marker);
+
+                    throw $exception;
                 }
-
-                $user->notify(new NotificationDigest($items));
                 $sent++;
             });
 

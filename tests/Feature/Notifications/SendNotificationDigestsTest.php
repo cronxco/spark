@@ -10,6 +10,7 @@ use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -136,6 +137,25 @@ class SendNotificationDigestsTest extends TestCase
         $this->assertSame('Your Spark digest: 2 notifications', $mail->subject);
         $this->assertContains('**Monzo synced** — 42 transactions', $mail->introLines);
         $this->assertContains('**Page changed**', $mail->introLines);
+    }
+
+    #[Test]
+    public function a_failed_dispatch_can_be_retried_on_the_next_scheduler_run(): void
+    {
+        $this->notification('integration_completed', 'Monzo synced', '2026-10-05 07:00');
+        $this->travelTo(Carbon::parse('2026-10-05 09:05', 'UTC'));
+        Notification::shouldReceive('send')->once()->andThrow(new RuntimeException('Queue unavailable'));
+
+        try {
+            $this->artisan('notifications:send-digests');
+            $this->fail('Expected the dispatch failure.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Queue unavailable', $exception->getMessage());
+        }
+
+        Notification::fake();
+        $this->artisan('notifications:send-digests')->assertSuccessful();
+        Notification::assertSentToTimes($this->user, NotificationDigest::class, 1);
     }
 
     private function notification(string $type, string $title, string $at, ?User $user = null, ?string $lastOccurredAt = null): DatabaseNotification
