@@ -62,7 +62,7 @@ class FlintReviewTest extends TestCase
             ['transaction_id' => $suggested->id, 'confidence' => 0.7],
         ]]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, ['ios:read', 'flint:write']);
         $this->postJson("/api/v1/mobile/flint/review/receipt_suggestion/{$receipt->id}", ['action' => 'confirm', 'transaction_id' => $other->id])
             ->assertStatus(422);
 

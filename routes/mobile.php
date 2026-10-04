@@ -359,10 +359,10 @@ Route::delete('flint/notes/{id}', [FlintNotesController::class, 'destroy'])->mid
 Route::get('flint/routines/health', FlintRoutineHealthController::class)
     ->name('flint.routines.health');
 
-Route::get('flint/review', [FlintReviewController::class, 'index'])->name('flint.review.index');
+Route::get('flint/review', [FlintReviewController::class, 'index'])->middleware('ability:ios:read,flint:read')->name('flint.review.index');
 Route::post('flint/review/{kind}/{id}', [FlintReviewController::class, 'act'])
     ->whereIn('kind', ['receipt_suggestion', 'receipt_auto_match', 'link_suggestion', 'auto_link'])
-    ->middleware('ability:ios:write')
+    ->middleware('ability:ios:write,flint:write')
     ->name('flint.review.act');
 
 /*
