@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class SearchControllerTest extends TestCase
@@ -98,6 +99,52 @@ class SearchControllerTest extends TestCase
             ->assertJsonPath('mode', 'integration')
             ->assertJsonCount(1, 'integrations')
             ->assertJsonPath('integrations.0.service', 'monzo');
+    }
+
+    #[Test]
+    public function plural_mode_names_from_ios_are_accepted_as_aliases(): void
+    {
+        MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_sleep_score',
+        ]);
+
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
+
+        $this->getJson('/api/v1/mobile/search?q=monzo&mode=integrations')
+            ->assertOk()
+            ->assertJsonPath('mode', 'integration')
+            ->assertJsonCount(1, 'integrations');
+
+        $this->getJson('/api/v1/mobile/search?q=sleep&mode=metrics')
+            ->assertOk()
+            ->assertJsonPath('mode', 'metric')
+            ->assertJsonCount(1, 'metrics');
+
+        $this->getJson('/api/v1/mobile/search?q=x&mode=tags')
+            ->assertOk()
+            ->assertJsonPath('mode', 'tag');
+    }
+
+    #[Test]
+    public function typed_search_accepts_the_parameters_ios_sends(): void
+    {
+        EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'Tesco Metro']);
+
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
+
+        $this->getJson('/api/v1/mobile/search/objects?q=Tesco&semantic=false')
+            ->assertOk()
+            ->assertJsonPath('meta.query', 'Tesco')
+            ->assertJsonCount(1, 'objects');
+
+        $this->getJson('/api/v1/mobile/search/objects?query=Tesco&semantic=false')
+            ->assertOk()
+            ->assertJsonCount(1, 'objects');
+
+        $this->getJson('/api/v1/mobile/search/objects?semantic=false')
+            ->assertStatus(422);
     }
 
     #[Test]

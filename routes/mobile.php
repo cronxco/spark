@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Mobile\ApiTokensController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController;
 use App\Http\Controllers\Api\V1\Mobile\BookmarksController;
 use App\Http\Controllers\Api\V1\Mobile\BriefingController;
+use App\Http\Controllers\Api\V1\Mobile\CapturesController;
 use App\Http\Controllers\Api\V1\Mobile\CheckInsController;
 use App\Http\Controllers\Api\V1\Mobile\ContextController;
 use App\Http\Controllers\Api\V1\Mobile\DevicesController;
@@ -212,12 +213,27 @@ Route::delete('devices/{id}', [DevicesController::class, 'destroy'])->middleware
  * per-notification version and there is no `GET /notifications/{id}`, so no
  * client could obtain the strong ETag the middleware demanded.
  *
+ * Archiving is the same: it is reversible from History, so it carries no
+ * precondition either. It briefly required one, which the iOS client (by
+ * design) never sends, so every native archive answered 428 and the row came
+ * back.
+ *
  * Deletion is destructive and keeps its precondition; CompactNotificationResource
  * now emits `version` so a client can satisfy it.
  */
 Route::post('notifications/read-all', [NotificationsController::class, 'markAllRead'])
     ->middleware('ability:ios:write')
     ->name('notifications.read-all');
+
+// Delivery receipts from the app (decision N-8): id, event, time and action
+// identifier only, never message content.
+Route::post('notifications/receipts', [NotificationsController::class, 'recordReceipts'])
+    ->middleware('ability:ios:write,notifications:write')
+    ->name('notifications.receipts');
+
+Route::post('notifications/{id}/receipts', [NotificationsController::class, 'recordReceipt'])
+    ->middleware('ability:ios:write,notifications:write')
+    ->name('notifications.receipt');
 
 Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead'])
     ->middleware('ability:ios:write')
@@ -228,7 +244,7 @@ Route::post('notifications/{id}/unread', [NotificationsController::class, 'markU
     ->name('notifications.unread');
 
 Route::post('notifications/{id}/archive', [NotificationsController::class, 'archive'])
-    ->middleware(['ability:ios:write', 'if-match:notification'])
+    ->middleware('ability:ios:write')
     ->name('notifications.archive');
 
 Route::delete('notifications/{id}', [NotificationsController::class, 'destroy'])
@@ -286,6 +302,10 @@ Route::post('bookmarks', [BookmarksController::class, 'store'])
 Route::post('bookmarks/capture', [CapturedBookmarksController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('bookmarks.capture');
+
+Route::post('captures', [CapturesController::class, 'store'])
+    ->middleware('ability:ios:write,data:write')
+    ->name('captures.store');
 
 /*
 |--------------------------------------------------------------------------

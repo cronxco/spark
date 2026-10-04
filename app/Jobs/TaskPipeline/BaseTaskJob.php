@@ -2,6 +2,7 @@
 
 namespace App\Jobs\TaskPipeline;
 
+use App\Exceptions\TaskOutcomeException;
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
@@ -24,6 +25,17 @@ abstract class BaseTaskJob implements ShouldQueue
     public $tries = 3;
 
     public $backoff = [30, 120, 300]; // 30s, 2m, 5m
+
+    /**
+     * What the run achieved, recorded with a successful status so "success"
+     * can be told apart from "nothing to do" or "done with warnings".
+     */
+    private ?string $outcome = null;
+
+    /**
+     * @var array<string, int>
+     */
+    private array $outcomeCounts = [];
 
     public function __construct(
         public Model $model,
@@ -60,9 +72,20 @@ abstract class BaseTaskJob implements ShouldQueue
 
         try {
             $this->execute();
-            $this->updateStatus('success', ['completed_at' => now()->toIso8601String()]);
+            $this->updateStatus('success', array_merge(
+                ['completed_at' => now()->toIso8601String()],
+                $this->outcomeData(),
+            ));
             $this->dispatchDependentTasks();
 
+        } catch (TaskOutcomeException $e) {
+            $this->updateStatus('failed', [
+                'completed_at' => now()->toIso8601String(),
+                'error' => $e->getMessage(),
+                'attempts' => $this->attempts(),
+                'outcome' => $e->outcome,
+                'outcome_counts' => $e->counts,
+            ]);
         } catch (Exception $e) {
             // Report to Sentry with comprehensive context
             if (app()->bound('sentry')) {
@@ -101,6 +124,18 @@ abstract class BaseTaskJob implements ShouldQueue
      * Execute the task logic - to be implemented by subclasses
      */
     abstract protected function execute(): void;
+
+    /**
+     * Record what a successful run achieved, e.g. `matched`, `no_candidate`,
+     * `not_applicable` or `succeeded_with_warnings`, with any counts.
+     *
+     * @param  array<string, int>  $counts
+     */
+    protected function recordOutcome(string $outcome, array $counts = []): void
+    {
+        $this->outcome = $outcome;
+        $this->outcomeCounts = $counts;
+    }
 
     /**
      * Update the task status in metadata
@@ -148,5 +183,20 @@ abstract class BaseTaskJob implements ShouldQueue
         }
 
         return $attributes;
+    }
+
+    /**
+     * @return array{outcome?: string, outcome_counts?: array<string, int>}
+     */
+    private function outcomeData(): array
+    {
+        if ($this->outcome === null) {
+            return [];
+        }
+
+        return array_filter([
+            'outcome' => $this->outcome,
+            'outcome_counts' => $this->outcomeCounts,
+        ], fn ($value) => $value !== []);
     }
 }

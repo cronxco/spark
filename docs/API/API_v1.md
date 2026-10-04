@@ -420,6 +420,15 @@ All of the user's integrations, ordered by service. Identical to
 
 A single integration. Identical to `GET /api/v1/mobile/integrations/{id}`.
 
+### `PATCH /api/v1/integrations/{id}/configure`
+
+Requires `integrations:manage` and the current `If-Match` ETag from integration detail.
+Validates supplied fields against the instance type's schema, merging with existing
+configuration so partial updates preserve credentials, pause and schedule settings.
+Returns the compact integration and its new ETag. Missing/stale versions return
+428/412, another user's integration returns 404, and invalid fields return 422.
+The unversioned configuration endpoint remains retired by the API cutover.
+
 ### `POST /api/v1/integrations/{id}/sync`
 
 Triggers an immediate fetch for one integration instance (`integrations:sync`).

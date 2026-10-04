@@ -5,6 +5,7 @@ namespace App\Jobs\TaskPipeline\Tasks;
 use App\Actions\DispatchIntegrationFetchJobs;
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
+use RuntimeException;
 
 /**
  * Runs a single due integration's scheduled fetch, dispatched by
@@ -37,8 +38,15 @@ class RunIntegrationUpdateTask extends BaseTaskJob implements ShouldBeUnique
 
     protected function execute(): void
     {
-        (new DispatchIntegrationFetchJobs)->dispatch($this->model);
+        $jobsDispatched = (new DispatchIntegrationFetchJobs)->dispatch($this->model);
 
         $this->model->markAsTriggered();
+
+        // Recorded as a failed execution rather than a success that did
+        // nothing. markAsTriggered() above still holds the integration until
+        // its next interval, so this fails once per interval, not every tick.
+        if ($jobsDispatched === 0) {
+            throw new RuntimeException(DispatchIntegrationFetchJobs::NOTHING_TO_DISPATCH . " ({$this->model->service}/{$this->model->instance_type})");
+        }
     }
 }
