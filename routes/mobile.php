@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\Mobile\FeedController;
 use App\Http\Controllers\Api\V1\Mobile\FlintDigestsController;
 use App\Http\Controllers\Api\V1\Mobile\FlintNotesController;
 use App\Http\Controllers\Api\V1\Mobile\FlintQuestionsController;
+use App\Http\Controllers\Api\V1\Mobile\FlintReviewController;
 use App\Http\Controllers\Api\V1\Mobile\FlintRoutineHealthController;
 use App\Http\Controllers\Api\V1\Mobile\FlintTopicsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
@@ -400,6 +401,12 @@ Route::delete('flint/notes/{id}', [FlintNotesController::class, 'destroy'])->mid
 
 Route::get('flint/routines/health', FlintRoutineHealthController::class)
     ->name('flint.routines.health');
+
+Route::get('flint/review', [FlintReviewController::class, 'index'])->middleware('ability:ios:read,flint:read')->name('flint.review.index');
+Route::post('flint/review/{kind}/{id}', [FlintReviewController::class, 'act'])
+    ->whereIn('kind', ['receipt_suggestion', 'receipt_auto_match', 'link_suggestion', 'auto_link'])
+    ->middleware('ability:ios:write,flint:write')
+    ->name('flint.review.act');
 
 /*
 |--------------------------------------------------------------------------

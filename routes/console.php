@@ -107,7 +107,6 @@ Schedule::call(function () {
         ->value('id');
 
     $users = User::query()->where(function ($query) {
-        $query->whereNotNull('settings->flint->digests_enabled');
         foreach (FlintScheduleSettings::ENABLED_KEYS as $key) {
             $query->orWhereNotNull("settings->flint->{$key}");
         }
@@ -166,7 +165,6 @@ Schedule::call(function () {
     $flintSchedule = app(FlintScheduleService::class);
 
     $users = User::query()->where(function ($query) {
-        $query->whereNotNull('settings->flint->digests_enabled');
         foreach (FlintScheduleSettings::ENABLED_KEYS as $key) {
             $query->orWhereNotNull("settings->flint->{$key}");
         }
