@@ -177,7 +177,9 @@ class FlintReviewService
 
     private function actOnReceiptSuggestion(User $user, string $id, string $action, ?string $transactionId): void
     {
-        $receipt = $this->receipts($user)->with('target')->findOrFail($id);
+        $receipt = $this->receipts($user)
+            ->whereHas('target', fn (Builder $query) => $query->whereJsonContains('metadata->needs_review', true))
+            ->findOrFail($id);
 
         if ($action === 'confirm') {
             $candidate = collect($receipt->target?->metadata['candidate_matches'] ?? [])->firstWhere('transaction_id', $transactionId);
@@ -196,7 +198,13 @@ class FlintReviewService
 
     private function actOnAutoDecision(User $user, string $kind, string $id, string $action): void
     {
-        $link = $this->ownedLink($user, $id);
+        $link = $this->unreviewedAutoDecisions($user)
+            ->when($kind === 'receipt_auto_match', fn (Builder $query) => $query
+                ->where('type', 'receipt_for')
+                ->where('metadata->match_method', 'automatic'))
+            ->when($kind === 'auto_link', fn (Builder $query) => $query
+                ->whereRaw("(metadata->>'auto_linked')::boolean = true"))
+            ->findOrFail($id);
 
         if ($action === 'keep') {
             $link->update(['metadata' => [...($link->metadata ?? []), 'reviewed_at' => now()->toIso8601String()]]);
@@ -222,18 +230,18 @@ class FlintReviewService
 
     private function actOnLinkSuggestion(User $user, string $id, string $action): void
     {
-        $link = $this->ownedLink($user, $id);
+        $link = Relationship::query()
+            ->where('user_id', $user->id)
+            ->where('from_type', Event::class)
+            ->where('to_type', Event::class)
+            ->pending()
+            ->findOrFail($id);
 
         match ($action) {
             'confirm' => $link->approve(),
             'dismiss' => $link->reject(),
             default => throw new InvalidArgumentException('A link suggestion can be confirmed or dismissed.'),
         };
-    }
-
-    private function ownedLink(User $user, string $id): Relationship
-    {
-        return Relationship::query()->where('user_id', $user->id)->findOrFail($id);
     }
 
     /** @return Builder<Event> */

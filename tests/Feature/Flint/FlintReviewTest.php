@@ -137,6 +137,36 @@ class FlintReviewTest extends TestCase
         $this->assertSoftDeleted($link);
     }
 
+    #[Test]
+    public function review_actions_reject_a_different_kind_or_an_item_already_reviewed(): void
+    {
+        $link = $this->link(['auto_linked' => true, 'confidence' => 91.0]);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson("/api/v1/mobile/flint/review/receipt_auto_match/{$link->id}", ['action' => 'undo'])->assertNotFound();
+        $this->postJson("/api/v1/mobile/flint/review/link_suggestion/{$link->id}", ['action' => 'confirm'])->assertNotFound();
+        $this->assertNotSoftDeleted($link);
+        $this->assertArrayNotHasKey('reviewed_at', $link->fresh()->metadata);
+
+        $this->postJson("/api/v1/mobile/flint/review/auto_link/{$link->id}", ['action' => 'keep'])->assertOk();
+        $this->postJson("/api/v1/mobile/flint/review/auto_link/{$link->id}", ['action' => 'undo'])->assertNotFound();
+        $this->assertNotSoftDeleted($link);
+    }
+
+    #[Test]
+    public function a_dismissed_receipt_suggestion_cannot_be_confirmed_from_a_stale_screen(): void
+    {
+        $transaction = $this->transaction('Coffee House');
+        $receipt = $this->receipt('Coffee House', ['needs_review' => true, 'candidate_matches' => [
+            ['transaction_id' => $transaction->id, 'confidence' => 0.7],
+        ]]);
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson("/api/v1/mobile/flint/review/receipt_suggestion/{$receipt->id}", ['action' => 'dismiss'])->assertOk();
+        $this->postJson("/api/v1/mobile/flint/review/receipt_suggestion/{$receipt->id}", ['action' => 'confirm', 'transaction_id' => $transaction->id])->assertNotFound();
+        $this->assertFalse(Relationship::where('from_id', $receipt->id)->exists());
+    }
+
     private function transaction(string $merchant): Event
     {
         return Event::factory()->create([
