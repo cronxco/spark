@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 /** Decisions E-1 and EX-D4: Flint's Review tab, on web and the mobile API. */
@@ -62,7 +63,7 @@ class FlintReviewTest extends TestCase
             ['transaction_id' => $suggested->id, 'confidence' => 0.7],
         ]]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'flint:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'flint:write']));
         $this->postJson("/api/v1/mobile/flint/review/receipt_suggestion/{$receipt->id}", ['action' => 'confirm', 'transaction_id' => $other->id])
             ->assertStatus(422);
 
@@ -79,7 +80,7 @@ class FlintReviewTest extends TestCase
         $kinds = collect(app(FlintReviewService::class)->items($this->user))->pluck('kind');
         $this->assertSame(['receipt_auto_match', 'receipt_auto_match'], $kinds->all());
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $this->postJson("/api/v1/mobile/flint/review/receipt_auto_match/{$keptLink->id}", ['action' => 'keep'])->assertOk();
         $this->postJson("/api/v1/mobile/flint/review/receipt_auto_match/{$undoneLink->id}", ['action' => 'undo'])
             ->assertOk()
@@ -96,7 +97,7 @@ class FlintReviewTest extends TestCase
         $pending = $this->link(['auto_linked' => true, 'pending' => true, 'confidence' => 62.0]);
         $auto = $this->link(['auto_linked' => true, 'confidence' => 91.0]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
         $items = collect($this->getJson('/api/v1/mobile/flint/review')->assertOk()->json('data'))->keyBy('kind');
 
         $this->assertSame((string) $pending->id, $items['link_suggestion']['id']);
@@ -115,7 +116,7 @@ class FlintReviewTest extends TestCase
         $link = $this->link(['auto_linked' => true, 'pending' => true, 'confidence' => 62.0]);
         $stranger = User::factory()->create();
 
-        Sanctum::actingAs($stranger, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($stranger, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $this->getJson('/api/v1/mobile/flint/review')->assertOk()->assertJsonCount(0, 'data');
         $this->postJson("/api/v1/mobile/flint/review/link_suggestion/{$link->id}", ['action' => 'confirm'])->assertNotFound();
 
@@ -141,7 +142,7 @@ class FlintReviewTest extends TestCase
     public function review_actions_reject_a_different_kind_or_an_item_already_reviewed(): void
     {
         $link = $this->link(['auto_linked' => true, 'confidence' => 91.0]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson("/api/v1/mobile/flint/review/receipt_auto_match/{$link->id}", ['action' => 'undo'])->assertNotFound();
         $this->postJson("/api/v1/mobile/flint/review/link_suggestion/{$link->id}", ['action' => 'confirm'])->assertNotFound();
@@ -160,7 +161,7 @@ class FlintReviewTest extends TestCase
         $receipt = $this->receipt('Coffee House', ['needs_review' => true, 'candidate_matches' => [
             ['transaction_id' => $transaction->id, 'confidence' => 0.7],
         ]]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson("/api/v1/mobile/flint/review/receipt_suggestion/{$receipt->id}", ['action' => 'dismiss'])->assertOk();
         $this->postJson("/api/v1/mobile/flint/review/receipt_suggestion/{$receipt->id}", ['action' => 'confirm', 'transaction_id' => $transaction->id])->assertNotFound();

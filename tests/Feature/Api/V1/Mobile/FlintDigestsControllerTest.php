@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class FlintDigestsControllerTest extends TestCase
@@ -578,7 +579,7 @@ class FlintDigestsControllerTest extends TestCase
     {
         $event = $this->createDigestEvent('evening', Carbon::parse('2026-07-14'), ['local_date' => '2026-07-13']);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
 
         $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
             ->assertOk()

@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionMethod;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 /**
@@ -55,7 +56,7 @@ class FlintDigestLocalDayTest extends TestCase
     #[Test]
     public function the_mobile_day_query_finds_a_new_york_digest(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
 
         $this->getJson('/api/v1/mobile/flint/digests?date=2026-06-14')
             ->assertOk()
@@ -70,7 +71,7 @@ class FlintDigestLocalDayTest extends TestCase
     #[Test]
     public function mobile_history_finds_a_new_york_digest_on_its_own_day_only(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
 
         $this->getJson('/api/v1/mobile/flint/digests?from=2026-06-14&to=2026-06-14')
             ->assertOk()
