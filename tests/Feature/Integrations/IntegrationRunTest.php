@@ -24,6 +24,7 @@ use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\Fixtures\IntegrationRuns\FakeRunFetchJob;
 use Tests\Fixtures\IntegrationRuns\FakeRunProcessingJob;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class IntegrationRunTest extends TestCase
@@ -171,7 +172,7 @@ class IntegrationRunTest extends TestCase
         $this->pushedJob(FakeRunFetchJob::class)->batch()->recordFailedJob('fetch', new RuntimeException('Provider unavailable'));
 
         config(['ios.mobile_api_enabled' => true]);
-        Sanctum::actingAs($integration->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($integration->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->getJson("/api/v1/mobile/integrations/{$integration->id}")
             ->assertOk()

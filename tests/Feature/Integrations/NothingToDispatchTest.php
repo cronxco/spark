@@ -18,6 +18,7 @@ use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 /**
@@ -51,7 +52,7 @@ class NothingToDispatchTest extends TestCase
     #[Test]
     public function mobile_sync_answers_422_instead_of_triggered(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $etag = app(ResourceVersion::class)->etag($this->nothingToFetch);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->nothingToFetch->id}/sync", [], ['If-Match' => $etag])
@@ -62,7 +63,7 @@ class NothingToDispatchTest extends TestCase
     #[Test]
     public function mobile_service_sync_reports_the_instance_as_failed(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson('/api/v1/mobile/integrations/sync', ['service' => 'github'])
             ->assertOk()
