@@ -21,7 +21,10 @@ const git = (...args) =>
 
 try {
     await mkdir(working);
-    execFileSync("git", ["init", "--bare", remote], { env, stdio: "pipe" });
+    execFileSync("git", ["init", "--bare", "--initial-branch=main", remote], {
+        env,
+        stdio: "pipe",
+    });
     git("init", "--initial-branch=main");
     git("config", "user.name", "Release compatibility test");
     git("config", "user.email", "release-test@example.invalid");
