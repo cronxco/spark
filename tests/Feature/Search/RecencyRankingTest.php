@@ -20,6 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionObject;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 /**
@@ -93,7 +94,7 @@ class RecencyRankingTest extends TestCase
     {
         $old = $this->object('Tesco Express', now()->subYears(2));
         $recent = $this->object('Tesco Metro', now()->subDay());
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         config(['spark.search.recency.weight' => 0.2]);
         $this->getJson('/api/v1/mobile/search?q=Tesco')
@@ -111,7 +112,7 @@ class RecencyRankingTest extends TestCase
     {
         $old = $this->object('Tesco Express', now()->subYears(2));
         $recent = $this->object('Tesco Metro', now()->subDay());
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->getJson('/api/v1/mobile/search/objects?q=Tesco&semantic=false')
             ->assertOk()

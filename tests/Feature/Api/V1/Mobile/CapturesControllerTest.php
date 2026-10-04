@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class CapturesControllerTest extends TestCase
@@ -32,7 +33,7 @@ class CapturesControllerTest extends TestCase
     #[Test]
     public function requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
 
         $this->postJson('/api/v1/mobile/captures', ['kind' => 'text', 'idempotency_key' => 'k1', 'text' => 'hi'])
             ->assertForbidden();
@@ -41,7 +42,7 @@ class CapturesControllerTest extends TestCase
     #[Test]
     public function free_text_lands_in_the_inbox_as_an_event(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'data:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'data:write']));
 
         $response = $this->postJson('/api/v1/mobile/captures', [
             'kind' => 'text',
@@ -64,7 +65,7 @@ class CapturesControllerTest extends TestCase
     #[Test]
     public function a_retry_with_the_same_key_returns_the_first_receipt(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $payload = ['kind' => 'text', 'idempotency_key' => 'share-2', 'text' => 'Remember the milk'];
 
         $first = $this->postJson('/api/v1/mobile/captures', $payload)->assertCreated();
@@ -78,7 +79,7 @@ class CapturesControllerTest extends TestCase
     #[Test]
     public function two_captures_share_one_inbox(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson('/api/v1/mobile/captures', ['kind' => 'text', 'idempotency_key' => 'a', 'text' => 'One'])->assertCreated();
         $this->postJson('/api/v1/mobile/captures', ['kind' => 'text', 'idempotency_key' => 'b', 'text' => 'Two'])->assertCreated();
@@ -91,10 +92,10 @@ class CapturesControllerTest extends TestCase
     public function the_same_key_from_another_user_is_a_separate_capture(): void
     {
         $other = User::factory()->create();
-        Sanctum::actingAs($other, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($other, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $this->postJson('/api/v1/mobile/captures', ['kind' => 'text', 'idempotency_key' => 'shared', 'text' => 'Theirs'])->assertCreated();
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $this->postJson('/api/v1/mobile/captures', ['kind' => 'text', 'idempotency_key' => 'shared', 'text' => 'Mine'])
             ->assertCreated();
     }
@@ -102,7 +103,7 @@ class CapturesControllerTest extends TestCase
     #[Test]
     public function a_url_becomes_a_bookmark(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $response = $this->postJson('/api/v1/mobile/captures', [
             'kind' => 'url',
@@ -120,7 +121,7 @@ class CapturesControllerTest extends TestCase
     #[Test]
     public function an_unsafe_url_is_rejected(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson('/api/v1/mobile/captures', ['kind' => 'url', 'idempotency_key' => 'x', 'url' => 'http://127.0.0.1/admin'])
             ->assertUnprocessable()
@@ -131,7 +132,7 @@ class CapturesControllerTest extends TestCase
     public function an_image_is_stored_on_its_own_object(): void
     {
         Storage::fake(config('media-library.disk_name'));
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $response = $this->postJson('/api/v1/mobile/captures', [
             'kind' => 'image',
@@ -151,7 +152,7 @@ class CapturesControllerTest extends TestCase
     public function a_file_that_is_not_an_image_is_rejected_and_nothing_is_kept(): void
     {
         Storage::fake(config('media-library.disk_name'));
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson('/api/v1/mobile/captures', [
             'kind' => 'image',
@@ -167,7 +168,7 @@ class CapturesControllerTest extends TestCase
     #[Test]
     public function the_payload_must_match_the_kind(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->postJson('/api/v1/mobile/captures', ['kind' => 'text', 'idempotency_key' => 'k', 'url' => 'https://example.com'])
             ->assertUnprocessable()
