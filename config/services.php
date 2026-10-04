@@ -201,7 +201,6 @@ return [
         'email_address' => env('RECEIPT_EMAIL_ADDRESS', 'receipts@spark.cronx.co'),
         's3_bucket' => env('AWS_BUCKET_RECEIPTS', 'spark-receipts-emails'),
         'sns_topic_arn' => env('AWS_SNS_RECEIPT_TOPIC_ARN'),
-        'retention_days' => 30,
         'auto_match_threshold' => 0.8,
         'review_threshold' => 0.5,
         'currency_tolerance_percent' => (float) env('RECEIPT_CURRENCY_TOLERANCE', 2.0),
