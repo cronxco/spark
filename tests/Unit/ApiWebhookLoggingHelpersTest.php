@@ -4,8 +4,8 @@ namespace Tests\Unit;
 
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\Support\IsolatesLogs;
 use Tests\FrameworkTestCase;
+use Tests\Support\IsolatesLogs;
 
 class ApiWebhookLoggingHelpersTest extends FrameworkTestCase
 {
