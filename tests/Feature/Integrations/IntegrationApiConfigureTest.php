@@ -4,6 +4,7 @@ namespace Tests\Feature\Integrations;
 
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\Api\ResourceVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -28,9 +29,9 @@ class IntegrationApiConfigureTest extends TestCase
             'instance_type' => 'workouts',
             'configuration' => ['api_key' => 'hevy-key', 'paused' => true, 'update_frequency_minutes' => 60],
         ]);
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['integrations:manage']);
 
-        $this->postJson("/api/integrations/{$integration->id}/configure", ['update_frequency_minutes' => 30])
+        $this->withHeader('If-Match', app(ResourceVersion::class)->etag($integration))->patchJson("/api/v1/integrations/{$integration->id}/configure", ['update_frequency_minutes' => 30])
             ->assertOk();
 
         $configuration = $integration->fresh()->configuration;
@@ -54,9 +55,9 @@ class IntegrationApiConfigureTest extends TestCase
                 'poll_interval_minutes' => 15,
             ],
         ]);
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, ['integrations:manage']);
 
-        $this->postJson("/api/integrations/{$integration->id}/configure", ['task_mode' => 'job'])
+        $this->withHeader('If-Match', app(ResourceVersion::class)->etag($integration))->patchJson("/api/v1/integrations/{$integration->id}/configure", ['task_mode' => 'job'])
             ->assertOk();
 
         $this->assertSame('job', $integration->fresh()->configuration['task_mode'] ?? null);
@@ -71,9 +72,22 @@ class IntegrationApiConfigureTest extends TestCase
             'service' => 'hevy',
             'instance_type' => 'workouts',
         ]);
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), ['integrations:manage']);
 
-        $this->postJson("/api/integrations/{$integration->id}/configure", ['update_frequency_minutes' => 30])
+        $this->withHeader('If-Match', app(ResourceVersion::class)->etag($integration))->patchJson("/api/v1/integrations/{$integration->id}/configure", ['update_frequency_minutes' => 30])
             ->assertNotFound();
     }
+    #[Test]
+    public function configuration_requires_management_scope_and_current_version(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'hevy', 'instance_type' => 'workouts']);
+        $url = "/api/v1/integrations/{$integration->id}/configure";
+        Sanctum::actingAs($user, ['integrations:read']);
+        $this->patchJson($url, [])->assertForbidden();
+        Sanctum::actingAs($user, ['integrations:manage']);
+        $this->patchJson($url, [])->assertStatus(428);
+        $this->withHeader('If-Match', '"stale"')->patchJson($url, [])->assertStatus(412);
+    }
+
 }

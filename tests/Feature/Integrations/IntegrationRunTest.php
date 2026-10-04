@@ -15,6 +15,7 @@ use App\Services\IntegrationRuns\RunBatchMiddleware;
 use Illuminate\Bus\BatchRepository;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -48,7 +49,7 @@ class IntegrationRunTest extends TestCase
         }
         $this->assertSame($original, app(Dispatcher::class));
 
-        $url = new FetchSingleUrl($integration, (string) \Illuminate\Support\Str::uuid(), 'https://example.com');
+        $url = new FetchSingleUrl($integration, (string) Str::uuid(), 'https://example.com');
         $dispatcher->dispatch($url);
         $this->assertSame($batch->id, $url->batchId);
         $this->assertCount(1, $url->middleware);

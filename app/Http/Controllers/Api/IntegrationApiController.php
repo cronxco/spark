@@ -8,7 +8,6 @@ use App\Integrations\PluginRegistry;
 use App\Models\Integration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class IntegrationApiController extends Controller
 {
@@ -17,7 +16,7 @@ class IntegrationApiController extends Controller
      */
     public function index(Request $request)
     {
-        $plugins = PluginRegistry::getPluginsAvailableTo($request->user())->map(function ($pluginClass) {
+        $plugins = PluginRegistry::getAllPlugins()->map(function ($pluginClass) {
             return [
                 'identifier' => $pluginClass::getIdentifier(),
                 'name' => $pluginClass::getDisplayName(),
@@ -57,31 +56,22 @@ class IntegrationApiController extends Controller
             return response()->json(['error' => 'Plugin not found'], 404);
         }
 
-        // Validate against the instance type's schema, as web configuration
-        // does. The top-level schema is a different (and for several plugins
-        // smaller) field set.
-        $schema = $pluginClass::getInstanceTypes()[$integration->instance_type]['schema']
-            ?? $pluginClass::getConfigurationSchema();
+        $schema = $pluginClass::getConfigurationSchema();
 
         // Build validation rules
         $rules = $this->buildValidationRules($schema);
 
-        // Validate the configuration as it will be saved, so a request that
-        // changes one field need not resend every required one.
-        $current = $integration->configuration ?? [];
-        $validated = Validator::make(array_merge($current, $request->all()), $rules)->validate();
+        $validated = $request->validate($rules);
 
         // Process array fields that come as comma-separated strings
         foreach ($validated as $field => $value) {
-            if (($schema[$field]['type'] ?? null) === 'array' && is_string($value)) {
+            if ($schema[$field]['type'] === 'array' && is_string($value)) {
                 $validated[$field] = array_filter(array_map('trim', explode(',', $value)));
             }
         }
 
-        // Merge rather than replace: replacing dropped every key outside the
-        // schema, including `paused`, schedule settings and stored API keys.
         $integration->update([
-            'configuration' => array_merge($current, $validated),
+            'configuration' => $validated,
         ]);
 
         return response()->json([
@@ -102,13 +92,6 @@ class IntegrationApiController extends Controller
         }
 
         $jobsDispatched = (new DispatchIntegrationFetchJobs)->dispatch($integration);
-
-        if ($jobsDispatched === 0) {
-            return response()->json([
-                'error' => DispatchIntegrationFetchJobs::NOTHING_TO_DISPATCH,
-                'code' => 'nothing_to_dispatch',
-            ], 422);
-        }
 
         return response()->json([
             'message' => 'Integration update triggered.',
