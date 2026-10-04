@@ -6,11 +6,14 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Support\FlintDigestKind;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Foundation\Testing\WithCachedConfig;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class FlintDigestKindTest extends TestCase
+class FlintDigestKindTest extends FrameworkTestCase
 {
+    use WithCachedConfig;
+
     #[Test]
     public function prefers_the_kind_recorded_at_write_time(): void
     {

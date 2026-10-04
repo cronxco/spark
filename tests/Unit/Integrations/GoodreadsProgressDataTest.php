@@ -545,7 +545,7 @@ class GoodreadsProgressDataTest extends TestCase
         ];
 
         // Small delay to ensure timestamps would differ if updated
-        sleep(1);
+        $this->travel(1)->seconds();
 
         $job = new GoodreadsProgressData($this->integration, $rawData);
         $job->handle();
