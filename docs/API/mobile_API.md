@@ -1745,6 +1745,10 @@ All write endpoints require `ios:write` ability.
 | `DELETE` | `/notifications/{id}`              | Delete one notification                                                                    |
 | `PATCH`  | `/{kind}/{id}`                     | Non-destructive update of an owned event/object/block                                      |
 | `PATCH`  | `/events/{id}/note`                | Set or clear an event's note                                                               |
+| `DELETE` | `/events/{id}`                     | Soft-delete an owned event (`If-Match`)                                                    |
+| `POST`   | `/events/{id}/restore`             | Undo: restore a soft-deleted event                                                         |
+| `DELETE` | `/objects/{id}`                    | Soft-delete an owned object (`If-Match`)                                                   |
+| `POST`   | `/objects/{id}/restore`            | Undo: restore a soft-deleted object                                                        |
 | `PATCH`  | `/{kind}/{id}/location`            | Set a location on an owned event/object                                                    |
 | `DELETE` | `/{kind}/{id}/location`            | Clear a location                                                                           |
 | `POST`   | `/{kind}/{id}/location/geocode`    | Geocode an address and set it as the location                                              |
@@ -1802,6 +1806,30 @@ stays editable. **Response `428`/`412`** — Missing/stale `If-Match`.
 
 Sets or clears the user-authored note block on an event. Requires
 `If-Match`. Same behavior as MCP's `set-event-note`.
+
+---
+
+### `DELETE /events/{id}` · `DELETE /objects/{id}`
+
+Soft-deletes an owned event or object (`deleted_at` is set; nothing is
+removed). Deleting an object keeps its events, media and relationships.
+Requires `If-Match` with the entity's current `ETag`.
+
+**Response `200`**: `{"id": "uuid", "deleted_at": "ISO-8601"}`. A deleted
+event appears in `GET /sync/delta` under `deleted`.
+
+**Response `404`** — Not found or not owned. **Response `428`/`412`** —
+Missing/stale `If-Match`.
+
+### `POST /events/{id}/restore` · `POST /objects/{id}/restore`
+
+The app's Undo. Restores a soft-deleted owned event or object and returns it
+in its Compact shape with a fresh `ETag` (an object is returned without
+`recent_events`). Restoring an item that is not deleted returns it
+unchanged. No `If-Match`: a deleted row has no readable version and
+restoring is idempotent.
+
+**Response `404`** — Not found or not owned.
 
 ---
 

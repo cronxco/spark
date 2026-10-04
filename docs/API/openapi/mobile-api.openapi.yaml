@@ -304,6 +304,56 @@ paths:
               },
           }
         "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteEvent
+      tags: [entities]
+      summary: Soft-delete an owned event (undo with restore)
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            id: { type: string, format: uuid },
+                            deleted_at: { type: string, format: date-time },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+
+  /events/{id}/restore:
+    post:
+      operationId: restoreEvent
+      tags: [entities]
+      summary: Restore a soft-deleted event (idempotent, no If-Match)
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactEvent" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /events/{id}/note:
     patch:
@@ -342,6 +392,56 @@ paths:
             in: query,
             schema: { type: integer, minimum: 1, maximum: 25, default: 5 },
           }
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactObject" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteObject
+      tags: [entities]
+      summary: Soft-delete an owned object (undo with restore)
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            id: { type: string, format: uuid },
+                            deleted_at: { type: string, format: date-time },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+
+  /objects/{id}/restore:
+    post:
+      operationId: restoreObject
+      tags: [entities]
+      summary: Restore a soft-deleted object (idempotent, no If-Match)
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
         "200":
           {

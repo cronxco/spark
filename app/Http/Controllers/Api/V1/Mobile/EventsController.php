@@ -70,4 +70,50 @@ class EventsController extends Controller
             (new CompactEventResource($event))->resolve($request),
         )->header('ETag', $this->versions->etag($event));
     }
+
+    /**
+     * DELETE /api/v1/mobile/events/{id}
+     *
+     * Soft-deletes an owned event. The row stays recoverable through
+     * `POST /events/{id}/restore`, which is what the client's Undo calls.
+     */
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $event = $this->lookup->find($request->user(), $id);
+
+        if (! $event) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        $event->delete();
+
+        return response()->json([
+            'id' => $event->id,
+            'deleted_at' => $event->deleted_at?->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/mobile/events/{id}/restore
+     *
+     * Restores a soft-deleted owned event and returns its detail shape. An
+     * event that is not deleted is returned unchanged, so a repeated Undo is
+     * harmless.
+     */
+    public function restore(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $trashed = $this->lookup->findTrashed($user, $id);
+        $trashed?->restore();
+
+        $event = $this->lookup->find($user, $id);
+
+        if (! $event) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        return response()->json(
+            (new CompactEventResource($event))->resolve($request),
+        )->header('ETag', $this->versions->etag($event));
+    }
 }

@@ -107,7 +107,14 @@ class EventObject extends Model implements HasMedia
         });
 
         static::deleting(function ($model): void {
-            // Handle media deletion with deduplication logic
+            /*
+             * A soft delete is recoverable (the apps offer Undo), so the
+             * object's media stays until the object is force deleted.
+             */
+            if (! $model->isForceDeleting()) {
+                return;
+            }
+
             $deduplicationService = app(MediaDeduplicationService::class);
 
             foreach ($model->media as $media) {
