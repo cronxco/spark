@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\MetricStatistic;
 use App\Models\User;
 use App\Services\Ai\EmbeddingClient;
+use App\Services\Search\RecencyRanking;
 use Illuminate\Support\Collection;
 use Throwable;
 
@@ -18,6 +19,9 @@ use Throwable;
  * appropriate underlying machinery (direct SQL / embedding / tag relation /
  * metric lookup / integration scan) and returns a normalised shape so the
  * controller can compose one response regardless of mode.
+ *
+ * Default and semantic results are ordered by {@see RecencyRanking}, the
+ * ranking Spotlight uses too, so recency is tuned in one place.
  */
 class SearchDispatcher
 {
@@ -35,7 +39,12 @@ class SearchDispatcher
      */
     public const MODE_ALIASES = ['tags' => 'tag', 'metrics' => 'metric', 'integrations' => 'integration'];
 
-    public function __construct(protected ?EmbeddingClient $embeddingService = null) {}
+    protected RecencyRanking $ranking;
+
+    public function __construct(protected ?EmbeddingClient $embeddingService = null, ?RecencyRanking $ranking = null)
+    {
+        $this->ranking = $ranking ?? new RecencyRanking;
+    }
 
     /**
      * @return array{mode: string, query: string, events: Collection, objects: Collection, integrations: Collection, metrics: Collection}
@@ -73,21 +82,21 @@ class SearchDispatcher
         $like = '%' . $query . '%';
 
         if (! empty($integrationIds)) {
-            $result['events'] = Event::query()
+            $events = Event::query()
                 ->whereIn('integration_id', $integrationIds)
                 ->where(fn ($q) => $q->where('action', 'like', $like)->orWhere('service', 'like', $like))
                 ->with(['actor', 'target'])
-                ->orderBy('time', 'desc')
-                ->limit($limit)
-                ->get();
+                ->limit($limit);
+
+            $result['events'] = $this->ranking->orderByText($events, $query, 'action')->get();
         }
 
-        $result['objects'] = EventObject::query()
+        $objects = EventObject::query()
             ->where('user_id', $user->id)
             ->where(fn ($q) => $q->where('title', 'like', $like)->orWhere('content', 'like', $like))
-            ->orderBy('time', 'desc')
-            ->limit($limit)
-            ->get();
+            ->limit($limit);
+
+        $result['objects'] = $this->ranking->orderByText($objects, $query, 'title')->get();
 
         return $result;
     }
@@ -107,15 +116,17 @@ class SearchDispatcher
         $integrationIds = $user->integrations()->pluck('id')->all();
 
         if (! empty($integrationIds)) {
-            $result['events'] = Event::semanticSearch($embedding, threshold: 1.2, limit: $limit)
+            $events = Event::semanticSearch($embedding, threshold: 1.2, limit: $limit, temporalWeight: 0)
                 ->whereIn('integration_id', $integrationIds)
-                ->with(['actor', 'target'])
-                ->get();
+                ->with(['actor', 'target']);
+
+            $result['events'] = $this->ranking->orderBySemantic($events, $embedding)->get();
         }
 
-        $result['objects'] = EventObject::semanticSearch($embedding, threshold: 1.2, limit: $limit)
-            ->where('user_id', $user->id)
-            ->get();
+        $objects = EventObject::semanticSearch($embedding, threshold: 1.2, limit: $limit, temporalWeight: 0)
+            ->where('user_id', $user->id);
+
+        $result['objects'] = $this->ranking->orderBySemantic($objects, $embedding)->get();
 
         return $result;
     }
