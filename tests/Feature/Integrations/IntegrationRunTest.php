@@ -5,10 +5,15 @@ namespace Tests\Feature\Integrations;
 use App\Actions\DispatchIntegrationFetchJobs;
 use App\Http\Resources\Compact\CompactIntegrationResource;
 use App\Jobs\OAuth\GitHub\GitHubActivityPull;
+use App\Jobs\Fetch\FetchSingleUrl;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Services\IntegrationRuns\IntegrationRunService;
+use App\Services\IntegrationRuns\RunBatchDispatcher;
+use App\Services\IntegrationRuns\RunBatchMiddleware;
+use Illuminate\Bus\BatchRepository;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
@@ -22,6 +27,34 @@ use Tests\TestCase;
 
 class IntegrationRunTest extends TestCase
 {
+    #[Test]
+    public function nested_processing_and_url_fetches_join_the_ingestion_run(): void
+    {
+        Queue::fake();
+        $integration = $this->makeIntegration();
+        $batch = app(IntegrationRunService::class)->start($integration, [new FakeRunFetchJob($integration)]);
+        $original = app(Dispatcher::class);
+        $dispatcher = new RunBatchDispatcher($original, app(BatchRepository::class), $batch->id);
+
+        $parent = new FakeRunProcessingJob($integration, ['parent']);
+        $dispatcher->dispatch($parent);
+        $this->assertCount(1, $parent->middleware);
+        (new RunBatchMiddleware)->handle($parent, fn ($job) => $job->handle());
+
+        $children = Queue::pushed(FakeRunProcessingJob::class);
+        $this->assertCount(2, $children);
+        foreach ($children as $child) {
+            $this->assertSame($batch->id, $child->batchId);
+        }
+        $this->assertSame($original, app(Dispatcher::class));
+
+        $url = new FetchSingleUrl($integration, (string) \Illuminate\Support\Str::uuid(), 'https://example.com');
+        $dispatcher->dispatch($url);
+        $this->assertSame($batch->id, $url->batchId);
+        $this->assertCount(1, $url->middleware);
+        $this->assertSame(4, Bus::findBatch($batch->id)->totalJobs);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

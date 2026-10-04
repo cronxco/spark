@@ -19,5 +19,10 @@ class FakeRunProcessingJob extends BaseProcessingJob
         return 'fake_run';
     }
 
-    protected function process(): void {}
+    protected function process(): void
+    {
+        if (($this->rawData[0] ?? null) === 'parent') {
+            self::dispatch($this->integration, ['child']);
+        }
+    }
 }

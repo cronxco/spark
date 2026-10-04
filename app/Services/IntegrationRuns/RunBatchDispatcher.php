@@ -2,7 +2,13 @@
 
 namespace App\Services\IntegrationRuns;
 
+use App\Jobs\Base\BaseFetchJob;
 use App\Jobs\Base\BaseProcessingJob;
+use App\Jobs\Data\Fetch\ExtractContentJob;
+use App\Jobs\Data\Fetch\GenerateSummariesJob;
+use App\Jobs\Data\Fetch\ProcessFetchedContent;
+use App\Jobs\Fetch\DiscoverUrlsFromIntegrations;
+use App\Jobs\Fetch\FetchSingleUrl;
 use Illuminate\Bus\BatchRepository;
 use Illuminate\Contracts\Bus\QueueingDispatcher;
 
@@ -26,9 +32,16 @@ class RunBatchDispatcher implements QueueingDispatcher
 
     public function dispatch($command): mixed
     {
-        if ($command instanceof BaseProcessingJob && $command->batchId === null) {
+        if (($command instanceof BaseProcessingJob
+            || $command instanceof BaseFetchJob
+            || $command instanceof FetchSingleUrl
+            || $command instanceof DiscoverUrlsFromIntegrations
+            || $command instanceof ProcessFetchedContent
+            || $command instanceof ExtractContentJob
+            || $command instanceof GenerateSummariesJob) && $command->batchId === null) {
             $this->batches->incrementTotalJobs($this->batchId, 1);
             $command->withBatchId($this->batchId);
+            $command->through([...$command->middleware, new RunBatchMiddleware]);
         }
 
         return $this->dispatcher->dispatch($command);
