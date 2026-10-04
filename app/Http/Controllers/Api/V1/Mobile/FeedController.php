@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactEventResource;
 use App\Integrations\PluginRegistry;
+use App\Services\EffectiveTimezoneResolver;
 use App\Services\Mobile\EventFeed;
 use App\Support\CursorPaginator;
 use Carbon\Carbon;
@@ -39,7 +40,13 @@ class FeedController extends Controller
 
         if ($dateParam !== null) {
             try {
-                $parsed = Carbon::createFromFormat('Y-m-d', is_string($dateParam) ? $dateParam : '');
+                // The requested local date is read in the timezone the user was
+                // in on that day, as the web Day view and briefing do; parsing
+                // it as UTC shifted the feed window by the user's offset.
+                $timezone = is_string($dateParam)
+                    ? app(EffectiveTimezoneResolver::class)->timezoneForDate($request->user(), $dateParam)
+                    : 'UTC';
+                $parsed = Carbon::createFromFormat('Y-m-d', is_string($dateParam) ? $dateParam : '', $timezone);
                 if ($parsed === false || $parsed->format('Y-m-d') !== $dateParam) {
                     throw new InvalidArgumentException;
                 }

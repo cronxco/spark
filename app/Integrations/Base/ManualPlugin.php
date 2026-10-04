@@ -23,6 +23,15 @@ abstract class ManualPlugin implements IntegrationPlugin
     }
 
     /**
+     * Admin-only plugins are hidden from everyone else's add-integration
+     * list and cannot be added by them. See PluginRegistry::isAvailableTo().
+     */
+    public static function isAdminOnly(): bool
+    {
+        return false;
+    }
+
+    /**
      * Default stale time for manual integrations: 30 days
      * Override in child classes to customize
      */

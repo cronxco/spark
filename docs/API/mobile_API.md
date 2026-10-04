@@ -2147,6 +2147,35 @@ to reconsider.
 
 ---
 
+### `POST /captures`
+
+One way in for anything shared into Spark: a URL, free text or an image.
+Requires `ios:write`. Captures are ordinary events on the user's Manual Log
+integration, so there is no capture table.
+
+**Request Body**: `kind` (`url`, `text` or `image`) and `idempotency_key`
+(letters, numbers, `.`, `:`, `_`, `-`; max 100) are required. Send exactly the
+field that matches `kind`:
+
+- `url`: a valid URL (max 2048). Becomes a bookmark, as with `POST /bookmarks`.
+- `text`: free text (max 20,000 chars). Lands on the user's **Inbox** object
+  as a `captured_text` event with `event_metadata.triage = "pending"`.
+- `image`: base64 JPEG, PNG, HEIC, GIF or WebP (max 15 MB decoded). Stored on
+  its own `captured_image` object.
+
+`title` is optional.
+
+**Response `201`/`200`**:
+`{"capture_receipt": {"id": "uuid", "kind": "text", "status": "accepted", "idempotency_key": "...", "destination": {"type": "event", "id": "uuid", "object_id": "uuid"}, "created_at": "..."}}`.
+A retry with the same `idempotency_key` returns the first receipt with `200`.
+For `url`, `destination.type` is `object` (the bookmark) and `state` is the
+bookmark state.
+
+**Response `422`**: a validation error, a URL that fails the safety
+validator, or an image that cannot be read or stored.
+
+---
+
 ### `POST /money/accounts`
 
 Creates a manual finance account.
@@ -2827,14 +2856,29 @@ shapes.
     "paused": false,
     "last_sync_at": "2026-09-26T10:14:00+00:00",
     "next_update_at": "2026-09-26T11:14:00+00:00",
-    "schedule_summary": null
+    "schedule_summary": null,
+    "last_run": {
+        "status": "up_to_date",
+        "requested_at": "2026-09-26T10:12:00+00:00",
+        "started_at": "2026-09-26T10:12:03+00:00",
+        "finished_at": "2026-09-26T10:14:00+00:00",
+        "processed_jobs": 4,
+        "failed_jobs": 0,
+        "error": null
+    }
 }
 ```
 
 `status` is derived by `Integration::statusKey()` and is one of `paused`,
 `processing`, `stale`, `needs_update` or `up_to_date`. `stale` means a push or
 manual source has gone quiet; there is nothing to trigger, so clients should
-not present it as an error.
+not present it as an error. `status` stays `processing` until the latest run's
+processing jobs have finished, not just its fetch.
+
+`last_run` is the latest update run (the fetch jobs and the processing jobs
+they dispatch), or `null` before the first one. Its `status` is one of
+`requested`, `fetching`, `processing`, `up_to_date`, `partial` (some jobs
+failed) or `failed` (every job failed, or the run stalled for an hour).
 
 ### CompactMetric
 
