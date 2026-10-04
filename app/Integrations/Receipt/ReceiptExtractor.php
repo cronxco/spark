@@ -31,7 +31,13 @@ If it IS a valid receipt, extract the data with is_valid_receipt: true.
 
 CRITICAL REQUIREMENTS:
 1. ALL monetary amounts must be in smallest currency unit (pence for GBP, cents for USD, etc.)
-2. Parse dates as ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)
+2. Preserve the transaction date and clock time printed on the receipt as ISO 8601.
+   If a timezone/offset is explicitly printed, preserve it (Z only for explicit UTC).
+   Otherwise return YYYY-MM-DDTHH:mm:ss WITHOUT Z or an offset; do not convert to UTC.
+   Set transaction_timezone to an IANA timezone only when supported by the merchant's
+   physical location (e.g. Europe/London for a UK shop), otherwise null. Do not infer
+   it from currency alone. If only a date is printed, return YYYY-MM-DD; if absent,
+   return null. Use the purchase/payment date, not delivery, collection or due dates.
 3. If receipt is not in English, extract data AND translate all text to English
 4. confidence_score: 0.0-1.0 (only >0.8 if all key fields clearly visible)
 5. Infer merchant name even if partially visible or abbreviated
@@ -157,7 +163,8 @@ PROMPT;
                 'tip_amount' => 0,
             ],
             'transaction_metadata' => [
-                'transaction_date' => '2025-01-15T14:30:00Z',
+                'transaction_date' => '2025-01-15T14:30:00',
+                'transaction_timezone' => 'Europe/London',
                 'receipt_number' => 'R-2025-0123456',
                 'terminal_id' => 'T-005 or null',
                 'payment_method' => 'card',
