@@ -2147,6 +2147,35 @@ to reconsider.
 
 ---
 
+### `POST /captures`
+
+One way in for anything shared into Spark: a URL, free text or an image.
+Requires `ios:write`. Captures are ordinary events on the user's Manual Log
+integration, so there is no capture table.
+
+**Request Body**: `kind` (`url`, `text` or `image`) and `idempotency_key`
+(letters, numbers, `.`, `:`, `_`, `-`; max 100) are required. Send exactly the
+field that matches `kind`:
+
+- `url`: a valid URL (max 2048). Becomes a bookmark, as with `POST /bookmarks`.
+- `text`: free text (max 20,000 chars). Lands on the user's **Inbox** object
+  as a `captured_text` event with `event_metadata.triage = "pending"`.
+- `image`: base64 JPEG, PNG, HEIC, GIF or WebP (max 15 MB decoded). Stored on
+  its own `captured_image` object.
+
+`title` is optional.
+
+**Response `201`/`200`**:
+`{"capture_receipt": {"id": "uuid", "kind": "text", "status": "accepted", "idempotency_key": "...", "destination": {"type": "event", "id": "uuid", "object_id": "uuid"}, "created_at": "..."}}`.
+A retry with the same `idempotency_key` returns the first receipt with `200`.
+For `url`, `destination.type` is `object` (the bookmark) and `state` is the
+bookmark state.
+
+**Response `422`**: a validation error, a URL that fails the safety
+validator, or an image that cannot be read or stored.
+
+---
+
 ### `POST /money/accounts`
 
 Creates a manual finance account.
