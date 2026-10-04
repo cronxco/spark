@@ -35,20 +35,72 @@ final class SparkAbility
         'flint:write',
         'insights:read',
         'insights:write',
+        'integrations:manage',
         'integrations:read',
         'integrations:sync',
+        'notifications:read',
+        'notifications:write',
         'tokens:manage',
     ];
 
     /**
      * Capabilities that exist but may never be delegated into a new token.
      *
-     * `ios:read`/`ios:write` are the iOS app's own OAuth session scopes, and
-     * `mcp:read` is a transition alias we do not want to keep issuing.
+     * `mobile:session` marks the iOS app's own OAuth session token, and
+     * `tokens:revoke` lets that session revoke the user's other tokens.
+     * `ios:read`/`ios:write` are the session scopes it replaced (decision
+     * D-API-3); they no longer open any route. `mcp:read` is a transition
+     * alias we do not want to keep issuing.
      *
      * @var array<int, string>
      */
-    public const NON_DELEGABLE = ['ios:read', 'ios:write', 'mcp:read'];
+    public const NON_DELEGABLE = ['mobile:session', 'tokens:revoke', 'ios:read', 'ios:write', 'mcp:read'];
+
+    /** The marker on every iOS app session token. */
+    public const MOBILE_SESSION_MARKER = 'mobile:session';
+
+    /** The retired iOS session scopes. A token holding only these must sign in again. */
+    public const LEGACY_MOBILE_ABILITIES = ['ios:read', 'ios:write'];
+
+    /**
+     * What a read-only iOS session may do.
+     *
+     * @var array<int, string>
+     */
+    public const MOBILE_READ = [
+        self::MOBILE_SESSION_MARKER,
+        'data:read',
+        'finance:read',
+        'flint:read',
+        'insights:read',
+        'integrations:read',
+        'notifications:read',
+    ];
+
+    /**
+     * What an iOS session may change, on top of MOBILE_READ. Token creation
+     * (`tokens:manage`) is deliberately absent, so a stolen app session cannot
+     * mint a longer-lived credential for itself.
+     *
+     * @var array<int, string>
+     */
+    public const MOBILE_WRITE = [
+        'data:write',
+        'finance:write',
+        'flint:write',
+        'insights:write',
+        'integrations:manage',
+        'integrations:sync',
+        'notifications:write',
+        'tokens:revoke',
+    ];
+
+    /**
+     * The full iOS app session.
+     *
+     * @var array<int, string>
+     */
+    public const MOBILE_SESSION = [...self::MOBILE_READ, ...self::MOBILE_WRITE];
 
     /** @var array<string, array<int, string>> */
     private const LEGACY_ALIASES = [

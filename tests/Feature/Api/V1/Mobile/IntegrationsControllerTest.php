@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -50,7 +51,7 @@ class IntegrationsControllerTest extends TestCase
     #[Test]
     public function index_returns_users_integrations(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/integrations')
             ->assertOk()
@@ -62,7 +63,7 @@ class IntegrationsControllerTest extends TestCase
     #[Test]
     public function show_returns_integration_for_owner(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/integrations/{$this->integration->id}")
             ->assertOk()
@@ -86,7 +87,7 @@ class IntegrationsControllerTest extends TestCase
     {
         $this->makeEvent($this->integration, now()->subHours(2));
         $latest = $this->makeEvent($this->integration, now()->subMinutes(5));
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/integrations/{$this->integration->id}")
             ->assertOk()
@@ -103,7 +104,7 @@ class IntegrationsControllerTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'daily_checkin',
         ]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/integrations/{$manual->id}")
             ->assertOk()
@@ -115,7 +116,7 @@ class IntegrationsControllerTest extends TestCase
     public function index_reports_a_derived_status_for_each_integration(): void
     {
         $this->integration->update(['last_successful_update_at' => now()->subMinute()]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/integrations')
             ->assertOk()
@@ -127,7 +128,7 @@ class IntegrationsControllerTest extends TestCase
     public function index_reports_paused_integrations_as_paused(): void
     {
         $this->integration->update(['configuration' => ['paused' => true]]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/integrations')
             ->assertOk()
@@ -144,7 +145,7 @@ class IntegrationsControllerTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'daily_checkin',
         ]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/integrations')->assertOk();
 
@@ -156,7 +157,7 @@ class IntegrationsControllerTest extends TestCase
     public function show_returns_404_for_other_users_integration(): void
     {
         $other = User::factory()->create();
-        Sanctum::actingAs($other, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($other, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/integrations/{$this->integration->id}")
             ->assertStatus(404);
@@ -169,7 +170,7 @@ class IntegrationsControllerTest extends TestCase
     #[Test]
     public function sync_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/sync")
             ->assertStatus(403);
@@ -179,7 +180,7 @@ class IntegrationsControllerTest extends TestCase
     public function sync_triggers_a_fetch_for_the_owner(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/sync", [], $this->ifMatch($this->integration))
             ->assertOk()
@@ -190,7 +191,7 @@ class IntegrationsControllerTest extends TestCase
     public function sync_returns_404_for_other_users_integration(): void
     {
         $other = User::factory()->create();
-        Sanctum::actingAs($other, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($other, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/sync")
             ->assertStatus(404);
@@ -200,7 +201,7 @@ class IntegrationsControllerTest extends TestCase
     public function sync_returns_422_when_paused(): void
     {
         $this->integration->update(['configuration' => ['paused' => true]]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/sync", [], $this->ifMatch($this->integration))
             ->assertStatus(422);
@@ -213,7 +214,7 @@ class IntegrationsControllerTest extends TestCase
     #[Test]
     public function pause_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => true])
             ->assertStatus(403);
@@ -222,7 +223,7 @@ class IntegrationsControllerTest extends TestCase
     #[Test]
     public function pause_requires_if_match(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => true])
             ->assertStatus(428);
@@ -231,7 +232,7 @@ class IntegrationsControllerTest extends TestCase
     #[Test]
     public function pause_and_resume_toggle_the_integration(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => true], $this->ifMatch($this->integration))
             ->assertOk()
@@ -249,7 +250,7 @@ class IntegrationsControllerTest extends TestCase
     #[Test]
     public function pause_validates_the_flag(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => 'sometimes'], $this->ifMatch($this->integration))
             ->assertStatus(422)
@@ -260,7 +261,7 @@ class IntegrationsControllerTest extends TestCase
     public function pause_returns_404_for_other_users_integration(): void
     {
         $other = User::factory()->create();
-        Sanctum::actingAs($other, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($other, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/pause", ['paused' => true], ['If-Match' => '"x"'])
             ->assertStatus(404);
@@ -273,7 +274,7 @@ class IntegrationsControllerTest extends TestCase
     #[Test]
     public function oauth_start_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/oauth/start")
             ->assertStatus(403);
@@ -282,7 +283,7 @@ class IntegrationsControllerTest extends TestCase
     #[Test]
     public function oauth_start_returns_a_url_and_flags_the_group(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/oauth/start")
             ->assertOk()
@@ -298,7 +299,7 @@ class IntegrationsControllerTest extends TestCase
     public function oauth_start_returns_404_for_other_users_integration(): void
     {
         $other = User::factory()->create();
-        Sanctum::actingAs($other, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($other, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/integrations/{$this->integration->id}/oauth/start")
             ->assertStatus(404);
@@ -316,7 +317,7 @@ class IntegrationsControllerTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'daily_checkin',
         ]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/integrations/{$manual->id}/oauth/start")
             ->assertStatus(422);

@@ -9,6 +9,7 @@ use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\FlintTopicService;
 use App\Services\FlintTopicTaskService;
 use App\Support\FlintDigestKind;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -71,12 +72,11 @@ new class extends Component
     {
         $settings = Auth::user()->settings['flint'] ?? [];
 
-        $legacyEnabled = (bool) ($settings['digests_enabled'] ?? true);
-        $this->morningDigestEnabled = FlintScheduleSettings::enabled($settings, 'morning_digest_enabled', $legacyEnabled);
-        $this->eveningDigestEnabled = FlintScheduleSettings::enabled($settings, 'evening_digest_enabled', $legacyEnabled);
-        $this->topicsEnabled = FlintScheduleSettings::enabled($settings, 'topics_enabled', $legacyEnabled);
-        $this->readingListEnabled = FlintScheduleSettings::enabled($settings, 'reading_list_enabled', $legacyEnabled);
-        $this->newsRoundupEnabled = FlintScheduleSettings::enabled($settings, 'news_roundup_enabled', $legacyEnabled);
+        $this->morningDigestEnabled = FlintScheduleSettings::enabled($settings, 'morning_digest_enabled');
+        $this->eveningDigestEnabled = FlintScheduleSettings::enabled($settings, 'evening_digest_enabled');
+        $this->topicsEnabled = FlintScheduleSettings::enabled($settings, 'topics_enabled');
+        $this->readingListEnabled = FlintScheduleSettings::enabled($settings, 'reading_list_enabled');
+        $this->newsRoundupEnabled = FlintScheduleSettings::enabled($settings, 'news_roundup_enabled');
         $this->morningTimeWeekday = $settings['morning_time_weekday'] ?? config('services.flint_routine.morning_time_weekday');
         $this->morningTimeWeekend = $settings['morning_time_weekend'] ?? config('services.flint_routine.morning_time_weekend');
         $this->morningFallback = $settings['morning_fallback'] ?? config('services.flint_routine.morning_fallback');
@@ -406,20 +406,13 @@ new class extends Component
 
         // Merge rather than replace: the scheduler and the routine both read out
         // of this bag, and a blind overwrite would drop keys set elsewhere.
-        $enabled = [
-            $this->morningDigestEnabled,
-            $this->eveningDigestEnabled,
-            $this->topicsEnabled,
-            $this->readingListEnabled,
-            $this->newsRoundupEnabled,
-        ];
-        $settings['flint'] = array_merge($settings['flint'] ?? [], [
+        // The legacy all-routines switch is dropped on save (decision D-F1).
+        $settings['flint'] = array_merge(Arr::except($settings['flint'] ?? [], 'digests_enabled'), [
             'morning_digest_enabled' => $this->morningDigestEnabled,
             'evening_digest_enabled' => $this->eveningDigestEnabled,
             'topics_enabled' => $this->topicsEnabled,
             'reading_list_enabled' => $this->readingListEnabled,
             'news_roundup_enabled' => $this->newsRoundupEnabled,
-            'digests_enabled' => in_array(true, $enabled, true),
             'morning_time_weekday' => $this->morningTimeWeekday,
             'morning_time_weekend' => $this->morningTimeWeekend,
             'morning_fallback' => $this->morningFallback,
@@ -964,6 +957,11 @@ new class extends Component
                 </div>
                 @endif
             </div>
+        </x-tab>
+
+        {{-- ============================== Review ============================== --}}
+        <x-tab name="review" label="Review" icon="o-clipboard-document-check">
+            <livewire:flint.review />
         </x-tab>
 
         {{-- ============================== Settings ============================== --}}

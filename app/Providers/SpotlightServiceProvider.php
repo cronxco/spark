@@ -42,7 +42,6 @@ use App\Spotlight\Queries\Search\MetricSearchQuery;
 use App\Spotlight\Queries\Search\MetricTrendsQuery;
 use App\Spotlight\Queries\Search\ObjectSearchQuery;
 use App\Spotlight\Queries\Search\SemanticModeQuery;
-use App\Spotlight\Queries\Search\SemanticSearchQuery;
 use App\Spotlight\Queries\Search\TagSearchQuery;
 use App\Spotlight\Scopes\BlockDetailScope;
 use App\Spotlight\Scopes\EventDetailScope;
@@ -310,7 +309,6 @@ class SpotlightServiceProvider extends ServiceProvider
         // Search queries
         Spotlight::registerQueries(
             SemanticModeQuery::make(),
-            SemanticSearchQuery::make(),
             EventSearchQuery::make(),
             ObjectSearchQuery::make(),
             BlockSearchQuery::make(),
@@ -402,7 +400,7 @@ class SpotlightServiceProvider extends ServiceProvider
             'Press <kbd>Cmd+K</kbd> or click Search to open Spotlight',
             'Use arrow keys to navigate, Enter to select',
             'Press <kbd>Escape</kbd> to close Spotlight',
-            'Semantic search automatically finds similar events using AI (3+ words)',
+            'Semantic search (<kbd>~</kbd>) finds similar events, objects and blocks by meaning',
         );
     }
 }

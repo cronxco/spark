@@ -205,11 +205,13 @@ Preferences are stored in `users->settings->notifications`:
 
 ### Delivery Timing Options
 
-| Mode         | Behavior                                 |
-| ------------ | ---------------------------------------- |
-| immediate    | Send all emails right away               |
-| work_hours   | Delay non-urgent emails until work hours |
-| daily_digest | Group notifications into one daily email |
+| Mode         | Behavior                                                                                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| immediate    | Send all emails right away                                                                                                                                    |
+| work_hours   | Outside the window, the mail channel is queued with a delay until the window next opens (`SparkNotification::withDelay()`). Other channels go immediately.    |
+| daily_digest | No per-notification email. `notifications:send-digests` (every 15 minutes) sends one `NotificationDigest` covering the 24 hours up to the user's digest time. |
+
+Priority (`forced_delivery`) types always email immediately and are left out of the digest. The digest time is read in the user's effective timezone; the work-hours window uses its own timezone setting. Both modes previously dropped the email instead of delaying it.
 
 ### UI Indicator Features
 

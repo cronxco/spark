@@ -105,7 +105,9 @@ class EventFeed
         }
 
         if ($date !== null) {
-            $query->whereBetween('time', [$date->copy()->startOfDay(), $date->copy()->endOfDay()]);
+            // `time` is stored in UTC, so the local day's bounds are converted
+            // before binding; `$date` carries the timezone the day belongs to.
+            $query->whereBetween('time', [$date->copy()->startOfDay()->utc(), $date->copy()->endOfDay()->utc()]);
         } else {
             $query->where('time', '<=', now());
         }

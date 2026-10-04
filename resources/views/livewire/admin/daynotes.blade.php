@@ -1,16 +1,20 @@
 <?php
 
 use App\Jobs\Outline\GenerateDayNotes;
-use App\Models\{ActionProgress, Integration, IntegrationGroup};
+use App\Models\ActionProgress;
+use App\Models\Integration;
+use App\Models\IntegrationGroup;
+use App\Support\AdminTenant;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
+
 use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
 
-new class extends Component {
+new class extends Component
+{
     use Toast;
 
     public ?IntegrationGroup $group = null;
@@ -23,7 +27,7 @@ new class extends Component {
     {
         // Find Outline IntegrationGroup (shared credentials)
         $this->group = IntegrationGroup::where('service', 'outline')
-            ->where('user_id', Auth::id())
+            ->where('user_id', AdminTenant::id())
             ->first();
 
         if ($this->group) {
@@ -37,35 +41,6 @@ new class extends Component {
         }
     }
 
-    protected function loadYearStatuses(): void
-    {
-        $years = [2026, 2027, 2028];
-
-        foreach ($years as $year) {
-            $progress = ActionProgress::where('user_id', Auth::id())
-                ->where('action_type', 'outline_generate_daynotes')
-                ->where('details->year', $year)
-                ->latest()
-                ->first();
-
-            $status = 'not_started';
-            if ($progress) {
-                if ($progress->isCompleted()) {
-                    $status = 'completed';
-                } elseif ($progress->isFailed()) {
-                    $status = 'failed';
-                } elseif ($progress->isInProgress()) {
-                    $status = 'in_progress';
-                }
-            }
-
-            $this->yearStatuses[$year] = [
-                'status' => $status,
-                'progress' => $progress,
-            ];
-        }
-    }
-
     public function generateYear(int $year): void
     {
         if (! $this->taskIntegration) {
@@ -76,7 +51,7 @@ new class extends Component {
 
         // Create progress tracker
         $progress = ActionProgress::createProgress(
-            (string) Auth::id(),
+            (string) AdminTenant::id(),
             'outline_generate_daynotes',
             "year_{$year}",
             'starting',
@@ -101,15 +76,44 @@ new class extends Component {
         $this->loadYearStatuses();
     }
 
-    protected function getDaysInYear(int $year): int
-    {
-        return Carbon::create($year, 12, 31)->dayOfYear;
-    }
-
     public function refreshStatus(): void
     {
         $this->loadYearStatuses();
         $this->success('Status refreshed');
+    }
+
+    protected function loadYearStatuses(): void
+    {
+        $years = [2026, 2027, 2028];
+
+        foreach ($years as $year) {
+            $progress = ActionProgress::where('user_id', AdminTenant::id())
+                ->where('action_type', 'outline_generate_daynotes')
+                ->where('details->year', $year)
+                ->latest()
+                ->first();
+
+            $status = 'not_started';
+            if ($progress) {
+                if ($progress->isCompleted()) {
+                    $status = 'completed';
+                } elseif ($progress->isFailed()) {
+                    $status = 'failed';
+                } elseif ($progress->isInProgress()) {
+                    $status = 'in_progress';
+                }
+            }
+
+            $this->yearStatuses[$year] = [
+                'status' => $status,
+                'progress' => $progress,
+            ];
+        }
+    }
+
+    protected function getDaysInYear(int $year): int
+    {
+        return Carbon::create($year, 12, 31)->dayOfYear;
     }
 }; ?>
 

@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -26,7 +27,7 @@ class FlintHistoryControllerTest extends TestCase
         $this->user = User::factory()->create();
         $this->user->setTimezone('Europe/London');
         $this->integration = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'flint']);
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
     }
 
     protected function tearDown(): void

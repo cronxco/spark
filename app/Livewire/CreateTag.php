@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Support\OwnedTagQuery;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 use Spatie\Tags\Tag;
@@ -61,10 +62,7 @@ class CreateTag extends Component
 
     public function getExistingTypes(): array
     {
-        // Get all distinct tag types from the database
-        $types = Tag::distinct()
-            ->pluck('type')
-            ->filter()
+        $types = collect(OwnedTagQuery::typesFor(auth()->guard('web')->user()))
             ->mapWithKeys(function ($type) {
                 // Convert snake_case to Title Case for display
                 $label = str($type)->replace('_', ' ')->title()->toString();

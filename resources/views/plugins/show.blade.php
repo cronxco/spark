@@ -8,27 +8,21 @@
             subtitle="{{ $pluginClass::getDescription() }}"
             separator>
             <x-slot:actions>
+                @php
+                    $identifier = $pluginClass::getIdentifier();
+                    // OAuth services start at the provider, except GoCardless,
+                    // which picks a bank first. Everything else is initialised
+                    // with a POST. Both layouts use this one decision.
+                    $addViaOAuth = $pluginClass::getServiceType() === 'oauth' && $identifier !== 'gocardless';
+                    $instanceCount = $groups->sum(fn ($group) => $group->integrations->count());
+                @endphp
                 <!-- Desktop: Full buttons -->
                 <div class="hidden sm:flex gap-2">
-                    @php
-                        $serviceType = $pluginClass::getServiceType();
-                        $identifier = $pluginClass::getIdentifier();
-                    @endphp
-                    @if ($serviceType === 'oauth')
-                        @if ($identifier === 'gocardless')
-                            <form method="POST" action="{{ route('integrations.initialize', ['service' => $identifier]) }}">
-                                @csrf
-                                <button type="submit" class="btn btn-primary">
-                                    <x-icon name="fas.plus" class="w-4 h-4" />
-                                    Add Instance
-                                </button>
-                            </form>
-                        @else
-                            <a href="{{ route('integrations.oauth', $identifier) }}" class="btn btn-primary">
-                                <x-icon name="fas.plus" class="w-4 h-4" />
-                                Add Instance
-                            </a>
-                        @endif
+                    @if ($addViaOAuth)
+                        <a href="{{ route('integrations.oauth', $identifier) }}" class="btn btn-primary">
+                            <x-icon name="fas.plus" class="w-4 h-4" />
+                            Add Instance
+                        </a>
                     @else
                         <form method="POST" action="{{ route('integrations.initialize', ['service' => $identifier]) }}">
                             @csrf
@@ -52,7 +46,16 @@
                                 <x-icon name="fas.ellipsis-vertical" class="w-5 h-5" />
                             </x-button>
                         </x-slot:trigger>
-                        <x-menu-item title="Add Instance" icon="fas.plus" link="{{ route('integrations.oauth', $pluginClass::getIdentifier()) }}" />
+                        @if ($addViaOAuth)
+                            <x-menu-item title="Add Instance" icon="fas.plus" link="{{ route('integrations.oauth', $identifier) }}" />
+                        @else
+                            <form method="POST" action="{{ route('integrations.initialize', ['service' => $identifier]) }}">
+                                @csrf
+                                <button type="submit" class="w-full text-left">
+                                    <x-menu-item title="Add Instance" icon="fas.plus" />
+                                </button>
+                            </form>
+                        @endif
                         <x-menu-item title="Back to Integrations" icon="fas.arrow-left" link="{{ route('integrations.index') }}" />
                     </x-dropdown>
                 </div>
@@ -89,11 +92,11 @@
                             <x-icon name="fas.tag" class="w-4 h-4" />
                             <span>{{ ucfirst($pluginClass::getDomain()) }}</span>
                         </div>
-                        @if ($group)
+                        @if ($groups->isNotEmpty())
                             <span class="hidden sm:inline">·</span>
                             <div class="flex items-center gap-2">
                                 <x-icon name="fas.circle-check" class="w-4 h-4 text-success" />
-                                <span class="text-success font-medium">{{ $group->integrations->count() }} active {{ Str::plural('instance', $group->integrations->count()) }}</span>
+                                <span class="text-success font-medium">{{ $instanceCount }} active {{ Str::plural('instance', $instanceCount) }}</span>
                             </div>
                         @endif
                     </div>
@@ -102,11 +105,16 @@
         </x-card>
 
         <!-- Connected Instances (if any) -->
-        @if ($group && $group->integrations->count() > 0)
+        @foreach ($groups as $group)
+        @continue($group->integrations->isEmpty())
         <x-card class="bg-base-200/50 border-2 border-info/10">
             <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
                 <x-icon name="fas.link" class="w-5 h-5 text-info" />
-                Your Instances ({{ $group->integrations->count() }})
+                @if ($groups->count() > 1)
+                    Account {{ $loop->iteration }} ({{ $group->integrations->count() }})
+                @else
+                    Your Instances ({{ $group->integrations->count() }})
+                @endif
             </h3>
             <div class="space-y-3">
                 @foreach ($group->integrations as $integration)
@@ -133,7 +141,7 @@
                 @endforeach
             </div>
         </x-card>
-        @endif
+        @endforeach
 
         <!-- Action Types Section -->
         @if (count($pluginClass::getActionTypes()) > 0)
@@ -307,16 +315,19 @@
         </x-card>
         @endif
 
-        <!-- Logs Section (if group exists) -->
-        @if ($group)
+        <!-- Logs Section (one per credential group) -->
+        @foreach ($groups as $group)
         <x-card class="bg-base-200 shadow">
             <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
                 <x-icon name="fas.file-lines" class="w-5 h-5 text-primary" />
                 Logs
+                @if ($groups->count() > 1)
+                    <span class="text-base-content/60 font-normal">· Account {{ $loop->iteration }}</span>
+                @endif
             </h3>
             <p class="text-base-content/70 mb-4">View logs for all {{ $pluginClass::getDisplayName() }} integrations</p>
-            <livewire:log-viewer type="group" :entity-id="$group->id" />
+            <livewire:log-viewer type="group" :entity-id="$group->id" :key="'logs-' . $group->id" />
         </x-card>
-        @endif
+        @endforeach
     </div>
 </x-layouts.app>

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -32,7 +33,7 @@ class MeControllerTest extends TestCase
             'email' => 'will@example.com',
         ]);
 
-        Sanctum::actingAs($user, ['ios:read']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/me')
             ->assertOk()
@@ -46,7 +47,7 @@ class MeControllerTest extends TestCase
     #[Test]
     public function id_is_returned_as_string(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
 
         $response = $this->getJson('/api/v1/mobile/me')->assertOk();
 
@@ -56,7 +57,7 @@ class MeControllerTest extends TestCase
     #[Test]
     public function timezone_defaults_to_utc(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/me')
             ->assertOk()
@@ -66,7 +67,7 @@ class MeControllerTest extends TestCase
     #[Test]
     public function etag_header_is_present(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/me')
             ->assertOk()
