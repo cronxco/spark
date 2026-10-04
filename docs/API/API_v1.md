@@ -228,6 +228,14 @@ individual markers once the result count exceeds 500. Identical to
 A single place (`EventObject` with `concept = 'place'`). Identical to
 `GET /api/v1/mobile/places/{id}`.
 
+### `GET /api/v1/relationship-types`
+
+The relationship types the server accepts, straight from
+`RelationshipTypeRegistry`. Clients build their type pickers from this rather
+than a hard-coded list.
+
+**Response `200`**: `{"data": [{"type": "transferred_to", "display_name": "Transferred To", "description": "...", "is_directional": true, "supports_value": true, "default_value_unit": "GBP"}, ...]}`
+
 ### `GET /api/v1/{kind}/{id}/relationships`
 
 Lists the relationships attached to an owned event, object, or block.
@@ -653,7 +661,10 @@ see [MCP.md](MCP.md#update-entity) for the exact allowed fields per kind.
 **Response `404`** — Not found or not owned.
 
 **Response `422`** — Disallowed field or invalid value (from
-`EntityMutationService::validateUpdate`). **Response `428`/`412`** —
+`EntityMutationService::validateUpdate`), or a change to a source field of an
+integration-sourced or locked item (`SourceFieldGuard`, see
+[OBJECTS.md](../Architecture/OBJECTS.md#no-overrides-of-source-fields)).
+**Response `428`/`412`** —
 Missing/stale `If-Match`.
 
 ### `PATCH /api/v1/events/{id}/note`
@@ -708,7 +719,7 @@ Requires `If-Match`. Prevents self-links and enforces the registered
 relationship-type directionality — same rules as MCP's
 `manage-relationship` create operation.
 
-**Request body**: `{"to_kind": "objects", "to_id": "uuid", "type": "linked_to", "value": null, "value_multiplier": null, "value_unit": null, "metadata": {}}`
+**Request body**: `{"to_kind": "object", "to_id": "uuid", "type": "linked_to", "value": null, "value_multiplier": null, "value_unit": null, "metadata": {}}`
 
 **Response `201`**: [Relationship](#relationship).
 
@@ -769,8 +780,26 @@ documented once to avoid drift.
     "value": null,
     "value_multiplier": null,
     "value_unit": null,
-    "metadata": {}
+    "metadata": {},
+    "created_at": "2026-10-03T09:00:00+00:00",
+    "etag": "\"…\""
 }
+```
+
+`to_kind` and the `*_type` fields are singular (`event`, `object`, `block`);
+plural forms appear only in URL path segments. `etag` is the edge's own
+version: send it as `If-Match` to delete the relationship. The parent
+entity's ETag is rejected with `412`.
+
+A create response (`201`) also carries `versions`, the new ETags of the
+entities the create touched, so a client can replace the parent ETag it holds
+without re-reading it:
+
+```json
+"versions": [
+    {"kind": "event", "id": "uuid", "etag": "\"…\""},
+    {"kind": "object", "id": "uuid", "etag": "\"…\""}
+]
 ```
 
 ### FlintDigest

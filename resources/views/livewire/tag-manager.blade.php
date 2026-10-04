@@ -3,9 +3,17 @@
 use Livewire\Volt\Component;
 use Illuminate\Database\Eloquent\Model as EloquentModel;
 use Spatie\Tags\Tag;
+use App\Support\OwnedTagQuery;
+use App\Traits\AuthorizesOwnership;
+use Livewire\Attributes\Locked;
 
 new class extends Component {
+    use AuthorizesOwnership;
+
+    #[Locked]
     public string $modelClass;
+
+    #[Locked]
     public string $modelId;
 
     /** @var array<int, string> */
@@ -25,6 +33,7 @@ new class extends Component {
 
         /** @var EloquentModel $model */
         $model = $modelClass::query()->with('tags')->findOrFail($modelId);
+        $this->authorizeModelOwner($model);
         $this->model = $model;
 
         $this->refreshData();
@@ -51,6 +60,7 @@ new class extends Component {
         if (! isset($this->model)) {
             /** @var EloquentModel $model */
             $model = $this->modelClass::query()->with('tags')->findOrFail($this->modelId);
+            $this->authorizeModelOwner($model);
             $this->model = $model;
         }
         return $this->model;
@@ -72,20 +82,7 @@ new class extends Component {
             ->values()
             ->all();
 
-        $this->allTags = Tag::query()
-            ->select(['id', 'name', 'type'])
-            ->get()
-            ->map(function (Tag $tag) {
-                return [
-                    'value' => (string) $tag->name,
-                    'type' => $tag->type ? (string) $tag->type : null,
-                ];
-            })
-            ->sort(function ($a, $b) {
-                return strnatcasecmp((string) ($a['value'] ?? ''), (string) ($b['value'] ?? ''));
-            })
-            ->values()
-            ->all();
+        $this->allTags = OwnedTagQuery::suggestionsFor(auth()->guard('web')->user());
     }
 
     public function addTag(string $value, ?string $type = null): void

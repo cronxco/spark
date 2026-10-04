@@ -374,6 +374,100 @@ paths:
               },
           }
         "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteEvent
+      tags: [entities]
+      summary: Soft-delete an owned event (undo with restore)
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            id: { type: string, format: uuid },
+                            deleted_at: { type: string, format: date-time },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+
+  /events/{id}/route:
+    get:
+      operationId: getEventRoute
+      tags: [entities]
+      summary: Read-only GPS route of a workout event, thinned to at most 1000 points
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        required: [points, total_points],
+                        properties:
+                          {
+                            points:
+                              {
+                                type: array,
+                                items:
+                                  {
+                                    type: object,
+                                    properties:
+                                      {
+                                        lat: { type: number },
+                                        lng: { type: number },
+                                      },
+                                  },
+                              },
+                            total_points: { type: integer },
+                            distance: { type: [number, "null"] },
+                            distance_unit: { type: [string, "null"] },
+                            duration_seconds: { type: [number, "null"] },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /events/{id}/restore:
+    post:
+      operationId: restoreEvent
+      tags: [entities]
+      summary: Restore a soft-deleted event (idempotent, no If-Match)
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactEvent" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /events/{id}/note:
     patch:
@@ -412,6 +506,56 @@ paths:
             in: query,
             schema: { type: integer, minimum: 1, maximum: 25, default: 5 },
           }
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  { schema: { $ref: "#/components/schemas/CompactObject" } },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteObject
+      tags: [entities]
+      summary: Soft-delete an owned object (undo with restore)
+      parameters:
+        [
+          { $ref: "#/components/parameters/EntityId" },
+          { $ref: "#/components/parameters/IfMatch" },
+        ]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        properties:
+                          {
+                            id: { type: string, format: uuid },
+                            deleted_at: { type: string, format: date-time },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+
+  /objects/{id}/restore:
+    post:
+      operationId: restoreObject
+      tags: [entities]
+      summary: Restore a soft-deleted object (idempotent, no If-Match)
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
       responses:
         "200":
           {
@@ -542,6 +686,14 @@ paths:
         "422":
           { description: Entity not found or address could not be geocoded }
 
+  /relationship-types:
+    get:
+      operationId: listRelationshipTypes
+      tags: [entities]
+      summary: Relationship types the server accepts
+      responses:
+        "200": { description: OK }
+
   /{kind}/{id}/relationships:
     get:
       operationId: listRelationships
@@ -574,7 +726,7 @@ paths:
                 required: [to_kind, to_id, type],
                 properties:
                   {
-                    to_kind: { type: string },
+                    to_kind: { type: string, enum: [event, object, block] },
                     to_id: { type: string, format: uuid },
                     type: { type: string },
                     value: { type: [number, "null"] },
@@ -2398,6 +2550,11 @@ components:
             description: "Money events only (domain=money, value set) — resolved server-side so the client never infers direction from the action-name suffix.",
           }
         url: { type: string }
+        has_route:
+          {
+            type: boolean,
+            description: "Present (true) only when GET /events/{id}/route has a route.",
+          }
         actor: { type: object }
         target: { type: object }
         tags: { type: array, items: { type: object } }

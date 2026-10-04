@@ -88,6 +88,9 @@ Route::get('notifications/feed/{id}', [NotificationsController::class, 'show'])
     ->name('notifications.show');
 
 Route::get('events/{id}', [EventsController::class, 'show'])->name('events.show');
+Route::get('events/{id}/route', [EventsController::class, 'route'])
+    ->middleware('ability:ios:read,data:read')
+    ->name('events.route');
 Route::patch('{kind}/{id}/location', [LocationsController::class, 'set'])->whereIn('kind', ['events', 'objects'])->middleware(['ability:ios:write', 'if-match:entity'])->name('locations.set');
 Route::delete('{kind}/{id}/location', [LocationsController::class, 'clear'])->whereIn('kind', ['events', 'objects'])->middleware(['ability:ios:write', 'if-match:entity'])->name('locations.clear');
 Route::post('{kind}/{id}/location/geocode', [LocationsController::class, 'geocode'])->whereIn('kind', ['events', 'objects'])->middleware(['ability:ios:write', 'if-match:entity'])->name('locations.geocode');
@@ -99,6 +102,24 @@ Route::patch('events/{id}/note', [EventsController::class, 'updateNote'])
     ->middleware(['ability:ios:write', 'if-match:event'])
     ->name('events.note.update');
 Route::get('objects/{id}', [ObjectsController::class, 'show'])->name('objects.show');
+
+/*
+ * Soft delete takes the entity's If-Match like every destructive write.
+ * Restore is the client's Undo: the deleted row has no readable version, and
+ * restoring twice changes nothing, so it carries no precondition.
+ */
+Route::delete('events/{id}', [EventsController::class, 'destroy'])
+    ->middleware(['ability:ios:write,data:write', 'if-match:event'])
+    ->name('events.destroy');
+Route::post('events/{id}/restore', [EventsController::class, 'restore'])
+    ->middleware('ability:ios:write,data:write')
+    ->name('events.restore');
+Route::delete('objects/{id}', [ObjectsController::class, 'destroy'])
+    ->middleware(['ability:ios:write,data:write', 'if-match:object'])
+    ->name('objects.destroy');
+Route::post('objects/{id}/restore', [ObjectsController::class, 'restore'])
+    ->middleware('ability:ios:write,data:write')
+    ->name('objects.restore');
 Route::get('blocks/{id}', [BlocksController::class, 'show'])->name('blocks.show');
 Route::get('metrics', [MetricsController::class, 'index'])->name('metrics.index');
 Route::get('metrics/baselines', [InsightDiscoveryController::class, 'baselines'])->name('metrics.baselines');
@@ -150,6 +171,8 @@ Route::get('places/{id}', [PlacesController::class, 'show'])->name('places.show'
 
 Route::get('map/data', [MapController::class, 'data'])->name('map.data');
 
+Route::get('relationship-types', [EntityMutationsController::class, 'relationshipTypes'])
+    ->name('relationship-types.index');
 Route::get('{kind}/{id}/relationships', [EntityMutationsController::class, 'relationships'])
     ->whereIn('kind', ['events', 'objects', 'blocks'])
     ->name('relationships.index');
