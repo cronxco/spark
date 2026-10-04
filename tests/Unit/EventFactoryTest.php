@@ -22,12 +22,23 @@ class EventFactoryTest extends TestCase
         $event = Event::factory()->create([
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
-            'target_id' => null,
+            'target_id' => $actor->id,
         ]);
 
         $this->assertSame($counts, $this->relatedCounts());
         $this->assertSame($actor->id, $event->actor_id);
-        $this->assertNull($event->target_id);
+        $this->assertSame($actor->id, $event->target_id);
+
+        // Null overrides are valid for unsaved attributes; the schema requires
+        // actor and target IDs when persisting an event.
+        $attributes = Event::factory()->make([
+            'integration_id' => $integration->id,
+            'actor_id' => null,
+            'target_id' => null,
+        ]);
+        $this->assertNull($attributes->actor_id);
+        $this->assertNull($attributes->target_id);
+        $this->assertSame($counts, $this->relatedCounts());
     }
 
     #[Test]

@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 class TestRunnerTest(unittest.TestCase):
@@ -38,9 +39,23 @@ exit "$RUNNER_STATUS"
             (commands / 'python3').chmod(0o755)
             env = os.environ | {'PATH': str(commands) + ':' + os.environ['PATH'],
                                 'RUNNER_STATUS': str(runner_status), 'DISCOVERY_STATUS': str(discovery_status),
-                                'WRITE_REPORT': '1' if report else '0', 'TEST_PROCESSES': '2' if parallel else '1'}
+                                'WRITE_REPORT': '1' if report else '0', 'TEST_PROCESSES': '2' if parallel else '1',
+                                'GITHUB_OUTPUT': str(root / 'outputs'),
+                                'GITHUB_STEP_SUMMARY': str(root / 'summary')}
             return subprocess.run(['bash', str(scripts / 'run-tests.sh')], cwd=root, env=env,
                                   capture_output=True, text=True).returncode
+
+    def test_fixture_reports_do_not_modify_real_actions_outputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary = Path(directory) / 'real-summary'
+            outputs = Path(directory) / 'real-outputs'
+            summary.write_text('real summary\n')
+            outputs.write_text('real outputs\n')
+            with patch.dict(os.environ, {'GITHUB_STEP_SUMMARY': str(summary), 'GITHUB_OUTPUT': str(outputs)}):
+                self.assertEqual(self.run_fixture(), 0)
+                self.assertEqual(self.run_fixture(report=False), 1)
+            self.assertEqual(summary.read_text(), 'real summary\n')
+            self.assertEqual(outputs.read_text(), 'real outputs\n')
 
     def test_serial_and_parallel_success(self):
         self.assertEqual(self.run_fixture(), 0)
