@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedJsonSecrets;
 use App\Integrations\PluginRegistry;
+use App\Traits\RedactsLoggedProperties;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -13,7 +16,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Integration extends Model
 {
-    use HasFactory, LogsActivity, SoftDeletes;
+    use HasFactory, LogsActivity, RedactsLoggedProperties, SoftDeletes;
 
     public $incrementing = false;
 
@@ -34,12 +37,20 @@ class Integration extends Model
         'migration_batch_id',
     ];
 
+    /**
+     * `configuration` is `jsonb` and is read through SQL JSON paths (the ten
+     * `configuration->migration_*` updates in the migration jobs), so encrypting
+     * the whole column would break them. EncryptedJsonSecrets encrypts only the
+     * secret leaves — the api_key several plugins keep here — and leaves the
+     * JSON structurally valid, so those paths keep working. Run
+     * `integrations:encrypt-credentials` to convert existing plaintext rows.
+     */
     protected $casts = [
         // tokens now live on IntegrationGroup
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
-        'configuration' => 'array',
+        'configuration' => EncryptedJsonSecrets::class,
         'last_triggered_at' => 'datetime',
         'last_successful_update_at' => 'datetime',
     ];
@@ -51,7 +62,7 @@ class Integration extends Model
      */
     public static function scopeNeedsUpdate($query)
     {
-        return $query->where(function ($q) {
+        return $query->external()->where(function ($q) {
             $q->whereNull('last_successful_update_at')
                 ->orWhereRaw('last_successful_update_at + INTERVAL \'1 minute\' * 15 < NOW()');
         });
@@ -62,7 +73,7 @@ class Integration extends Model
      */
     public static function scopeOAuthNeedsUpdate($query)
     {
-        return $query->whereIn('service', PluginRegistry::getOAuthPlugins()->keys())
+        return $query->external()->whereIn('service', PluginRegistry::getOAuthPlugins()->keys())
             ->needsUpdate();
     }
 
@@ -109,6 +120,23 @@ class Integration extends Model
 
             $group->delete();
         });
+    }
+
+    public function scopeExternal(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereNull('instance_type')->orWhere('instance_type', '!=', 'internal');
+        });
+    }
+
+    public function scopeInternal(Builder $query): Builder
+    {
+        return $query->where('instance_type', 'internal');
+    }
+
+    public function isInternal(): bool
+    {
+        return $this->instance_type === 'internal';
     }
 
     /**
@@ -475,6 +503,51 @@ class Integration extends Model
             || $this->last_triggered_at->gt($this->last_successful_update_at);
 
         return $triggerIsRecent && $triggerAfterLastSuccess;
+    }
+
+    /**
+     * One status vocabulary for the Updates page and the mobile API.
+     *
+     * `stale` belongs to push and manual sources that have gone quiet: there is
+     * nothing Spark can trigger, so it is reported but never counted as an issue.
+     * `needs_update` allows the every-minute scheduler a short grace period
+     * before an overdue pull integration is flagged.
+     *
+     * @param  Carbon|null  $lastEventTime  Pre-fetched latest event time for push/manual sources, to avoid a query per row.
+     * @return 'paused'|'processing'|'stale'|'needs_update'|'up_to_date'
+     */
+    public function statusKey(?Carbon $lastEventTime = null): string
+    {
+        if ($this->isPaused()) {
+            return 'paused';
+        }
+
+        if ($this->isProcessing()) {
+            return 'processing';
+        }
+
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        $staleAfterMinutes = $pluginClass ? $pluginClass::getTimeUntilStaleMinutes() : null;
+
+        if ($staleAfterMinutes !== null) {
+            $lastEventTime ??= $this->getLastEventTime();
+
+            return ! $lastEventTime || $lastEventTime->lessThan(now()->subMinutes($staleAfterMinutes))
+                ? 'stale'
+                : 'up_to_date';
+        }
+
+        if (! $this->isDue()) {
+            return 'up_to_date';
+        }
+
+        $nextUpdateTime = $this->getNextUpdateTime();
+
+        if ($nextUpdateTime && $nextUpdateTime->greaterThan(now()->subMinutes(2))) {
+            return 'up_to_date';
+        }
+
+        return 'needs_update';
     }
 
     /**

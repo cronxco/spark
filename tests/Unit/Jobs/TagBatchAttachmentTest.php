@@ -7,15 +7,14 @@ use App\Models\Event;
 use App\Models\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class TagBatchAttachmentTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function it_batch_attaches_tags_without_n_plus_one()
     {
         $integration = Integration::factory()->create();
@@ -91,9 +90,7 @@ class TagBatchAttachmentTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function it_handles_mixed_tag_types()
     {
         $integration = Integration::factory()->create();

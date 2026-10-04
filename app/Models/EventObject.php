@@ -132,6 +132,14 @@ class EventObject extends Model implements HasMedia
 
     public function getActivitylogOptions(): LogOptions
     {
+        if ($this->concept === 'document' && $this->type === 'flint_note') {
+            return LogOptions::defaults()
+                ->useLogName('changelog')
+                ->logOnly(['concept', 'type'])
+                ->logOnlyDirty()
+                ->dontSubmitEmptyLogs();
+        }
+
         return LogOptions::defaults()
             ->useLogName('changelog')
             ->logFillable()
@@ -210,6 +218,12 @@ class EventObject extends Model implements HasMedia
     public function targetEvents()
     {
         return $this->hasMany(Event::class, 'target_id')->withTrashed();
+    }
+
+    /** Most recent non-deleted event that enriched or referenced this object. */
+    public function latestTargetEvent()
+    {
+        return $this->hasOne(Event::class, 'target_id')->latestOfMany('time');
     }
 
     public function events()

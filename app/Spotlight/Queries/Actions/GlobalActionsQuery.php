@@ -33,6 +33,34 @@ class GlobalActionsQuery
                     'event' => 'trigger-all-integrations',
                 ],
                 [
+                    'title' => 'Run Flint Digest',
+                    'subtitle' => 'Generate today\'s Flint digest now',
+                    'icon' => 'newspaper',
+                    'event' => 'run-flint-routine',
+                    'data' => ['skill' => 'spark-day-briefing-async'],
+                ],
+                [
+                    'title' => 'Run Flint Topics',
+                    'subtitle' => 'Review and update Flint Topics now',
+                    'icon' => 'map',
+                    'event' => 'run-flint-routine',
+                    'data' => ['skill' => 'flint-topics'],
+                ],
+                [
+                    'title' => 'Run Flint Reading List',
+                    'subtitle' => 'Pick out what is worth reading now',
+                    'icon' => 'book-open',
+                    'event' => 'run-flint-routine',
+                    'data' => ['skill' => 'flint-reading-list'],
+                ],
+                [
+                    'title' => 'Run Flint News Roundup',
+                    'subtitle' => 'Synthesise overnight newsletters now',
+                    'icon' => 'rss',
+                    'event' => 'run-flint-routine',
+                    'data' => ['skill' => 'flint-news-roundup'],
+                ],
+                [
                     'title' => 'Create New Tag',
                     'subtitle' => 'Add a new tag to organize your data',
                     'icon' => 'tag',
@@ -61,7 +89,7 @@ class GlobalActionsQuery
                     if (isset($actionConfig['event'])) {
                         $result->setAction('dispatch_event', [
                             'name' => $actionConfig['event'],
-                            'data' => [],
+                            'data' => $actionConfig['data'] ?? [],
                             'close' => true,
                         ]);
                     } elseif (isset($actionConfig['route'])) {

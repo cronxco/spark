@@ -6,10 +6,13 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
 use App\Models\TaskExecution;
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
@@ -35,9 +38,19 @@ class TaskExecutionStore
         }
 
         $fromTable = $rows
-            ->mapWithKeys(fn (TaskExecution $execution) => [
-                $execution->task_key => $this->legacyShapeFromRow($execution),
-            ])
+            ->mapWithKeys(function (TaskExecution $execution) use ($legacy): array {
+                $taskKey = $execution->task_key;
+                $legacyShape = $legacy[$taskKey] ?? [];
+                $rowShape = $this->legacyShapeFromRow($execution);
+                $rowShape['last_attempt'] = array_replace(
+                    $legacyShape['last_attempt'] ?? [],
+                    $rowShape['last_attempt'],
+                );
+
+                return [
+                    $taskKey => array_replace($legacyShape, $rowShape),
+                ];
+            })
             ->all();
 
         return array_replace($legacy, $fromTable);
@@ -76,7 +89,22 @@ class TaskExecutionStore
         array $data = [],
         ?object $jobContext = null,
         bool $mergeLastAttempt = true,
+        bool $promoteSuccess = true,
     ): array {
+        if (DB::transactionLevel() === 0) {
+            return DB::transaction(fn () => $this->recordStatus(
+                $model,
+                $task,
+                $status,
+                $data,
+                $jobContext,
+                $mergeLastAttempt,
+                $promoteSuccess,
+            ));
+        }
+
+        $this->acquireTaskLock($model, $task->key);
+
         $executions = $this->getTaskExecutions($model);
 
         $executionData = array_merge($data, [
@@ -89,7 +117,7 @@ class TaskExecutionStore
 
         $executions[$task->key]['last_attempt'] = $lastAttempt;
 
-        if ($status === 'success') {
+        if ($status === 'success' && $promoteSuccess) {
             $executions[$task->key]['last_success'] = $lastAttempt;
         }
 
@@ -97,6 +125,77 @@ class TaskExecutionStore
         $this->mirrorLegacyTaskExecutions($model, $executions);
 
         return $executions[$task->key];
+    }
+
+    /**
+     * Record provider acceptance without overwriting a completion that raced
+     * the provider response. Accepted runs are retained in history so a newer
+     * manual run cannot make an earlier callback untrackable.
+     *
+     * @return array{completed:bool, execution:array<string,mixed>}
+     */
+    public function recordAcceptedUnlessSucceeded(
+        Model $model,
+        TaskDefinition $task,
+        string $runUuid,
+        array $data = [],
+        ?object $jobContext = null,
+    ): array {
+        return $this->withTaskLock($model, $task, function () use ($model, $task, $runUuid, $data, $jobContext): array {
+            $completed = $this->getTaskExecutions($model)[$task->key]['last_success'] ?? null;
+            if (is_array($completed) && ($completed['run_uuid'] ?? null) === $runUuid) {
+                return ['completed' => true, 'execution' => $completed];
+            }
+
+            $execution = $this->recordStatus(
+                $model,
+                $task,
+                'accepted',
+                ['run_uuid' => $runUuid] + $data,
+                $jobContext,
+                promoteSuccess: false,
+            );
+
+            return ['completed' => false, 'execution' => $execution];
+        });
+    }
+
+    /** @return array<string,mixed>|null */
+    public function trackedRunAttempt(Model $model, string $taskKey, string $runUuid): ?array
+    {
+        $shape = $this->getTaskExecutions($model)[$taskKey] ?? [];
+        $candidates = array_filter([
+            $shape['last_attempt'] ?? null,
+            $shape['last_success'] ?? null,
+        ], 'is_array');
+
+        if ($model->exists && Schema::hasTable('task_executions')) {
+            $row = TaskExecution::query()
+                ->forEntity($this->entityType($model), (string) $model->getKey())
+                ->where('task_key', $taskKey)
+                ->first();
+            $history = is_array($row?->history) ? array_reverse($row->history) : [];
+            $candidates = [...$candidates, ...array_filter($history, 'is_array')];
+        }
+
+        foreach ($candidates as $attempt) {
+            if (($attempt['run_uuid'] ?? null) === $runUuid) {
+                return $attempt;
+            }
+        }
+
+        return null;
+    }
+
+    public function withTaskLock(Model $model, TaskDefinition $task, Closure $callback): mixed
+    {
+        if (DB::transactionLevel() === 0) {
+            return DB::transaction(fn () => $this->withTaskLock($model, $task, $callback));
+        }
+
+        $this->acquireTaskLock($model, $task->key);
+
+        return $callback();
     }
 
     public function upsertFromLegacy(
@@ -116,11 +215,13 @@ class TaskExecutionStore
             return null;
         }
 
-        $execution = TaskExecution::firstOrNew([
+        $identity = [
             'entity_type' => $this->entityType($model),
             'entity_id' => (string) $model->getKey(),
             'task_key' => $taskKey,
-        ]);
+        ];
+        $execution = TaskExecution::query()->where($identity)->lockForUpdate()->first()
+            ?? new TaskExecution($identity);
 
         if ($execution->exists && ! $force) {
             return $execution;
@@ -184,6 +285,7 @@ class TaskExecutionStore
         return match (true) {
             $model instanceof Event => 'event_metadata',
             $model instanceof Integration => 'configuration',
+            $model instanceof IntegrationGroup => 'auth_metadata',
             $model instanceof Block, $model instanceof EventObject => 'metadata',
             default => throw new InvalidArgumentException('Unsupported task execution model: ' . get_class($model)),
         };
@@ -195,6 +297,7 @@ class TaskExecutionStore
             $model instanceof Event => 'event',
             $model instanceof Block => 'block',
             $model instanceof EventObject => 'object',
+            $model instanceof IntegrationGroup => 'integration_group',
             $model instanceof Integration => 'integration',
             default => throw new InvalidArgumentException('Unsupported task execution model: ' . get_class($model)),
         };
@@ -202,7 +305,7 @@ class TaskExecutionStore
 
     public function resolveUserId(Model $model): ?string
     {
-        if ($model instanceof Integration || $model instanceof EventObject) {
+        if ($model instanceof Integration || $model instanceof EventObject || $model instanceof IntegrationGroup) {
             return $model->user_id;
         }
 
@@ -261,22 +364,37 @@ class TaskExecutionStore
 
     protected function historySnapshot(string $taskKey, array $lastAttempt): array
     {
-        return [
+        return array_filter([
             'task_key' => $taskKey,
             'status' => $lastAttempt['status'] ?? null,
             'attempts' => $lastAttempt['attempts'] ?? null,
             'started_at' => $lastAttempt['started_at'] ?? null,
-            'completed_at' => $lastAttempt['completed_at'] ?? now()->toIso8601String(),
+            'completed_at' => $lastAttempt['completed_at'] ?? (($lastAttempt['status'] ?? null) === 'accepted' ? null : now()->toIso8601String()),
+            'accepted_at' => Arr::get($lastAttempt, 'accepted_at'),
             'triggered_by' => $lastAttempt['triggered_by'] ?? null,
             'error' => Arr::get($lastAttempt, 'error'),
             'waiting_for' => Arr::get($lastAttempt, 'waiting_for'),
             'blocked_by' => Arr::get($lastAttempt, 'blocked_by'),
-        ];
+            'run_uuid' => Arr::get($lastAttempt, 'run_uuid'),
+            'local_date' => Arr::get($lastAttempt, 'local_date'),
+            'period' => Arr::get($lastAttempt, 'period'),
+            'trigger_source' => Arr::get($lastAttempt, 'trigger_source'),
+            'driver' => Arr::get($lastAttempt, 'driver'),
+            'response_id' => Arr::get($lastAttempt, 'response_id'),
+            'tools_called' => Arr::get($lastAttempt, 'tools_called'),
+            'tool_calls' => Arr::get($lastAttempt, 'tool_calls'),
+            'input_tokens' => Arr::get($lastAttempt, 'input_tokens'),
+            'output_tokens' => Arr::get($lastAttempt, 'output_tokens'),
+            'total_tokens' => Arr::get($lastAttempt, 'total_tokens'),
+            'event_id' => Arr::get($lastAttempt, 'event_id'),
+            'output_id' => Arr::get($lastAttempt, 'output_id'),
+            'persisted_at' => Arr::get($lastAttempt, 'persisted_at'),
+        ], fn (mixed $value) => $value !== null);
     }
 
     protected function isTerminalStatus(string $status): bool
     {
-        return in_array($status, ['success', 'failed', 'blocked', 'not_applicable'], true);
+        return in_array($status, ['accepted', 'success', 'failed', 'blocked', 'not_applicable'], true);
     }
 
     protected function dateOrNull(mixed $value): mixed
@@ -286,5 +404,24 @@ class TaskExecutionStore
         }
 
         return $value ?: null;
+    }
+
+    private function acquireTaskLock(Model $model, string $taskKey): void
+    {
+        if (! $model->exists || ! Schema::hasTable('task_executions')) {
+            return;
+        }
+
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [
+                'task-execution:' . $this->entityType($model) . ':' . $model->getKey() . ':' . $taskKey,
+            ]);
+        }
+
+        TaskExecution::query()
+            ->forEntity($this->entityType($model), (string) $model->getKey())
+            ->where('task_key', $taskKey)
+            ->lockForUpdate()
+            ->first();
     }
 }

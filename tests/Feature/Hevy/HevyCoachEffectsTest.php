@@ -5,6 +5,7 @@ namespace Tests\Feature\Hevy;
 use App\Jobs\Effects\Hevy\HevyAnalyzeProgressionEffect;
 use App\Jobs\Effects\Hevy\HevyAutoCoachEffect;
 use App\Jobs\Effects\Hevy\HevyUpdateRoutineEffect;
+use App\Jobs\TaskPipeline\Tasks\HevyAutoCoachTask;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -13,15 +14,14 @@ use App\Models\User;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class HevyCoachEffectsTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function analyze_effect_creates_recommendation_blocks(): void
     {
         $user = User::factory()->create();
@@ -95,9 +95,7 @@ class HevyCoachEffectsTest extends TestCase
         $this->assertGreaterThan(0, $recommendationEvents->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function update_effect_calls_hevy_api(): void
     {
         Http::fake([
@@ -186,9 +184,7 @@ class HevyCoachEffectsTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function update_effect_returns_error_when_no_recommendations(): void
     {
         $user = User::factory()->create();
@@ -206,9 +202,7 @@ class HevyCoachEffectsTest extends TestCase
         $this->assertStringContainsString('No recommendations found', $result['message']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function auto_coach_runs_both_effects(): void
     {
         Http::fake([
@@ -277,24 +271,21 @@ class HevyCoachEffectsTest extends TestCase
         $this->assertArrayHasKey('update', $result['data']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function task_is_registered_in_pipeline(): void
     {
         $task = TaskRegistry::getTask('hevy_auto_coach');
 
         $this->assertNotNull($task);
         $this->assertEquals('Hevy Auto Coach', $task->name);
-        $this->assertEquals(HevyAutoCoachEffect::class, $task->jobClass);
+        // The pipeline runs the task wrapper (#867), which invokes HevyAutoCoachEffect
+        $this->assertEquals(HevyAutoCoachTask::class, $task->jobClass);
         $this->assertEquals(['event'], $task->appliesTo);
         $this->assertEquals('hevy', $task->conditions['service']);
         $this->assertEquals('completed_workout', $task->conditions['action']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function task_runs_when_coach_enabled(): void
     {
         $user = User::factory()->create();
@@ -333,9 +324,7 @@ class HevyCoachEffectsTest extends TestCase
         $this->assertTrue($task->isApplicableTo($event));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function task_does_not_run_when_coach_disabled(): void
     {
         $user = User::factory()->create();
@@ -374,9 +363,7 @@ class HevyCoachEffectsTest extends TestCase
         $this->assertFalse($task->isApplicableTo($event));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function task_does_not_run_for_non_hevy_events(): void
     {
         $user = User::factory()->create();

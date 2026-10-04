@@ -7,7 +7,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\SearchLog;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Validator;
 class SearchApiController extends Controller
 {
     public function __construct(
-        private EmbeddingService $embeddingService
+        private EmbeddingClient $embeddingService
     ) {}
 
     /**
