@@ -10,6 +10,9 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Services\Fetch\Assessment\ListPageDetector;
+use App\Services\Fetch\FetchMetadata;
+use App\Services\Fetch\Links\UrlCanonicalizer;
 use App\Services\Fetch\UrlSafetyValidator;
 use App\Services\PlaywrightHealthMetrics;
 use Illuminate\Support\Facades\Auth;
@@ -618,6 +621,12 @@ new class extends Component
                 'last_playwright_worker_status' => $metadata['last_playwright_worker_status'] ?? null,
                 'error_screenshot_url' => get_media_temporary_url($obj, 'error_screenshots'),
                 'playwright_history' => array_slice($metadata['playwright_history'] ?? [], -10), // Last 10 entries
+                'is_list' => ($metadata['list_detection']['kind'] ?? null) === 'list' && ! ($metadata['list_detection']['shadow'] ?? false),
+                'list_new_count' => $metadata['list_detection']['last_new_count'] ?? null,
+                'list_mode' => ListPageDetector::mode($obj),
+                'list_expandable' => ListPageDetector::isEnabled()
+                    && (ListPageDetector::isEligibleForListExpansion($obj)
+                        || ListPageDetector::mode($obj) === 'off'),
             ];
         });
     }
@@ -812,6 +821,7 @@ new class extends Component
             'content' => 'Object Content',
             'event_url_field' => 'Event URL',
             'event_metadata' => 'Event Metadata',
+            'list_expansion' => 'List page',
         ];
 
         $contextParts[] = $foundInMap[$foundIn] ?? ucfirst(str_replace('_', ' ', $foundIn));
@@ -974,6 +984,7 @@ new class extends Component
                     'domain' => $domain,
                     'fetch_integration_id' => $this->integration->id,
                     'subscription_source' => 'subscribed',
+                    'canonical_url' => UrlCanonicalizer::canonicalize($this->newUrl),
                     'fetch_mode' => 'recurring', // Subscribed URLs are fetched repeatedly
                     'subscribed_at' => now()->toIso8601String(),
                     'enabled' => true,
@@ -1012,6 +1023,42 @@ new class extends Component
         $eventObject->update(['metadata' => $metadata]);
 
         $this->success($metadata['enabled'] ? 'URL enabled.' : 'URL disabled.');
+        $this->loadData();
+    }
+
+    public function setListDetectionMode(string $id, string $mode): void
+    {
+        $eventObject = EventObject::find($id);
+
+        if (! $eventObject || $eventObject->user_id !== Auth::id()) {
+            $this->error('URL not found.');
+
+            return;
+        }
+
+        if (! in_array($mode, ['auto', 'off', 'force'], true)) {
+            $this->error('Unknown list detection mode.');
+
+            return;
+        }
+
+        FetchMetadata::mutate($eventObject, function (array $metadata) use ($mode): array {
+            $listDetection = $metadata['list_detection'] ?? [];
+            $listDetection['mode'] = $mode;
+
+            // A changed mode should take effect on the next fetch, not after a memo expires
+            unset($listDetection['assessed_at']);
+
+            $metadata['list_detection'] = $listDetection;
+
+            return $metadata;
+        });
+
+        $this->success(match ($mode) {
+            'force' => 'This page will be treated as a list of articles when it looks like one.',
+            'off' => 'This page will always be treated as a single article.',
+            default => 'List detection is automatic for this page.',
+        });
         $this->loadData();
     }
 
