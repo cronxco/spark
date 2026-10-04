@@ -13,6 +13,7 @@ use App\Notifications\MigrationFailed;
 use App\Notifications\SystemMaintenance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class NotificationSystemTest extends TestCase
@@ -28,7 +29,7 @@ class NotificationSystemTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    /** @test */
+    #[Test]
     public function it_stores_notification_in_database()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -45,25 +46,25 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('integration_completed', $notification->data['type']);
     }
 
-    /** @test */
+    #[Test]
     public function priority_notifications_always_send_email()
     {
         Notification::fake();
 
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
 
-        // Disable email notifications for this type
-        $this->user->disableEmailNotifications('integration_failed');
+        // Priority is the catalogue's forced_delivery flag (#1111). An auth
+        // failure is forced, so it still emails with email switched off.
+        $this->user->disableEmailNotifications('integration_authentication_failed');
 
-        // Priority notifications should still send
-        $this->user->notify(new IntegrationFailed($integration, 'Test error'));
+        $this->user->notify(new IntegrationAuthenticationFailed($integration, 'Test error'));
 
-        Notification::assertSentTo($this->user, IntegrationFailed::class, function ($notification, $channels) {
+        Notification::assertSentTo($this->user, IntegrationAuthenticationFailed::class, function ($notification, $channels) {
             return in_array('mail', $channels);
         });
     }
 
-    /** @test */
+    #[Test]
     public function non_priority_notifications_respect_email_preferences()
     {
         Notification::fake();
@@ -80,7 +81,7 @@ class NotificationSystemTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function notifications_respect_work_hours_setting()
     {
         Notification::fake();
@@ -112,7 +113,7 @@ class NotificationSystemTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function user_can_check_if_in_work_hours()
     {
         $this->user->updateNotificationPreferences([
@@ -137,7 +138,7 @@ class NotificationSystemTest extends TestCase
         $this->assertFalse($this->user->isInWorkHours());
     }
 
-    /** @test */
+    #[Test]
     public function daily_digest_mode_prevents_immediate_emails()
     {
         Notification::fake();
@@ -160,7 +161,7 @@ class NotificationSystemTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function immediate_mode_sends_emails_right_away()
     {
         Notification::fake();
@@ -182,7 +183,7 @@ class NotificationSystemTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function user_can_get_notification_preferences()
     {
         $preferences = $this->user->getNotificationPreferences();
@@ -192,7 +193,7 @@ class NotificationSystemTest extends TestCase
         $this->assertArrayHasKey('delayed_sending', $preferences);
     }
 
-    /** @test */
+    #[Test]
     public function user_can_update_notification_preferences()
     {
         $this->user->updateNotificationPreferences([
@@ -215,7 +216,7 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('America/New_York', $preferences['work_hours']['timezone']);
     }
 
-    /** @test */
+    #[Test]
     public function user_can_enable_and_disable_email_notifications()
     {
         $this->user->enableEmailNotifications('integration_completed');
@@ -225,7 +226,7 @@ class NotificationSystemTest extends TestCase
         $this->assertFalse($this->user->hasEmailNotificationsEnabled('integration_completed'));
     }
 
-    /** @test */
+    #[Test]
     public function integration_completed_notification_has_correct_metadata()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -239,19 +240,20 @@ class NotificationSystemTest extends TestCase
         $this->assertStringContainsString('completed successfully', $notification->getMessage());
     }
 
-    /** @test */
-    public function integration_failed_notification_is_priority()
+    #[Test]
+    public function integration_failed_notification_respects_preferences()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
 
         $notification = new IntegrationFailed($integration, 'API error');
 
-        $this->assertTrue($notification->isPriority());
+        // Configurable, not forced, since the notification catalogue (#1111)
+        $this->assertFalse($notification->isPriority());
         $this->assertEquals('fas.circle-xmark', $notification->getIcon());
         $this->assertEquals('error', $notification->getColor());
     }
 
-    /** @test */
+    #[Test]
     public function data_export_ready_notification_includes_download_url()
     {
         $downloadUrl = 'https://example.com/download/123';
@@ -263,17 +265,18 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('info', $notification->getColor());
     }
 
-    /** @test */
-    public function system_maintenance_notification_is_priority()
+    #[Test]
+    public function system_maintenance_notification_respects_preferences()
     {
         $notification = new SystemMaintenance('Update', 'System will be down');
 
-        $this->assertTrue($notification->isPriority());
+        // Configurable, not forced, since the notification catalogue (#1111)
+        $this->assertFalse($notification->isPriority());
         $this->assertEquals('fas.screwdriver-wrench', $notification->getIcon());
         $this->assertEquals('warning', $notification->getColor());
     }
 
-    /** @test */
+    #[Test]
     public function notification_includes_action_url_in_database_data()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -285,7 +288,7 @@ class NotificationSystemTest extends TestCase
         $this->assertStringContainsString((string) $integration->id, $notification->data['action_url']);
     }
 
-    /** @test */
+    #[Test]
     public function unread_notifications_can_be_retrieved()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -298,7 +301,7 @@ class NotificationSystemTest extends TestCase
         $this->assertCount(2, $unread);
     }
 
-    /** @test */
+    #[Test]
     public function notifications_can_be_marked_as_read()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -312,7 +315,7 @@ class NotificationSystemTest extends TestCase
         $this->assertCount(0, $this->user->unreadNotifications()->get());
     }
 
-    /** @test */
+    #[Test]
     public function email_notification_contains_correct_content()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -329,7 +332,7 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('View Integration', $mailMessage->actionText);
     }
 
-    /** @test */
+    #[Test]
     public function work_hours_disabled_means_always_in_work_hours()
     {
         $this->user->updateNotificationPreferences([
@@ -346,7 +349,7 @@ class NotificationSystemTest extends TestCase
         $this->assertTrue($this->user->isInWorkHours());
     }
 
-    /** @test */
+    #[Test]
     public function get_delayed_sending_mode_returns_correct_value()
     {
         $this->user->updateNotificationPreferences([
@@ -362,7 +365,7 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('daily_digest', $this->user->getDelayedSendingMode());
     }
 
-    /** @test */
+    #[Test]
     public function get_digest_time_returns_correct_value()
     {
         $this->user->updateNotificationPreferences([
@@ -372,7 +375,7 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('10:30', $this->user->getDigestTime());
     }
 
-    /** @test */
+    #[Test]
     public function notification_with_details_stores_them_in_database()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -392,7 +395,7 @@ class NotificationSystemTest extends TestCase
         $this->assertArrayHasKey('message', $notification->data);
     }
 
-    /** @test */
+    #[Test]
     public function integration_authentication_failed_notification_is_priority()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -407,10 +410,10 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('o-shield-exclamation', $notification->getIcon());
         $this->assertEquals('error', $notification->getColor());
         $this->assertEquals('integration_authentication_failed', $notification->getNotificationType());
-        $this->assertStringContainsString('re-authorized', $notification->getMessage());
+        $this->assertStringContainsString('sign in again', $notification->getMessage());
     }
 
-    /** @test */
+    #[Test]
     public function integration_authentication_failed_always_sends_email()
     {
         Notification::fake();
@@ -431,7 +434,7 @@ class NotificationSystemTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function migration_completed_notification_has_correct_metadata()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -449,7 +452,7 @@ class NotificationSystemTest extends TestCase
         $this->assertStringContainsString('1,500', $notification->getMessage());
     }
 
-    /** @test */
+    #[Test]
     public function migration_completed_respects_email_preferences()
     {
         Notification::fake();
@@ -466,7 +469,7 @@ class NotificationSystemTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function migration_failed_notification_is_priority()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -481,10 +484,10 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('fas.triangle-exclamation', $notification->getIcon());
         $this->assertEquals('error', $notification->getColor());
         $this->assertEquals('migration_failed', $notification->getNotificationType());
-        $this->assertStringContainsString('failed', $notification->getMessage());
+        $this->assertStringContainsString('may be missing', $notification->getMessage());
     }
 
-    /** @test */
+    #[Test]
     public function migration_failed_always_sends_email()
     {
         Notification::fake();
@@ -505,7 +508,7 @@ class NotificationSystemTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function migration_completed_email_contains_stats()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -524,7 +527,7 @@ class NotificationSystemTest extends TestCase
         $this->assertEquals('Explore Your Data', $mailMessage->actionText);
     }
 
-    /** @test */
+    #[Test]
     public function authentication_failed_email_contains_re_auth_action()
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);

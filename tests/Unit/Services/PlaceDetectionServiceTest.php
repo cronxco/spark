@@ -13,6 +13,7 @@ use App\Services\PlaceDetectionService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class PlaceDetectionServiceTest extends TestCase
@@ -43,9 +44,7 @@ class PlaceDetectionServiceTest extends TestCase
         $this->service = new PlaceDetectionService($geocodingMock);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function detects_existing_place_within_radius(): void
     {
         // Create existing place
@@ -71,9 +70,7 @@ class PlaceDetectionServiceTest extends TestCase
         $this->assertEquals(5, $place->visit_count);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function creates_new_place_when_none_exists_nearby(): void
     {
         $this->assertEquals(0, Place::count());
@@ -93,9 +90,7 @@ class PlaceDetectionServiceTest extends TestCase
         $this->assertEquals(1, $place->visit_count);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function extracts_meaningful_title_from_address(): void
     {
         $testCases = [
@@ -118,9 +113,7 @@ class PlaceDetectionServiceTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function guesses_category_from_address(): void
     {
         $testCases = [
@@ -145,9 +138,7 @@ class PlaceDetectionServiceTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function links_event_to_place(): void
     {
         $place = Place::factory()->create(['user_id' => $this->user->id]);
@@ -163,9 +154,7 @@ class PlaceDetectionServiceTest extends TestCase
         $this->assertEquals($place->id, $relationship->to_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function detects_and_links_place_for_event(): void
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -186,9 +175,7 @@ class PlaceDetectionServiceTest extends TestCase
         $this->assertEquals($place->id, $relationship->to_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function does_not_create_place_for_event_without_location(): void
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
@@ -200,9 +187,7 @@ class PlaceDetectionServiceTest extends TestCase
         $this->assertEquals(0, Place::count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function finds_nearby_place_within_custom_radius(): void
     {
         $existingPlace = Place::factory()->create(['user_id' => $this->user->id]);
@@ -230,9 +215,7 @@ class PlaceDetectionServiceTest extends TestCase
         $this->assertNull($place);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function merges_two_places_correctly(): void
     {
         $keepPlace = Place::factory()->create([
@@ -303,9 +286,7 @@ class PlaceDetectionServiceTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function only_finds_places_for_correct_user(): void
     {
         $otherUser = User::factory()->create();
@@ -335,9 +316,7 @@ class PlaceDetectionServiceTest extends TestCase
         $this->assertEquals($this->user->id, $newPlace->user_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function reprocessing_same_event_does_not_increment_visit_count(): void
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);

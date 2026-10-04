@@ -69,7 +69,7 @@ class GenerateEmbeddings extends Command
     {
         $this->info('Processing events...');
 
-        $query = Event::query();
+        $query = Event::query()->withoutInternal();
 
         if (! $force) {
             $query->whereNull('embeddings');

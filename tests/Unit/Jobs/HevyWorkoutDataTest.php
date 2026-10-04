@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -28,9 +29,7 @@ class HevyWorkoutDataTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation()
     {
         $job = $this->createTestableJob([]);
@@ -46,9 +45,7 @@ class HevyWorkoutDataTest extends TestCase
         $this->assertEquals('workout', $jobTypeMethod->invoke($job));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function process_workout_data()
     {
         $rawData = [
@@ -109,9 +106,7 @@ class HevyWorkoutDataTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function duplicate_workout_handling()
     {
         // Create actor and target objects first
@@ -162,9 +157,7 @@ class HevyWorkoutDataTest extends TestCase
         $this->assertEquals(1, Event::where('source_id', "hevy_workout_{$this->integration->id}_workout123")->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function exercise_blocks_creation()
     {
         $rawData = [
@@ -205,9 +198,7 @@ class HevyWorkoutDataTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function weight_unit_inference()
     {
         // Test with preferred kg units
@@ -225,9 +216,7 @@ class HevyWorkoutDataTest extends TestCase
         $this->assertEquals('kg', $result); // Should use preferred unit
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function encode_numeric_value()
     {
         $plugin = new HevyPlugin;

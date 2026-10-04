@@ -153,6 +153,14 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
                 'value_unit' => null,
                 'hidden' => true,
             ],
+            'expanded' => [
+                'icon' => 'fas.list',
+                'display_name' => 'Found articles',
+                'description' => 'New articles were found on a list page and bookmarked',
+                'display_with_object' => true,
+                'value_unit' => 'articles',
+                'hidden' => true,
+            ],
             // NOTE: had_link_to has been migrated to the Relationship model.
             // See app/Models/Relationship.php and relationship type 'linked_to'
         ];
@@ -201,6 +209,14 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'fetch_link_list' => [
+                'icon' => 'fas.list-ol',
+                'display_name' => 'Articles Found',
+                'description' => 'Articles listed on a list page and which of them were new',
+                'display_with_object' => true,
+                'value_unit' => 'articles',
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -246,11 +262,11 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
                 dependencies: ['fetch_extract_content'],
                 runOnCreate: true,
                 runOnUpdate: false,
-                shouldRun: fn (Event $event) => ! empty($event->target?->content)
-                    && ! $event->blocks()->where('block_type', 'fetch_tldr')
-                        ->whereNotNull('metadata->content')
-                        ->whereNull('deleted_at')
-                        ->exists(),
+                shouldRun: fn (Event $event) => $event->blocks()
+                    ->where('block_type', 'fetch_content')
+                    ->whereNotNull('metadata->article_text')
+                    ->whereNull('deleted_at')
+                    ->exists(),
             ),
         ];
     }

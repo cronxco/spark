@@ -60,13 +60,13 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
-    @if (env('VITE_SENTRY_DSN'))
+    @if (config('sentry.js.dsn'))
     <script>
-        window.SENTRY_DSN = "{{ env('VITE_SENTRY_DSN') }}";
+        window.SENTRY_DSN = "{{ config('sentry.js.dsn') }}";
     </script>
     @endif
     <script>
-        window.SENTRY_RELEASE = "{{ env('SENTRY_RELEASE') }}";
+        window.SENTRY_RELEASE = "{{ config('sentry.release') }}";
         window.SENTRY_ENVIRONMENT = "{{ app()->environment() }}";
     </script>
 </head>
@@ -127,15 +127,13 @@
                                 }
                                 keysToRemove.forEach(key => localStorage.removeItem(key));
 
-                                // Clear server-side cache via API
-                                fetch('/api/clear-card-cache', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
-                                    }
-                                }).catch(err => console.error('Failed to clear cache:', err));
-
+                                /*
+                                 * The server-side call this used to make hit
+                                 * /api/clear-card-cache, which flushed every
+                                 * tenant's cache and has been removed. Card view
+                                 * history lives in localStorage, cleared above, so
+                                 * the control still does what it says.
+                                 */
                                 alert('Card view history cleared! All cards will show again on your next visit.');
                                 window.location.reload();
                             }

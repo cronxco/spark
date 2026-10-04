@@ -11,6 +11,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class TimelineTest extends TestCase
@@ -40,7 +41,7 @@ class TimelineTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function timeline_data_groups_events_by_day(): void
     {
         // Create events on different days
@@ -85,7 +86,7 @@ class TimelineTest extends TestCase
         $this->assertCount(1, $timelineData['2025-12-26']); // 1 event on Dec 26
     }
 
-    /** @test */
+    #[Test]
     public function timeline_data_groups_events_by_hour(): void
     {
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -129,7 +130,7 @@ class TimelineTest extends TestCase
         $this->assertCount(1, $timelineData['2025-12-25 11:00']);
     }
 
-    /** @test */
+    #[Test]
     public function timeline_data_groups_events_by_week(): void
     {
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -170,7 +171,7 @@ class TimelineTest extends TestCase
         $this->assertCount(2, $timelineData); // 2 weeks
     }
 
-    /** @test */
+    #[Test]
     public function journey_routes_calculates_polylines_between_events(): void
     {
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -207,7 +208,7 @@ class TimelineTest extends TestCase
         $this->assertEquals(60, $routes[0]['time_gap_minutes']);
     }
 
-    /** @test */
+    #[Test]
     public function journey_routes_respects_toggle(): void
     {
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -239,7 +240,7 @@ class TimelineTest extends TestCase
         $this->assertEmpty($routes);
     }
 
-    /** @test */
+    #[Test]
     public function timeline_applies_service_filter(): void
     {
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -274,7 +275,7 @@ class TimelineTest extends TestCase
         $this->assertEquals('test_service', $allEvents[0]->service);
     }
 
-    /** @test */
+    #[Test]
     public function timeline_applies_date_range_filter(): void
     {
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -315,7 +316,7 @@ class TimelineTest extends TestCase
         $this->assertEquals('2025-12-25', $allEvents[0]->time->format('Y-m-d'));
     }
 
-    /** @test */
+    #[Test]
     public function timeline_shows_only_events_with_location(): void
     {
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -348,7 +349,7 @@ class TimelineTest extends TestCase
         $this->assertNotNull($allEvents[0]->location);
     }
 
-    /** @test */
+    #[Test]
     public function timeline_sorts_events_chronologically(): void
     {
         $target = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -391,7 +392,7 @@ class TimelineTest extends TestCase
         $this->assertEquals('14:00', $allEvents[2]->time->format('H:i'));
     }
 
-    /** @test */
+    #[Test]
     public function changing_timeline_grouping_dispatches_event(): void
     {
         $component = Livewire::test(Index::class);
@@ -400,7 +401,7 @@ class TimelineTest extends TestCase
             ->assertDispatched('map-filters-updated');
     }
 
-    /** @test */
+    #[Test]
     public function toggling_journey_routes_dispatches_event(): void
     {
         $component = Livewire::test(Index::class);

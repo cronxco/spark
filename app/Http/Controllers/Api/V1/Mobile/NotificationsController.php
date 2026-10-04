@@ -3,13 +3,46 @@
 namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Mobile\ListNotificationFeedRequest;
 use App\Http\Resources\Compact\CompactNotificationResource;
+use App\Services\Api\ResourceVersion;
+use App\Services\Notifications\NotificationArchiver;
+use App\Services\Notifications\NotificationFeedService;
 use App\Support\CursorPaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class NotificationsController extends Controller
 {
+    public function __construct(
+        private ResourceVersion $versions,
+        private NotificationFeedService $feed,
+        private NotificationArchiver $archiver,
+    ) {}
+
+    public function feed(ListNotificationFeedRequest $request): JsonResponse
+    {
+        return response()->json($this->feed->feed(
+            user: $request->user(),
+            scope: (string) $request->validated('scope', 'active'),
+            stream: $request->validated('stream'),
+            search: $request->validated('search'),
+            cursor: $request->validated('cursor'),
+            limit: (int) $request->validated('limit', 25),
+        ))->header('Cache-Control', 'no-store');
+    }
+
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $item = $this->feed->detail($request->user(), $id);
+
+        $response = $item === null
+            ? response()->json(['message' => 'Notification not found.'], 404)
+            : response()->json(['data' => $item]);
+
+        return $response->header('Cache-Control', 'no-store');
+    }
+
     /**
      * GET /api/v1/mobile/notifications
      */
@@ -19,7 +52,7 @@ class NotificationsController extends Controller
         $limit = (int) $request->query('limit', CursorPaginator::DEFAULT_LIMIT);
 
         [$notifications, $nextCursor, $hasMore] = CursorPaginator::paginate(
-            $request->user()->notifications()->getQuery(),
+            $request->user()->notifications()->whereNull('archived_at')->getQuery(),
             is_string($cursor) && $cursor !== '' ? $cursor : null,
             $limit,
             timeColumn: 'created_at',
@@ -45,7 +78,7 @@ class NotificationsController extends Controller
      */
     public function markRead(Request $request, string $id): JsonResponse
     {
-        $notification = $request->user()->notifications()->find($id);
+        $notification = $request->user()->notifications()->whereNull('archived_at')->find($id);
 
         if (! $notification) {
             return response()->json(['message' => 'Notification not found.'], 404);
@@ -53,7 +86,33 @@ class NotificationsController extends Controller
 
         $notification->markAsRead();
 
-        return response()->json(null, 204);
+        return response()->json(null, 204)->header('ETag', $this->versions->etag($notification->fresh()));
+    }
+
+    public function markUnread(Request $request, string $id): JsonResponse
+    {
+        $notification = $request->user()->notifications()->whereNull('archived_at')->find($id);
+
+        if (! $notification) {
+            return response()->json(['message' => 'Notification not found.'], 404);
+        }
+
+        $notification->markAsUnread();
+
+        return response()->json(null, 204)->header('ETag', $this->versions->etag($notification->fresh()));
+    }
+
+    public function archive(Request $request, string $id): JsonResponse
+    {
+        $notification = $request->user()->notifications()->whereNull('archived_at')->find($id);
+
+        if (! $notification) {
+            return response()->json(['message' => 'Notification not found.'], 404);
+        }
+
+        $notification = $this->archiver->archive($notification, 'manual');
+
+        return response()->json(null, 204)->header('ETag', $this->versions->etag($notification));
     }
 
     /**
@@ -61,9 +120,10 @@ class NotificationsController extends Controller
      */
     public function markAllRead(Request $request): JsonResponse
     {
-        $request->user()->unreadNotifications()->update(['read_at' => now()]);
+        $request->user()->unreadNotifications()->whereNull('archived_at')->update(['read_at' => now()]);
+        $request->user()->touch();
 
-        return response()->json(null, 204);
+        return response()->json(null, 204)->header('ETag', $this->versions->etag($request->user()->fresh()));
     }
 
     /**
@@ -77,8 +137,12 @@ class NotificationsController extends Controller
             return response()->json(['message' => 'Notification not found.'], 404);
         }
 
+        // Computed before delete(): the row is gone afterward, and
+        // ResourceVersion::etag() falls back to a live query for any model
+        // that doesn't already have `xmin` loaded.
+        $etag = $this->versions->etag($notification);
         $notification->delete();
 
-        return response()->json(null, 204);
+        return response()->json(null, 204)->header('ETag', $etag);
     }
 }

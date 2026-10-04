@@ -20,7 +20,7 @@ class SystemMaintenance extends SparkNotification
 
     public function isPriority(): bool
     {
-        return true;
+        return parent::isPriority();
     }
 
     public function getIcon(): string

@@ -5,13 +5,14 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactEventResource;
 use App\Http\Resources\Compact\CompactObjectResource;
+use App\Services\Api\ResourceVersion;
 use App\Services\Mobile\ObjectLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ObjectsController extends Controller
 {
-    public function __construct(protected ObjectLookup $lookup) {}
+    public function __construct(protected ObjectLookup $lookup, protected ResourceVersion $versions) {}
 
     /**
      * GET /api/v1/mobile/objects/{id}
@@ -47,6 +48,7 @@ class ObjectsController extends Controller
         if ($lastModified) {
             $response->header('Last-Modified', $lastModified->toRfc7231String());
         }
+        $response->header('ETag', $this->versions->etag($object));
 
         return $response;
     }

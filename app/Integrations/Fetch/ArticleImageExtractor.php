@@ -2,6 +2,7 @@
 
 namespace App\Integrations\Fetch;
 
+use App\Services\Fetch\Links\UrlResolver;
 use App\Services\Fetch\UrlSafetyValidator;
 use DOMDocument;
 use DOMXPath;
@@ -398,40 +399,7 @@ class ArticleImageExtractor
      */
     protected static function makeAbsoluteUrl(string $url, string $baseUrl): string
     {
-        // Already absolute
-        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
-            return $url;
-        }
-
-        // Protocol-relative URL
-        if (str_starts_with($url, '//')) {
-            $scheme = parse_url($baseUrl, PHP_URL_SCHEME) ?? 'https';
-
-            return $scheme . ':' . $url;
-        }
-
-        // Parse the base URL
-        $parsedBase = parse_url($baseUrl);
-        $scheme = $parsedBase['scheme'] ?? 'https';
-        $host = $parsedBase['host'] ?? '';
-
-        if (empty($host)) {
-            return $url;
-        }
-
-        // Root-relative URL
-        if (str_starts_with($url, '/')) {
-            return "{$scheme}://{$host}{$url}";
-        }
-
-        // Relative URL - append to base path
-        $basePath = $parsedBase['path'] ?? '/';
-        $basePath = dirname($basePath);
-        if ($basePath === '.') {
-            $basePath = '/';
-        }
-
-        return "{$scheme}://{$host}{$basePath}/{$url}";
+        return UrlResolver::resolve($url, $baseUrl) ?? $url;
     }
 
     /**

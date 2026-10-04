@@ -156,4 +156,18 @@ class FlintQuestionsControllerTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['answer']);
     }
+
+    #[Test]
+    public function transition_errors_from_the_shared_writer_remain_client_errors(): void
+    {
+        $metadata = $this->questionBlock->metadata;
+        $metadata['question_status'] = 'skipped';
+        $metadata['skipped_at'] = now()->toIso8601String();
+        $this->questionBlock->update(['metadata' => $metadata]);
+        Sanctum::actingAs($this->user);
+
+        $this->postJson("/api/flint/questions/{$this->questionBlock->id}/answer", ['answer' => 'Yes'])
+            ->assertUnprocessable()
+            ->assertJsonPath('error', 'Only open or retired questions can be answered.');
+    }
 }

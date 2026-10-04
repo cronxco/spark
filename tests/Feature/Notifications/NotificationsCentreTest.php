@@ -8,6 +8,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Notifications\IntegrationCompleted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class NotificationsCentreTest extends TestCase
@@ -36,9 +37,7 @@ class NotificationsCentreTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function notifications_index_page_is_accessible(): void
     {
         $response = $this->actingAs($this->user)->get(route('notifications.index'));
@@ -47,9 +46,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSeeLivewire('notifications.index');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_see_their_notifications_in_chronological_feed(): void
     {
         // Create a notification
@@ -61,9 +58,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Integration Completed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_see_their_action_progress_in_feed(): void
     {
         // Create action progress
@@ -83,9 +78,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Syncing data...');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function feed_is_sorted_chronologically_newest_first(): void
     {
         // Create notifications at different times
@@ -106,9 +99,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Integration Completed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_search_notifications_by_title(): void
     {
         $this->user->notify(new IntegrationCompleted($this->integration));
@@ -119,9 +110,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Integration Completed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_filter_by_type_notifications_only(): void
     {
         $this->user->notify(new IntegrationCompleted($this->integration));
@@ -142,9 +131,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Syncing data...');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_filter_by_type_progress_only(): void
     {
         $this->user->notify(new IntegrationCompleted($this->integration));
@@ -164,9 +151,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Syncing data...');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_filter_by_status_active(): void
     {
         ActionProgress::create([
@@ -194,9 +179,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Syncing data...');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_filter_by_status_unread(): void
     {
         $this->user->notify(new IntegrationCompleted($this->integration));
@@ -211,9 +194,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Integration Completed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_filter_by_time_range(): void
     {
         ActionProgress::create([
@@ -244,9 +225,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Recent sync');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_mark_notification_as_read(): void
     {
         $this->user->notify(new IntegrationCompleted($this->integration));
@@ -260,9 +239,7 @@ class NotificationsCentreTest extends TestCase
         $this->assertNotNull($notification->fresh()->read_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_delete_notification(): void
     {
         $this->user->notify(new IntegrationCompleted($this->integration));
@@ -276,9 +253,7 @@ class NotificationsCentreTest extends TestCase
         $this->assertNull($this->user->notifications()->find($notification->id));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_mark_all_notifications_as_read(): void
     {
         $this->user->notify(new IntegrationCompleted($this->integration));
@@ -294,9 +269,7 @@ class NotificationsCentreTest extends TestCase
         $this->assertEquals(0, $this->user->unreadNotifications->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_can_clear_completed_activities(): void
     {
         // Create old completed action
@@ -340,9 +313,7 @@ class NotificationsCentreTest extends TestCase
         $this->assertEquals(1, ActionProgress::where('user_id', $this->user->id)->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function pagination_works_correctly(): void
     {
         // Create more than 25 notifications
@@ -357,9 +328,7 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Integration Completed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function users_only_see_their_own_notifications_and_progress(): void
     {
         $otherUser = User::factory()->create();
@@ -393,21 +362,16 @@ class NotificationsCentreTest extends TestCase
         $response->assertDontSee('Other user export');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function empty_state_displays_when_no_items(): void
     {
         $response = $this->actingAs($this->user)->get(route('notifications.index'));
 
         $response->assertStatus(200);
-        $response->assertSee('No Notifications');
         $response->assertSee('all caught up', false);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function no_results_empty_state_displays_when_filters_return_nothing(): void
     {
         $this->user->notify(new IntegrationCompleted($this->integration));
@@ -417,16 +381,16 @@ class NotificationsCentreTest extends TestCase
         $response->assertSee('Integration Completed');
     }
 
-    /**
-     * @test
-     */
-    public function clear_filters_resets_all_filters(): void
+    #[Test]
+    public function page_shows_scope_tabs_and_search(): void
     {
         $response = $this->actingAs($this->user)->get(route('notifications.index'));
 
         $response->assertOk();
-        // Verify page loads with filters UI
-        $response->assertSee('Type');
-        $response->assertSee('Status');
+        // The unified centre (#1111) replaced the type/status filters with
+        // Inbox/History scopes, stream chips and search
+        $response->assertSee('Inbox');
+        $response->assertSee('History');
+        $response->assertSee('Search notifications');
     }
 }

@@ -29,7 +29,7 @@ $iconColorClass = match ($accentColor) {
                 Editorial Note
             </div>
             <div class="text-xs text-base-content/50">
-                {{ $block->time->diffForHumans() }}
+                {{ $block->time?->diffForHumans() }}
             </div>
         </div>
 

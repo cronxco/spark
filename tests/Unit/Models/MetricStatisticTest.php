@@ -6,15 +6,14 @@ use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MetricStatisticTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function it_belongs_to_a_user(): void
     {
         $user = User::factory()->create();
@@ -24,9 +23,7 @@ class MetricStatisticTest extends TestCase
         $this->assertEquals($user->id, $metric->user->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function it_has_many_trends(): void
     {
         $metric = MetricStatistic::factory()->create();
@@ -36,9 +33,7 @@ class MetricStatisticTest extends TestCase
         $this->assertInstanceOf(MetricTrend::class, $metric->trends->first());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function with_sufficient_data_scope_filters_metrics_with_30_days_data(): void
     {
         // Metric with insufficient time range
@@ -59,9 +54,7 @@ class MetricStatisticTest extends TestCase
         $this->assertEquals($validMetric->id, $results->first()->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function needs_recalculation_scope_returns_metrics_never_calculated(): void
     {
         $neverCalculated = MetricStatistic::factory()->create(['last_calculated_at' => null]);
@@ -73,9 +66,7 @@ class MetricStatisticTest extends TestCase
         $this->assertEquals($neverCalculated->id, $results->first()->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function needs_recalculation_scope_returns_metrics_calculated_over_an_hour_ago(): void
     {
         $oldCalculation = MetricStatistic::factory()->create([
@@ -89,9 +80,7 @@ class MetricStatisticTest extends TestCase
         $this->assertEquals($oldCalculation->id, $results->first()->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function get_display_name_formats_action_properly(): void
     {
         $metric = MetricStatistic::factory()->create(['action' => 'had_readiness_score']);
@@ -102,9 +91,7 @@ class MetricStatisticTest extends TestCase
         $this->assertNotEquals('had_readiness_score', $displayName);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function get_identifier_returns_correct_format(): void
     {
         $metric = MetricStatistic::factory()->create([
@@ -118,9 +105,7 @@ class MetricStatisticTest extends TestCase
         $this->assertEquals('oura.had_readiness_score.percent', $identifier);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function has_valid_statistics_returns_true_with_complete_data(): void
     {
         $metric = MetricStatistic::factory()->create([
@@ -134,9 +119,7 @@ class MetricStatisticTest extends TestCase
         $this->assertTrue($metric->hasValidStatistics());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function has_valid_statistics_returns_false_with_insufficient_events(): void
     {
         $metric = MetricStatistic::factory()->create([
@@ -150,9 +133,7 @@ class MetricStatisticTest extends TestCase
         $this->assertFalse($metric->hasValidStatistics());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function has_valid_statistics_returns_false_with_missing_statistics(): void
     {
         $metric = MetricStatistic::factory()->create([

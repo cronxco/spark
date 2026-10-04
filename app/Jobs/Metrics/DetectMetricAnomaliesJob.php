@@ -5,6 +5,7 @@ namespace App\Jobs\Metrics;
 use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,6 +16,11 @@ use Illuminate\Support\Facades\Log;
 class DetectMetricAnomaliesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    /**
+     * Days of unbroken anomalies after which the baseline, not the reading, is
+     * what has moved.
+     */
+    private const PERSISTENT_ANOMALY_DAYS = 7;
 
     public $timeout = 60;
 
@@ -123,6 +129,8 @@ class DetectMetricAnomaliesJob implements ShouldQueue
             ],
         ]);
 
+        $this->suggestBaselineReviewIfPersistent($metricStatistic, $type);
+
         Log::info('Detected metric anomaly', [
             'event_id' => $this->event->id,
             'service' => $this->event->service,
@@ -133,6 +141,46 @@ class DetectMetricAnomaliesJob implements ShouldQueue
             'mean' => $metricStatistic->mean_value,
             'deviation' => $deviation,
         ]);
+    }
+
+    /**
+     * A metric that has been anomalous every day for a week has not been
+     * surprising for six of them — its baseline has drifted. Flag it for review
+     * so the level can be re-learned, rather than leaving it to announce the
+     * same "unusual" reading indefinitely.
+     */
+    protected function suggestBaselineReviewIfPersistent(MetricStatistic $metricStatistic, string $type): void
+    {
+        if ($metricStatistic->baseline_reset_suggested_at !== null) {
+            return;
+        }
+
+        $anomalyDates = MetricTrend::query()
+            ->where('metric_statistic_id', $metricStatistic->id)
+            ->where('type', $type)
+            ->where('detected_at', '>=', now()->subDays(self::PERSISTENT_ANOMALY_DAYS))
+            ->whereNotNull('start_date')
+            ->distinct()
+            ->orderBy('start_date')
+            ->pluck('start_date')
+            ->map(fn (string $date): Carbon => Carbon::parse($date));
+
+        $consecutiveDays = 0;
+        $previousDate = null;
+
+        foreach ($anomalyDates as $date) {
+            $consecutiveDays = $previousDate?->copy()->addDay()->isSameDay($date)
+                ? $consecutiveDays + 1
+                : 1;
+
+            if ($consecutiveDays >= self::PERSISTENT_ANOMALY_DAYS) {
+                $metricStatistic->update(['baseline_reset_suggested_at' => now()]);
+
+                return;
+            }
+
+            $previousDate = $date;
+        }
     }
 
     /**

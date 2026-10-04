@@ -51,6 +51,7 @@ class CalculateMetricStatsTask extends BaseTaskJob
         $events = Event::whereHas('integration', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })
+            ->withoutInternal()
             ->where('service', $service)
             ->where('action', $action)
             ->where('value_unit', $valueUnit)

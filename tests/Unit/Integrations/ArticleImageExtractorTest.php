@@ -3,11 +3,25 @@
 namespace Tests\Unit\Integrations;
 
 use App\Integrations\Fetch\ArticleImageExtractor;
+use App\Services\Fetch\UrlSafetyValidator;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ArticleImageExtractorTest extends TestCase
 {
-    /** @test */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // These tests cover extraction, not SSRF policy. The validator resolves
+        // DNS, so a fixture host that does not resolve (cdn.example.com) would
+        // be rejected as unsafe and the test would depend on the network.
+        $this->mock(UrlSafetyValidator::class, function ($mock): void {
+            $mock->shouldReceive('isSafe')->andReturnTrue();
+        });
+    }
+
+    #[Test]
     public function it_extracts_open_graph_image()
     {
         $html = <<<'HTML'
@@ -31,7 +45,7 @@ HTML;
         $this->assertEquals('https://example.com/og-image.jpg', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_extracts_twitter_image_when_no_og_image()
     {
         $html = <<<'HTML'
@@ -55,7 +69,7 @@ HTML;
         $this->assertEquals('https://example.com/twitter-image.jpg', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_prefers_og_image_over_twitter_image()
     {
         $html = <<<'HTML'
@@ -80,7 +94,7 @@ HTML;
         $this->assertEquals('https://example.com/og-image.jpg', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_extracts_schema_org_image_from_json_ld()
     {
         $html = <<<'HTML'
@@ -111,7 +125,7 @@ HTML;
         $this->assertEquals('https://example.com/schema-image.jpg', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_extracts_schema_org_image_object()
     {
         $html = <<<'HTML'
@@ -145,7 +159,7 @@ HTML;
         $this->assertEquals('https://example.com/schema-image-object.jpg', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_relative_urls()
     {
         $html = <<<'HTML'
@@ -169,7 +183,7 @@ HTML;
         $this->assertEquals('https://example.com/images/og-image.jpg', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_protocol_relative_urls()
     {
         $html = <<<'HTML'
@@ -193,7 +207,7 @@ HTML;
         $this->assertEquals('https://cdn.example.com/image.jpg', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_null_for_empty_html()
     {
         $result = ArticleImageExtractor::extract('', 'https://example.com/article');
@@ -201,7 +215,7 @@ HTML;
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_null_when_no_image_found()
     {
         $html = <<<'HTML'
@@ -224,7 +238,7 @@ HTML;
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[Test]
     public function it_skips_logo_images_in_fallback()
     {
         $html = <<<'HTML'
@@ -248,7 +262,7 @@ HTML;
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[Test]
     public function it_extracts_largest_content_image_as_fallback()
     {
         $html = <<<'HTML'
@@ -274,7 +288,7 @@ HTML;
         $this->assertEquals('https://example.com/large-image.jpg', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_og_image_url_variant()
     {
         $html = <<<'HTML'
@@ -298,7 +312,7 @@ HTML;
         $this->assertEquals('https://example.com/og-image-url.jpg', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_graph_structure_in_json_ld()
     {
         $html = <<<'HTML'

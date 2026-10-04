@@ -9,6 +9,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class KarakeepBookmarksDataTest extends TestCase
@@ -38,9 +39,7 @@ class KarakeepBookmarksDataTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation(): void
     {
         $rawData = [
@@ -58,9 +57,7 @@ class KarakeepBookmarksDataTest extends TestCase
         $this->assertEquals(2, $job->tries);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function handles_empty_bookmarks(): void
     {
         Queue::fake();
@@ -79,9 +76,7 @@ class KarakeepBookmarksDataTest extends TestCase
         Queue::assertNotPushed(KarakeepBookmarkData::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function dispatches_individual_bookmark_jobs(): void
     {
         Queue::fake();
@@ -138,9 +133,7 @@ class KarakeepBookmarksDataTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function dispatches_jobs_with_context_data(): void
     {
         Queue::fake();
@@ -198,9 +191,7 @@ class KarakeepBookmarksDataTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function skips_bookmarks_without_id(): void
     {
         Queue::fake();

@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class UntappdRssDataTest extends TestCase
@@ -53,7 +54,7 @@ class UntappdRssDataTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_beer_checkin_with_brewery()
     {
         $items = [
@@ -100,7 +101,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertEquals('untappd_brewery', $breweryTag->type);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_beer_checkin_with_venue()
     {
         $items = [
@@ -131,7 +132,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertEquals('untappd_venue', $venueTag->type);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_beer_checkin_with_comment()
     {
         $items = [
@@ -155,7 +156,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertEquals('Absolutely fantastic!', $commentBlock->title);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_html_entities_in_beer_names()
     {
         $items = [
@@ -176,7 +177,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertEquals('Enchanté', $event->target->title);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_beer_with_special_characters()
     {
         $items = [
@@ -198,7 +199,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertEquals('Artisan Brewery', $event->target->metadata['brewery_name']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_multiple_checkins_in_one_batch()
     {
         $items = [
@@ -244,7 +245,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertNotNull($eventWithComment);
     }
 
-    /** @test */
+    #[Test]
     public function it_uses_guid_for_idempotency()
     {
         $items = [
@@ -272,7 +273,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertEquals('untappd_' . md5('https://untappd.com/user/george/checkin/9999999999'), $event->source_id);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_both_brewery_block_and_tag()
     {
         $items = [
@@ -301,7 +302,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertEquals('Sample Brewery', $breweryTags->first()->name);
     }
 
-    /** @test */
+    #[Test]
     public function it_skips_items_without_guid()
     {
         $items = [
@@ -321,7 +322,7 @@ class UntappdRssDataTest extends TestCase
         $this->assertCount(0, $events);
     }
 
-    /** @test */
+    #[Test]
     public function it_skips_items_that_dont_match_pattern()
     {
         $items = [
