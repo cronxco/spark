@@ -3,6 +3,7 @@
 namespace App\Jobs\GoCardless;
 
 use App\Models\IntegrationGroup;
+use App\Services\GoCardlessAccounts;
 use App\Notifications\IntegrationAuthenticationFailed;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
@@ -26,10 +27,20 @@ class HandleExpiredEuaJob implements ShouldQueue
     public function __construct(
         protected string $groupId,
         protected ?string $euaId = null,
-        protected array $errorResponse = []
+        protected array $errorResponse = [],
+        protected ?array $snapshot = null
     ) {}
 
     public function handle(TaskExecutionStore $store): void
+    {
+        $group = IntegrationGroup::find($this->groupId);
+        if (! $group) {
+            return;
+        }
+        app(GoCardlessAccounts::class)->locked($group->user_id, fn () => $this->handleCurrentExpiry($store));
+    }
+
+    private function handleCurrentExpiry(TaskExecutionStore $store): void
     {
         $group = IntegrationGroup::find($this->groupId);
 
@@ -38,6 +49,16 @@ class HandleExpiredEuaJob implements ShouldQueue
                 'group_id' => $this->groupId,
             ]);
 
+            return;
+        }
+
+        $metadata = $group->auth_metadata ?? [];
+        if (($this->snapshot === null && ! empty($metadata['gocardless_generation'])) ||
+            ($this->snapshot !== null && (
+                ($this->snapshot['requisition_id'] ?? null) !== $group->account_id ||
+                ($this->snapshot['generation'] ?? null) !== ($metadata['gocardless_generation'] ?? null)
+            )) || ($this->euaId && ! empty($metadata['gocardless_agreement_id']) &&
+                $this->euaId !== $metadata['gocardless_agreement_id'])) {
             return;
         }
 
@@ -79,6 +100,7 @@ class HandleExpiredEuaJob implements ShouldQueue
                 $config = $integration->configuration ?? [];
                 if (! ($config['paused'] ?? false)) {
                     $config['paused'] = true;
+                    $config['gocardless_pause_reason'] = 'eua_expired';
                     $integration->update(['configuration' => $config]);
                     $pausedCount++;
                 }

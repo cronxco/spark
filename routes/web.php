@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\GoCardlessRenewalController;
 use App\Http\Controllers\AasaController;
 use App\Http\Controllers\Admin\BlockViewController;
 use App\Http\Controllers\Admin\GoCardlessAdminController;
@@ -103,6 +104,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
     Route::get('integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
     Route::post('integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
+    Route::get('integrations/gocardless/renewal/{group}', [GoCardlessRenewalController::class, 'show'])
+        ->whereUuid('group')->name('integrations.gocardless.renewal.show');
+    Route::post('integrations/gocardless/renewal/{group}', [GoCardlessRenewalController::class, 'store'])
+        ->whereUuid('group')->name('integrations.gocardless.renewal.store');
+
     Route::get('integrations/{service}/reconnect/{group}', [IntegrationController::class, 'reconnect'])
         ->whereUuid('group')
         ->name('integrations.reconnect');

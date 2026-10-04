@@ -2,6 +2,7 @@
 
 namespace App\Services\Mobile;
 
+use App\Services\GoCardlessAccounts;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
@@ -22,11 +23,17 @@ class ObjectLookup
             return null;
         }
 
-        return EventObject::query()
+        $object = EventObject::withTrashed()
             ->where('user_id', $user->id)
             ->where('id', $objectId)
             ->with('tags')
             ->first();
+
+        if ($object?->type === 'bank_account' && ($object->metadata['merged_into'] ?? null)) {
+            return app(GoCardlessAccounts::class)->canonical($object)?->load('tags');
+        }
+
+        return $object && ! $object->trashed() ? $object : null;
     }
 
     /**
@@ -39,6 +46,7 @@ class ObjectLookup
         }
 
         return EventObject::onlyTrashed()
+            ->whereNull('metadata->merged_into')
             ->where('user_id', $user->id)
             ->where('id', $objectId)
             ->first();

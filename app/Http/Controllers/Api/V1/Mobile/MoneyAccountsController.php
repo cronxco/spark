@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Mobile;
 
+use App\Services\GoCardlessAccounts;
 use App\Http\Controllers\Api\V1\Mobile\Concerns\HandlesIdempotency;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\BalanceEntryResource;
@@ -107,7 +108,7 @@ class MoneyAccountsController extends Controller
             return response()->json(['message' => 'Account not found.'], 404);
         }
 
-        $paginator = Event::where('actor_id', $account->id)
+        $paginator = Event::whereIn('actor_id', app(GoCardlessAccounts::class)->memberIds($account))
             ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->orderByDesc('time')
@@ -306,10 +307,16 @@ class MoneyAccountsController extends Controller
      */
     private function resolveAccount(string $id, string $userId): ?EventObject
     {
-        return EventObject::where('id', $id)
+        $account = EventObject::withTrashed()->where('id', $id)
             ->where('user_id', $userId)
             ->where('concept', 'account')
             ->first();
+
+        if (! $account || ($account->trashed() && empty($account->metadata['merged_into']))) {
+            return null;
+        }
+
+        return app(GoCardlessAccounts::class)->canonical($account);
     }
 
     /**

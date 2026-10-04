@@ -44,10 +44,10 @@ class IntegrationController extends Controller
                     'session_id' => session()->getId(),
                 ]);
 
-                // Find the most recent GoCardless group for this user
+                // Bank selection records the exact group in the session.
                 $group = IntegrationGroup::where('user_id', $user->id)
                     ->where('service', 'gocardless')
-                    ->latest()
+                    ->whereKey(session('gocardless_oauth_group_id'))
                     ->first();
 
                 Log::info('GoCardless group lookup result', [
@@ -132,73 +132,17 @@ class IntegrationController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        // Handle GoCardless differently since it doesn't use state parameter
+        // A callback must identify the exact owner-scoped consent attempt.
         if ($service === 'gocardless') {
-            // For GoCardless, find the group by the reference from the callback
-            $ref = $request->get('ref');
-            if ($ref) {
-                // The ref parameter from GoCardless is actually the reference field, not the requisition ID
-                // We need to find the group that has this reference stored
-                $group = IntegrationGroup::query()
-                    ->where('user_id', $user->id)
-                    ->where('service', $service)
-                    ->where('auth_metadata->gocardless_reference', $ref)
-                    ->first();
-
-                if (! $group) {
-                    Log::error('GoCardless OAuth callback: no group found with reference', [
-                        'service' => $service,
-                        'user_id' => $user->id,
-                        'reference' => $ref,
-                    ]);
-
-                    return redirect()->route('integrations.index')
-                        ->with('error', 'No GoCardless integration found with this reference. Please start over.');
-                }
-            } else {
-                // Use the dedicated session key to avoid "latest group" ambiguity
-                $oauthGroupId = session('gocardless_oauth_group_id');
-                if ($oauthGroupId) {
-                    $group = IntegrationGroup::query()
-                        ->where('id', $oauthGroupId)
-                        ->where('user_id', $user->id)
-                        ->where('service', $service)
-                        ->first();
-
-                    if ($group) {
-                        Log::info('GoCardless OAuth callback: found group from session', [
-                            'service' => $service,
-                            'user_id' => $user->id,
-                            'group_id' => $group->id,
-                            'session_key' => 'gocardless_oauth_group_id',
-                        ]);
-                    }
-                }
-
-                // Fallback to most recent group only if session lookup failed
-                if (! $group) {
-                    Log::warning('GoCardless OAuth callback: session lookup failed, falling back to latest group', [
-                        'service' => $service,
-                        'user_id' => $user->id,
-                        'session_oauth_group_id' => $oauthGroupId,
-                    ]);
-
-                    $group = IntegrationGroup::query()
-                        ->where('user_id', $user->id)
-                        ->where('service', $service)
-                        ->latest()
-                        ->first();
-
-                    if (! $group) {
-                        Log::error('GoCardless OAuth callback: no group found for user', [
-                            'service' => $service,
-                            'user_id' => $user->id,
-                        ]);
-
-                        return redirect()->route('integrations.index')
-                            ->with('error', 'No GoCardless integration found. Please start over.');
-                    }
-                }
+            $ref = $request->query('ref');
+            $group = $ref ? IntegrationGroup::where('user_id', $user->id)->where('service', $service)
+                ->where(function ($query) use ($ref) {
+                    $query->where('auth_metadata->gocardless_pending->reference', $ref)
+                        ->orWhere('auth_metadata->gocardless_completed_reference', $ref);
+                })->first() : null;
+            if (! $group) {
+                return redirect()->route('integrations.index')
+                    ->with('error', 'This consent attempt is invalid or has expired. Please reconnect again.');
             }
         } else {
             // Standard OAuth flow with state parameter
@@ -249,8 +193,9 @@ class IntegrationController extends Controller
 
         // If the OAuth flow was started from the iOS app, bridge the terminal
         // redirects back to the `spark://` custom scheme so the in-app
-        // ASWebAuthenticationSession closes. Consume (clear) the marker now.
-        $mobileReauthOrigin = $this->consumeMobileReauthOrigin($group);
+        // ASWebAuthenticationSession closes after consent and account mapping succeed.
+        $mobileReauthOrigin = (bool) ($group->auth_metadata['mobile_reauth_origin'] ?? false);
+        $mobileAttemptId = $group->auth_metadata['mobile_reauth_attempt_id'] ?? null;
 
         try {
             if (method_exists($plugin, 'handleOAuthCallback')) {
@@ -261,6 +206,10 @@ class IntegrationController extends Controller
                 ]);
 
                 $plugin->handleOAuthCallback($request, $group);
+                if ($service === 'gocardless' && ($group->fresh()->auth_metadata['gocardless_pending']['requires_mapping'] ?? false)) {
+                    return redirect()->route('integrations.gocardless.renewal.show', $group);
+                }
+                $this->consumeMobileReauthOrigin($group->fresh());
 
                 Log::info('Plugin handleOAuthCallback completed successfully', [
                     'service' => $service,
@@ -313,7 +262,7 @@ class IntegrationController extends Controller
             ]);
 
             if ($mobileReauthOrigin) {
-                return $this->mobileReauthRedirect(true);
+                return $this->mobileReauthRedirect(true, $mobileAttemptId);
             }
 
             // If group already has integrations, this is a reconnect — skip onboarding
@@ -342,7 +291,7 @@ class IntegrationController extends Controller
             ]);
 
             if ($mobileReauthOrigin) {
-                return $this->mobileReauthRedirect(false);
+                return $this->mobileReauthRedirect(false, $mobileAttemptId);
             }
 
             return redirect()->route('integrations.index')
@@ -403,6 +352,7 @@ class IntegrationController extends Controller
             abort(403);
         }
 
+        abort_unless($group->service === $service, 404);
         $pluginClass = PluginRegistry::getPlugin($service);
         if (! $pluginClass) {
             abort(404);
@@ -822,7 +772,7 @@ class IntegrationController extends Controller
             return false;
         }
 
-        unset($metadata['mobile_reauth_origin'], $metadata['mobile_reauth_started_at']);
+        unset($metadata['mobile_reauth_origin'], $metadata['mobile_reauth_started_at'], $metadata['mobile_reauth_attempt_id']);
         $group->auth_metadata = $metadata;
         $group->save();
 
@@ -833,10 +783,10 @@ class IntegrationController extends Controller
      * Redirect to the iOS app's custom scheme to close the in-app
      * ASWebAuthenticationSession after a mobile-initiated reauth.
      */
-    private function mobileReauthRedirect(bool $success): RedirectResponse
+    private function mobileReauthRedirect(bool $success, ?string $attemptId = null): RedirectResponse
     {
         $status = $success ? 'success' : 'error';
 
-        return redirect()->away('spark://integrations/reauth-complete?status=' . $status);
+        return redirect()->away('spark://integrations/reauth-complete?' . http_build_query(['status' => $status, 'attempt_id' => $attemptId]));
     }
 }
