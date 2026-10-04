@@ -3,6 +3,7 @@
 namespace App\Spotlight\Queries\Scoped;
 
 use App\Models\Event;
+use App\Spotlight\Support\OwnedRecords;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -19,7 +20,7 @@ class EventActorQuery
                 return collect();
             }
 
-            $event = Event::with('actor')->find($eventId);
+            $event = OwnedRecords::events()->with('actor')->find($eventId);
             if (! $event || ! $event->actor) {
                 return collect();
             }

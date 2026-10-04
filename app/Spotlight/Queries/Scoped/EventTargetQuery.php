@@ -3,6 +3,7 @@
 namespace App\Spotlight\Queries\Scoped;
 
 use App\Models\Event;
+use App\Spotlight\Support\OwnedRecords;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -19,7 +20,7 @@ class EventTargetQuery
                 return collect();
             }
 
-            $event = Event::with('target')->find($eventId);
+            $event = OwnedRecords::events()->with('target')->find($eventId);
             if (! $event || ! $event->target) {
                 return collect();
             }

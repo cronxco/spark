@@ -32,6 +32,21 @@ Integration Update Flow
 | `BaseProcessingJob`  | Data processing     | 300s    | 2 (120s, 300s backoff)      |
 | `BaseWebhookHookJob` | Webhook splitting   | 60s     | 3 (30s, 120s, 300s backoff) |
 
+### Integration Runs
+
+`DispatchIntegrationFetchJobs` queues an integration's fetch jobs as one job batch through `IntegrationRunService`. While a batched fetch job runs `dispatchProcessingJobs()`, every `BaseProcessingJob` it dispatches joins the same batch (keeping its own queue and delay), so the batch only finishes once the data has been processed. The run's state lives in `configuration.last_run`:
+
+| Status       | Meaning                                                        |
+| ------------ | -------------------------------------------------------------- |
+| `requested`  | Batch created, fetch jobs queued                               |
+| `fetching`   | A fetch job has started                                        |
+| `processing` | Fetching finished; processing jobs are queued or running       |
+| `up_to_date` | Every job in the batch succeeded                               |
+| `partial`    | Some jobs failed for good                                      |
+| `failed`     | Every job failed, or the run was still in flight after an hour |
+
+`last_run` is written with a jsonb merge in SQL, so it never overwrites other configuration keys. Fetch and processing jobs dispatched outside a run (webhooks, migrations, detail fetches) behave exactly as before.
+
 ## Implementation Status
 
 ### Base Infrastructure

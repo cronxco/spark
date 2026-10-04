@@ -10,8 +10,8 @@ use App\Services\EffectiveTimezoneResolver;
 use App\Services\FlintDigestService;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Support\FlintDigestDay;
 use App\Support\FlintQuestion;
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -198,9 +198,7 @@ class SendDigestNotificationJob implements ShouldQueue
      * The digest to announce: the event we were handed, else the most recent
      * one for this period on the user's effective-local day.
      *
-     * The `had_summary` event's `time` is anchored at the local date's 00:00
-     * UTC marker (see FlintDigestService), so the day is bounded in UTC against
-     * that same local date rather than a server-tz day.
+     * The day is matched on the digest's recorded local date (FlintDigestDay).
      */
     private function findDigest(string $period): ?Event
     {
@@ -215,10 +213,7 @@ class SendDigestNotificationJob implements ShouldQueue
                 fn ($query) => $query->whereKey($this->digestEventId),
                 fn ($query) => $query
                     ->whereJsonContains('event_metadata->period', $period)
-                    ->whereBetween('time', [
-                        Carbon::parse($localDate, 'UTC')->startOfDay(),
-                        Carbon::parse($localDate, 'UTC')->endOfDay(),
-                    ]),
+                    ->tap(fn ($query) => FlintDigestDay::on($query, $localDate)),
             )
             ->with(['blocks', 'target'])
             ->orderByDesc('created_at')

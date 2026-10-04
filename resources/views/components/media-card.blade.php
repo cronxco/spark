@@ -99,7 +99,7 @@ $fullUrl = get_media_object_url($media);
                 // Get all instances for this media's MD5 hash
                 $md5Hash = $media->getCustomProperty('md5_hash');
                 $allInstances = $md5Hash
-                    ? \Spatie\MediaLibrary\MediaCollections\Models\Media::where('custom_properties->md5_hash', $md5Hash)
+                    ? \App\Support\OwnedMediaQuery::scope(\Spatie\MediaLibrary\MediaCollections\Models\Media::where('custom_properties->md5_hash', $md5Hash), auth()->id())
                         ->with(['model'])
                         ->orderBy('created_at', 'desc')
                         ->limit(10) // Limit to 10 for performance

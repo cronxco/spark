@@ -6,10 +6,12 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class FlintDigestsControllerTest extends TestCase
@@ -43,7 +45,7 @@ class FlintDigestsControllerTest extends TestCase
     {
         $event = $this->createDigestEvent('morning');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests')
             ->assertOk()
@@ -54,7 +56,7 @@ class FlintDigestsControllerTest extends TestCase
     #[Test]
     public function index_returns_404_when_no_digest_exists(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests?date=2020-01-01')
             ->assertNotFound()
@@ -67,7 +69,7 @@ class FlintDigestsControllerTest extends TestCase
         $this->createDigestEvent('morning');
         $pmEvent = $this->createDigestEvent('afternoon');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests?period=afternoon')
             ->assertOk()
@@ -81,7 +83,7 @@ class FlintDigestsControllerTest extends TestCase
         $this->createDigestEvent('morning');
         $this->createDigestEvent('afternoon');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests?all=true')
             ->assertOk()
@@ -107,7 +109,7 @@ class FlintDigestsControllerTest extends TestCase
             'event_metadata' => ['period' => 'morning'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests')
             ->assertNotFound();
@@ -132,7 +134,7 @@ class FlintDigestsControllerTest extends TestCase
             'metadata' => ['question' => 'Sleep well?', 'answer' => 'Yes', 'answer_note' => null, 'answered_at' => now()->toIso8601String()],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests')
             ->assertOk()
@@ -163,7 +165,7 @@ class FlintDigestsControllerTest extends TestCase
             ],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests')
             ->assertOk()
@@ -198,7 +200,7 @@ class FlintDigestsControllerTest extends TestCase
             ],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $response = $this->getJson('/api/v1/mobile/flint/digests')
             ->assertOk()
@@ -225,7 +227,7 @@ class FlintDigestsControllerTest extends TestCase
             'metadata' => ['content' => 'Just a plain note.'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests')
             ->assertOk()
@@ -257,7 +259,7 @@ class FlintDigestsControllerTest extends TestCase
             ],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
             ->assertOk()
@@ -287,7 +289,7 @@ class FlintDigestsControllerTest extends TestCase
             'event_metadata' => ['period' => 'morning'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
             ->assertNotFound();
@@ -296,7 +298,7 @@ class FlintDigestsControllerTest extends TestCase
     #[Test]
     public function show_returns_404_for_unknown_id(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests/00000000-0000-0000-0000-000000000000')
             ->assertNotFound();
@@ -318,7 +320,7 @@ class FlintDigestsControllerTest extends TestCase
             'metadata' => ['question' => 'How are you?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
             'answer' => 'Good',
@@ -346,7 +348,7 @@ class FlintDigestsControllerTest extends TestCase
             'metadata' => ['question' => 'Yes or no?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
             'answer' => 'Yes',
@@ -367,7 +369,7 @@ class FlintDigestsControllerTest extends TestCase
             'metadata' => ['question' => 'Test?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
             'answer' => 'Yes',
@@ -399,7 +401,7 @@ class FlintDigestsControllerTest extends TestCase
             'metadata' => ['question' => 'Test?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
             'answer' => 'Yes',
@@ -418,7 +420,7 @@ class FlintDigestsControllerTest extends TestCase
             'metadata' => ['content' => 'Some note'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
             'answer' => 'Yes',
@@ -437,7 +439,7 @@ class FlintDigestsControllerTest extends TestCase
             'metadata' => ['question' => 'Test?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [])
             ->assertUnprocessable()
@@ -464,7 +466,7 @@ class FlintDigestsControllerTest extends TestCase
             'opener' => 'The lede the skill chose itself.',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests')
             ->assertOk()
@@ -478,7 +480,7 @@ class FlintDigestsControllerTest extends TestCase
             'summary' => "Good morning!\n\nHEADLINE IN CAPS\n\nHere is the actual lede sentence, long enough to survive the short-paragraph filter easily.",
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests')
             ->assertOk()
@@ -498,7 +500,7 @@ class FlintDigestsControllerTest extends TestCase
         $this->createDigestEvent('evening', Carbon::yesterday());
         $today = $this->createDigestEvent('morning', Carbon::today());
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests/latest')
             ->assertOk()
@@ -510,7 +512,7 @@ class FlintDigestsControllerTest extends TestCase
     {
         $yesterday = $this->createDigestEvent('evening', Carbon::yesterday());
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests/latest')
             ->assertOk()
@@ -524,7 +526,7 @@ class FlintDigestsControllerTest extends TestCase
         $this->createDigestEvent('morning', meta: ['kind' => 'briefing']);
         $roundup = $this->createDigestEvent('evening', meta: ['kind' => 'news_roundup']);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests/latest?kind=news_roundup')
             ->assertOk()
@@ -549,7 +551,7 @@ class FlintDigestsControllerTest extends TestCase
             'created_at' => $dayStart->copy()->setTime(18, 36),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests/latest?kind=briefing')
             ->assertOk()
@@ -564,9 +566,25 @@ class FlintDigestsControllerTest extends TestCase
     #[Test]
     public function latest_returns_404_when_no_digest_exists(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/digests/latest')->assertNotFound();
+    }
+
+    /**
+     * `show` and `latest` used to read the date off the event's `time`; the
+     * digest's recorded `local_date` is the canonical day.
+     */
+    #[Test]
+    public function show_prefers_the_digests_recorded_local_date(): void
+    {
+        $event = $this->createDigestEvent('evening', Carbon::parse('2026-07-14'), ['local_date' => '2026-07-13']);
+
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
+
+        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+            ->assertOk()
+            ->assertJsonPath('date', '2026-07-13');
     }
 
     private function createDigestEvent(string $period = 'morning', ?Carbon $date = null, array $meta = [], array $overrides = []): Event

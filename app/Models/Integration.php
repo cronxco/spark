@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\EncryptedJsonSecrets;
 use App\Integrations\PluginRegistry;
+use App\Services\IntegrationRuns\IntegrationRunService;
 use App\Traits\RedactsLoggedProperties;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -155,6 +156,19 @@ class Integration extends Model
     public function isTaskInstance(): bool
     {
         return ($this->instance_type === 'task') || ($this->service === 'task');
+    }
+
+    /**
+     * Whether the scheduler may run this Task instance. Task instances run on
+     * schedule only once `use_schedule` is explicitly switched on; a missing
+     * setting means off, so instances created before scheduling worked stay
+     * idle until someone opts each one in.
+     */
+    public function runsTaskOnSchedule(): bool
+    {
+        $useSchedule = ($this->configuration ?? [])['use_schedule'] ?? null;
+
+        return filter_var($useSchedule, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true;
     }
 
     /**
@@ -485,10 +499,65 @@ class Integration extends Model
     }
 
     /**
-     * Check if this integration is currently being processed
+     * The summary of the latest batched update run, or null before the first.
+     *
+     * A run still in flight after IntegrationRunService::STALL_AFTER_MINUTES
+     * is reported as failed, so a lost batch cannot read as "updating" forever.
+     *
+     * @return array{batch_id: ?string, status: string, requested_at: ?string, started_at: ?string, finished_at: ?string, processed_jobs: int, failed_jobs: int, error: ?string}|null
+     */
+    public function lastRun(): ?array
+    {
+        $run = ($this->configuration ?? [])['last_run'] ?? null;
+
+        if (! is_array($run) || ! is_string($run['status'] ?? null)) {
+            return null;
+        }
+
+        $summary = [
+            'batch_id' => isset($run['batch_id']) ? (string) $run['batch_id'] : null,
+            'status' => $run['status'],
+            'requested_at' => $run['requested_at'] ?? null,
+            'started_at' => $run['started_at'] ?? null,
+            'finished_at' => $run['finished_at'] ?? null,
+            'processed_jobs' => (int) ($run['processed_jobs'] ?? 0),
+            'failed_jobs' => (int) ($run['failed_jobs'] ?? 0),
+            'error' => $run['error'] ?? null,
+        ];
+
+        if (in_array($summary['status'], IntegrationRunService::IN_FLIGHT, true)) {
+            $requestedAt = is_string($summary['requested_at']) ? Carbon::make($summary['requested_at']) : null;
+
+            if (! $requestedAt || $requestedAt->lt(now()->subMinutes(IntegrationRunService::STALL_AFTER_MINUTES))) {
+                $summary['status'] = IntegrationRunService::STATUS_FAILED;
+                $summary['error'] ??= 'The update did not finish.';
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Whether a batched update run has been requested and not yet finished
+     * processing.
+     */
+    public function hasRunInFlight(): bool
+    {
+        $run = $this->lastRun();
+
+        return $run !== null && in_array($run['status'], IntegrationRunService::IN_FLIGHT, true);
+    }
+
+    /**
+     * Check if this integration is currently being processed: a run still
+     * fetching or processing, or a recent trigger with no success after it.
      */
     public function isProcessing(): bool
     {
+        if ($this->hasRunInFlight()) {
+            return true;
+        }
+
         if (! $this->last_triggered_at) {
             return false;
         }

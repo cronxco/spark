@@ -6,6 +6,7 @@ use App\Jobs\Data\Fetch\ProcessFetchedContent;
 use App\Jobs\Fetch\FetchSingleUrl;
 use App\Models\EventObject;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -36,7 +37,7 @@ class BookmarksControllerTest extends TestCase
     #[Test]
     public function requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/bookmarks', ['url' => 'https://example.com/article'])
             ->assertStatus(403);
@@ -46,7 +47,7 @@ class BookmarksControllerTest extends TestCase
     public function stores_bookmark_and_dispatches_fetch_job(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/bookmarks', ['url' => 'https://example.com/article'])
             ->assertStatus(201)
@@ -66,7 +67,7 @@ class BookmarksControllerTest extends TestCase
     public function duplicate_bookmark_does_not_create_a_second(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         EventObject::create([
             'user_id' => $this->user->id,
@@ -88,7 +89,7 @@ class BookmarksControllerTest extends TestCase
     #[Test]
     public function validates_url_format(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/bookmarks', ['url' => 'not-a-url'])
             ->assertStatus(422)
@@ -99,7 +100,7 @@ class BookmarksControllerTest extends TestCase
     public function rejects_unsafe_ssrf_targets(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/bookmarks', ['url' => 'http://169.254.169.254/latest/meta-data/'])
             ->assertStatus(422);
@@ -112,7 +113,7 @@ class BookmarksControllerTest extends TestCase
     public function captures_rendered_safari_content_without_refetching(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/bookmarks/capture', [
             'url' => 'https://example.com/subscriber-article',
@@ -148,7 +149,7 @@ class BookmarksControllerTest extends TestCase
     #[Test]
     public function safari_capture_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/bookmarks/capture', [
             'url' => 'https://example.com/article',

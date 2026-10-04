@@ -75,9 +75,9 @@ All check-in endpoints sit under `/api/v1/mobile/` and require a valid Sanctum B
 
 | Operation            | Required ability |
 | -------------------- | ---------------- |
-| Submit (`POST`)      | `ios:write`      |
-| Read status (`GET`)  | `ios:read`       |
-| Read history (`GET`) | `ios:read`       |
+| Submit (`POST`)      | `insights:write` |
+| Read status (`GET`)  | `insights:read`  |
+| Read history (`GET`) | `insights:read`  |
 
 See [mobile_API.md](./mobile_API.md) for how to obtain tokens via OAuth PKCE.
 
@@ -91,7 +91,7 @@ Submit a morning or afternoon check-in. If a check-in already exists for the sam
 
 ```
 POST /api/v1/mobile/check-ins
-Authorization: Bearer <token with ios:write>
+Authorization: Bearer <token with insights:write>
 Content-Type: application/json
 ```
 
@@ -183,7 +183,7 @@ Returns the completion status for morning and afternoon on a specific date. Use 
 
 ```
 GET /api/v1/mobile/check-ins?date=YYYY-MM-DD
-Authorization: Bearer <token with ios:read>
+Authorization: Bearer <token with insights:read>
 ```
 
 #### Query parameters
@@ -230,7 +230,7 @@ Returns a lightweight day-by-day summary for a date range. Designed for streak d
 
 ```
 GET /api/v1/mobile/check-ins/history?from=YYYY-MM-DD&to=YYYY-MM-DD
-Authorization: Bearer <token with ios:read>
+Authorization: Bearer <token with insights:read>
 ```
 
 #### Query parameters
@@ -315,7 +315,7 @@ This means:
 | `201`  | Check-in created or updated successfully                       |
 | `200`  | Status / history retrieved successfully                        |
 | `401`  | Missing or expired token                                       |
-| `403`  | Token lacks the required ability (`ios:read` or `ios:write`)   |
+| `403`  | Token lacks the required ability (`insights:read` or `insights:write`)   |
 | `404`  | Mobile API is disabled (`ios.mobile_api_enabled` feature flag) |
 | `422`  | Validation error — response body contains `errors` object      |
 

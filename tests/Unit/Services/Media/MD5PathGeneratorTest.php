@@ -78,6 +78,18 @@ class MD5PathGeneratorTest extends TestCase
     /**
      * Create a mock Media object with a given MD5 hash.
      */
+    #[Test]
+    public function a_file_without_a_stored_hash_uses_its_id_and_does_not_recurse(): void
+    {
+        $media = new Media;
+        $media->id = 123;
+        $media->custom_properties = [];
+
+        $hash = md5('123');
+
+        $this->assertSame(substr($hash, 0, 2) . '/' . substr($hash, 2, 2) . '/' . $hash . '/', $this->pathGenerator->getPath($media));
+    }
+
     protected function createMockMedia(string $md5Hash): Media
     {
         $media = $this->getMockBuilder(Media::class)

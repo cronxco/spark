@@ -67,6 +67,13 @@ Schedule::command('notifications:maintain-history')
     ->withoutOverlapping()
     ->sentryMonitor();
 
+// Daily Digest email: each user's digest goes out once their local digest time passes.
+Schedule::command('notifications:send-digests')
+    ->everyFifteenMinutes()
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->sentryMonitor();
+
 // Check cookie expiry daily at 6am
 Schedule::job(new CheckCookieExpiryJob)
     ->dailyAt('06:00')
@@ -100,7 +107,6 @@ Schedule::call(function () {
         ->value('id');
 
     $users = User::query()->where(function ($query) {
-        $query->whereNotNull('settings->flint->digests_enabled');
         foreach (FlintScheduleSettings::ENABLED_KEYS as $key) {
             $query->orWhereNotNull("settings->flint->{$key}");
         }
@@ -159,7 +165,6 @@ Schedule::call(function () {
     $flintSchedule = app(FlintScheduleService::class);
 
     $users = User::query()->where(function ($query) {
-        $query->whereNotNull('settings->flint->digests_enabled');
         foreach (FlintScheduleSettings::ENABLED_KEYS as $key) {
             $query->orWhereNotNull("settings->flint->{$key}");
         }

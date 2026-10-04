@@ -11,6 +11,7 @@ use App\Services\Flint\FlintQuestionActionService;
 use App\Services\FlintDigestService;
 use App\Support\FlintAudience;
 use App\Support\FlintBlockPresenter;
+use App\Support\FlintDigestDay;
 use App\Support\FlintDigestFreshness;
 use App\Support\FlintDigestKind;
 use App\Support\FlintDigestOpener;
@@ -61,18 +62,10 @@ class FlintDigestsController extends Controller
 
         $integrationIds = $request->user()->integrations()->pluck('id');
 
-        // `whereDate()` compares the stored UTC date, so a timezone-aware date
-        // alone changes nothing — see UpToSpeedController::localDayRange(),
-        // whose docblock warns about exactly this. A digest is filed at the
-        // start of the user's local day, which for anyone east or west of UTC
-        // is a different UTC calendar date.
-        [$dayStart, $dayEnd] = $this->localDayRange($date, $timezone);
-
         $query = Event::whereIn('integration_id', $integrationIds)
             ->where('service', 'flint')
             ->where('action', 'had_summary')
-            ->where('time', '>=', $dayStart)
-            ->where('time', '<', $dayEnd)
+            ->tap(fn ($query) => FlintDigestDay::on($query, $date->toDateString()))
             ->with('blocks')
             ->orderBy('time', 'desc')
             // Every digest is filed at the start of its local day, so `time`
@@ -95,7 +88,7 @@ class FlintDigestsController extends Controller
             ], 404);
         }
 
-        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $date, $integrationIds, $timezone));
+        $formatted = $events->map(fn (Event $event) => $this->formatDigest($event, $integrationIds, $timezone));
 
         if ($all) {
             return response()->json([
@@ -155,7 +148,7 @@ class FlintDigestsController extends Controller
         }
 
         return response()->json(
-            $this->formatDigest($event, Carbon::parse($event->time, $timezone), $integrationIds, $timezone)
+            $this->formatDigest($event, $integrationIds, $timezone)
         );
     }
 
@@ -179,7 +172,7 @@ class FlintDigestsController extends Controller
             return response()->json(['error' => 'Digest not found.'], 404);
         }
 
-        return response()->json($this->formatDigest($event, Carbon::parse($event->time), $integrationIds, $timezone));
+        return response()->json($this->formatDigest($event, $integrationIds, $timezone));
     }
 
     /**
@@ -254,8 +247,7 @@ class FlintDigestsController extends Controller
             ->whereIn('integration_id', $integrationIds)
             ->where('service', 'flint')
             ->where('action', 'had_summary')
-            ->where('time', '>=', $from->copy()->utc())
-            ->where('time', '<', $to->copy()->addDay()->utc())
+            ->tap(fn ($query) => FlintDigestDay::between($query, $from->toDateString(), $to->toDateString()))
             ->withCount(['blocks as unanswered_question_count' => fn ($query) => $query
                 ->whereNull('deleted_at')
                 ->where('block_type', FlintQuestion::BLOCK_TYPE)
@@ -299,25 +291,9 @@ class FlintDigestsController extends Controller
     }
 
     /**
-     * The half-open UTC interval covering one local calendar day:
-     * `[start of local day, start of the next local day)`.
-     *
-     * @return array{0: Carbon, 1: Carbon}
-     */
-    private function localDayRange(Carbon $localDay, string $timezone): array
-    {
-        $start = $localDay->copy()->timezone($timezone)->startOfDay();
-
-        return [
-            $start->copy()->setTimezone('UTC'),
-            $start->copy()->addDay()->setTimezone('UTC'),
-        ];
-    }
-
-    /**
      * @return array<string, mixed>
      */
-    private function formatDigest(Event $event, Carbon $date, mixed $integrationIds = null, ?string $timezone = null): array
+    private function formatDigest(Event $event, mixed $integrationIds = null, ?string $timezone = null): array
     {
         $eventMeta = $event->event_metadata ?? [];
 
@@ -331,7 +307,10 @@ class FlintDigestsController extends Controller
         return [
             'event_id' => $event->id,
             'digest_object_id' => $eventMeta['digest_object_id'] ?? null,
-            'date' => $date->toDateString(),
+            // The local day the digest was written for. `time` holds that
+            // day's midnight as a wall-clock value, so it is only the fallback
+            // for digests written before `local_date` was recorded.
+            'date' => $eventMeta['local_date'] ?? $event->time->toDateString(),
             'effective_timezone' => $timezone,
             'period' => $eventMeta['period'] ?? null,
             'kind' => FlintDigestKind::for($event, $eventMeta),
