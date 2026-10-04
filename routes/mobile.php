@@ -204,11 +204,11 @@ Route::post('notifications/read-all', [NotificationsController::class, 'markAllR
 // Delivery receipts from the app (decision N-8): id, event, time and action
 // identifier only, never message content.
 Route::post('notifications/receipts', [NotificationsController::class, 'recordReceipts'])
-    ->middleware('ability:ios:write')
+    ->middleware('ability:ios:write,notifications:write')
     ->name('notifications.receipts');
 
 Route::post('notifications/{id}/receipts', [NotificationsController::class, 'recordReceipt'])
-    ->middleware('ability:ios:write')
+    ->middleware('ability:ios:write,notifications:write')
     ->name('notifications.receipt');
 
 Route::post('notifications/{id}/read', [NotificationsController::class, 'markRead'])

@@ -28,7 +28,7 @@ class NotificationReceiptsTest extends TestCase
     public function each_event_is_stored_once_and_the_first_time_wins(): void
     {
         $notification = $this->notification();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, ['ios:read', 'notifications:write']);
 
         foreach (['shown', 'opened', 'tapped'] as $event) {
             $this->postJson("/api/v1/mobile/notifications/{$notification->id}/receipts", [
