@@ -7,6 +7,7 @@ use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Services\Api\ResourceVersion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -133,13 +134,15 @@ class TaskIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function the_rest_plugin_list_hides_task_from_non_admins(): void
+    public function a_non_admin_cannot_configure_a_task_through_the_versioned_api(): void
     {
-        Sanctum::actingAs(User::factory()->create());
-        $this->assertNotContains('task', array_column($this->getJson('/api/integrations')->assertOk()->json('plugins'), 'identifier'));
+        $user = User::factory()->create();
+        $integration = $this->taskInstance($user, []);
+        Sanctum::actingAs($user, ['integrations:manage']);
 
-        Sanctum::actingAs(User::factory()->create(['is_admin' => true]));
-        $this->assertContains('task', array_column($this->getJson('/api/integrations')->assertOk()->json('plugins'), 'identifier'));
+        $this->withHeader('If-Match', app(ResourceVersion::class)->etag($integration))
+            ->patchJson("/api/v1/integrations/{$integration->id}/configure", [])
+            ->assertNotFound();
     }
 
     /**

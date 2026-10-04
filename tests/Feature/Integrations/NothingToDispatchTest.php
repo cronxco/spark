@@ -72,11 +72,11 @@ class NothingToDispatchTest extends TestCase
     }
 
     #[Test]
-    public function rest_trigger_answers_422(): void
+    public function versioned_sync_answers_422(): void
     {
-        Sanctum::actingAs($this->user);
+        Sanctum::actingAs($this->user, ['integrations:sync']);
 
-        $this->postJson("/api/integrations/{$this->nothingToFetch->id}/trigger")
+        $this->postJson("/api/v1/integrations/{$this->nothingToFetch->id}/sync")
             ->assertStatus(422)
             ->assertJsonPath('code', 'nothing_to_dispatch');
     }
