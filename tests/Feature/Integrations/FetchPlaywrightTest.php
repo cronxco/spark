@@ -18,7 +18,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\Fixtures\FetchPages;
 use Tests\TestCase;
 
 class FetchPlaywrightTest extends TestCase
@@ -33,12 +32,11 @@ class FetchPlaywrightTest extends TestCase
 
         config([
             'fetch.url_safety.allowed_hosts' => ['example.com', 'twitter.com'],
-            'fetch.list_detection.enabled' => false,
         ]);
 
         $this->app->bind(Client::class, fn (): Client => new Client([
             'handler' => HandlerStack::create(new MockHandler([
-                new Response(200, [], FetchPages::articleWithRelatedRail()),
+                new Response(200, [], $this->articleHtml('A thoughtful essay about testing software')),
             ])),
         ]));
 
@@ -83,7 +81,7 @@ class FetchPlaywrightTest extends TestCase
         $result = $engine->fetch('https://example.com', $group, $webpage);
 
         $this->assertEquals('http', $result['method']);
-        $this->assertSame(FetchPages::articleWithRelatedRail(), $result['html']);
+        $this->assertSame($this->articleHtml('A thoughtful essay about testing software'), $result['html']);
     }
 
     #[Test]
@@ -119,7 +117,7 @@ class FetchPlaywrightTest extends TestCase
         $this->assertContains($result['method'], ['http', 'http (fallback)']);
         $this->assertEquals('playwright', $result['selected_method']);
         $this->assertEquals('http_fallback', $result['actual_method']);
-        $this->assertSame(FetchPages::articleWithRelatedRail(), $result['html']);
+        $this->assertSame($this->articleHtml('A thoughtful essay about testing software'), $result['html']);
         $this->assertFalse($result['playwright_reached_worker']);
         $this->assertNotEmpty($result['playwright_error']);
     }

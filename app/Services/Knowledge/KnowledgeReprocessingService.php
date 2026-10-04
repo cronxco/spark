@@ -90,8 +90,6 @@ class KnowledgeReprocessingService
             $query
                 ->where(function (Builder $query): void {
                     $query->where('service', 'fetch')
-                        // List expansions record found articles, not an article to summarise
-                        ->where('action', '!=', 'expanded')
                         ->whereDoesntHave('blocks', function (Builder $query): void {
                             $this->whereUsableTldrBlock($query, 'fetch_tldr');
                         });
