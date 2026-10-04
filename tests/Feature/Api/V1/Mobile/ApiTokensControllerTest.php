@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -18,7 +19,7 @@ class ApiTokensControllerTest extends TestCase
      *
      * @var array<int, string>
      */
-    private const MANAGER = ['ios:read', 'tokens:manage', 'data:read', 'insights:read'];
+    private const MANAGER = [...SparkAbility::MOBILE_READ, 'tokens:manage', 'data:read', 'insights:read'];
 
     protected User $user;
 
@@ -40,7 +41,7 @@ class ApiTokensControllerTest extends TestCase
     public function index_lists_user_tokens(): void
     {
         $this->user->createToken('CLI', ['data:read']);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/api-tokens')
             ->assertOk()
@@ -52,9 +53,9 @@ class ApiTokensControllerTest extends TestCase
     #[Test]
     public function index_hides_ios_app_session_tokens(): void
     {
-        $this->user->createToken('iOS App', ['ios:read', 'ios:write']);
+        $this->user->createToken('iOS App', SparkAbility::MOBILE_SESSION);
         $this->user->createToken('MCP', ['data:read']);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/api-tokens')
             ->assertOk()
@@ -163,7 +164,7 @@ class ApiTokensControllerTest extends TestCase
         // ['*'] — so asking for the narrowest scopes produced the widest token.
         $this->postJson('/api/v1/mobile/api-tokens', [
             'name' => 'Sneaky',
-            'abilities' => ['ios:read', 'ios:write'],
+            'abilities' => SparkAbility::MOBILE_SESSION,
         ])->assertStatus(422);
 
         $this->assertDatabaseMissing('personal_access_tokens', [
@@ -175,7 +176,7 @@ class ApiTokensControllerTest extends TestCase
     #[Test]
     public function an_ios_session_cannot_reach_the_creation_endpoint(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/api-tokens', [
             'name' => 'From the app',
@@ -188,7 +189,7 @@ class ApiTokensControllerTest extends TestCase
     #[Test]
     public function store_cannot_delegate_more_than_the_issuing_token_holds(): void
     {
-        $issuer = $this->user->createToken('Manager', ['ios:read', 'tokens:manage', 'data:read']);
+        $issuer = $this->user->createToken('Manager', [...SparkAbility::MOBILE_READ, 'tokens:manage', 'data:read']);
 
         $this->withToken($issuer->plainTextToken)
             ->postJson('/api/v1/mobile/api-tokens', [
@@ -207,7 +208,7 @@ class ApiTokensControllerTest extends TestCase
     {
         $issuer = $this->user->createToken(
             'Manager',
-            ['ios:read', 'tokens:manage', 'data:read', 'finance:read'],
+            [...SparkAbility::MOBILE_READ, 'tokens:manage', 'data:read', 'finance:read'],
         );
 
         $this->withToken($issuer->plainTextToken)
@@ -251,7 +252,7 @@ class ApiTokensControllerTest extends TestCase
     public function destroy_revokes_a_token(): void
     {
         $token = $this->user->createToken('MCP', ['data:read'])->accessToken;
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->deleteJson("/api/v1/mobile/api-tokens/{$token->getKey()}")
             ->assertStatus(204);
@@ -262,8 +263,8 @@ class ApiTokensControllerTest extends TestCase
     #[Test]
     public function destroy_will_not_revoke_ios_session_tokens(): void
     {
-        $token = $this->user->createToken('iOS App', ['ios:read', 'ios:write'])->accessToken;
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        $token = $this->user->createToken('iOS App', SparkAbility::MOBILE_SESSION)->accessToken;
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->deleteJson("/api/v1/mobile/api-tokens/{$token->getKey()}")
             ->assertStatus(404);
@@ -276,7 +277,7 @@ class ApiTokensControllerTest extends TestCase
     {
         $other = User::factory()->create();
         $token = $other->createToken('Theirs', ['data:read'])->accessToken;
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->deleteJson("/api/v1/mobile/api-tokens/{$token->getKey()}")
             ->assertStatus(404);
@@ -288,7 +289,7 @@ class ApiTokensControllerTest extends TestCase
     public function destroy_requires_write_ability(): void
     {
         $token = $this->user->createToken('MCP', ['data:read'])->accessToken;
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->deleteJson("/api/v1/mobile/api-tokens/{$token->getKey()}")
             ->assertStatus(403);

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Integrations\PluginRegistry;
+use App\Integrations\Task\TaskPlugin;
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Integration;
 use Exception;
@@ -53,6 +54,7 @@ class CheckIntegrationUpdates implements ShouldQueue
             // Get integrations that need updating
             // - OAuth: require a valid group token
             // - API key: no token requirement
+            // - Task: admin-owned instances with use_schedule switched on
             $oauthServices = PluginRegistry::getOAuthPlugins()->keys();
             $apiKeyServices = PluginRegistry::getApiKeyPlugins()->keys();
 
@@ -69,12 +71,21 @@ class CheckIntegrationUpdates implements ShouldQueue
                     })->orWhere(function ($q) use ($apiKeyServices) {
                         // API key integrations (no token required)
                         $q->whereIn('service', $apiKeyServices);
+                    })->orWhere(function ($q) {
+                        $q->where('service', TaskPlugin::getIdentifier())
+                            ->whereHas('user', function ($userQuery) {
+                                $userQuery->where('is_admin', true);
+                            });
                     });
                 })
                 ->get();
 
             // Filter to only those that actually need updating using the individual/schedule-aware method
             $integrations = $allIntegrations->filter(function ($integration) {
+                if ($integration->service === TaskPlugin::getIdentifier() && ! $integration->runsTaskOnSchedule()) {
+                    return false;
+                }
+
                 return $integration->isDue();
             });
 

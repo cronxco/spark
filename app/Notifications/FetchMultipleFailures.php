@@ -60,6 +60,11 @@ class FetchMultipleFailures extends SparkNotification
         return (string) $this->webpage->id;
     }
 
+    public function isIncidentAlert(): bool
+    {
+        return true;
+    }
+
     public function getGroupKey(): ?string
     {
         return "fetch_multiple_failures:{$this->webpage->id}";

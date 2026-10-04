@@ -4,9 +4,11 @@ namespace Tests\Unit\Services;
 
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\Integration;
 use App\Models\User;
 use App\Services\Flint\FlintRunToken;
 use App\Services\FlintDigestService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -334,6 +336,47 @@ class FlintDigestServiceTest extends TestCase
 
         $this->assertNotSame($briefing['event_id'], $roundup['event_id']);
         $this->assertFalse($roundup['deduplicated']);
+    }
+
+    /** Question length and shape are editorial guidance for the skill, not a Spark gate. */
+    #[Test]
+    public function keeps_a_long_question_that_asks_two_things(): void
+    {
+        $text = 'Was the late finish on Thursday the planned deadline push you mentioned last week, or did something new land, and is it likely to repeat this week?';
+
+        $result = $this->service->create($this->user, [
+            'title' => 'Morning Digest',
+            'period' => 'morning',
+            'blocks' => [['block_type' => 'flint_user_question', 'title' => 'Question', 'question' => $text]],
+        ]);
+
+        $this->assertSame(1, $result['block_count']);
+        $this->assertSame($text, Block::findOrFail($result['block_ids'][0])->metadata['question']);
+    }
+
+    /**
+     * Files the digest on the effective (acknowledged travel) local day, not
+     * the profile timezone's day.
+     */
+    #[Test]
+    public function files_a_dateless_digest_on_the_effective_local_day(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-15 02:30:00', 'UTC'), function (): void {
+            $user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
+            $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'daily_checkin']);
+            Event::factory()->create([
+                'integration_id' => $integration->id,
+                'service' => 'daily_checkin',
+                'action' => 'time_travel',
+                'event_metadata' => ['timezone' => 'America/New_York', 'acknowledged_at' => '2026-06-10T10:00:00.000000Z'],
+            ]);
+
+            $result = app(FlintDigestService::class)->create($user, ['title' => 'Evening Digest']);
+
+            // 02:30 UTC is 03:30 in London on the 15th but 22:30 in New York on the 14th.
+            $this->assertSame('2026-06-14', $result['date']);
+            $this->assertSame('evening', $result['period']);
+        });
     }
 
     private function runTokenFor(string $routine, string $period): string

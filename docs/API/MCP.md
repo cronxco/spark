@@ -294,7 +294,10 @@ _Class_: `UpdateEntityTool` · _Ability_: `data:write`
 Safely updates an owned event, object, or block. Never deletes records or
 changes integration ownership. Same allow-list and validation
 (`EntityMutationService::validateUpdate`) that `PATCH /api/v1/{kind}/{id}`
-uses.
+uses. Source fields (object `title`/`concept`/`type`/`url`, block
+`title`/`block_type`/`url`) of integration-sourced or locked items cannot be
+changed; the tool returns an error naming the field. Use `set-event-note` for
+a note instead.
 
 | Parameter    | Type   | Required | Notes                                                                                                                                                                                                     |
 | ------------ | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

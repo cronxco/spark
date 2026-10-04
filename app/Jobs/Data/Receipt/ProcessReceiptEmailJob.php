@@ -14,12 +14,12 @@ use Exception;
 use Html2Text\Html2Text;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Smalot\PdfParser\Parser as PdfParser;
 use ZBateson\MailMimeParser\MailMimeParser;
 
@@ -60,8 +60,19 @@ class ProcessReceiptEmailJob implements ShouldQueue
             // Parse email to extract text
             $parsedEmail = $this->parseEmail($emailContent);
 
+            $sourceId = $this->receiptSourceId($parsedEmail['message_id'], $emailContent);
+
+            if ($this->receiptAlreadyExists($sourceId)) {
+                Log::info('Receipt: Skipping email already processed', [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $sourceId,
+                ]);
+
+                return;
+            }
+
             // Extract receipt data using OpenAI
-            $extractor = new ReceiptExtractor;
+            $extractor = app(ReceiptExtractor::class);
             $receiptData = $extractor->extract(
                 $parsedEmail['combined_text'],
                 $parsedEmail['subject'],
@@ -87,11 +98,18 @@ class ProcessReceiptEmailJob implements ShouldQueue
                 return;
             }
 
-            // Create receipt event and related data
-            $receiptEvent = $this->createReceiptEvent($receiptData, $parsedEmail);
+            // Create receipt event and related data. Matching runs from the
+            // Task Pipeline's match_receipt_to_transaction task on creation.
+            try {
+                $receiptEvent = $this->createReceiptEvent($receiptData, $parsedEmail, $sourceId);
+            } catch (UniqueConstraintViolationException) {
+                Log::info('Receipt: Another delivery of this email created the receipt first', [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $sourceId,
+                ]);
 
-            // Dispatch matching job
-            MatchReceiptToTransactionJob::dispatch($receiptEvent);
+                return;
+            }
 
             Log::info('Receipt: Successfully processed receipt email', [
                 'integration_id' => $this->integration->id,
@@ -116,6 +134,32 @@ class ProcessReceiptEmailJob implements ShouldQueue
             : md5($this->rawEmailContent ?? '');
 
         return 'process_receipt_email_' . $this->integration->id . '_' . $contentHash;
+    }
+
+    /**
+     * A stable identity for this email within the integration, so a redelivery
+     * finds the receipt it already created. Uses the Message-ID header, falling
+     * back to the S3 object key and then the raw content.
+     */
+    private function receiptSourceId(string $messageId, string $emailContent): string
+    {
+        $messageId = strtolower(trim($messageId, " \t\n\r\0\x0B<>"));
+
+        $identity = match (true) {
+            $messageId !== '' => 'message:' . $messageId,
+            ! empty($this->s3ObjectKey) => 's3:' . $this->s3ObjectKey,
+            default => 'content:' . hash('sha256', $emailContent),
+        };
+
+        return 'receipt_' . hash('sha256', $identity);
+    }
+
+    private function receiptAlreadyExists(string $sourceId): bool
+    {
+        return Event::withTrashed()
+            ->where('integration_id', $this->integration->id)
+            ->where('source_id', $sourceId)
+            ->exists();
     }
 
     /**
@@ -251,7 +295,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
     /**
      * Create receipt event and related objects/blocks
      */
-    private function createReceiptEvent(array $receiptData, array $parsedEmail): Event
+    private function createReceiptEvent(array $receiptData, array $parsedEmail, string $sourceId): Event
     {
         // Create merchant EventObject
         $merchant = EventObject::updateOrCreate(
@@ -301,7 +345,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
 
         // Create receipt event
         $event = Event::create([
-            'source_id' => 'receipt_' . Str::uuid(),
+            'source_id' => $sourceId,
             'time' => $transactionTime,
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,

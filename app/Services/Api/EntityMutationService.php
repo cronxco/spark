@@ -11,6 +11,7 @@ use App\Services\Mobile\BlockLookup;
 use App\Services\Mobile\EventLookup;
 use App\Services\Mobile\ObjectLookup;
 use App\Services\RelationshipTypeRegistry;
+use App\Services\SourceFieldGuard;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Spatie\Tags\Tag;
@@ -20,10 +21,14 @@ use Spatie\Tags\Tag;
  */
 class EntityMutationService
 {
+    public const LOCKED_TITLE_MESSAGE = 'This object is locked, so its title can\'t be changed. Unlock it first.';
+
     public function __construct(
         private EventLookup $events,
         private ObjectLookup $objects,
         private BlockLookup $blocks,
+        private ResourceVersion $versions,
+        private SourceFieldGuard $sourceFields,
     ) {}
 
     /** @return array<string, mixed> */
@@ -65,6 +70,7 @@ class EntityMutationService
         if (! $object) {
             return null;
         }
+        $this->sourceFields->assertEditable($object, $attributes);
         $object->update($this->only($attributes, ['title', 'type', 'concept', 'url']));
 
         return $object->fresh('tags');
@@ -76,6 +82,7 @@ class EntityMutationService
         if (! $block) {
             return null;
         }
+        $this->sourceFields->assertEditable($block, $attributes);
         $block->update($this->only($attributes, ['title', 'block_type', 'value', 'value_multiplier', 'value_unit', 'time', 'url']));
 
         return $block->fresh(['event.integration', 'event.actor', 'event.target']);
@@ -155,7 +162,42 @@ class EntityMutationService
 
     public function relationshipPayload(Relationship $relationship): array
     {
-        return ['id' => $relationship->id, 'type' => $relationship->type, 'from_type' => $this->kind($relationship->from_type), 'from_id' => $relationship->from_id, 'to_type' => $this->kind($relationship->to_type), 'to_id' => $relationship->to_id, 'value' => $relationship->formatted_value, 'value_unit' => $relationship->value_unit, 'metadata' => $relationship->metadata, 'created_at' => $relationship->created_at?->toIso8601String()];
+        return ['id' => $relationship->id, 'type' => $relationship->type, 'from_type' => $this->kind($relationship->from_type), 'from_id' => $relationship->from_id, 'to_type' => $this->kind($relationship->to_type), 'to_id' => $relationship->to_id, 'value' => $relationship->formatted_value, 'value_unit' => $relationship->value_unit, 'metadata' => $relationship->metadata, 'created_at' => $relationship->created_at?->toIso8601String(), 'etag' => $this->versions->etag($relationship)];
+    }
+
+    /**
+     * Versions of every resource a relationship mutation changed, so a client
+     * can replace the ETags it holds without re-reading each entity.
+     *
+     * @return array<int, array{kind: string, id: string, etag: string}>
+     */
+    public function relationshipVersions(Relationship $relationship): array
+    {
+        return collect([$relationship->from, $relationship->to])
+            ->filter()
+            ->map(fn (Model $entity) => ['kind' => $this->kind($entity::class), 'id' => (string) $entity->getKey(), 'etag' => $this->versions->etag($entity->fresh())])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Relationship types a client may offer, straight from the registry.
+     *
+     * @return array<int, array{type: string, display_name: string, description: string, is_directional: bool, supports_value: bool, default_value_unit: string|null}>
+     */
+    public function relationshipTypes(): array
+    {
+        return collect(RelationshipTypeRegistry::getTypes())
+            ->map(fn (array $config, string $type) => [
+                'type' => $type,
+                'display_name' => $config['display_name'],
+                'description' => $config['description'],
+                'is_directional' => $config['is_directional'],
+                'supports_value' => $config['supports_value'],
+                'default_value_unit' => $config['default_value_unit'] ?? null,
+            ])
+            ->values()
+            ->all();
     }
 
     private function entity(User $user, string $kind, string $id): Event|EventObject|Block|null

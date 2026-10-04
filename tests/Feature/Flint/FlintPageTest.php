@@ -307,7 +307,7 @@ class FlintPageTest extends TestCase
 
         $settings = $this->user->refresh()->settings['flint'];
 
-        $this->assertTrue($settings['digests_enabled']);
+        $this->assertArrayNotHasKey('digests_enabled', $settings);
         $this->assertSame('06:45', $settings['morning_time_weekday']);
         $this->assertSame('09:00', $settings['morning_time_weekend']);
         $this->assertSame('11:30', $settings['morning_fallback']);
@@ -361,9 +361,9 @@ class FlintPageTest extends TestCase
     }
 
     #[Test]
-    public function legacy_digest_setting_hydrates_all_independent_switches(): void
+    public function switches_default_to_off_and_ignore_the_legacy_all_routines_key(): void
     {
-        $this->user->update(['settings' => ['flint' => ['digests_enabled' => false]]]);
+        $this->user->update(['settings' => ['flint' => ['digests_enabled' => true]]]);
 
         Volt::test('flint.index')
             ->assertSet('morningDigestEnabled', false)
@@ -374,7 +374,7 @@ class FlintPageTest extends TestCase
     }
 
     #[Test]
-    public function explicit_switches_override_legacy_and_save_a_derived_compatibility_flag(): void
+    public function saving_keeps_explicit_switches_and_drops_the_legacy_key(): void
     {
         $this->user->update(['settings' => ['flint' => [
             'digests_enabled' => false,
@@ -395,7 +395,7 @@ class FlintPageTest extends TestCase
         $this->assertFalse($settings['topics_enabled']);
         $this->assertFalse($settings['reading_list_enabled']);
         $this->assertTrue($settings['news_roundup_enabled']);
-        $this->assertTrue($settings['digests_enabled']);
+        $this->assertArrayNotHasKey('digests_enabled', $settings);
         $this->assertSame('keep me', $settings['some_other_key']);
     }
 

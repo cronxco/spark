@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\OAuthRefreshToken;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -80,7 +81,7 @@ class LogoutTest extends TestCase
             'expires_at' => now()->addDays(30),
             'revoked_at' => now(),
         ]);
-        $successorAccess = $user->createToken('iPhone', ['ios:read', 'ios:write'])->accessToken;
+        $successorAccess = $user->createToken('iPhone', SparkAbility::MOBILE_SESSION)->accessToken;
         $successorRefresh = OAuthRefreshToken::create([
             'user_id' => $user->getKey(),
             'token_hash' => hash('sha256', 'successor-refresh'),
@@ -103,7 +104,7 @@ class LogoutTest extends TestCase
     {
         $user = User::factory()->create();
         [$plain, $current] = $this->issueSession($user);
-        $otherDevice = $user->createToken('iPad', ['ios:read', 'ios:write'])->accessToken;
+        $otherDevice = $user->createToken('iPad', SparkAbility::MOBILE_SESSION)->accessToken;
         $personalToken = $user->createToken('CLI', ['data:read'])->accessToken;
 
         $otherRefresh = OAuthRefreshToken::create([
@@ -130,7 +131,7 @@ class LogoutTest extends TestCase
         $other = User::factory()->create();
 
         [$plain, $token] = $this->issueSession($user);
-        $othersToken = $other->createToken('Their iPhone', ['ios:read', 'ios:write'])->accessToken;
+        $othersToken = $other->createToken('Their iPhone', SparkAbility::MOBILE_SESSION)->accessToken;
 
         $othersRefresh = OAuthRefreshToken::create([
             'user_id' => $other->getKey(),
@@ -152,7 +153,7 @@ class LogoutTest extends TestCase
     public function it_is_reachable_by_a_read_only_session(): void
     {
         $user = User::factory()->create();
-        $issued = $user->createToken('iPhone', ['ios:read']);
+        $issued = $user->createToken('iPhone', SparkAbility::MOBILE_READ);
 
         // Signing out must never be blocked by lacking the write scope.
         $this->withToken($issued->plainTextToken)
@@ -172,7 +173,7 @@ class LogoutTest extends TestCase
     private function issueSession(User $user): array
     {
         /** @var NewAccessToken $issued */
-        $issued = $user->createToken('iPhone', ['ios:read', 'ios:write']);
+        $issued = $user->createToken('iPhone', SparkAbility::MOBILE_SESSION);
 
         return [$issued->plainTextToken, $issued->accessToken];
     }

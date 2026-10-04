@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\EventObject;
-use Illuminate\Support\Facades\Auth;
+use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
@@ -83,7 +83,7 @@ new class extends Component
                 // Delete objects (soft delete)
                 // $selectedObjects is a public Livewire property; re-resolve it
                 // through the owning-user predicate before mutating.
-                return EventObject::where('user_id', Auth::id())
+                return EventObject::where('user_id', AdminTenant::id())
                     ->whereIn('id', $this->selectedObjects)
                     ->delete();
             });
@@ -92,14 +92,14 @@ new class extends Component
 
             $this->selectedObjects = [];
             $this->resetPage();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Failed to delete objects: ' . $e->getMessage());
         }
     }
 
     public function getObjects()
     {
-        $query = EventObject::where('user_id', Auth::id())
+        $query = EventObject::where('user_id', AdminTenant::id())
             ->withCount(['actorEvents', 'targetEvents']);
 
         // Apply search filter
@@ -132,7 +132,7 @@ new class extends Component
 
     public function getUniqueConcepts()
     {
-        return EventObject::where('user_id', Auth::id())
+        return EventObject::where('user_id', AdminTenant::id())
             ->distinct()
             ->pluck('concept')
             ->filter()
@@ -142,7 +142,7 @@ new class extends Component
 
     public function getUniqueTypes()
     {
-        return EventObject::where('user_id', Auth::id())
+        return EventObject::where('user_id', AdminTenant::id())
             ->distinct()
             ->pluck('type')
             ->filter()

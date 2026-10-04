@@ -11,8 +11,11 @@ use App\Notifications\IntegrationFailed;
 use App\Notifications\MigrationCompleted;
 use App\Notifications\MigrationFailed;
 use App\Notifications\SystemMaintenance;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -107,10 +110,59 @@ class NotificationSystemTest extends TestCase
 
         $this->user->notify(new IntegrationCompleted($integration));
 
-        // Email should be delayed (not sent)
-        Notification::assertSentTo($this->user, IntegrationCompleted::class, function ($notification, $channels) {
-            return ! in_array('mail', $channels);
+        // Email is held until the window opens, not dropped.
+        $opensAt = now()->setTime(9, 0);
+        Notification::assertSentTo($this->user, IntegrationCompleted::class, function ($notification, $channels) use ($opensAt) {
+            return in_array('mail', $channels)
+                && $notification->withDelay($this->user, 'mail')?->equalTo($opensAt)
+                && $notification->withDelay($this->user, 'database') === null;
         });
+    }
+
+    #[Test]
+    public function the_held_email_is_queued_with_the_delay_while_other_channels_go_now()
+    {
+        Queue::fake();
+        $this->useWorkHours('UTC', '09:00', '17:00');
+        $this->travelTo(now()->setTime(8, 0));
+
+        $this->user->notify(new IntegrationCompleted(Integration::factory()->create(['user_id' => $this->user->id])));
+
+        Queue::assertPushed(SendQueuedNotifications::class, fn ($job) => $job->channels === ['mail'] && $job->delay->equalTo(now()->setTime(9, 0)));
+        Queue::assertPushed(SendQueuedNotifications::class, fn ($job) => $job->channels === ['database'] && $job->delay === null);
+    }
+
+    #[Test]
+    public function work_hours_email_after_the_window_waits_for_tomorrow()
+    {
+        $this->useWorkHours('Europe/London', '09:00', '17:00');
+        $this->travelTo(Carbon::parse('2026-10-05 18:30', 'Europe/London'));
+
+        $notification = new IntegrationCompleted(Integration::factory()->create(['user_id' => $this->user->id]));
+
+        $this->assertTrue($notification->withDelay($this->user, 'mail')->equalTo(Carbon::parse('2026-10-06 09:00', 'Europe/London')));
+    }
+
+    #[Test]
+    public function work_hours_email_inside_the_window_is_not_delayed()
+    {
+        $this->useWorkHours('Europe/London', '09:00', '17:00');
+        $this->travelTo(Carbon::parse('2026-10-05 10:00', 'Europe/London'));
+
+        $notification = new IntegrationCompleted(Integration::factory()->create(['user_id' => $this->user->id]));
+
+        $this->assertNull($notification->withDelay($this->user, 'mail'));
+    }
+
+    #[Test]
+    public function priority_email_is_never_held_for_work_hours()
+    {
+        $this->useWorkHours('UTC', '09:00', '17:00');
+        $this->travelTo(now()->setTime(22, 0));
+
+        $notification = new IntegrationAuthenticationFailed(Integration::factory()->create(['user_id' => $this->user->id]), 'Expired');
+
+        $this->assertNull($notification->withDelay($this->user, 'mail'));
     }
 
     #[Test]
@@ -155,7 +207,7 @@ class NotificationSystemTest extends TestCase
 
         $this->user->notify(new IntegrationCompleted($integration));
 
-        // Email should be delayed for digest
+        // Email is left to the daily digest (SendNotificationDigests)
         Notification::assertSentTo($this->user, IntegrationCompleted::class, function ($notification, $channels) {
             return ! in_array('mail', $channels);
         });
@@ -542,5 +594,14 @@ class NotificationSystemTest extends TestCase
         $this->assertStringContainsString('Hello ' . $this->user->name, $mailMessage->greeting);
         $this->assertStringContainsString('re-authorize', collect($mailMessage->introLines)->implode(' '));
         $this->assertEquals('Re-authorize Connection', $mailMessage->actionText);
+    }
+
+    private function useWorkHours(string $timezone, string $start, string $end): void
+    {
+        $this->user->updateNotificationPreferences([
+            'email_enabled' => ['integration_completed' => true],
+            'work_hours' => ['enabled' => true, 'timezone' => $timezone, 'start' => $start, 'end' => $end],
+            'delayed_sending' => ['mode' => 'work_hours'],
+        ]);
     }
 }
