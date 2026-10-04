@@ -129,7 +129,6 @@ Route::get('metrics', [MetricsController::class, 'index'])->middleware('spark.ab
 Route::get('metrics/baselines', [InsightDiscoveryController::class, 'baselines'])->middleware('spark.ability:insights:read')->name('metrics.baselines');
 Route::get('metrics/{metric}', [MetricsController::class, 'show'])->middleware('spark.ability:insights:read')->name('metrics.show');
 
-
 Route::get('widgets/today', [WidgetsController::class, 'today'])->middleware('spark.ability:insights:read')->name('widgets.today');
 Route::get('widgets/metrics/{metric}', [WidgetsController::class, 'metric'])->middleware('spark.ability:insights:read')->name('widgets.metric');
 Route::get('widgets/spend', [WidgetsController::class, 'spend'])->middleware('spark.ability:finance:read')->name('widgets.spend');
