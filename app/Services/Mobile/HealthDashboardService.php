@@ -100,7 +100,8 @@ class HealthDashboardService
         return Event::query()
             ->withoutInternal()
             ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id))
-            ->whereBetween('time', [$date->copy()->startOfDay(), $date->copy()->endOfDay()])
+            // `time` is stored in UTC; `$date` carries the user's local timezone.
+            ->whereBetween('time', [$date->copy()->startOfDay()->utc(), $date->copy()->endOfDay()->utc()])
             ->with(['integration', 'actor', 'target', 'blocks', 'tags'])
             ->orderBy('time')
             ->limit(1000)
