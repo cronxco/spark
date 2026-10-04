@@ -57,7 +57,7 @@ class ReceiptTimeResolver
                 $zone = $date->getTimezone();
                 $transitions = $zone->getTransitions($date->getTimestamp() - 86400, $date->getTimestamp() + 86400);
                 foreach ($transitions ?: [] as $transition) {
-                    $other = $date->modify(($date->getOffset() - $transition['offset']) . ' seconds');
+                    $other = $date->setTimestamp($date->getTimestamp() + $date->getOffset() - $transition['offset']);
                     if ($other->getTimestamp() !== $date->getTimestamp() && $other->format('Y-m-d\TH:i:s') === $raw) {
                         throw new InvalidArgumentException('ambiguous_local_time');
                     }
