@@ -142,7 +142,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Money routes
     Route::get('money', FinancialAccounts::class)->name('money');
-    Route::get('money/{account}', FinancialAccountShow::class)->name('money.show');
+    Route::get('money/{account}', FinancialAccountShow::class)->whereUuid('account')->name('money.show');
 
     // Receipts routes
     Route::get('money/receipts', Receipts::class)->name('receipts.index');

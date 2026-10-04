@@ -7,6 +7,7 @@ use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use Exception;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -16,7 +17,7 @@ use Sentry\SentrySdk;
 use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
 
-class DetectMetricTrendsJob implements ShouldQueue
+class DetectMetricTrendsJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -29,6 +30,21 @@ class DetectMetricTrendsJob implements ShouldQueue
     public $tries = 2;
 
     public $backoff = [300, 600];
+
+    /**
+     * @param  string|null  $userId  Limit the run to one user. A user-triggered
+     *                               run must pass this; null is the all-tenant run.
+     */
+    public function __construct(public ?string $userId = null) {}
+
+    /**
+     * One pending run per user (or one all-tenant run) at a time, so repeated
+     * clicks don't stack recalculation work on the queue.
+     */
+    public function uniqueId(): string
+    {
+        return $this->userId ?? 'all';
+    }
 
     /**
      * Execute the job.
@@ -46,7 +62,9 @@ class DetectMetricTrendsJob implements ShouldQueue
             Log::info('Starting metric trend detection');
 
             // Get all metrics with sufficient data
-            $metrics = MetricStatistic::withSufficientData()->get();
+            $metrics = MetricStatistic::withSufficientData()
+                ->when($this->userId, fn ($query) => $query->where('user_id', $this->userId))
+                ->get();
 
             Log::info('Found metrics for trend detection', ['count' => $metrics->count()]);
 
