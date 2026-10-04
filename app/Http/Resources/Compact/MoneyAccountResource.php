@@ -62,6 +62,7 @@ class MoneyAccountResource extends JsonResource
             'balance' => $this->resolveBalance($event),
             'currency' => $event->value_unit ?? $currency,
             'time' => $event->time?->toIso8601String(),
+            'date' => $event->time?->copy()->utc()->toDateString(),
             'notes' => $event->event_metadata['notes'] ?? null,
         ];
     }
