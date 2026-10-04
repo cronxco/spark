@@ -266,7 +266,7 @@ Route::post('bookmarks/capture', [CapturedBookmarksController::class, 'store'])
     ->name('bookmarks.capture');
 
 Route::post('captures', [CapturesController::class, 'store'])
-    ->middleware('ability:ios:write')
+    ->middleware('ability:ios:write,data:write')
     ->name('captures.store');
 
 /*

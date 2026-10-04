@@ -41,7 +41,7 @@ class CapturesControllerTest extends TestCase
     #[Test]
     public function free_text_lands_in_the_inbox_as_an_event(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, ['ios:read', 'data:write']);
 
         $response = $this->postJson('/api/v1/mobile/captures', [
             'kind' => 'text',
