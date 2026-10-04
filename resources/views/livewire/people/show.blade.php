@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Person;
 use App\Models\Relationship;
 use App\Services\PersonProfileService;
@@ -19,13 +20,17 @@ new class extends Component
 {
     use AuthorizesOwnership;
 
-    public Person $person;
+    /**
+     * Held as a plain EventObject so views, links and relationships record the
+     * object class, as everywhere else; binding through Person 404s non-people.
+     */
+    public EventObject $person;
 
     public function mount(Person $person): void
     {
         $this->authorizeOwner($person->user_id);
 
-        $this->person = $person;
+        $this->person = EventObject::query()->findOrFail($person->id);
         $this->person->logViewIfNotRecent(5);
     }
 
@@ -63,7 +68,15 @@ new class extends Component
     #[Computed]
     public function birthDate(): ?Carbon
     {
-        return rescue(fn () => $this->person->birth_date ? Carbon::parse($this->person->birth_date) : null, null, false);
+        $birthDate = $this->person->metadata['birth_date'] ?? null;
+
+        return rescue(fn () => is_string($birthDate) && $birthDate !== '' ? Carbon::parse($birthDate) : null, null, false);
+    }
+
+    #[Computed]
+    public function photoCount(): int
+    {
+        return (int) ($this->person->metadata['face_count'] ?? 0);
     }
 };
 
@@ -101,10 +114,10 @@ new class extends Component
                             {{ $this->birthDate->format('j M Y') }}
                         </span>
                     @endif
-                    @if ($person->photo_count > 0)
+                    @if ($this->photoCount > 0)
                         <span class="flex items-center gap-1">
                             <x-icon name="fas.images" class="h-4 w-4" />
-                            {{ $person->photo_count }} {{ Str::plural('photo', $person->photo_count) }}
+                            {{ $this->photoCount }} {{ Str::plural('photo', $this->photoCount) }}
                         </span>
                     @endif
                 </div>

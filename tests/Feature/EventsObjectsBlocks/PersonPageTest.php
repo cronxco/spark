@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\PersonProfileService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 /**
@@ -53,6 +54,12 @@ class PersonPageTest extends TestCase
             ->assertSee('Sam')
             ->assertSee('1 event')
             ->assertSee('2 connections');
+
+        $this->assertTrue(Activity::query()
+            ->where('event', 'viewed')
+            ->where('subject_type', EventObject::class)
+            ->where('subject_id', $person->id)
+            ->exists());
     }
 
     #[Test]
