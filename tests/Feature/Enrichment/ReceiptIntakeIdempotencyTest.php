@@ -165,6 +165,35 @@ class ReceiptIntakeIdempotencyTest extends TestCase
             . "Thanks for your order. Total: GBP 12.50\r\n";
     }
 
+    #[Test]
+    public function local_receipt_time_is_normalized_for_the_event_blocks_and_matching_window(): void
+    {
+        $data = $this->receiptData();
+        $data['transaction_metadata'] = [
+            'transaction_date' => '2026-10-02T10:00:00',
+            'transaction_timezone' => 'Europe/London',
+        ];
+        $data['line_items'] = [[
+            'description' => 'Coffee', 'quantity' => 1, 'unit_price' => 1250,
+            'total_price' => 1250, 'category' => 'food',
+        ]];
+        $this->mock(ReceiptExtractor::class, function ($mock) use ($data) {
+            $mock->shouldReceive('extract')->once()->andReturn($data);
+        });
+
+        (new ProcessReceiptEmailJob($this->integration, null, $this->email('<local-time@shop.example>')))->handle();
+
+        $event = Event::where('integration_id', $this->integration->id)->firstOrFail();
+        $this->assertSame('2026-10-02T09:00:00+00:00', $event->time->toIso8601String());
+        $this->assertSame('2026-10-02T07:00:00+00:00', $event->event_metadata['matching_hints']['suggested_date_range']['start']);
+        $this->assertSame($data, $event->event_metadata['raw_extraction']);
+        $this->assertSame('receipt', $event->event_metadata['time_resolution']['source']);
+        $this->assertNotEmpty($event->blocks);
+        foreach ($event->blocks as $block) {
+            $this->assertTrue($block->time->equalTo($event->time));
+        }
+    }
+
     /**
      * @return array<string, mixed>
      */
