@@ -105,16 +105,16 @@ Route::get('objects/{id}', [ObjectsController::class, 'show'])->name('objects.sh
  * restoring twice changes nothing, so it carries no precondition.
  */
 Route::delete('events/{id}', [EventsController::class, 'destroy'])
-    ->middleware(['ability:ios:write', 'if-match:event'])
+    ->middleware(['ability:ios:write,data:write', 'if-match:event'])
     ->name('events.destroy');
 Route::post('events/{id}/restore', [EventsController::class, 'restore'])
-    ->middleware('ability:ios:write')
+    ->middleware('ability:ios:write,data:write')
     ->name('events.restore');
 Route::delete('objects/{id}', [ObjectsController::class, 'destroy'])
-    ->middleware(['ability:ios:write', 'if-match:object'])
+    ->middleware(['ability:ios:write,data:write', 'if-match:object'])
     ->name('objects.destroy');
 Route::post('objects/{id}/restore', [ObjectsController::class, 'restore'])
-    ->middleware('ability:ios:write')
+    ->middleware('ability:ios:write,data:write')
     ->name('objects.restore');
 Route::get('blocks/{id}', [BlocksController::class, 'show'])->name('blocks.show');
 Route::get('metrics', [MetricsController::class, 'index'])->name('metrics.index');

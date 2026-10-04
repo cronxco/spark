@@ -36,7 +36,7 @@ class EntityDeleteRestoreTest extends TestCase
     #[Test]
     public function an_event_is_soft_deleted_and_restored(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, ['ios:read', 'data:write']);
         $event = Event::factory()->create(['integration_id' => $this->integration->id, 'service' => 'monzo']);
         $etag = $this->getJson("/api/v1/mobile/events/{$event->id}")->headers->get('ETag');
 
