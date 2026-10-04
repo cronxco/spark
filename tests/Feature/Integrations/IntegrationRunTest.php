@@ -40,7 +40,9 @@ class IntegrationRunTest extends TestCase
     {
         Queue::fake();
         $integration = $this->makeIntegration();
-        $batch = app(IntegrationRunService::class)->start($integration, [new FakeRunFetchJob($integration)]);
+        $fetch = new FakeRunFetchJob($integration);
+        $batch = app(IntegrationRunService::class)->start($integration, [$fetch]);
+        $this->assertInstanceOf(RunBatchMiddleware::class, $fetch->middleware[0]);
         $original = app(Dispatcher::class);
         $dispatcher = new RunBatchDispatcher($original, app(BatchRepository::class), $batch->id);
 

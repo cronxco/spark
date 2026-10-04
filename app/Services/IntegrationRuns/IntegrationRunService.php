@@ -55,6 +55,12 @@ class IntegrationRunService
      */
     public function start(Integration $integration, array $fetchJobs): Batch
     {
+        // Fetch jobs can queue children while fetching (e.g. scheduled URLs),
+        // before BaseFetchJob reaches dispatchProcessingJobsIntoRun().
+        foreach ($fetchJobs as $job) {
+            $job->through([...$job->middleware, new RunBatchMiddleware]);
+        }
+
         $integrationId = (string) $integration->id;
 
         return Bus::batch($fetchJobs)
