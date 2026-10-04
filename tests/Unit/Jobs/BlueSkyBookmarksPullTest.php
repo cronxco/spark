@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BlueSkyBookmarksPullTest extends TestCase
@@ -43,9 +44,7 @@ class BlueSkyBookmarksPullTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation(): void
     {
         $job = new BlueSkyBookmarksPull($this->integration);
@@ -56,9 +55,7 @@ class BlueSkyBookmarksPullTest extends TestCase
         $this->assertEquals([60, 300, 600], $job->backoff);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unique_id_generation(): void
     {
         $job = new BlueSkyBookmarksPull($this->integration);
@@ -68,9 +65,7 @@ class BlueSkyBookmarksPullTest extends TestCase
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_integration_correctly(): void
     {
         $job = new BlueSkyBookmarksPull($this->integration);
@@ -81,9 +76,7 @@ class BlueSkyBookmarksPullTest extends TestCase
         $this->assertEquals('activity', $this->integration->instance_type);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function configuration_inheritance(): void
     {
         $this->assertTrue($this->integration->configuration['track_bookmarks']);
@@ -95,9 +88,7 @@ class BlueSkyBookmarksPullTest extends TestCase
         $this->assertInstanceOf(BlueSkyBookmarksPull::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_with_minimal_configuration(): void
     {
         $minimalIntegration = Integration::factory()->create([
@@ -112,9 +103,7 @@ class BlueSkyBookmarksPullTest extends TestCase
         $this->assertInstanceOf(BlueSkyBookmarksPull::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_with_different_account_ids(): void
     {
         $this->assertEquals('did:plc:test123', $this->group->account_id);
@@ -141,9 +130,7 @@ class BlueSkyBookmarksPullTest extends TestCase
         $this->assertNotEquals($job1->uniqueId(), $job2->uniqueId());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_null_account_id(): void
     {
         $groupWithoutAccountId = IntegrationGroup::factory()->create([
@@ -165,9 +152,7 @@ class BlueSkyBookmarksPullTest extends TestCase
         $this->assertEquals($integrationWithoutAccountId->id, $integrationWithoutAccountId->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_with_various_config_options(): void
     {
         $fullConfigIntegration = Integration::factory()->create([

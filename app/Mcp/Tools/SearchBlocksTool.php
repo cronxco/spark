@@ -3,8 +3,9 @@
 namespace App\Mcp\Tools;
 
 use App\Http\Resources\BlockResource;
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Block;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Exception;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -17,6 +18,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class SearchBlocksTool extends Tool
 {
+    use RequiresSparkAbility;
     /**
      * The tool's description.
      */
@@ -27,7 +29,7 @@ class SearchBlocksTool extends Tool
     MARKDOWN;
 
     public function __construct(
-        protected EmbeddingService $embeddingService
+        protected EmbeddingClient $embeddingService
     ) {}
 
     /**
@@ -35,6 +37,9 @@ class SearchBlocksTool extends Tool
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'data:read')) {
+            return $error;
+        }
         $user = $request->user();
 
         if (! $user) {

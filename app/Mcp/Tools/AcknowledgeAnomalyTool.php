@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Mcp\Helpers\DateParser;
 use App\Mcp\Helpers\MetricIdentifierMap;
 use App\Models\MetricTrend;
@@ -16,6 +17,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 class AcknowledgeAnomalyTool extends Tool
 {
     use DateParser;
+    use RequiresSparkAbility;
 
     /**
      * The tool's description.
@@ -31,6 +33,10 @@ class AcknowledgeAnomalyTool extends Tool
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'insights:write')) {
+            return $error;
+        }
+
         $user = $request->user();
 
         if (! $user) {

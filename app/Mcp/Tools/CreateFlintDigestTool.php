@@ -2,22 +2,21 @@
 
 namespace App\Mcp\Tools;
 
-use App\Models\Event;
-use App\Models\EventObject;
-use App\Models\Integration;
-use App\Models\Relationship;
-use Carbon\Carbon;
+use App\Mcp\Concerns\RequiresSparkAbility;
+use App\Services\FlintDigestService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use RuntimeException;
 
 #[Name('create-flint-digest')]
-#[IsIdempotent]
 class CreateFlintDigestTool extends Tool
 {
+    use RequiresSparkAbility;
+
     protected string $description = <<<'MARKDOWN'
         Create a Flint digest event with attached blocks.
         Use this to record an AI-generated digest, including user questions (flint_user_question)
@@ -27,144 +26,61 @@ class CreateFlintDigestTool extends Tool
         - `flint_user_question`: A question for the user. Provide `question`, optional `topic`,
           `priority` (low/medium/high), and optional `answer_options` array.
         - `flint_editorial_note`: Freeform AI commentary. Provide `content` (markdown).
-        - Any `flint_*` type: Provide `content` (markdown) for the block body.
+        - `flint_day_context`: Structured calendar + weather for today, drawn from the same
+          grounding calls used for the prose briefing. Provide `day_context` — an object with
+          `calendar` (array of `{title, all_day, start, person}` for actual commitments; `person`
+          is "will" or "dan": "dan" only when the title names Dan/Daniel and does not also name
+          Will, "will" for everything else including an unspecified title — never omit `person`),
+          `birthdays` (array of `{title}` — a birthday is not a commitment either of you is
+          attending, so no `person` field; keep it out of `calendar`), and `weather`
+          (`{location, condition, temp_high_c, rain_probability_pct}`). Do not put this in `content`.
+        - `flint_news`: One story from the news roundup. Provide `content` (the story's TL;DR, one
+          or two sentences), structured `news` (`key_points`, optional `contested`, `sources`
+          with a `url` or `event_id` each, optional `why_it_matters`, `what_to_watch`), and
+          `referenced_event_ids`.
+        - `flint_reading_pick` / `flint_reading_drop`: One item from the reading list. Provide
+          `content` (why this, tonight), `url`, and for a pick `minutes` (a whole number).
+        - `flint_insight`: A standalone observation. Provide `content` (markdown).
 
-        Returns the created event ID and block IDs for future reference.
+        Only these registered types are accepted; an unknown `flint_*` type is rejected rather
+        than stored as an unrenderable block.
+
+        Calls create a new digest. Do not retry after an unknown outcome without
+        checking get-latest-flint-digest first. Routine callers must pass the
+        encrypted `run_token` supplied in their trigger payload; retries with
+        that token return the original digest.
     MARKDOWN;
+
+    public function __construct(private FlintDigestService $digests) {}
 
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'flint:write')) {
+            return $error;
+        }
+
         $user = $request->user();
 
         if (! $user) {
             return Response::error('Authentication required.');
         }
 
-        $title = $request->get('title');
-        if (! $title) {
-            return Response::error('title is required.');
-        }
+        try {
+            $payload = $request->all();
 
-        $date = $request->get('date', 'today');
-        $parsedDate = $date === 'today' ? Carbon::today() : Carbon::parse($date);
-
-        $period = $request->get('period') ?? $this->inferPeriod();
-        $summary = $request->get('summary');
-        $blocksInput = $request->get('blocks') ?? [];
-
-        // Get or create the Flint integration
-        $integration = Integration::firstOrCreate(
-            [
-                'user_id' => $user->id,
-                'service' => 'flint',
-                'instance_type' => 'digest',
-            ],
-            [
-                'name' => 'Flint Digest',
-                'active' => true,
-            ]
-        );
-
-        // Get or create the digest EventObject
-        $digestTitle = $parsedDate->format('Y-m-d') . ' ' . match ($period) {
-            'morning' => 'AM',
-            'afternoon' => 'PM',
-            default => 'EVE',
-        };
-
-        $digestObject = EventObject::firstOrCreate(
-            [
-                'user_id' => $user->id,
-                'concept' => 'digest',
-                'type' => $period . '_digest',
-                'title' => $digestTitle,
-            ],
-            [
-                'time' => now(),
-                'metadata' => [
-                    'service' => 'flint',
-                    'period' => $period,
-                    'generated_at' => now()->toIso8601String(),
-                ],
-            ]
-        );
-
-        // Get or create the user actor EventObject
-        $actorObject = EventObject::firstOrCreate(
-            [
-                'user_id' => $user->id,
-                'concept' => 'user',
-                'type' => 'user_profile',
-                'title' => $user->name,
-            ],
-            [
-                'time' => now(),
-            ]
-        );
-
-        // Create the summary event
-        $event = Event::create([
-            'source_id' => $digestObject->id,
-            'integration_id' => $integration->id,
-            'actor_id' => $actorObject->id,
-            'service' => 'flint',
-            'domain' => 'knowledge',
-            'action' => 'had_summary',
-            'time' => $parsedDate,
-            'value' => count($blocksInput),
-            'target_id' => $digestObject->id,
-            'event_metadata' => [
-                'period' => $period,
-                'digest_object_id' => $digestObject->id,
-                'title' => $title,
-                'summary' => $summary,
-            ],
-        ]);
-
-        // Relate event to digest object
-        Relationship::createRelationship([
-            'user_id' => $user->id,
-            'from_type' => Event::class,
-            'from_id' => $event->id,
-            'to_type' => EventObject::class,
-            'to_id' => $digestObject->id,
-            'type' => 'part_of',
-        ]);
-
-        // Create blocks
-        $blockIds = [];
-        foreach ($blocksInput as $blockData) {
-            $blockType = $blockData['block_type'] ?? null;
-            $blockTitle = $blockData['title'] ?? null;
-
-            if (! $blockType || ! $blockTitle) {
-                continue;
+            // "today" is resolved by the service, in the user's own timezone.
+            // Rewriting it here used the app timezone, so a digest written late
+            // in a user's evening could be filed against the wrong local date.
+            if (($payload['date'] ?? null) === 'today') {
+                unset($payload['date']);
             }
 
-            $metadata = $this->buildBlockMetadata($blockType, $blockData);
-
-            $block = $event->createBlock([
-                'block_type' => $blockType,
-                'title' => $blockTitle,
-                'time' => $parsedDate,
-                'metadata' => $metadata,
-            ]);
-
-            $blockIds[] = $block->id;
+            return Response::json($this->digests->create($user, $payload));
+        } catch (ValidationException $exception) {
+            return Response::error($exception->validator->errors()->first());
+        } catch (RuntimeException $exception) {
+            return Response::error($exception->getMessage());
         }
-
-        // Notification dispatch is handled by the NotifyOnDigestReadyTask task
-        // pipeline task, triggered off this event's creation below.
-
-        return Response::text(json_encode([
-            'event_id' => $event->id,
-            'digest_object_id' => $digestObject->id,
-            'date' => $parsedDate->toDateString(),
-            'period' => $period,
-            'title' => $title,
-            'block_count' => count($blockIds),
-            'block_ids' => $blockIds,
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 
     public function schema(JsonSchema $schema): array
@@ -184,6 +100,23 @@ class CreateFlintDigestTool extends Tool
             'summary' => $schema->string()
                 ->description('Optional headline summary content for the digest.'),
 
+            'opener' => $schema->string()
+                ->description('The lede sentence of `summary`, verbatim — publish it explicitly so a client never has to parse it out of the prose. Falls back to a best-effort extraction when omitted.'),
+
+            'run_token' => $schema->string()
+                ->description('Opaque run token from a scheduled or manual Flint trigger. Pass through unchanged.'),
+
+            'note_ids_used' => $schema->array()
+                ->items($schema->string())
+                ->description('Flint Note UUIDs that materially informed this digest.'),
+
+            'question_omission' => $schema->object([
+                'reason' => $schema->string()->required()
+                    ->description('Why no useful question survived the evidence, quality, and fatigue gates.'),
+                'candidates' => $schema->array()->items($schema->string())->required()
+                    ->description('At least three candidate questions considered and why each was rejected.'),
+            ])->description('Required for a routine briefing that emits no flint_user_question block.'),
+
             'blocks' => $schema->array()
                 ->items($schema->object([
                     'block_type' => $schema->string()
@@ -194,6 +127,10 @@ class CreateFlintDigestTool extends Tool
                         ->description('Block title.'),
                     'content' => $schema->string()
                         ->description('Markdown content — for flint_editorial_note and other content blocks.'),
+                    'url' => $schema->string()
+                        ->description('Link this block points at — for flint_reading_pick and flint_reading_drop.'),
+                    'minutes' => $schema->integer()
+                        ->description('Estimated read time in whole minutes — for flint_reading_pick. A single number, not a range.'),
                     'referenced_event_ids' => $schema->array()
                         ->items($schema->string())
                         ->description('Event UUIDs this block draws on. Surfaced to the client as tappable reference chips and linkified inline in the content.'),
@@ -206,46 +143,56 @@ class CreateFlintDigestTool extends Tool
                     'answer_options' => $schema->array()
                         ->items($schema->string())
                         ->description('For flint_user_question: optional multiple-choice answers. Omit for freeform.'),
+                    'news' => $schema->object([
+                        'key_points' => $schema->array()->items($schema->string())
+                            ->description('2–4 specifics a reader would otherwise have to go and find: figures, names, dates, mechanism. Each adds something the TL;DR in `content` does not.'),
+                        'contested' => $schema->string()
+                            ->description('Where named outlets actually differ on the facts or their reading, and why. Omit when they do not.'),
+                        'summary' => $schema->string()
+                            ->description('Legacy prose summary. Required only when `key_points` is omitted.'),
+                        'sources' => $schema->array()->items($schema->object([
+                            'publication' => $schema->string()->required(),
+                            'position' => $schema->string()->required()
+                                ->description('One sentence: what this outlet uniquely reported or argued.'),
+                            'url' => $schema->string()
+                                ->description('Link to the article itself. Required for research sources.'),
+                            'event_id' => $schema->string()
+                                ->description('For a source from the user\'s own feeds: the event UUID of that issue. Must also appear in the block\'s referenced_event_ids.'),
+                            'origin' => $schema->string()->enum(['feed', 'research'])
+                                ->description('`feed` for the user\'s own newsletters and fetches, `research` for anything found by searching.'),
+                        ]))->required(),
+                        'why_it_matters' => $schema->string(),
+                        'what_to_watch' => $schema->string()->required(),
+                    ])->description('For flint_news: structured story content used by web and mobile clients.'),
+                    'day_context' => $schema->object([
+                        'date' => $schema->string()
+                            ->description('The local day this context describes (Y-m-d): the payload\'s local_date for morning and afternoon, tomorrow for evening. Omit only if it is today.'),
+                        'calendar' => $schema->array()
+                            ->items($schema->object([
+                                'title' => $schema->string()->required(),
+                                'all_day' => $schema->boolean(),
+                                'start' => $schema->string()
+                                    ->description('ISO 8601 timestamp; omit for all-day entries.'),
+                                'person' => $schema->string()
+                                    ->enum(['will', 'dan'])
+                                    ->required()
+                                    ->description('"dan" only when the title names Dan/Daniel without also naming Will; "will" otherwise.'),
+                            ]))
+                            ->description('Calendar rows for the day named in `date` — actual commitments, not birthdays.'),
+                        'birthdays' => $schema->array()
+                            ->items($schema->object([
+                                'title' => $schema->string()->required(),
+                            ]))
+                            ->description('Birthdays on the day named in `date` — title only, no person attribution.'),
+                        'weather' => $schema->object([
+                            'location' => $schema->string(),
+                            'condition' => $schema->string(),
+                            'temp_high_c' => $schema->number(),
+                            'rain_probability_pct' => $schema->integer(),
+                        ]),
+                    ])->description('For flint_day_context: structured calendar + weather. See block-type notes above.'),
                 ]))
                 ->description('Blocks to attach to this digest.'),
-        ];
-    }
-
-    private function inferPeriod(): string
-    {
-        $hour = (int) now()->format('G');
-
-        if ($hour >= 5 && $hour <= 11) {
-            return 'morning';
-        }
-
-        if ($hour >= 12 && $hour <= 16) {
-            return 'afternoon';
-        }
-
-        return 'evening';
-    }
-
-    /**
-     * Build the metadata array for a block based on its type and input data.
-     */
-    private function buildBlockMetadata(string $blockType, array $blockData): array
-    {
-        if ($blockType === 'flint_user_question') {
-            return [
-                'question' => $blockData['question'] ?? $blockData['title'],
-                'topic' => $blockData['topic'] ?? null,
-                'priority' => $blockData['priority'] ?? 'medium',
-                'answer_options' => $blockData['answer_options'] ?? null,
-                'answer' => null,
-                'answer_note' => null,
-                'answered_at' => null,
-            ];
-        }
-
-        return [
-            'content' => $blockData['content'] ?? '',
-            'referenced_event_ids' => $blockData['referenced_event_ids'] ?? [],
         ];
     }
 }

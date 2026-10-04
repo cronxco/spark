@@ -4,6 +4,7 @@ namespace Tests\Unit\TaskPipeline;
 
 use App\Jobs\TaskPipeline\Tasks\GenerateEmbeddingTask;
 use App\Models\Event;
+use App\Models\IntegrationGroup;
 use App\Models\TaskExecution;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
@@ -93,5 +94,35 @@ class TaskExecutionStoreTest extends TestCase
         $metadata = $event->refresh()->event_metadata['task_executions']['generate_embedding'];
         $this->assertSame('success', $metadata['last_attempt']['status']);
         $this->assertSame('success', $metadata['last_success']['status']);
+    }
+
+    #[Test]
+    public function records_status_for_an_integration_group_anchor(): void
+    {
+        $group = IntegrationGroup::factory()->create();
+        $task = new TaskDefinition(
+            key: 'check_cookie_expiry_example_com',
+            name: 'Check Cookie Expiry: example.com',
+            description: 'Warn the user before fetch cookies expire',
+            jobClass: 'App\\Jobs\\Fetch\\CheckCookieExpiryJob',
+            appliesTo: ['integration_group'],
+        );
+
+        $store = app(TaskExecutionStore::class);
+        $store->recordStatus($group, $task, 'success', [
+            'domain' => 'example.com',
+            'notification_sent' => true,
+        ]);
+
+        $row = TaskExecution::where('entity_type', 'integration_group')
+            ->where('entity_id', $group->id)
+            ->where('task_key', 'check_cookie_expiry_example_com')
+            ->firstOrFail();
+
+        $this->assertSame('success', $row->status);
+        $this->assertSame($group->user_id, $row->user_id);
+
+        $metadata = $group->refresh()->auth_metadata['task_executions']['check_cookie_expiry_example_com'];
+        $this->assertSame('success', $metadata['last_attempt']['status']);
     }
 }

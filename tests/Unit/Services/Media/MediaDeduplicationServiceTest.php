@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\Media\MediaDeduplicationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\Test;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\TestCase;
 
@@ -22,9 +23,7 @@ class MediaDeduplicationServiceTest extends TestCase
         $this->service = new MediaDeduplicationService;
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function calculates_file_hash(): void
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'test');
@@ -37,9 +36,7 @@ class MediaDeduplicationServiceTest extends TestCase
         unlink($tempFile);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function calculates_content_hash(): void
     {
         $hash = $this->service->calculateContentHash('test content');
@@ -47,9 +44,7 @@ class MediaDeduplicationServiceTest extends TestCase
         $this->assertEquals(md5('test content'), $hash);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function throws_exception_for_nonexistent_file(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -57,9 +52,7 @@ class MediaDeduplicationServiceTest extends TestCase
         $this->service->calculateFileHash('/nonexistent/file.jpg');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function finds_existing_media_by_hash(): void
     {
         $user = User::factory()->create();
@@ -78,9 +71,7 @@ class MediaDeduplicationServiceTest extends TestCase
         $this->assertEquals('test_hash_12345', $found->getCustomProperty('md5_hash'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function returns_null_when_no_media_found_by_hash(): void
     {
         $found = $this->service->findExistingMediaByHash('nonexistent_hash');
@@ -88,9 +79,7 @@ class MediaDeduplicationServiceTest extends TestCase
         $this->assertNull($found);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function gets_correct_reference_count(): void
     {
         $user = User::factory()->create();
@@ -116,9 +105,7 @@ class MediaDeduplicationServiceTest extends TestCase
         $this->assertEquals(2, $count);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_delete_media_returns_false_when_references_exist(): void
     {
         $user = User::factory()->create();
@@ -142,9 +129,7 @@ class MediaDeduplicationServiceTest extends TestCase
         $this->assertFalse($canDelete);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_delete_media_returns_true_for_last_reference(): void
     {
         $user = User::factory()->create();

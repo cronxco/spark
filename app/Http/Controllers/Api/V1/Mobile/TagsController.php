@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers\Api\V1\Mobile;
 
+use App\Http\Controllers\Api\V1\Mobile\Concerns\HandlesIdempotency;
 use App\Http\Controllers\Controller;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
+use App\Services\Api\ResourceVersion;
 use App\Services\Mobile\EventLookup;
 use App\Services\Mobile\ObjectLookup;
+use App\Support\OwnedTagQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +20,8 @@ use Spatie\Tags\Tag;
 
 class TagsController extends Controller
 {
+    use HandlesIdempotency;
+
     private const DEFAULT_LIMIT = 30;
 
     private const MAX_LIMIT = 100;
@@ -24,6 +29,7 @@ class TagsController extends Controller
     public function __construct(
         protected EventLookup $eventLookup,
         protected ObjectLookup $objectLookup,
+        protected ResourceVersion $versions,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -159,39 +165,44 @@ class TagsController extends Controller
 
     private function attach(Request $request, Event|EventObject $entity): JsonResponse
     {
-        $validated = $request->validate([
-            'tag_id' => ['nullable', 'integer'],
-            'name' => ['required_without:tag_id', 'nullable', 'string', 'max:255'],
-            'type' => ['nullable', 'string', 'max:100'],
-        ]);
+        // A phone retrying a tag-add on a bad connection replays the first
+        // response instead of attaching (or creating) the tag twice.
+        return $this->idempotent($request, 'tags.attach', function () use ($request, $entity) {
+            $validated = $request->validate([
+                'tag_id' => ['nullable', 'integer'],
+                'name' => ['required_without:tag_id', 'nullable', 'string', 'max:255'],
+                'type' => ['nullable', 'string', 'max:100'],
+            ]);
 
-        if (isset($validated['tag_id'])) {
-            $tag = $this->tagQuery($request->user())
-                ->whereKey($validated['tag_id'])
-                ->first();
+            if (isset($validated['tag_id'])) {
+                $tag = $this->tagQuery($request->user())
+                    ->whereKey($validated['tag_id'])
+                    ->first();
 
-            if (! $tag) {
-                return response()->json(['message' => 'Tag not found.'], 404);
+                if (! $tag) {
+                    return response()->json(['message' => 'Tag not found.'], 404);
+                }
+            } else {
+                [$name, $type] = $this->normaliseTag(
+                    (string) $validated['name'],
+                    $validated['type'] ?? null,
+                );
+                if ($name === '') {
+                    return response()->json(['message' => 'The tag name field is required.'], 422);
+                }
+
+                $tag = Tag::findOrCreate($name, $type);
             }
-        } else {
-            [$name, $type] = $this->normaliseTag(
-                (string) $validated['name'],
-                $validated['type'] ?? null,
-            );
-            if ($name === '') {
-                return response()->json(['message' => 'The tag name field is required.'], 422);
-            }
 
-            $tag = Tag::findOrCreate($name, $type);
-        }
+            $entity->attachTags([$tag]);
+            $entity->touch();
+            $entity->load('tags');
 
-        $entity->attachTags([$tag]);
-        $entity->load('tags');
-
-        return response()->json([
-            'tag' => $this->tagPayload($tag),
-            'tags' => $entity->tags->map(fn (Tag $item) => $this->tagPayload($item))->values(),
-        ], 201);
+            return response()->json([
+                'tag' => $this->tagPayload($tag),
+                'tags' => $entity->tags->map(fn (Tag $item) => $this->tagPayload($item))->values(),
+            ], 201)->header('ETag', $this->versions->etag($entity->fresh()));
+        });
     }
 
     private function detach(Event|EventObject $entity, string $tagId): JsonResponse
@@ -202,68 +213,17 @@ class TagsController extends Controller
         }
 
         $entity->detachTags([$tag]);
+        $entity->touch();
         $entity->load('tags');
 
         return response()->json([
             'tags' => $entity->tags->map(fn (Tag $item) => $this->tagPayload($item))->values(),
-        ]);
+        ])->header('ETag', $this->versions->etag($entity->fresh()));
     }
 
     private function tagQuery(User $user, ?string $search = null): Builder
     {
-        $integrationIds = $user->integrations()->pluck('id');
-
-        $query = Tag::query()
-            ->select('tags.*')
-            ->selectSub(
-                Event::query()
-                    ->selectRaw('COUNT(*)')
-                    ->join('taggables', function ($join) {
-                        $join->on('taggables.taggable_id', '=', 'events.id')
-                            ->where('taggables.taggable_type', Event::class);
-                    })
-                    ->whereColumn('taggables.tag_id', 'tags.id')
-                    ->whereIn('events.integration_id', $integrationIds),
-                'events_count',
-            )
-            ->selectSub(
-                EventObject::query()
-                    ->selectRaw('COUNT(*)')
-                    ->join('taggables', function ($join) {
-                        $join->on('taggables.taggable_id', '=', 'objects.id')
-                            ->where('taggables.taggable_type', EventObject::class);
-                    })
-                    ->whereColumn('taggables.tag_id', 'tags.id')
-                    ->where('objects.user_id', $user->id),
-                'objects_count',
-            )
-            ->where(function (Builder $query) use ($user, $integrationIds) {
-                $query->whereExists(function ($events) use ($integrationIds) {
-                    $events->selectRaw('1')
-                        ->from('taggables')
-                        ->join('events', 'events.id', '=', 'taggables.taggable_id')
-                        ->whereColumn('taggables.tag_id', 'tags.id')
-                        ->where('taggables.taggable_type', Event::class)
-                        ->whereIn('events.integration_id', $integrationIds);
-                })->orWhereExists(function ($objects) use ($user) {
-                    $objects->selectRaw('1')
-                        ->from('taggables')
-                        ->join('objects', 'objects.id', '=', 'taggables.taggable_id')
-                        ->whereColumn('taggables.tag_id', 'tags.id')
-                        ->where('taggables.taggable_type', EventObject::class)
-                        ->where('objects.user_id', $user->id);
-                });
-            });
-
-        $search = trim((string) $search);
-        if ($search !== '') {
-            $query->where(function (Builder $query) use ($search) {
-                $query->where('name->en', 'ilike', '%' . $search . '%')
-                    ->orWhere('type', 'ilike', '%' . $search . '%');
-            });
-        }
-
-        return $query;
+        return OwnedTagQuery::for($user, $search);
     }
 
     private function withTotals(Collection $tags): Collection

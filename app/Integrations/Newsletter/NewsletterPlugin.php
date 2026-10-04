@@ -5,6 +5,7 @@ namespace App\Integrations\Newsletter;
 use App\Integrations\Base\WebhookPlugin;
 use App\Integrations\Contracts\SupportsTaskPipeline;
 use App\Jobs\Data\Newsletter\ProcessNewsletterEmailJob;
+use App\Jobs\TaskPipeline\Tasks\NewsletterExpandLinksTask;
 use App\Jobs\TaskPipeline\Tasks\NewsletterExtractContentTask;
 use App\Jobs\TaskPipeline\Tasks\NewsletterGenerateSummariesTask;
 use App\Models\Event;
@@ -34,7 +35,15 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
 
     public static function getConfigurationSchema(?string $instanceType = null): array
     {
-        return [];
+        return [
+            'expand_links' => [
+                'type' => 'boolean',
+                'label' => 'Bookmark articles from digest newsletters',
+                'required' => false,
+                'default' => true,
+                'description' => 'When list detection is on, the articles a roundup or digest issue links to are bookmarked and fetched individually.',
+            ],
+        ];
     }
 
     public static function getInstanceTypes(): array
@@ -124,6 +133,24 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
                 'accent_color' => 'info',
                 'hidden' => false,
             ],
+            'newsletter_content' => [
+                'icon' => 'fas.file-lines',
+                'display_name' => 'Issue Content',
+                'description' => 'The extracted text of this issue',
+                'display_with_object' => false,
+                'value_unit' => null,
+                'accent_color' => 'info',
+                'hidden' => true,
+            ],
+            'newsletter_link_list' => [
+                'icon' => 'fas.list-ol',
+                'display_name' => 'Articles Found',
+                'description' => 'Articles this digest links to, and which were bookmarked',
+                'display_with_object' => true,
+                'value_unit' => 'articles',
+                'accent_color' => 'info',
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -158,7 +185,20 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
                 runOnCreate: true,
                 runOnUpdate: false,
                 shouldRun: fn (Event $event) => ! empty($event->event_metadata['raw_html'])
-                    && empty($event->target?->metadata['extracted_at']),
+                    && ! $event->blocks()->where('block_type', 'newsletter_content')->whereNull('deleted_at')->exists(),
+            ),
+            new TaskDefinition(
+                key: 'newsletter_expand_links',
+                name: 'Newsletter: Bookmark Digest Articles',
+                description: 'Bookmark and fetch the articles a digest newsletter links to',
+                jobClass: NewsletterExpandLinksTask::class,
+                appliesTo: ['event'],
+                conditions: ['service' => 'newsletter', 'domain' => 'knowledge'],
+                runOnCreate: true,
+                runOnUpdate: false,
+                shouldRun: fn (Event $event) => NewsletterExpandLinksTask::isEnabledFor($event)
+                    && ! empty($event->event_metadata['raw_html'])
+                    && empty($event->event_metadata['link_assessment']),
             ),
             new TaskDefinition(
                 key: 'newsletter_generate_summaries',
@@ -170,7 +210,7 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
                 dependencies: ['newsletter_extract_content'],
                 runOnCreate: true,
                 runOnUpdate: false,
-                shouldRun: fn (Event $event) => ! empty($event->target?->content)
+                shouldRun: fn (Event $event) => ! empty($event->issueContent() ?? $event->target?->content)
                     && ! $event->blocks()->where('block_type', 'newsletter_tldr')
                         ->whereNotNull('metadata->content')
                         ->whereNull('deleted_at')

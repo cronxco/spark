@@ -7,15 +7,14 @@ use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class RedditSavedDataTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function creates_event_objects_and_blocks_with_tags(): void
     {
         $user = User::factory()->create();

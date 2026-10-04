@@ -26,9 +26,10 @@ class NotifyOnDigestReadyTask extends BaseTaskJob
 
         $period = $event->event_metadata['period'] ?? null;
 
-        // SendDigestNotificationJob infers the period from a schedule-time string;
-        // map the digest's period onto a representative time so it resolves the
-        // same period when it looks up today's digest blocks.
+        // SendDigestNotificationJob falls back to inferring the period from a
+        // schedule-time string, so map the digest's period onto a representative
+        // time for that path. Passing the event id keeps it from having to guess
+        // at all: it announces exactly the digest that just landed.
         $scheduleTime = match ($period) {
             'morning' => '08:00',
             'afternoon' => '13:00',
@@ -41,6 +42,6 @@ class NotifyOnDigestReadyTask extends BaseTaskJob
             'period' => $period,
         ]);
 
-        dispatch(new SendDigestNotificationJob($user, $scheduleTime))->onQueue('flint');
+        dispatch(new SendDigestNotificationJob($user, $scheduleTime, $period, $event->id))->onQueue('flint');
     }
 }

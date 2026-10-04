@@ -14,6 +14,7 @@ use App\Services\PlaceDetectionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class DailyCheckinLocationTest extends TestCase
@@ -48,7 +49,7 @@ class DailyCheckinLocationTest extends TestCase
         $this->plugin = new DailyCheckinPlugin;
     }
 
-    /** @test */
+    #[Test]
     public function checkin_without_location_works(): void
     {
         $event = $this->plugin->createCheckinEvent(
@@ -68,7 +69,7 @@ class DailyCheckinLocationTest extends TestCase
         $this->assertEquals(false, $event->event_metadata['has_location'] ?? false);
     }
 
-    /** @test */
+    #[Test]
     public function checkin_with_location_sets_coordinates(): void
     {
         // Mock geocoding service (shouldn't be called since we're providing address)
@@ -94,7 +95,7 @@ class DailyCheckinLocationTest extends TestCase
         $this->assertEquals(true, $event->event_metadata['has_location']);
     }
 
-    /** @test */
+    #[Test]
     public function checkin_with_location_links_to_existing_place(): void
     {
         // Create an existing place at the same location
@@ -149,7 +150,7 @@ class DailyCheckinLocationTest extends TestCase
         $this->assertNotNull($relationship);
     }
 
-    /** @test */
+    #[Test]
     public function afternoon_checkin_with_location_works(): void
     {
         $event = $this->plugin->createCheckinEvent(
@@ -171,7 +172,7 @@ class DailyCheckinLocationTest extends TestCase
         $this->assertEquals('Birmingham, UK', $event->location_address);
     }
 
-    /** @test */
+    #[Test]
     public function checkin_stores_physical_and_mental_energy_separately(): void
     {
         $event = $this->plugin->createCheckinEvent(
@@ -202,7 +203,7 @@ class DailyCheckinLocationTest extends TestCase
         $this->assertEquals(5, $mentalBlock->value);
     }
 
-    /** @test */
+    #[Test]
     public function checkin_validates_period(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -217,7 +218,7 @@ class DailyCheckinLocationTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function checkin_validates_energy_ratings(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -232,7 +233,7 @@ class DailyCheckinLocationTest extends TestCase
         );
     }
 
-    /** @test */
+    #[Test]
     public function checkin_can_be_updated_with_same_source_id(): void
     {
         $date = now()->format('Y-m-d');
@@ -264,7 +265,7 @@ class DailyCheckinLocationTest extends TestCase
         $this->assertNotNull($event2->location); // Now has location
     }
 
-    /** @test */
+    #[Test]
     public function multiple_checkins_on_same_day_are_separate(): void
     {
         $date = now()->format('Y-m-d');
@@ -290,7 +291,7 @@ class DailyCheckinLocationTest extends TestCase
         $this->assertEquals('had_afternoon_checkin', $afternoonEvent->action);
     }
 
-    /** @test */
+    #[Test]
     public function get_checkins_for_date_returns_both_periods(): void
     {
         $date = now()->format('Y-m-d');
@@ -321,7 +322,7 @@ class DailyCheckinLocationTest extends TestCase
         $this->assertEquals(7, $checkins['afternoon']->value);
     }
 
-    /** @test */
+    #[Test]
     public function get_checkins_for_date_returns_null_for_missing_periods(): void
     {
         $date = now()->format('Y-m-d');

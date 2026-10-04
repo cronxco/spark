@@ -86,6 +86,10 @@ class Event extends Model
         });
 
         static::created(function ($model): void {
+            if ($model->isInternal()) {
+                return;
+            }
+
             // Dispatch Task Pipeline to run applicable tasks
             // This includes: embedding generation, anomaly detection, receipt matching, etc.
             if (config('app.enable_task_pipeline', true)) {
@@ -105,6 +109,78 @@ class Event extends Model
                 ->performedOn($model)
                 ->event('restored')
                 ->log('restored');
+        });
+    }
+
+    public function isInternal(): bool
+    {
+        return data_get($this->event_metadata, 'internal') === true;
+    }
+
+    public function hasFetchTargetSnapshot(): bool
+    {
+        return $this->service === 'fetch' && ! empty($this->target_metadata);
+    }
+
+    public function displayTargetTitle(): ?string
+    {
+        return $this->hasFetchTargetSnapshot()
+            ? ($this->target_metadata['title'] ?? $this->target?->title)
+            : $this->target?->title;
+    }
+
+    public function displayTargetUrl(): ?string
+    {
+        return $this->hasFetchTargetSnapshot()
+            ? ($this->target_metadata['url'] ?? $this->event_metadata['url'] ?? $this->target?->url)
+            : ($this->url ?? $this->target?->url);
+    }
+
+    public function displayTargetMediaUrl(): ?string
+    {
+        return $this->hasFetchTargetSnapshot()
+            ? ($this->target_metadata['media_url'] ?? $this->target?->media_url)
+            : $this->target?->media_url;
+    }
+
+    public function displayTargetContent(): ?string
+    {
+        if (! $this->hasFetchTargetSnapshot()) {
+            return $this->issueContent() ?? $this->target?->content;
+        }
+
+        $this->loadMissing('blocks');
+        $rawBlock = $this->blocks->firstWhere('block_type', 'fetch_content');
+
+        return $rawBlock?->metadata['article_text']
+            ?? $rawBlock?->metadata['text']
+            ?? $this->target_metadata['excerpt']
+            ?? $this->target?->content;
+    }
+
+    /**
+     * The text of this newsletter issue. A publication object is shared by
+     * every issue, so its own `content` only ever holds the latest one.
+     */
+    public function issueContent(): ?string
+    {
+        if ($this->service !== 'newsletter') {
+            return null;
+        }
+
+        $block = $this->relationLoaded('blocks')
+            ? $this->blocks->first(fn (Block $block) => $block->block_type === 'newsletter_content' && $block->deleted_at === null)
+            : $this->blocks()->where('block_type', 'newsletter_content')->whereNull('deleted_at')->first();
+        $content = $block?->metadata['content'] ?? null;
+
+        return is_string($content) && trim($content) !== '' ? $content : null;
+    }
+
+    public function scopeWithoutInternal(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereNull('event_metadata->internal')
+                ->orWhere('event_metadata->internal', false);
         });
     }
 
@@ -414,8 +490,8 @@ class Event extends Model
         }
 
         // Target title
-        if ($this->target && $this->target->title) {
-            $parts[] = $this->target->title;
+        if ($targetTitle = $this->displayTargetTitle()) {
+            $parts[] = $targetTitle;
         }
 
         // Value/units OR summary block (prefer summary if it exists)
@@ -481,6 +557,7 @@ class Event extends Model
      */
     public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
+        $query->withoutInternal();
         $embeddingString = '[' . implode(',', $embedding) . ']';
 
         if ($temporalWeight > 0) {
@@ -520,6 +597,7 @@ class Event extends Model
      */
     public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
+        $query->withoutInternal();
         $embeddingString = '[' . implode(',', $embedding) . ']';
 
         if ($temporalWeight > 0) {

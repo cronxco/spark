@@ -10,10 +10,15 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Fixtures\FetchPages;
 use Tests\TestCase;
 
 class FetchPlaywrightTest extends TestCase
@@ -25,6 +30,19 @@ class FetchPlaywrightTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        config([
+            'fetch.url_safety.allowed_hosts' => ['example.com', 'twitter.com'],
+            'fetch.list_detection.enabled' => false,
+        ]);
+
+        $this->app->bind(Client::class, fn (): Client => new Client([
+            'handler' => HandlerStack::create(new MockHandler([
+                new Response(200, [], FetchPages::articleWithRelatedRail()),
+            ])),
+        ]));
+
+        Http::preventStrayRequests();
 
         // Store original config
         $this->originalPlaywrightEnabled = config('services.playwright.enabled');
@@ -44,9 +62,7 @@ class FetchPlaywrightTest extends TestCase
         config(['services.playwright.enabled' => false]);
 
         // Mock HTTP responses
-        Http::fake([
-            'https://example.com*' => Http::response('<html><body>Test</body></html>', 200),
-        ]);
+        Http::fake();
 
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
@@ -67,6 +83,7 @@ class FetchPlaywrightTest extends TestCase
         $result = $engine->fetch('https://example.com', $group, $webpage);
 
         $this->assertEquals('http', $result['method']);
+        $this->assertSame(FetchPages::articleWithRelatedRail(), $result['html']);
     }
 
     #[Test]
@@ -77,7 +94,6 @@ class FetchPlaywrightTest extends TestCase
         // Mock Playwright worker as unavailable
         Http::fake([
             '*/health' => Http::response(['status' => 'error'], 500),
-            'https://example.com*' => Http::response('<html><body>Test</body></html>', 200),
         ]);
 
         $user = User::factory()->create();
@@ -103,6 +119,7 @@ class FetchPlaywrightTest extends TestCase
         $this->assertContains($result['method'], ['http', 'http (fallback)']);
         $this->assertEquals('playwright', $result['selected_method']);
         $this->assertEquals('http_fallback', $result['actual_method']);
+        $this->assertSame(FetchPages::articleWithRelatedRail(), $result['html']);
         $this->assertFalse($result['playwright_reached_worker']);
         $this->assertNotEmpty($result['playwright_error']);
     }
@@ -115,8 +132,9 @@ class FetchPlaywrightTest extends TestCase
 
         Http::fake([
             '*/health' => Http::response(['status' => 'error', 'connected' => false], 500),
-            'https://example.com*' => Http::response('<html><head><title>Fallback Page</title></head><body><article><h1>Fallback Page</h1><p>This is fallback content with enough words for extraction to succeed. This paragraph exists so readability has a meaningful article body to parse during the fetch test.</p></article></body></html>', 200),
         ]);
+
+        $this->fakeFetchResponse($this->articleHtml('Fallback Page'));
 
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
@@ -144,9 +162,11 @@ class FetchPlaywrightTest extends TestCase
         (new FetchSingleUrl($integration, $webpage->id, $webpage->url))->handle();
 
         $webpage->refresh();
+        $this->assertNull($webpage->metadata['last_error'] ?? null, json_encode($webpage->metadata));
         $history = $webpage->metadata['playwright_history'] ?? [];
         $last = end($history);
 
+        $this->assertArrayHasKey('last_fetch_method', $webpage->metadata, $webpage->metadata['last_error']['message'] ?? 'Fetch method was not recorded');
         $this->assertEquals('http (fallback)', $webpage->metadata['last_fetch_method']);
         $this->assertEquals('playwright', $webpage->metadata['last_selected_fetch_method']);
         $this->assertEquals('http_fallback', $webpage->metadata['last_actual_fetch_method']);
@@ -216,7 +236,6 @@ class FetchPlaywrightTest extends TestCase
         // Mock HTTP responses
         Http::fake([
             '*/health' => Http::response(['status' => 'error'], 500),
-            'https://example.com*' => Http::response('<html><body>Test</body></html>', 200),
         ]);
 
         $user = User::factory()->create();
@@ -261,7 +280,6 @@ class FetchPlaywrightTest extends TestCase
         // Mock HTTP responses
         Http::fake([
             '*/health' => Http::response(['status' => 'error'], 500),
-            'https://twitter.com*' => Http::response('<html><body>Test Tweet</body></html>', 200),
         ]);
 
         $user = User::factory()->create();
@@ -295,11 +313,8 @@ class FetchPlaywrightTest extends TestCase
         // Fake the queue to prevent ProcessFetchedContent from dispatching
         Queue::fake([ProcessFetchedContent::class]);
 
-        // Fake HTTP responses
-        Http::fake([
-            'https://example.com*' => Http::response('<html><head><title>Test Page</title></head><body><article><h1>Test Page</h1><p>This is test content with enough text to pass the extraction requirements for the content extractor to work properly.</p></article></body></html>', 200),
-            '*' => Http::response('', 404),
-        ]);
+        // Fetch uses Guzzle directly, so fake its transport rather than Laravel HTTP.
+        $this->fakeFetchResponse($this->articleHtml('Test Article Page'));
 
         $user = User::factory()->create();
 
@@ -320,7 +335,7 @@ class FetchPlaywrightTest extends TestCase
             'concept' => 'bookmark',
             'type' => 'fetch_webpage',
             'url' => 'https://example.com',
-            'title' => 'Test Page',
+            'title' => 'Test Article Page',
             'metadata' => [
                 'enabled' => true,
                 'domain' => 'example.com',
@@ -335,8 +350,10 @@ class FetchPlaywrightTest extends TestCase
         // Reload webpage
         $webpage->refresh();
 
+        $this->assertNull($webpage->metadata['last_error'] ?? null, json_encode($webpage->metadata));
+
         // The job should have stored the fetch method
-        $this->assertArrayHasKey('last_fetch_method', $webpage->metadata);
+        $this->assertArrayHasKey('last_fetch_method', $webpage->metadata, $webpage->metadata['last_error']['message'] ?? 'Fetch method was not recorded');
         $this->assertEquals('http', $webpage->metadata['last_fetch_method']);
 
         // Verify ProcessFetchedContent was dispatched
@@ -398,5 +415,23 @@ class FetchPlaywrightTest extends TestCase
         $this->assertEquals(1, $stats['requires_playwright']);
         $this->assertEquals(1, $stats['prefers_http']);
         $this->assertEquals(1, $stats['auto']);
+    }
+
+    private function fakeFetchResponse(string $html): void
+    {
+        $this->app->bind(Client::class, fn ($app, array $parameters): Client => new Client(array_merge(
+            $parameters['config'],
+            ['handler' => HandlerStack::create(new MockHandler([new Response(200, [], $html)]))],
+        )));
+    }
+
+    private function articleHtml(string $title): string
+    {
+        // These tests exercise successful fetches, so supply a real article
+        // body that Readability can extract rather than a short teaser.
+        $paragraph = '<p>The local library has expanded its opening hours following a year of renovation. Visitors can now use the reading rooms throughout the week, with additional space for studying and community activities.</p>';
+
+        return '<html><head><title>' . $title . '</title></head><body><article><h1>'
+            . $title . '</h1>' . str_repeat($paragraph, 8) . '</article></body></html>';
     }
 }

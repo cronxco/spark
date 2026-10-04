@@ -208,9 +208,6 @@ class DevicesControllerTest extends TestCase
             ->assertStatus(404);
     }
 
-    /**
-     * @test
-     */
     #[Test]
     public function push_requires_ios_subscription(): void
     {
@@ -220,9 +217,6 @@ class DevicesControllerTest extends TestCase
             ->assertStatus(400);
     }
 
-    /**
-     * @test
-     */
     #[Test]
     public function push_sends_ios_notification(): void
     {

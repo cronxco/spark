@@ -3,6 +3,7 @@
 namespace Tests\Feature\Integrations;
 
 use App\Integrations\Immich\ImmichPlugin;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ImmichPluginTest extends TestCase
@@ -15,7 +16,7 @@ class ImmichPluginTest extends TestCase
         $this->plugin = new ImmichPlugin;
     }
 
-    /** @test */
+    #[Test]
     public function it_has_correct_metadata()
     {
         $this->assertEquals('immich', $this->plugin->getIdentifier());
@@ -24,13 +25,13 @@ class ImmichPluginTest extends TestCase
         $this->assertEquals('fas.images', $this->plugin->getIcon());
     }
 
-    /** @test */
+    #[Test]
     public function it_uses_apikey_service_type()
     {
         $this->assertEquals('apikey', $this->plugin->getServiceType());
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_group_configuration_schema()
     {
         $groupSchema = $this->plugin->getGroupConfigurationSchema();
@@ -45,7 +46,7 @@ class ImmichPluginTest extends TestCase
         $this->assertTrue($groupSchema['api_key']['secure']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_configuration_schema()
     {
         $configSchema = $this->plugin->getConfigurationSchema();
@@ -57,7 +58,7 @@ class ImmichPluginTest extends TestCase
         $this->assertArrayHasKey('cluster_window_minutes', $configSchema);
     }
 
-    /** @test */
+    #[Test]
     public function it_merges_group_schema_into_configuration_schema()
     {
         $configSchema = $this->plugin->getConfigurationSchema();
@@ -74,7 +75,7 @@ class ImmichPluginTest extends TestCase
         $this->assertTrue($configSchema['api_key']['secure']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_took_photos_action_type()
     {
         $actionTypes = $this->plugin->getActionTypes();
@@ -85,7 +86,7 @@ class ImmichPluginTest extends TestCase
         $this->assertFalse($actionTypes['took_photos']['hidden']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_immich_photo_block_type()
     {
         $blockTypes = $this->plugin->getBlockTypes();
@@ -94,7 +95,7 @@ class ImmichPluginTest extends TestCase
         $this->assertEquals('Photo', $blockTypes['immich_photo']['display_name']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_cluster_summary_block_type()
     {
         $blockTypes = $this->plugin->getBlockTypes();
@@ -103,7 +104,7 @@ class ImmichPluginTest extends TestCase
         $this->assertEquals('Cluster Summary', $blockTypes['cluster_summary']['display_name']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_cluster_people_block_type()
     {
         $blockTypes = $this->plugin->getBlockTypes();
@@ -112,7 +113,7 @@ class ImmichPluginTest extends TestCase
         $this->assertEquals('People in Cluster', $blockTypes['cluster_people']['display_name']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_immich_user_object_type()
     {
         $objectTypes = $this->plugin->getObjectTypes();
@@ -122,7 +123,7 @@ class ImmichPluginTest extends TestCase
         $this->assertTrue($objectTypes['immich_user']['hidden']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_immich_cluster_object_type()
     {
         $objectTypes = $this->plugin->getObjectTypes();
@@ -131,7 +132,7 @@ class ImmichPluginTest extends TestCase
         $this->assertEquals('Photo Cluster', $objectTypes['immich_cluster']['display_name']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_immich_person_object_type()
     {
         $objectTypes = $this->plugin->getObjectTypes();
@@ -140,7 +141,7 @@ class ImmichPluginTest extends TestCase
         $this->assertEquals('Person', $objectTypes['immich_person']['display_name']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_photos_instance_type()
     {
         $instanceTypes = $this->plugin->getInstanceTypes();
@@ -149,7 +150,7 @@ class ImmichPluginTest extends TestCase
         $this->assertEquals('Photos', $instanceTypes['photos']['label']);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_default_configuration_values()
     {
         $configSchema = $this->plugin->getConfigurationSchema();
@@ -163,7 +164,7 @@ class ImmichPluginTest extends TestCase
         $this->assertEquals(60, $configSchema['cluster_window_minutes']['default']);
     }
 
-    /** @test */
+    #[Test]
     public function it_validates_sync_mode_options()
     {
         $configSchema = $this->plugin->getConfigurationSchema();
@@ -172,13 +173,13 @@ class ImmichPluginTest extends TestCase
         $this->assertEquals(['recent', 'full'], $configSchema['sync_mode']['options']);
     }
 
-    /** @test */
+    #[Test]
     public function it_has_primary_accent_color()
     {
         $this->assertEquals('primary', $this->plugin->getAccentColor());
     }
 
-    /** @test */
+    #[Test]
     public function it_supports_migration()
     {
         $this->assertTrue($this->plugin->supportsMigration());
