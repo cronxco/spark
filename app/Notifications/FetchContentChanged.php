@@ -52,6 +52,21 @@ class FetchContentChanged extends SparkNotification
         return route('objects.show', $this->webpage->id);
     }
 
+    public function getEntityType(): ?string
+    {
+        return 'object';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return (string) $this->webpage->id;
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return "fetch_content_changed:{$this->webpage->id}";
+    }
+
     /**
      * Get the mail representation of the notification
      */

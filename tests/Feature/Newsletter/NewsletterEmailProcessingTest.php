@@ -11,6 +11,7 @@ use App\Models\User;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class NewsletterEmailProcessingTest extends TestCase
@@ -40,7 +41,7 @@ class NewsletterEmailProcessingTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_publication_event_object_from_newsletter_email()
     {
         Queue::fake();
@@ -75,7 +76,7 @@ class NewsletterEmailProcessingTest extends TestCase
         $this->assertEquals('morningbrew.com', $publication->metadata['sender_domain']);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_newsletter_user_actor()
     {
         Queue::fake();
@@ -104,7 +105,7 @@ class NewsletterEmailProcessingTest extends TestCase
         $this->assertNotNull($actor);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_received_post_event()
     {
         Queue::fake();
@@ -135,7 +136,7 @@ class NewsletterEmailProcessingTest extends TestCase
         $this->assertEquals('Morning Brew: Daily business news - Dec 21', $event->event_metadata['email_subject']);
     }
 
-    /** @test */
+    #[Test]
     public function it_dispatches_process_newsletter_email_job()
     {
         Queue::fake();
@@ -151,7 +152,7 @@ class NewsletterEmailProcessingTest extends TestCase
         Queue::assertPushed(ProcessNewsletterEmailJob::class);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_different_sender_formats()
     {
         Queue::fake();
@@ -181,7 +182,7 @@ class NewsletterEmailProcessingTest extends TestCase
         $this->assertEquals('The Browser', $publication->title);
     }
 
-    /** @test */
+    #[Test]
     public function it_groups_newsletters_from_same_publication()
     {
         Queue::fake();

@@ -86,7 +86,17 @@ class EventResource extends JsonResource
 
         // Target relationship
         if ($this->relationLoaded('target') && $this->target) {
-            $data['target'] = EventObjectResource::condensed($this->target);
+            $target = EventObjectResource::condensed($this->target)->resolve(request());
+
+            if ($this->hasFetchTargetSnapshot()) {
+                $target['title'] = $this->displayTargetTitle();
+                $target['url'] = $this->displayTargetUrl();
+                $target['content'] = $this->displayTargetContent();
+            } elseif ($this->service === 'newsletter') {
+                $target['content'] = $this->displayTargetContent();
+            }
+
+            $data['target'] = $target;
         }
 
         // Integration
@@ -96,7 +106,11 @@ class EventResource extends JsonResource
 
         // Blocks
         if ($this->relationLoaded('blocks') && $this->blocks->isNotEmpty()) {
-            $data['blocks'] = $this->blocks->map(fn ($block) => BlockResource::condensed($block))->values();
+            // A newsletter's issue text already travels as target.content.
+            $data['blocks'] = $this->blocks
+                ->reject(fn ($block) => $block->block_type === 'newsletter_content')
+                ->map(fn ($block) => BlockResource::condensed($block))
+                ->values();
         }
 
         // Tags

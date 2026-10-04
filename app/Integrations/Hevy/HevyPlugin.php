@@ -4,6 +4,7 @@ namespace App\Integrations\Hevy;
 
 use App\Integrations\Contracts\IntegrationPlugin;
 use App\Integrations\Contracts\SupportsEffects;
+use App\Integrations\Contracts\SupportsSweeps;
 use App\Integrations\Contracts\SupportsTaskPipeline;
 use App\Jobs\Effects\Hevy\HevyAnalyzeProgressionEffect;
 use App\Jobs\Effects\Hevy\HevyAutoCoachEffect;
@@ -26,7 +27,7 @@ use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
-class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipeline
+class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsSweeps, SupportsTaskPipeline
 {
     protected string $baseUrl = 'https://api.hevyapp.com';
 
@@ -37,6 +38,19 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
         // Optional project-wide API key fallback
         $this->apiKey = config('services.hevy.api_key');
         // Do not throw in non-testing; we allow per-instance API key configuration
+    }
+
+    /**
+     * @return array{label: string, window: string, period_hours: int, config_key: string}
+     */
+    public static function getSweepSchedule(): array
+    {
+        return [
+            'label' => 'Weekly sweep',
+            'window' => 'last 30 days',
+            'period_hours' => 24 * 6,
+            'config_key' => 'hevy_last_sweep_at',
+        ];
     }
 
     public static function getIdentifier(): string
@@ -60,7 +74,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsTaskPipe
             'api_key' => [
                 'type' => 'string',
                 'label' => 'API Key',
-                'description' => 'Hevy API key used for requests (stored encrypted). If empty, the global HEVY_API_KEY will be used if configured.',
+                'description' => 'Hevy API key used for requests. If empty, the global HEVY_API_KEY will be used if configured.',
                 'required' => false,
             ],
             'update_frequency_minutes' => [

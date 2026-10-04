@@ -833,7 +833,7 @@ new class extends Component
                     <x-slot:content>
                         <div class="max-w-prose mx-auto pt-4">
                             <div class="prose dark:prose-invert prose-base lg:prose-lg">
-                                {!! Str::markdown($this->object->content) !!}
+                                {!! render_markdown($this->object->content) !!}
                             </div>
                         </div>
                     </x-slot:content>
@@ -1516,9 +1516,7 @@ new class extends Component
                                     Metadata
                                 </div>
                                 <script type="application/json" id="object-meta-json-{{ $this->object->id }}">
-                                    {
-                                        !!json_encode($this - > object - > metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!
-                                    }
+                                    {!! json_encode($this->object->metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}
                                 </script>
                                 <x-button
                                     icon="o-clipboard"

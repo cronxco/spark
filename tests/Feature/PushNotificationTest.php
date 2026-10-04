@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\TestPushNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class PushNotificationTest extends TestCase
@@ -20,9 +21,7 @@ class PushNotificationTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function vapid_public_key_endpoint_returns_key(): void
     {
         config(['webpush.vapid.public_key' => 'test-public-key']);
@@ -33,9 +32,7 @@ class PushNotificationTest extends TestCase
             ->assertJson(['publicKey' => 'test-public-key']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function subscribe_requires_authentication(): void
     {
         $response = $this->postJson('/push/subscribe', [
@@ -50,9 +47,7 @@ class PushNotificationTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function subscribe_creates_push_subscription(): void
     {
         $response = $this->actingAs($this->user)
@@ -75,9 +70,7 @@ class PushNotificationTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function subscribe_updates_existing_subscription(): void
     {
         // Create initial subscription
@@ -105,9 +98,7 @@ class PushNotificationTest extends TestCase
         $this->assertEquals(1, $this->user->pushSubscriptions()->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unsubscribe_removes_subscription(): void
     {
         $this->user->updatePushSubscription(
@@ -128,9 +119,7 @@ class PushNotificationTest extends TestCase
         $this->assertEquals(0, $this->user->pushSubscriptions()->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unsubscribe_returns_404_for_unknown_endpoint(): void
     {
         $response = $this->actingAs($this->user)
@@ -141,9 +130,7 @@ class PushNotificationTest extends TestCase
         $response->assertNotFound();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function status_returns_subscription_status(): void
     {
         $this->user->updatePushSubscription(
@@ -163,9 +150,7 @@ class PushNotificationTest extends TestCase
             ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function list_returns_all_subscriptions(): void
     {
         $this->user->updatePushSubscription(
@@ -188,9 +173,7 @@ class PushNotificationTest extends TestCase
             ->assertJsonCount(2, 'subscriptions');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function destroy_removes_specific_subscription(): void
     {
         $this->user->updatePushSubscription(
@@ -214,7 +197,8 @@ class PushNotificationTest extends TestCase
     /**
      * @test
      */
-    public function test_notification_requires_subscription(): void
+    #[Test]
+    public function notification_requires_subscription(): void
     {
         $response = $this->actingAs($this->user)
             ->postJson('/push/test');
@@ -226,7 +210,8 @@ class PushNotificationTest extends TestCase
     /**
      * @test
      */
-    public function test_notification_sends_notification(): void
+    #[Test]
+    public function notification_sends_notification(): void
     {
         Notification::fake();
 
@@ -246,9 +231,7 @@ class PushNotificationTest extends TestCase
         Notification::assertSentTo($this->user, TestPushNotification::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function user_push_notification_preferences(): void
     {
         // Test enabling push notifications globally

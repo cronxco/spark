@@ -7,15 +7,14 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MigrationProgressUITest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function updates_page_shows_migration_progress(): void
     {
         $user = User::factory()->create();
@@ -46,9 +45,7 @@ class MigrationProgressUITest extends TestCase
         $response->assertSee('65%');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function updates_page_shows_failed_migration(): void
     {
         $user = User::factory()->create();
@@ -76,12 +73,10 @@ class MigrationProgressUITest extends TestCase
         $response = $this->get('/updates');
 
         $response->assertStatus(200);
-        $response->assertSee('Migration Failed');
+        $response->assertSee('Migration failed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function updates_page_shows_completed_migration(): void
     {
         $user = User::factory()->create();
@@ -108,13 +103,14 @@ class MigrationProgressUITest extends TestCase
 
         $response = $this->get('/updates');
 
+        // The rebuilt /updates page (#1134) only surfaces a migration while it
+        // runs or after it fails; a finished one leaves no badge or progress bar.
         $response->assertStatus(200);
-        $response->assertSee('Migrated');
+        $response->assertDontSee('Migration failed');
+        $response->assertDontSee('Migration progress');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function updates_page_shows_different_progress_steps(): void
     {
         $user = User::factory()->create();

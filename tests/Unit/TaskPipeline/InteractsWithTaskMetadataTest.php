@@ -6,15 +6,14 @@ use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class InteractsWithTaskMetadataTest extends TestCase
 {
     use InteractsWithTaskMetadata;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function gets_correct_metadata_field_for_event(): void
     {
         $event = new Event;
@@ -23,9 +22,7 @@ class InteractsWithTaskMetadataTest extends TestCase
         $this->assertEquals('event_metadata', $field);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function gets_correct_metadata_field_for_block(): void
     {
         $block = new Block;
@@ -34,9 +31,7 @@ class InteractsWithTaskMetadataTest extends TestCase
         $this->assertEquals('metadata', $field);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function gets_correct_metadata_field_for_object(): void
     {
         $object = new EventObject;
@@ -45,9 +40,7 @@ class InteractsWithTaskMetadataTest extends TestCase
         $this->assertEquals('metadata', $field);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function gets_task_executions_from_event(): void
     {
         $event = new Event;
@@ -66,9 +59,7 @@ class InteractsWithTaskMetadataTest extends TestCase
         $this->assertEquals('success', $executions['test_task']['last_attempt']['status']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function gets_task_executions_from_block(): void
     {
         $block = new Block;
@@ -86,9 +77,7 @@ class InteractsWithTaskMetadataTest extends TestCase
         $this->assertArrayHasKey('test_task', $executions);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function returns_empty_array_when_no_executions(): void
     {
         $event = new Event;

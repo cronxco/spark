@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SpotifyListeningPullTest extends TestCase
@@ -43,9 +44,7 @@ class SpotifyListeningPullTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation()
     {
         $job = new SpotifyListeningPull($this->integration);
@@ -56,9 +55,7 @@ class SpotifyListeningPullTest extends TestCase
         $this->assertEquals([60, 300, 600], $job->backoff);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unique_id_generation()
     {
         $job = new SpotifyListeningPull($this->integration);
@@ -68,9 +65,7 @@ class SpotifyListeningPullTest extends TestCase
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_integration_correctly()
     {
         $job = new SpotifyListeningPull($this->integration);
@@ -82,9 +77,7 @@ class SpotifyListeningPullTest extends TestCase
         $this->assertEquals('listening', $this->integration->instance_type);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function configuration_inheritance()
     {
         $this->assertEquals(['enabled'], $this->integration->configuration['auto_tag_artists']);
@@ -95,9 +88,7 @@ class SpotifyListeningPullTest extends TestCase
         $this->assertInstanceOf(SpotifyListeningPull::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_with_minimal_configuration()
     {
         $minimalIntegration = Integration::factory()->create([
@@ -112,9 +103,7 @@ class SpotifyListeningPullTest extends TestCase
         $this->assertInstanceOf(SpotifyListeningPull::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_with_different_account_ids()
     {
         // Test with group account_id
@@ -144,9 +133,7 @@ class SpotifyListeningPullTest extends TestCase
         $this->assertNotEquals($job1->uniqueId(), $job2->uniqueId());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_null_account_id()
     {
         $groupWithoutAccountId = IntegrationGroup::factory()->create([
@@ -169,9 +156,7 @@ class SpotifyListeningPullTest extends TestCase
         $this->assertEquals($integrationWithoutAccountId->id, $integrationWithoutAccountId->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_with_various_config_options()
     {
         // Test with all configuration options enabled

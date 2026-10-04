@@ -4,6 +4,7 @@ namespace App\Spotlight\Queries\Search;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -20,7 +21,8 @@ class EventSearchQuery
                 return collect();
             }
 
-            return Event::with(['actor', 'target', 'integration'])
+            return Event::forUser(Auth::id())
+                ->with(['actor', 'target', 'integration'])
                 ->where('action', 'ilike', "%{$query}%")
                 ->latest('time')
                 ->limit(5)

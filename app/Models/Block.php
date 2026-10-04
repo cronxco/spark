@@ -421,7 +421,7 @@ class Block extends Model implements HasMedia
             return null;
         }
 
-        return Str::markdown($content);
+        return render_markdown($content);
     }
 
     /**

@@ -5,15 +5,14 @@ namespace Tests\Unit\Jobs;
 use App\Jobs\Base\BaseFetchJob;
 use App\Models\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BaseFetchJobTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unique_id_generation()
     {
         $integration = Integration::factory()->create([
@@ -49,9 +48,7 @@ class BaseFetchJobTest extends TestCase
         $this->assertMatchesRegularExpression($expectedPattern, $uniqueId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_timeout_and_retries()
     {
         $integration = Integration::factory()->create();

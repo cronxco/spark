@@ -7,11 +7,15 @@ use App\Models\User;
 use App\Services\EffectiveTimezoneResolver;
 use App\Services\LoggingService;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Sentry\Breadcrumb;
+use Sentry\Event;
+use Sentry\Logs\Log as SentryLog;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -59,6 +63,33 @@ if (! function_exists('format_time_for_user')) {
         $userDatetime = to_user_timezone($datetime, $user);
 
         return $userDatetime->format($format);
+    }
+}
+
+if (! function_exists('format_relative_time')) {
+    /**
+     * Spark Design System time rule: relative within a day of now
+     * ("22 minutes ago", "in 3 hours"), absolute beyond it in the user's
+     * timezone ("Tue 14:05" within a week, then "12 Aug", then "12 Aug 2025").
+     * Defaults to the signed-in user's timezone.
+     */
+    function format_relative_time(Carbon $datetime, ?User $user = null, ?Carbon $now = null): string
+    {
+        $now ??= Carbon::now();
+        $user ??= auth()->user();
+
+        if (abs($now->diffInHours($datetime)) < 24) {
+            return $datetime->diffForHumans($now, ['syntax' => CarbonInterface::DIFF_RELATIVE_TO_NOW, 'parts' => 1]);
+        }
+
+        $local = to_user_timezone($datetime->copy(), $user);
+        $localNow = to_user_timezone($now->copy(), $user);
+
+        if (abs($now->diffInDays($datetime)) < 7) {
+            return $local->format('D H:i');
+        }
+
+        return $local->format($local->year === $localNow->year ? 'j M' : 'j M Y');
     }
 }
 
@@ -429,24 +460,208 @@ if (! function_exists('sanitizeHeaders')) {
 /**
  * Sanitize data for logging (remove sensitive data)
  */
+if (! function_exists('sensitive_log_keys')) {
+    /**
+     * Field names whose value is a credential or secret wherever it appears.
+     *
+     * Shared by sanitizeData() and the Sentry redaction hooks so there is one
+     * list to maintain rather than two that drift apart.
+     *
+     * @return array<int, string>
+     */
+    function sensitive_log_keys(): array
+    {
+        return [
+            'password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key',
+            'access_token', 'refresh_token', 'authorization', 'webhook_secret',
+            'server_url', 'cronxtools_url', 'you_mcp_url', 'you_mcp_key', 'cookies',
+            // `plaintext` is the one-time Sanctum bearer token returned by
+            // ApiTokensController::store.
+            'plaintext', 'plain_text_token', 'bearer',
+        ];
+    }
+}
+
 if (! function_exists('sanitizeData')) {
     function sanitizeData(array $data): array
     {
-        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key', 'access_token', 'refresh_token', 'authorization', 'webhook_secret'];
+        $sensitiveKeys = sensitive_log_keys();
         $sanitized = [];
 
         foreach ($data as $key => $value) {
-            $lowerKey = strtolower($key);
-            if (in_array($lowerKey, $sensitiveKeys)) {
+            $lowerKey = strtolower((string) $key);
+            if (in_array($lowerKey, $sensitiveKeys, true)) {
                 $sanitized[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 $sanitized[$key] = sanitizeData($value);
+            } elseif (is_string($value)) {
+                $sanitized[$key] = redact_sensitive_urls($value);
             } else {
                 $sanitized[$key] = $value;
             }
         }
 
         return $sanitized;
+    }
+}
+
+/**
+ * Redact credentials that live inside a URL rather than a header.
+ */
+if (! function_exists('redact_sensitive_urls')) {
+    /**
+     * The CronxTools MCP URL carries its bearer token in the URL itself, so it
+     * is a credential wherever it appears — including embedded in a longer
+     * string such as a serialised request body.
+     */
+    function redact_sensitive_urls(string $value): string
+    {
+        foreach (['cronxtools_url', 'you_mcp_url'] as $key) {
+            $value = redact_sensitive_url($value, config("services.flint_routine.{$key}"));
+        }
+
+        return $value;
+    }
+}
+
+if (! function_exists('redact_sensitive_url')) {
+    /**
+     * Redact every appearance of one MCP server URL, plain or encoded.
+     */
+    function redact_sensitive_url(string $value, mixed $url): string
+    {
+        if (! is_string($url) || $url === '') {
+            return $value;
+        }
+
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return str_replace($url, '[REDACTED_MCP_URL]', $value);
+        }
+
+        $authority = preg_quote($parts['host'], '~')
+            . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
+        $encodedAuthority = preg_quote($parts['host'], '~')
+            . (isset($parts['port']) ? '%3A' . (int) $parts['port'] : '');
+        $scheme = preg_quote($parts['scheme'], '~');
+        $patterns = [
+            '~' . $scheme . '://' . $authority . '(?:/[^\s"\'<>]*)?~i',
+            '~' . $scheme . ':\\\\/\\\\/' . $authority . '(?:\\\\/[^\s"\'<>]*)?~i',
+            '~' . $scheme . '%3A%2F%2F' . $encodedAuthority . '(?:%2F[^\s&"\'<>]*)?~i',
+        ];
+
+        return preg_replace($patterns, '[REDACTED_MCP_URL]', $value) ?? $value;
+    }
+}
+
+if (! function_exists('redact_sensitive_data')) {
+    /**
+     * Redact secrets from anything on its way to Sentry.
+     *
+     * Two passes: values under a credential-named key are replaced outright,
+     * and every remaining string is scanned for credential-bearing URLs. The
+     * key-based pass matters because the URL scan alone is blind to a bearer
+     * token sitting in a field called `plaintext`.
+     */
+    function redact_sensitive_data(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            return redact_sensitive_urls($value);
+        }
+        if (is_array($value)) {
+            $sensitiveKeys = sensitive_log_keys();
+
+            foreach ($value as $key => $item) {
+                $value[$key] = in_array(strtolower((string) $key), $sensitiveKeys, true)
+                    ? '[REDACTED]'
+                    : redact_sensitive_data($item);
+            }
+        }
+
+        return $value;
+    }
+}
+
+if (! function_exists('redact_sentry_event')) {
+    function redact_sentry_event(Event $event): Event
+    {
+        $event->setRequest(redact_sensitive_data($event->getRequest()));
+        $event->setExtra(redact_sensitive_data($event->getExtra()));
+        foreach ($event->getContexts() as $name => $context) {
+            $event->setContext($name, redact_sensitive_data($context));
+        }
+        if ($event->getMessage() !== null) {
+            $event->setMessage(
+                redact_sensitive_urls($event->getMessage()),
+                redact_sensitive_data($event->getMessageParams()),
+                $event->getMessageFormatted() ? redact_sensitive_urls($event->getMessageFormatted()) : null,
+            );
+        }
+        if ($event->getTransaction() !== null) {
+            $event->setTransaction(redact_sensitive_urls($event->getTransaction()));
+        }
+        foreach ($event->getExceptions() as $exception) {
+            $exception->setValue(redact_sensitive_urls($exception->getValue()));
+        }
+
+        $breadcrumbs = array_map(function (Breadcrumb $breadcrumb): Breadcrumb {
+            $copy = $breadcrumb;
+            if ($breadcrumb->getMessage() !== null) {
+                $copy = $copy->withMessage(redact_sensitive_urls($breadcrumb->getMessage()));
+            }
+            foreach ($breadcrumb->getMetadata() as $key => $metadata) {
+                $copy = $copy->withMetadata($key, in_array(strtolower((string) $key), sensitive_log_keys(), true)
+                    ? '[REDACTED]'
+                    : redact_sensitive_data($metadata));
+            }
+
+            return $copy;
+        }, $event->getBreadcrumbs());
+        $event->setBreadcrumb($breadcrumbs);
+
+        foreach ($event->getSpans() as $span) {
+            if ($span->getDescription() !== null) {
+                $span->setDescription(redact_sensitive_urls($span->getDescription()));
+            }
+            $span->setData(redact_sensitive_data($span->getData()));
+        }
+
+        return $event;
+    }
+}
+
+if (! function_exists('redact_sentry_log')) {
+    function redact_sentry_log(SentryLog $log): SentryLog
+    {
+        $log->setBody(redact_sensitive_urls($log->getBody()));
+        $sensitiveKeys = sensitive_log_keys();
+        foreach ($log->attributes()->all() as $key => $value) {
+            $log->setAttribute(
+                $key,
+                in_array(strtolower((string) $key), $sensitiveKeys, true)
+                    ? '[REDACTED]'
+                    : redact_sensitive_data($value),
+            );
+        }
+
+        return $log;
+    }
+}
+
+if (! function_exists('redact_sentry_breadcrumb')) {
+    function redact_sentry_breadcrumb(Breadcrumb $breadcrumb): Breadcrumb
+    {
+        $copy = $breadcrumb;
+        if ($breadcrumb->getMessage() !== null) {
+            $copy = $copy->withMessage(redact_sensitive_urls($breadcrumb->getMessage()));
+        }
+        foreach ($breadcrumb->getMetadata() as $key => $value) {
+            $copy = $copy->withMetadata($key, in_array(strtolower((string) $key), sensitive_log_keys(), true)
+                ? '[REDACTED]'
+                : redact_sensitive_data($value));
+        }
+
+        return $copy;
     }
 }
 
@@ -1317,5 +1532,29 @@ if (! function_exists('render_media_object_responsive')) {
         }
 
         return $html;
+    }
+}
+
+if (! function_exists('render_markdown')) {
+    /**
+     * Render untrusted markdown to HTML.
+     *
+     * Every string this is given originates outside Spark — newsletter bodies,
+     * fetched articles, bookmark summaries, and Flint prose written *about*
+     * them. The digest summary was already rendered with these options while
+     * block bodies two files away were not, so raw HTML and javascript: links
+     * passed straight through on one surface and not the other. There is no
+     * case where we want the permissive behaviour, so there is one function.
+     */
+    function render_markdown(?string $markdown): string
+    {
+        if ($markdown === null || trim($markdown) === '') {
+            return '';
+        }
+
+        return Str::markdown($markdown, [
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
+        ]);
     }
 }

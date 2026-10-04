@@ -7,6 +7,7 @@ use App\Integrations\PluginRegistry;
 use App\Jobs\Webhook\AppleHealth\AppleHealthWebhookHook;
 use App\Models\Event;
 use App\Models\User;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
@@ -116,6 +117,32 @@ class AppleHealthIntegrationTest extends TestCase
 
         // Note: Database assertions removed as processing is now asynchronous
         // The actual event creation happens in the background job
+    }
+
+    #[Test]
+    public function a_processed_push_records_the_integration_as_updated(): void
+    {
+        $user = User::factory()->create();
+        [$group, $workouts, $metrics] = $this->createGroupWithInstances($user);
+        $this->assertNull($metrics->fresh()->last_successful_update_at);
+
+        $payload = [
+            'metrics' => [
+                [
+                    'name' => 'step_count',
+                    'units' => 'count',
+                    'data' => [['date' => '2025-08-12 00:00:00 +0100', 'qty' => 5109]],
+                ],
+            ],
+        ];
+
+        // Run the hook itself; the processing jobs it dispatches stay faked.
+        (new AppleHealthWebhookHook($payload, ['x-webhook-secret' => [$group->account_id]], $metrics))
+            ->handle(app(TaskExecutionStore::class));
+
+        // A push is the only sync a webhook integration has; without this
+        // its freshness could never be anything but "never updated".
+        $this->assertNotNull($metrics->fresh()->last_successful_update_at);
     }
 
     private function createGroupWithInstances(User $user): array

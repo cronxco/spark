@@ -65,7 +65,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
         ]);
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess")
+        $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [], $this->ifMatch($event))
             ->assertStatus(422);
     }
 
@@ -78,7 +78,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [
             'mode' => 'refetch',
-        ])
+        ], $this->ifMatch($event))
             ->assertAccepted()
             ->assertJsonPath('status', 'queued')
             ->assertJsonPath('service', 'fetch');
@@ -96,7 +96,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [
             'mode' => 'summary_only',
-        ])->assertAccepted();
+        ], $this->ifMatch($event))->assertAccepted();
 
         Queue::assertPushed(ProcessTaskPipelineJob::class, fn (ProcessTaskPipelineJob $job) => $job->model->is($event)
             && $job->trigger === 'manual'
@@ -110,7 +110,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
         Queue::fake();
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess")
+        $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [], $this->ifMatch($event))
             ->assertAccepted()
             ->assertJsonPath('service', 'newsletter');
 
@@ -126,7 +126,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
         Queue::fake();
         Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
 
-        $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess")
+        $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [], $this->ifMatch($event))
             ->assertAccepted();
 
         Queue::assertPushed(ProcessTaskPipelineJob::class, fn (ProcessTaskPipelineJob $job) => $job->model->is($event)
@@ -233,5 +233,11 @@ class KnowledgeReprocessingControllerTest extends TestCase
     private function nextKnowledgeObjectSequence(): int
     {
         return ++$this->knowledgeObjectSequence;
+    }
+
+    /** @return array{If-Match: string} */
+    private function ifMatch(Event $event): array
+    {
+        return ['If-Match' => $this->getJson("/api/v1/mobile/events/{$event->id}")->headers->get('ETag')];
     }
 }

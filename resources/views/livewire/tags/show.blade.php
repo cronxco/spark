@@ -5,6 +5,8 @@ use Livewire\WithPagination;
 use Spatie\Tags\Tag;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Support\OwnedTagQuery;
+use Illuminate\Support\Facades\Auth;
 
 new class extends Component {
     use WithPagination;
@@ -14,7 +16,14 @@ new class extends Component {
 
     public function mount(string $type, string $slug, string $id): void
     {
-        $this->tag = Tag::findOrFail($id);
+        $user = Auth::user();
+
+        // Tags carry no user_id, so a bare findOrFail discloses the existence,
+        // name and type of tags belonging to other tenants. Resolve through the
+        // user's own tag catalogue instead.
+        abort_unless($user !== null, 403);
+
+        $this->tag = OwnedTagQuery::for($user)->whereKey($id)->firstOrFail();
     }
 
     public function setFilter(string $type): void

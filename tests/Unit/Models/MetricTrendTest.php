@@ -5,15 +5,14 @@ namespace Tests\Unit\Models;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MetricTrendTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function it_belongs_to_a_metric_statistic(): void
     {
         $metric = MetricStatistic::factory()->create();
@@ -23,9 +22,7 @@ class MetricTrendTest extends TestCase
         $this->assertEquals($metric->id, $trend->metricStatistic->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unacknowledged_scope_filters_correctly(): void
     {
         MetricTrend::factory()->create(['acknowledged_at' => now()]);
@@ -37,9 +34,7 @@ class MetricTrendTest extends TestCase
         $this->assertEquals($unacknowledged->id, $results->first()->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function acknowledged_scope_filters_correctly(): void
     {
         $acknowledged = MetricTrend::factory()->create(['acknowledged_at' => now()]);
@@ -51,9 +46,7 @@ class MetricTrendTest extends TestCase
         $this->assertEquals($acknowledged->id, $results->first()->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function of_type_scope_filters_correctly(): void
     {
         $anomalyHigh = MetricTrend::factory()->create(['type' => 'anomaly_high']);
@@ -65,9 +58,7 @@ class MetricTrendTest extends TestCase
         $this->assertEquals($anomalyHigh->id, $results->first()->id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function anomalies_scope_returns_only_anomalies(): void
     {
         MetricTrend::factory()->create(['type' => 'anomaly_high']);
@@ -79,9 +70,7 @@ class MetricTrendTest extends TestCase
         $this->assertCount(2, $results);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function trends_scope_excludes_anomalies(): void
     {
         MetricTrend::factory()->create(['type' => 'anomaly_high']);
@@ -93,9 +82,7 @@ class MetricTrendTest extends TestCase
         $this->assertCount(2, $results);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function acknowledge_sets_acknowledged_at(): void
     {
         $trend = MetricTrend::factory()->create(['acknowledged_at' => null]);
@@ -107,9 +94,7 @@ class MetricTrendTest extends TestCase
         $this->assertNotNull($trend->fresh()->acknowledged_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function is_anomaly_returns_true_for_anomaly_types(): void
     {
         $anomalyHigh = MetricTrend::factory()->create(['type' => 'anomaly_high']);
@@ -119,9 +104,7 @@ class MetricTrendTest extends TestCase
         $this->assertTrue($anomalyLow->isAnomaly());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function is_anomaly_returns_false_for_trend_types(): void
     {
         $trend = MetricTrend::factory()->create(['type' => 'trend_up_weekly']);
@@ -129,9 +112,7 @@ class MetricTrendTest extends TestCase
         $this->assertFalse($trend->isAnomaly());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function is_trend_returns_true_for_trend_types(): void
     {
         $trend = MetricTrend::factory()->create(['type' => 'trend_up_weekly']);
@@ -139,9 +120,7 @@ class MetricTrendTest extends TestCase
         $this->assertTrue($trend->isTrend());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function get_type_label_returns_human_readable_labels(): void
     {
         $anomalyHigh = MetricTrend::factory()->create(['type' => 'anomaly_high']);
@@ -151,9 +130,7 @@ class MetricTrendTest extends TestCase
         $this->assertEquals('Trending Up (Weekly)', $trendUp->getTypeLabel());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function get_direction_returns_correct_direction_for_upward_trends(): void
     {
         $trendUp = MetricTrend::factory()->create(['type' => 'trend_up_weekly']);
@@ -163,9 +140,7 @@ class MetricTrendTest extends TestCase
         $this->assertEquals('up', $anomalyHigh->getDirection());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function get_direction_returns_correct_direction_for_downward_trends(): void
     {
         $trendDown = MetricTrend::factory()->create(['type' => 'trend_down_monthly']);
