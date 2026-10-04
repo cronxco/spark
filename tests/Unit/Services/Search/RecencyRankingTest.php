@@ -2,8 +2,13 @@
 
 namespace Tests\Unit\Services\Search;
 
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
 use App\Services\Search\RecencyRanking;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\PostgresConnection;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -95,5 +100,61 @@ class RecencyRankingTest extends TestCase
         $this->assertSame(RecencyRanking::PREFIX, $ranking->textRelevance('Tesco Metro', 'tesco'));
         $this->assertSame(RecencyRanking::CONTAINS, $ranking->textRelevance('Big Tesco', 'tesco'));
         $this->assertSame(RecencyRanking::OTHER_FIELD, $ranking->textRelevance('Groceries', 'tesco'));
+    }
+
+    #[Test]
+    public function text_ranking_uses_the_query_connection_prefix_for_all_models(): void
+    {
+        foreach (['', 'dev_'] as $prefix) {
+            foreach ([0.0, 0.2] as $weight) {
+                foreach ([Event::class => 'action', EventObject::class => 'title', Block::class => 'title'] as $modelClass => $column) {
+                    $connection = new PostgresConnection(null, 'postgres', $prefix);
+                    $model = new $modelClass;
+                    $query = (new Builder($connection->query()))->setModel($model);
+                    $ranking = new RecencyRanking($weight, 30);
+
+                    $ranking->orderByText($query, 'leon', $column);
+                    $sql = $query->toSql();
+                    $table = '"' . $prefix . $model->getTable() . '"';
+
+                    $this->assertStringContainsString('from ' . $table, $sql);
+                    $this->assertStringContainsString('LOWER(' . $table . '."' . $column . '")', $sql);
+                    $this->assertStringEndsWith($table . '."id" asc', $sql);
+                    $this->assertSame(['leon', 'leon%', '%leon%'], $query->getBindings());
+
+                    if ($weight > 0) {
+                        $this->assertStringContainsString('EXTRACT(EPOCH FROM ' . $table . '."time")', $sql);
+                    } else {
+                        $this->assertStringNotContainsString('EXTRACT(EPOCH FROM', $sql);
+                    }
+                }
+            }
+        }
+    }
+
+    #[Test]
+    public function semantic_ranking_prefixes_embeddings_and_both_time_expressions(): void
+    {
+        foreach (['', 'dev_'] as $prefix) {
+            foreach ([0.0, 0.2] as $weight) {
+                foreach ([Event::class, EventObject::class, Block::class] as $modelClass) {
+                    $connection = new PostgresConnection(null, 'postgres', $prefix);
+                    $model = new $modelClass;
+                    $query = (new Builder($connection->query()))->setModel($model)->select($model->getTable() . '.*');
+                    $ranking = new RecencyRanking($weight, 30);
+
+                    $ranking->orderBySemantic($query, [0.1, 0.2]);
+                    $sql = $query->toSql();
+                    $table = '"' . $prefix . $model->getTable() . '"';
+
+                    $this->assertStringContainsString('from ' . $table, $sql);
+                    $this->assertStringContainsString($table . '."embeddings" <=> ?', $sql);
+                    $this->assertSame($weight > 0 ? 2 : 1, substr_count($sql, 'EXTRACT(EPOCH FROM ' . $table . '."time")'));
+                    $this->assertStringContainsString('as days_ago', $sql);
+                    $this->assertStringEndsWith($table . '."id" asc', $sql);
+                    $this->assertSame(['[0.1,0.2]'], $query->getBindings());
+                }
+            }
+        }
     }
 }
