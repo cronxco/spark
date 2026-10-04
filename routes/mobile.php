@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Mobile\ApiTokensController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController;
 use App\Http\Controllers\Api\V1\Mobile\BookmarksController;
 use App\Http\Controllers\Api\V1\Mobile\BriefingController;
+use App\Http\Controllers\Api\V1\Mobile\CapturesController;
 use App\Http\Controllers\Api\V1\Mobile\CheckInsController;
 use App\Http\Controllers\Api\V1\Mobile\ContextController;
 use App\Http\Controllers\Api\V1\Mobile\DevicesController;
@@ -263,6 +264,10 @@ Route::post('bookmarks', [BookmarksController::class, 'store'])
 Route::post('bookmarks/capture', [CapturedBookmarksController::class, 'store'])
     ->middleware('ability:ios:write')
     ->name('bookmarks.capture');
+
+Route::post('captures', [CapturesController::class, 'store'])
+    ->middleware('ability:ios:write,data:write')
+    ->name('captures.store');
 
 /*
 |--------------------------------------------------------------------------

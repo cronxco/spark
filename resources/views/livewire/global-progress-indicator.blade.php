@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\DispatchIntegrationFetchJobs;
+use App\Models\Integration;
 use App\Services\Flint\FlintRunDispatcher;
 use App\Services\Notifications\NotificationArchiver;
 use App\Services\Notifications\NotificationFeedService;
@@ -29,6 +31,24 @@ new class extends Component
         } catch (InvalidArgumentException) {
             return;
         }
+
+        $this->refreshFeed();
+    }
+
+    /**
+     * Spotlight's "Trigger All Integration Updates" and per-service sync
+     * commands. Mounted in the app layout, so the commands work on every page.
+     */
+    #[On('trigger-all-integrations')]
+    public function triggerIntegrationUpdates(?string $service = null): void
+    {
+        $dispatcher = new DispatchIntegrationFetchJobs;
+
+        Auth::user()->integrations()
+            ->when($service, fn ($query) => $query->where('service', $service))
+            ->get()
+            ->reject(fn (Integration $integration) => $integration->isPaused())
+            ->each(fn (Integration $integration) => $dispatcher->dispatch($integration));
 
         $this->refreshFeed();
     }

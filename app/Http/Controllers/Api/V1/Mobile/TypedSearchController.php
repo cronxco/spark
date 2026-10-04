@@ -17,6 +17,7 @@ class TypedSearchController extends Controller
     public function index(Request $request, string $type): JsonResponse
     {
         abort_unless(in_array($type, ['events', 'objects', 'blocks'], true), 404);
+        $this->acceptIosParameters($request);
         $data = $request->validate([
             'query' => ['required', 'string', 'max:500'],
             'semantic' => ['nullable', 'boolean'],
@@ -49,5 +50,21 @@ class TypedSearchController extends Controller
         }
 
         return response()->json([$type => $resource, 'meta' => ['query' => $data['query'], 'semantic' => $semantic, 'count' => $results->count(), 'limit' => $data['limit'] ?? 20]]);
+    }
+
+    /**
+     * The iOS client sends the search text as `q` and `semantic` as the
+     * strings "true"/"false", which the `boolean` rule rejects, so every typed
+     * search from the app returned 422. Map both onto the canonical contract.
+     */
+    private function acceptIosParameters(Request $request): void
+    {
+        if (! $request->filled('query') && $request->filled('q')) {
+            $request->merge(['query' => $request->input('q')]);
+        }
+
+        if (in_array($request->input('semantic'), ['true', 'false'], true)) {
+            $request->merge(['semantic' => $request->input('semantic') === 'true']);
+        }
     }
 }
