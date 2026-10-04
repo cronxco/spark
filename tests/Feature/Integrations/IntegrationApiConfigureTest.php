@@ -77,6 +77,7 @@ class IntegrationApiConfigureTest extends TestCase
         $this->withHeader('If-Match', app(ResourceVersion::class)->etag($integration))->patchJson("/api/v1/integrations/{$integration->id}/configure", ['update_frequency_minutes' => 30])
             ->assertNotFound();
     }
+
     #[Test]
     public function configuration_requires_management_scope_and_current_version(): void
     {
@@ -89,5 +90,4 @@ class IntegrationApiConfigureTest extends TestCase
         $this->patchJson($url, [])->assertStatus(428);
         $this->withHeader('If-Match', '"stale"')->patchJson($url, [])->assertStatus(412);
     }
-
 }

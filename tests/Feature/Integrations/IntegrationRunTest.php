@@ -4,8 +4,8 @@ namespace Tests\Feature\Integrations;
 
 use App\Actions\DispatchIntegrationFetchJobs;
 use App\Http\Resources\Compact\CompactIntegrationResource;
-use App\Jobs\OAuth\GitHub\GitHubActivityPull;
 use App\Jobs\Fetch\FetchSingleUrl;
+use App\Jobs\OAuth\GitHub\GitHubActivityPull;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
@@ -15,9 +15,9 @@ use App\Services\IntegrationRuns\RunBatchMiddleware;
 use Illuminate\Bus\BatchRepository;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
@@ -28,6 +28,13 @@ use Tests\TestCase;
 
 class IntegrationRunTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        FakeRunFetchJob::$statusesSeenWhileFetching = [];
+    }
+
     #[Test]
     public function nested_processing_and_url_fetches_join_the_ingestion_run(): void
     {
@@ -54,13 +61,6 @@ class IntegrationRunTest extends TestCase
         $this->assertSame($batch->id, $url->batchId);
         $this->assertCount(1, $url->middleware);
         $this->assertSame(4, Bus::findBatch($batch->id)->totalJobs);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        FakeRunFetchJob::$statusesSeenWhileFetching = [];
     }
 
     #[Test]
