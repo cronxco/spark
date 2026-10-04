@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Actions\DispatchIntegrationFetchJobs;
+use App\Mcp\Concerns\RequiresSparkAbility;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -10,6 +11,7 @@ use Laravel\Mcp\Server\Tool;
 
 class TriggerIntegrationUpdateTool extends Tool
 {
+    use RequiresSparkAbility;
     /**
      * The tool's description.
      */
@@ -25,6 +27,10 @@ class TriggerIntegrationUpdateTool extends Tool
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'integrations:sync')) {
+            return $error;
+        }
+
         $user = $request->user();
 
         if (! $user) {

@@ -15,7 +15,7 @@ class IntegrationSearchQuery
     public static function make(): SpotlightQuery
     {
         return SpotlightQuery::forMode('integrations', function (string $query) {
-            $integrationsQuery = Integration::with('group');
+            $integrationsQuery = Integration::external()->with('group');
 
             if (! blank($query)) {
                 $integrationsQuery->where(function ($q) use ($query) {

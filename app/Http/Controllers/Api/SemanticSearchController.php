@@ -7,7 +7,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Validator;
 class SemanticSearchController extends Controller
 {
     public function __construct(
-        private EmbeddingService $embeddingService
+        private EmbeddingClient $embeddingService
     ) {}
 
     /**
@@ -123,7 +123,7 @@ class SemanticSearchController extends Controller
      */
     private function searchEvents(array $embedding, string $userId, float $threshold, int $limit, float $temporalWeight): array
     {
-        $userIntegrationIds = Integration::where('user_id', $userId)->pluck('id')->toArray();
+        $userIntegrationIds = Integration::external()->where('user_id', $userId)->pluck('id')->toArray();
 
         $events = Event::semanticSearch($embedding, threshold: $threshold, limit: $limit, temporalWeight: $temporalWeight)
             ->whereIn('integration_id', $userIntegrationIds)
@@ -161,7 +161,7 @@ class SemanticSearchController extends Controller
      */
     private function searchBlocks(array $embedding, string $userId, float $threshold, int $limit, float $temporalWeight): array
     {
-        $userIntegrationIds = Integration::where('user_id', $userId)->pluck('id')->toArray();
+        $userIntegrationIds = Integration::external()->where('user_id', $userId)->pluck('id')->toArray();
 
         $blocks = Block::semanticSearch($embedding, threshold: $threshold, limit: $limit, temporalWeight: $temporalWeight)
             ->whereHas('event', function ($q) use ($userIntegrationIds) {

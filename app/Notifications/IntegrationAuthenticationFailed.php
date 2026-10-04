@@ -21,7 +21,7 @@ class IntegrationAuthenticationFailed extends SparkNotification
 
     public function isPriority(): bool
     {
-        return true;
+        return parent::isPriority();
     }
 
     public function getIcon(): string
@@ -36,7 +36,9 @@ class IntegrationAuthenticationFailed extends SparkNotification
 
     public function getTitle(): string
     {
-        return 'Authentication Required';
+        $name = $this->integration->name ?? ucfirst($this->integration->service);
+
+        return "Reconnect {$name}";
     }
 
     public function getMessage(): string
@@ -48,15 +50,35 @@ class IntegrationAuthenticationFailed extends SparkNotification
             ($this->details['eua_expired'] ?? false)) {
             $bankName = $this->details['bank_name'] ?? 'bank';
 
-            return "Your {$bankName} connection has expired. {$this->errorMessage}";
+            return "Spark can't update this account until you reconnect {$bankName}. Your history is safe.";
         }
 
-        return "Your {$serviceName} connection needs to be re-authorized. {$this->errorMessage}";
+        return "Spark can't update this connection until you sign in again.";
     }
 
     public function getActionUrl(): ?string
     {
         return route('integrations.details', $this->integration->id);
+    }
+
+    public function getEntityType(): ?string
+    {
+        return 'integration';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return (string) $this->integration->id;
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return "integration_authentication_failed:{$this->integration->id}";
+    }
+
+    public function getTechnicalDetail(): ?string
+    {
+        return $this->sanitiseTechnicalDetail($this->errorMessage);
     }
 
     public function toMail(User $notifiable): MailMessage
@@ -79,8 +101,7 @@ class IntegrationAuthenticationFailed extends SparkNotification
                 ->line('This is required every 90 days for security purposes. Your transaction history will remain intact.')
                 ->line('Click the button below to reconnect your account and resume syncing.');
         } else {
-            $mail->line("Your {$serviceName} integration has lost authentication and needs to be reconnected.")
-                ->line("**Error:** {$this->errorMessage}")
+            $mail->line("Your {$serviceName} connection needs to be reconnected.")
                 ->line('Please click the button below to re-authorize your connection and resume data syncing.');
         }
 

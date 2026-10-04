@@ -4,6 +4,7 @@ namespace App\Integrations\Fetch;
 
 use App\Models\EventObject;
 use App\Models\IntegrationGroup;
+use App\Services\Fetch\FetchMetadata;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
@@ -54,11 +55,11 @@ class FetchEngineManager
      */
     public function resetPlaywrightLearning(EventObject $webpage): void
     {
-        $metadata = $webpage->metadata ?? [];
-        unset($metadata['requires_playwright']);
-        unset($metadata['playwright_learned_at']);
+        FetchMetadata::mutate($webpage, function (array $metadata): array {
+            unset($metadata['requires_playwright'], $metadata['playwright_learned_at']);
 
-        $webpage->update(['metadata' => $metadata]);
+            return $metadata;
+        });
 
         Log::info('Fetch: Reset Playwright learning', [
             'webpage_id' => $webpage->id,
@@ -74,9 +75,6 @@ class FetchEngineManager
         if (! $webpage) {
             return;
         }
-
-        $metadata = $webpage->metadata ?? [];
-        $history = $metadata['playwright_history'] ?? [];
 
         // Create new history entry
         $entry = [
@@ -100,16 +98,15 @@ class FetchEngineManager
         // Merge any additional metadata
         $entry = array_merge($entry, $meta);
 
-        // Add to history
-        $history[] = $entry;
+        FetchMetadata::mutate($webpage, function (array $metadata) use ($entry): array {
+            $history = $metadata['playwright_history'] ?? [];
+            $history[] = $entry;
 
-        // Keep only the last 20 entries
-        if (count($history) > 20) {
-            $history = array_slice($history, -20);
-        }
+            // Keep only the last 20 entries
+            $metadata['playwright_history'] = array_slice($history, -20);
 
-        $metadata['playwright_history'] = $history;
-        $webpage->update(['metadata' => $metadata]);
+            return $metadata;
+        });
 
         Log::debug('Fetch: Logged decision to history', [
             'webpage_id' => $webpage->id,
@@ -123,19 +120,23 @@ class FetchEngineManager
      */
     public function updateLastHistoryEntry(EventObject $webpage, array $updates): void
     {
-        $metadata = $webpage->metadata ?? [];
-        $history = $metadata['playwright_history'] ?? [];
-
-        if (empty($history)) {
+        if (empty($webpage->metadata['playwright_history'] ?? [])) {
             return;
         }
 
-        // Update the last entry
-        $lastIndex = count($history) - 1;
-        $history[$lastIndex] = array_merge($history[$lastIndex], $updates);
+        FetchMetadata::mutate($webpage, function (array $metadata) use ($updates): array {
+            $history = $metadata['playwright_history'] ?? [];
 
-        $metadata['playwright_history'] = $history;
-        $webpage->update(['metadata' => $metadata]);
+            if (empty($history)) {
+                return $metadata;
+            }
+
+            $lastIndex = count($history) - 1;
+            $history[$lastIndex] = array_merge($history[$lastIndex], $updates);
+            $metadata['playwright_history'] = $history;
+
+            return $metadata;
+        });
 
         Log::debug('Fetch: Updated history entry', [
             'webpage_id' => $webpage->id,
@@ -311,6 +312,7 @@ class FetchEngineManager
 
             return [
                 'html' => $result['html'],
+                'final_url' => $result['url'] ?? $url,
                 'status_code' => 200,
                 'screenshot' => $result['screenshot'] ?? null,
                 'method' => 'playwright',
@@ -452,11 +454,10 @@ class FetchEngineManager
      */
     protected function learnPlaywrightSuccess(EventObject $webpage): void
     {
-        $metadata = $webpage->metadata ?? [];
-        $metadata['requires_playwright'] = true;
-        $metadata['playwright_learned_at'] = now()->toIso8601String();
-
-        $webpage->update(['metadata' => $metadata]);
+        FetchMetadata::merge($webpage, [
+            'requires_playwright' => true,
+            'playwright_learned_at' => now()->toIso8601String(),
+        ]);
 
         Log::info('Fetch: Learned Playwright requirement', [
             'webpage_id' => $webpage->id,

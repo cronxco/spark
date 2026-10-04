@@ -24,8 +24,13 @@ class CompactBlockResource extends JsonResource
             'time' => $this->time?->toIso8601String(),
         ];
 
+        // Scope citations to the viewer's own integrations. The ids come from
+        // stored block metadata written by a routine that reads inbound mail,
+        // so an unscoped lookup would resolve any UUID in the table and return
+        // another user's event title.
         $references = EntityReferenceResolver::resolveEvents(
             $this->metadata['referenced_event_ids'] ?? [],
+            $request->user()?->integrations()->pluck('id'),
         );
 
         $content = $this->resource->getContent();

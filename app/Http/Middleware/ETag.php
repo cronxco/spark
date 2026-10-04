@@ -21,7 +21,10 @@ class ETag
             return $response;
         }
 
-        $etag = '"' . md5((string) $response->getContent()) . '"';
+        // Detail controllers may provide a strong model-version ETag for
+        // optimistic writes. Preserve it; collection responses still receive
+        // a representation ETag for efficient conditional GET polling.
+        $etag = $response->headers->get('ETag') ?? ('W/"' . md5((string) $response->getContent()) . '"');
         $response->headers->set('ETag', $etag);
 
         $ifNoneMatch = $request->headers->get('If-None-Match');

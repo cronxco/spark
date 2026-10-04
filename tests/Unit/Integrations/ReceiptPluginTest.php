@@ -6,6 +6,7 @@ use App\Integrations\Receipt\ReceiptPlugin;
 use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ReceiptPluginTest extends TestCase
@@ -30,7 +31,7 @@ class ReceiptPluginTest extends TestCase
         $this->plugin = new ReceiptPlugin;
     }
 
-    /** @test */
+    #[Test]
     public function it_has_correct_metadata()
     {
         $this->assertEquals('Receipt', $this->plugin->getDisplayName());
@@ -39,7 +40,7 @@ class ReceiptPluginTest extends TestCase
         $this->assertNotEmpty($this->plugin->getDescription());
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_receipt_action_types()
     {
         $actionTypes = $this->plugin->getActionTypes();
@@ -52,7 +53,7 @@ class ReceiptPluginTest extends TestCase
         $this->assertTrue($receiptAction['display_with_object']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_block_types()
     {
         $blockTypes = $this->plugin->getBlockTypes();
@@ -68,7 +69,7 @@ class ReceiptPluginTest extends TestCase
         $this->assertEquals('GBP', $lineItemBlock['value_unit']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_object_types()
     {
         $objectTypes = $this->plugin->getObjectTypes();
@@ -80,7 +81,7 @@ class ReceiptPluginTest extends TestCase
         $this->assertEquals('fas.store', $merchant['icon']);
     }
 
-    /** @test */
+    #[Test]
     public function it_defines_instance_types()
     {
         $instanceTypes = $this->plugin->getInstanceTypes();
@@ -91,19 +92,19 @@ class ReceiptPluginTest extends TestCase
         $this->assertEquals('Receipts', $receipts['label']);
     }
 
-    /** @test */
+    #[Test]
     public function it_supports_webhook_service_type()
     {
         $this->assertEquals('webhook', $this->plugin->getServiceType());
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_correct_identifier()
     {
         $this->assertEquals('receipt', $this->plugin->getIdentifier());
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_success_accent_color()
     {
         $this->assertEquals('success', $this->plugin->getAccentColor());

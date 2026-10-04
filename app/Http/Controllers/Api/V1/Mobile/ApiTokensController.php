@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\ApiTokenResource;
+use App\Support\SparkAbility;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ApiTokensController extends Controller
 {
@@ -44,17 +46,20 @@ class ApiTokensController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'abilities' => ['sometimes', 'array', 'max:20'],
-            'abilities.*' => ['string', 'max:255', 'distinct'],
+            'abilities' => ['required', 'array', 'min:1', 'max:20'],
+            'abilities.*' => ['string', 'distinct', Rule::in(SparkAbility::DELEGABLE)],
         ]);
 
-        $abilities = array_values($validated['abilities'] ?? ['*']);
+        $abilities = array_values($validated['abilities']);
 
-        // Don't let a mobile-managed token grant itself the app's own session scopes.
-        $abilities = array_values(array_diff($abilities, self::HIDDEN_ABILITIES));
-
-        if (empty($abilities)) {
-            $abilities = ['*'];
+        // Authority attenuates: a credential may only mint capabilities it
+        // already holds. Previously an omitted or all-hidden selection fell
+        // back to ['*'], which let a narrow iOS session mint a token that
+        // satisfies every capability gate in the application.
+        if (! SparkAbility::canDelegate($request->user(), $abilities)) {
+            return response()->json([
+                'message' => 'The requested capabilities exceed those of the credential making this request.',
+            ], 403);
         }
 
         $token = $request->user()->createToken($validated['name'], $abilities);

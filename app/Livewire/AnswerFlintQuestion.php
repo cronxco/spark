@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Block;
+use App\Services\Flint\FlintQuestionAnswerer;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -40,13 +41,7 @@ class AnswerFlintQuestion extends Component
             'answer_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $this->block->metadata = array_merge($this->block->metadata ?? [], [
-            'answer' => $this->answer,
-            'answer_note' => $this->answer_note ?: null,
-            'answered_at' => now()->toIso8601String(),
-        ]);
-
-        $this->block->save();
+        app(FlintQuestionAnswerer::class)->record($this->block, $this->answer, $this->answer_note);
 
         $this->answered = true;
     }

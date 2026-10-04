@@ -1,0 +1,3 @@
+# Vendored verbatim from cronxco/claude — flint:skills-check enforces byte parity
+# with the Claude Code Routine copies, so Prettier must not reformat them.
+resources/ai/skills/

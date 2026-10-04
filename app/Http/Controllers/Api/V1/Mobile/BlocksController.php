@@ -4,13 +4,14 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactBlockResource;
+use App\Services\Api\ResourceVersion;
 use App\Services\Mobile\BlockLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class BlocksController extends Controller
 {
-    public function __construct(protected BlockLookup $lookup) {}
+    public function __construct(protected BlockLookup $lookup, protected ResourceVersion $versions) {}
 
     /**
      * GET /api/v1/mobile/blocks/{id}
@@ -30,6 +31,7 @@ class BlocksController extends Controller
         if ($block->updated_at) {
             $response->header('Last-Modified', $block->updated_at->toRfc7231String());
         }
+        $response->header('ETag', $this->versions->etag($block));
 
         return $response;
     }

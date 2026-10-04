@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
+use App\Jobs\Data\Fetch\ProcessFetchedContent;
 use App\Jobs\Fetch\FetchSingleUrl;
 use App\Models\EventObject;
 use App\Models\User;
@@ -105,5 +106,53 @@ class BookmarksControllerTest extends TestCase
 
         $this->assertSame(0, EventObject::query()->count());
         Queue::assertNothingPushed();
+    }
+
+    #[Test]
+    public function captures_rendered_safari_content_without_refetching(): void
+    {
+        Queue::fake();
+        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+
+        $this->postJson('/api/v1/mobile/bookmarks/capture', [
+            'url' => 'https://example.com/subscriber-article',
+            'title' => 'Subscriber article',
+            'html' => <<<'HTML'
+                <!doctype html>
+                <html>
+                    <head><title>Subscriber article</title></head>
+                    <body>
+                        <article>
+                            <h1>Subscriber article</h1>
+                            <p>This is the complete article captured from an authenticated Safari session. It contains enough meaningful text for Spark to extract and archive successfully.</p>
+                            <p>A hidden paywall marker may remain elsewhere in the rendered document.</p>
+                        </article>
+                        <div class="paywall">Already a subscriber? Sign in to read.</div>
+                    </body>
+                </html>
+                HTML,
+        ])->assertCreated()
+            ->assertJsonPath('state', 'captured')
+            ->assertJsonPath('bookmark.title', 'Subscriber article');
+
+        $bookmark = EventObject::query()
+            ->where('user_id', $this->user->id)
+            ->where('url', 'https://example.com/subscriber-article')
+            ->firstOrFail();
+
+        $this->assertSame('browser_extension', $bookmark->metadata['subscription_source']);
+        Queue::assertNotPushed(FetchSingleUrl::class);
+        Queue::assertPushed(ProcessFetchedContent::class);
+    }
+
+    #[Test]
+    public function safari_capture_requires_write_ability(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->postJson('/api/v1/mobile/bookmarks/capture', [
+            'url' => 'https://example.com/article',
+            'html' => '<html><head><title>Example article</title></head><body></body></html>',
+        ])->assertForbidden();
     }
 }

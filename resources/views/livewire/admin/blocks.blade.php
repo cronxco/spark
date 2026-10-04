@@ -80,12 +80,16 @@ new class extends Component
         }
 
         try {
-            DB::transaction(function () {
-                // Delete blocks
-                Block::whereIn('id', $this->selectedBlocks)->delete();
+            $count = DB::transaction(function () {
+                // $selectedBlocks is a public Livewire property; re-resolve it
+                // through the same ownership predicate getBlocks() uses.
+                return Block::whereHas('event.integration', function ($q) {
+                    $q->where('user_id', Auth::id());
+                })
+                    ->whereIn('id', $this->selectedBlocks)
+                    ->delete();
             });
 
-            $count = count($this->selectedBlocks);
             $this->success("Successfully deleted {$count} block(s).");
 
             $this->selectedBlocks = [];

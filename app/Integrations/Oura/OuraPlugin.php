@@ -3,6 +3,7 @@
 namespace App\Integrations\Oura;
 
 use App\Integrations\Base\OAuthPlugin;
+use App\Integrations\Contracts\SupportsSweeps;
 use App\Integrations\Contracts\SupportsValueMapping;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -21,7 +22,7 @@ use Sentry\SentrySdk;
 use Sentry\Tracing\SpanContext;
 use Throwable;
 
-class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
+class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMapping
 {
     protected string $baseUrl = 'https://api.ouraring.com/v2';
 
@@ -33,6 +34,11 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
 
     protected string $redirectUri;
 
+    /**
+     * @var array<string, EventObject>
+     */
+    protected array $userProfiles = [];
+
     public function __construct()
     {
         $this->clientId = config('services.oura.client_id') ?? '';
@@ -42,6 +48,19 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         if (app()->environment() !== 'testing' && (empty($this->clientId) || empty($this->clientSecret))) {
             throw new InvalidArgumentException('Oura OAuth credentials are not configured');
         }
+    }
+
+    /**
+     * @return array{label: string, window: string, period_hours: int, config_key: string}
+     */
+    public static function getSweepSchedule(): array
+    {
+        return [
+            'label' => 'Daily sweep',
+            'window' => 'last 30 days',
+            'period_hours' => 22,
+            'config_key' => 'oura_last_sweep_at',
+        ];
     }
 
     public static function getIcon(): string
@@ -118,6 +137,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'percent',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_sleep_score' => [
@@ -127,6 +147,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'percent',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_activity_score' => [
@@ -136,6 +157,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'percent',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_stress_score' => [
@@ -145,6 +167,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'stress_level',
                 'value_formatter' => '{{ match($value) { 3 => "Stressful", 2 => "Normal", 1 => "Restored", default => $value } }}',
+                'higher_is_better' => false,
+                'ordinal' => true,
                 'hidden' => false,
             ],
             'had_resilience_score' => [
@@ -154,6 +178,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'resilience_level',
                 'value_formatter' => '{{ match($value) { 5 => "Exceptional", 4 => "Strong", 3 => "Solid", 2 => "Adequate", 1 => "Limited", default => $value } }}',
+                'higher_is_better' => true,
+                'ordinal' => true,
                 'hidden' => false,
             ],
             'had_spo2' => [
@@ -163,6 +189,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'percent',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">%</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_cardiovascular_age' => [
@@ -172,6 +199,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">years</span>',
                 'value_unit' => 'years',
+                'higher_is_better' => false,
                 'hidden' => false,
             ],
             'had_vo2_max' => [
@@ -181,6 +209,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'display_with_object' => false,
                 'value_unit' => 'ml/kg/min',
                 'value_formatter' => '{{ round($value) }}<span class="text-[0.875em]">ml</span>',
+                'higher_is_better' => true,
                 'hidden' => false,
             ],
             'had_enhanced_tag' => [
@@ -1361,10 +1390,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         }
 
         $sourceId = "oura_{$kind}_{$integration->id}_{$day}";
-        $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
-        if ($exists) {
-            return;
-        }
 
         $actor = $this->ensureUserProfile($integration);
         $target = $this->getStaticMetricObject(
@@ -1395,7 +1420,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         ];
         $action = $actionMap[$kind] ?? 'scored';
 
-        $event = Event::create([
+        $event = Event::withTrashed()->updateOrCreate(['integration_id' => $integration->id, 'source_id' => $sourceId], [
             'source_id' => $sourceId,
             'time' => $day . ' 00:00:00',
             'integration_id' => $integration->id,
@@ -1976,21 +2001,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
         return $data['data'] ?? [];
     }
 
+    /**
+     * Resolve the Oura user profile object, fetching personal info at most once per integration for this plugin instance.
+     */
     public function ensureUserProfile(Integration $integration): EventObject
     {
-        $info = $this->getJson('/usercollection/personal_info', $integration);
-        $data = Arr::first($info['data'] ?? []) ?? $info;
-        $profile = [
-            'user_id' => $integration->group?->account_id,
-            'email' => Arr::get($data, 'email'),
-            'age' => Arr::get($data, 'age'),
-            'biological_sex' => Arr::get($data, 'biological_sex'),
-            'weight' => Arr::get($data, 'weight'),
-            'height' => Arr::get($data, 'height'),
-            'dominant_hand' => Arr::get($data, 'dominant_hand'),
-        ];
-
-        return $this->createOrUpdateUser($integration, $profile);
+        return $this->userProfiles[$integration->id] ??= $this->fetchUserProfile($integration);
     }
 
     /**
@@ -2012,6 +2028,23 @@ class OuraPlugin extends OAuthPlugin implements SupportsValueMapping
                 'metadata' => [],
             ]
         );
+    }
+
+    protected function fetchUserProfile(Integration $integration): EventObject
+    {
+        $info = $this->getJson('/usercollection/personal_info', $integration);
+        $data = Arr::first($info['data'] ?? []) ?? $info;
+        $profile = [
+            'user_id' => $integration->group?->account_id,
+            'email' => Arr::get($data, 'email'),
+            'age' => Arr::get($data, 'age'),
+            'biological_sex' => Arr::get($data, 'biological_sex'),
+            'weight' => Arr::get($data, 'weight'),
+            'height' => Arr::get($data, 'height'),
+            'dominant_hand' => Arr::get($data, 'dominant_hand'),
+        ];
+
+        return $this->createOrUpdateUser($integration, $profile);
     }
 
     /**

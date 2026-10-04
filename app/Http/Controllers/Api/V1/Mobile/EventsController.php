@@ -4,13 +4,19 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactEventResource;
+use App\Services\Api\ResourceVersion;
+use App\Services\EventNoteService;
 use App\Services\Mobile\EventLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class EventsController extends Controller
 {
-    public function __construct(protected EventLookup $lookup) {}
+    public function __construct(
+        protected EventLookup $lookup,
+        protected EventNoteService $notes,
+        protected ResourceVersion $versions,
+    ) {}
 
     /**
      * GET /api/v1/mobile/events/{id}
@@ -30,6 +36,7 @@ class EventsController extends Controller
         if ($event->updated_at) {
             $response->header('Last-Modified', $event->updated_at->toRfc7231String());
         }
+        $response->header('ETag', $this->versions->etag($event));
 
         return $response;
     }
@@ -57,27 +64,10 @@ class EventsController extends Controller
 
         $note = is_string($validated['note'] ?? null) ? trim($validated['note']) : null;
 
-        // blocks() is withTrashed(); only act on the live note block.
-        $existing = $event->blocks->first(
-            fn ($block) => $block->block_type === CompactEventResource::NOTE_BLOCK_TYPE && $block->deleted_at === null,
-        );
-
-        if ($note === null || $note === '') {
-            $existing?->delete();
-        } else {
-            $event->createBlock([
-                'title' => 'Note',
-                'block_type' => CompactEventResource::NOTE_BLOCK_TYPE,
-                'time' => $event->time,
-                'metadata' => ['content' => $note],
-            ]);
-        }
-
-        // Reload so the resource reflects the freshly written/cleared note block.
-        $event = $this->lookup->find($user, $id);
+        $event = $this->notes->set($user, $id, $note);
 
         return response()->json(
             (new CompactEventResource($event))->resolve($request),
-        );
+        )->header('ETag', $this->versions->etag($event));
     }
 }

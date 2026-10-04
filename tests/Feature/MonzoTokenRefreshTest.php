@@ -8,6 +8,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MonzoTokenRefreshTest extends TestCase
@@ -49,7 +50,7 @@ class MonzoTokenRefreshTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_refreshes_token_when_expired_during_api_call(): void
     {
         // Mock token refresh endpoint
@@ -92,7 +93,7 @@ class MonzoTokenRefreshTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_401_response_by_refreshing_token(): void
     {
         // Start with a non-expired token but mock 401 response
@@ -133,7 +134,7 @@ class MonzoTokenRefreshTest extends TestCase
         Http::assertSentCount(3); // 2 account calls + 1 token refresh
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_refresh_token_failure_gracefully(): void
     {
         Http::fake([
@@ -158,7 +159,7 @@ class MonzoTokenRefreshTest extends TestCase
         $this->assertEquals('valid-refresh-token', $this->group->refresh_token);
     }
 
-    /** @test */
+    #[Test]
     public function it_skips_refresh_when_missing_credentials(): void
     {
         // Remove config to simulate missing credentials
