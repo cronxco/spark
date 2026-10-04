@@ -8,6 +8,7 @@ use App\Services\RelationshipTypeRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 /**
@@ -25,7 +26,7 @@ class RelationshipContractTest extends TestCase
 
         config(['ios.mobile_api_enabled' => true]);
         $this->user = User::factory()->create();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
     }
 
     #[Test]

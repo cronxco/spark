@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 /**
@@ -56,7 +57,7 @@ class LockedObjectEditTest extends TestCase
     {
         config(['ios.mobile_api_enabled' => true]);
         [$user, $object] = $this->lockedObject();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $etag = $this->getJson("/api/v1/mobile/objects/{$object->id}")->headers->get('ETag');
 

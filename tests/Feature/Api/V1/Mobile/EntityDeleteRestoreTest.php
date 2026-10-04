@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 /**
@@ -36,7 +37,7 @@ class EntityDeleteRestoreTest extends TestCase
     #[Test]
     public function an_event_is_soft_deleted_and_restored(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'data:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'data:write']));
         $event = Event::factory()->create(['integration_id' => $this->integration->id, 'service' => 'monzo']);
         $etag = $this->getJson("/api/v1/mobile/events/{$event->id}")->headers->get('ETag');
 
@@ -59,7 +60,7 @@ class EntityDeleteRestoreTest extends TestCase
     #[Test]
     public function an_object_is_soft_deleted_and_restored_with_its_events_kept(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
         $event = Event::factory()->create(['integration_id' => $this->integration->id, 'service' => 'monzo', 'target_id' => $object->id]);
         $etag = $this->getJson("/api/v1/mobile/objects/{$object->id}")->headers->get('ETag');
@@ -81,7 +82,7 @@ class EntityDeleteRestoreTest extends TestCase
     #[Test]
     public function deleting_needs_a_current_if_match(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
 
         $this->deleteJson("/api/v1/mobile/objects/{$object->id}")->assertStatus(428);
@@ -93,7 +94,7 @@ class EntityDeleteRestoreTest extends TestCase
     #[Test]
     public function restoring_twice_is_harmless(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $event = Event::factory()->create(['integration_id' => $this->integration->id, 'service' => 'monzo']);
         $event->delete();
 
@@ -107,7 +108,7 @@ class EntityDeleteRestoreTest extends TestCase
         $other = User::factory()->create();
         $otherEvent = Event::factory()->create(['integration_id' => $this->integrationFor($other)->id, 'service' => 'monzo']);
         $otherObject = EventObject::factory()->create(['user_id' => $other->id]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $this->deleteJson("/api/v1/mobile/events/{$otherEvent->id}", [], ['If-Match' => '"x"'])->assertNotFound();
         $this->deleteJson("/api/v1/mobile/objects/{$otherObject->id}", [], ['If-Match' => '"x"'])->assertNotFound();
@@ -124,7 +125,7 @@ class EntityDeleteRestoreTest extends TestCase
     #[Test]
     public function a_read_only_token_cannot_delete_or_restore(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
 
         $this->deleteJson("/api/v1/mobile/objects/{$object->id}", [], ['If-Match' => '"x"'])->assertForbidden();
@@ -134,7 +135,7 @@ class EntityDeleteRestoreTest extends TestCase
     #[Test]
     public function a_deleted_event_shows_up_in_the_sync_delta(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $event = Event::factory()->create(['integration_id' => $this->integration->id, 'service' => 'monzo']);
         $since = now()->subMinute()->toIso8601String();
         $etag = $this->getJson("/api/v1/mobile/events/{$event->id}")->headers->get('ETag');

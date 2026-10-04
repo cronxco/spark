@@ -17,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 /**
@@ -57,7 +58,7 @@ class SourceFieldOverrideTest extends TestCase
     public function the_mobile_api_rejects_source_field_changes_with_a_clear_message(): void
     {
         [$object] = $this->sourcedGraph();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $etag = $this->getJson("/api/v1/mobile/objects/{$object->id}")->headers->get('ETag');
 
         $this->patchJson("/api/v1/mobile/objects/{$object->id}", ['title' => 'Renamed', 'url' => 'https://example.com/mine'], ['If-Match' => $etag])
@@ -74,7 +75,7 @@ class SourceFieldOverrideTest extends TestCase
     public function resubmitting_the_current_source_values_is_not_an_override(): void
     {
         [$object] = $this->sourcedGraph();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $etag = $this->getJson("/api/v1/mobile/objects/{$object->id}")->headers->get('ETag');
 
         $this->patchJson("/api/v1/mobile/objects/{$object->id}", ['title' => 'Current account', 'url' => null], ['If-Match' => $etag])
@@ -120,7 +121,7 @@ class SourceFieldOverrideTest extends TestCase
     public function the_event_note_stays_editable_on_an_integration_event(): void
     {
         [, $event] = $this->sourcedGraph();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
         $etag = $this->getJson("/api/v1/mobile/events/{$event->id}")->headers->get('ETag');
 
         $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Paid back by Sam'], ['If-Match' => $etag])
