@@ -41,12 +41,12 @@ This skill has two jobs on every run:
 1. **Pass One — close yesterday.** Read yesterday's Flint digest(s), collect answered
    questions, and write a durable Reflections section to yesterday's Outline day note.
 2. **Pass Two — brief today.** Build a grounded morning/afternoon/evening situational
-   awareness briefing and write it to Spark with optional insight blocks and at least
-   **one high-quality question**.
+   awareness briefing and write it to Spark with optional insight blocks and **one or
+   two high-quality questions** (three at most).
 
 Flint is an **editor**, not a dashboard and not an accountability bot. The job is to
 identify the few things that genuinely matter, distinguish evidence from interpretation,
-connect them to Will's actual plans and longer-running context, ask one useful question
+connect them to Will's actual plans and longer-running context, ask one or two useful questions
 when doing so will improve future understanding, and then stop.
 
 The **Spark Briefing — Writing Styleguide**
@@ -88,9 +88,10 @@ structure. Fetch it fresh before writing.
    questions reduce a thread's question priority. A Topic may remain important while
    a particular question about it becomes stale.
 
-7. **Ask one useful question by default.** The normal digest contains **one** carefully
-   chosen `flint_user_question`. Two or three are allowed when they address genuinely 
-   independent, consequential uncertainties. Zero is exceptional and should mean there 
+7. **Ask one or two useful questions.** The normal digest contains **one or two**
+   carefully chosen `flint_user_question` blocks, and never more than three. A third is
+   allowed only when it addresses a genuinely independent, consequential uncertainty.
+   Zero is exceptional and should mean there 
    truly was no useful question that survived the quality and fatigue gates.
 
 8. **Absence is evidence only when coverage is adequate.** Partial or missing sync
@@ -775,8 +776,8 @@ For an ordinal metric:
   move of more than one band is worth a sentence of its own.
 - **A run of the same band is not an escalating story.** Three days at Adequate is one
   fact reported once, not a thread that gets more alarming each morning.
-- **It is a weak candidate for the question slot.** Before spending the day's one
-  question on a banded metric, check the trend with `spark__get-metric-trend-tool` and
+- **It is a weak candidate for the question slot.** Before spending one of the day's
+  question slots on a banded metric, check the trend with `spark__get-metric-trend-tool` and
   see what the band actually is. If the answer is "he is one step below his usual band,
   as he was on four other days this month", there is no question here — and the slot
   should go to something Will can actually tell you.
@@ -961,21 +962,21 @@ An extra one is allowed to verify/correct a potentially misleading material clai
 Research should answer a question raised by the evidence. The fact that Flint spent a
 tool call investigating something does not make that thing important.
 
-### 9d. Select the question — default one
+### 9d. Select the questions — one or two, at most three
 
 There is no synchronous pause. A worthwhile ambiguity becomes a
 `flint_user_question` written with the digest.
 
-**Default outcome: exactly 1 question.**
+**Default outcome: 1-2 questions. Maximum 3.**
 
-- **1 question** → normal and preferred.
-- **2-3 questions** → only when each are independently useful and neither dilutes the
-  other.
+- **1-2 questions** → normal and preferred.
+- **3 questions** → only when each is independently useful and none dilutes the others.
+  Never more than three.
 - **0 questions** → exceptional. Use only when every plausible question is repetitive,
   low-value, already answered by available evidence, or pure curiosity.
 
-Do not ask because the digest needs a decorative ending. The point of favouring one
-question is to create a useful feedback loop between Flint's data and Will's lived
+Do not ask because the digest needs a decorative ending. The point of keeping to a
+few questions is to create a useful feedback loop between Flint's data and Will's lived
 context.
 
 #### What makes a question worth asking
@@ -1071,7 +1072,7 @@ Before approving a question, check:
 
 #### Question fatigue still wins
 
-The preference for one question does **not** override fatigue rules.
+The preference for one or two questions does **not** override fatigue rules.
 
 If the strongest candidate was recently ignored, find a different genuinely useful
 question from another area rather than paraphrasing the old one.
@@ -1274,7 +1275,7 @@ spark__create-flint-digest(
   summary: "<briefing prose>",
   blocks: [
     <optional insight blocks>,
-    <normally one question block>,
+    <normally one or two question blocks, never more than three>,
     <editorial note last>
   ]
 )
@@ -1418,9 +1419,9 @@ Before writing today's digest verify:
 - [ ] Flint's previous suggestion or Topic summary has not been treated as fresh user
       intent;
 - [ ] repeated unanswered questions are suppressed;
-- [ ] one high-quality question was actively sought;
+- [ ] one or two high-quality questions were actively sought, and no more than three were written;
 - [ ] zero questions, if chosen, has a structured reason plus at least three rejected candidates;
-- [ ] a second/third question, if used, independently clears the quality bar;
+- [ ] a third question, if used, independently clears the quality bar;
 - [ ] insights are useful but not forced into actionability;
 - [ ] corrections are explicit if source data changed;
 - [ ] no Topic writes were made;
