@@ -90,6 +90,7 @@ class IntegrationApiConfigureTest extends TestCase
         $this->patchJson($url, [])->assertStatus(428);
         $this->withHeader('If-Match', '"stale"')->patchJson($url, [])->assertStatus(412);
     }
+
     #[Test]
     public function invalid_select_number_and_range_values_do_not_change_configuration(): void
     {
@@ -112,5 +113,4 @@ class IntegrationApiConfigureTest extends TestCase
 
         $this->assertSame($before, $integration->fresh()->configuration);
     }
-
 }
