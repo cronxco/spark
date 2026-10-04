@@ -2455,6 +2455,20 @@ components:
         last_sync_at: { type: [string, "null"], format: date-time }
         next_update_at: { type: [string, "null"], format: date-time }
         schedule_summary: { type: [string, "null"] }
+        last_run:
+          type: [object, "null"]
+          properties:
+            status:
+              {
+                type: string,
+                enum: [requested, fetching, processing, up_to_date, partial, failed],
+              }
+            requested_at: { type: [string, "null"], format: date-time }
+            started_at: { type: [string, "null"], format: date-time }
+            finished_at: { type: [string, "null"], format: date-time }
+            processed_jobs: { type: integer }
+            failed_jobs: { type: integer }
+            error: { type: [string, "null"] }
 
     IntegrationDetail:
       type: object

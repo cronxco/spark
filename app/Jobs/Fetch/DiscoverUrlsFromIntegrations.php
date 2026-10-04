@@ -12,6 +12,7 @@ use App\Services\Fetch\Links\LinkCandidateExtractor;
 use App\Services\Fetch\Links\UrlCanonicalizer;
 use App\Services\Fetch\UrlSafetyValidator;
 use Exception;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -21,7 +22,7 @@ use Illuminate\Support\Facades\Log;
 
 class DiscoverUrlsFromIntegrations implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 1;
 
