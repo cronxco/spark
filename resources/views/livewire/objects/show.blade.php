@@ -736,6 +736,14 @@ new class extends Component
             <!-- Header -->
             <x-header title="Object Details" separator>
                 <x-slot:actions>
+                    @if ($this->object->concept === 'person')
+                    <x-button
+                        link="{{ route('people.show', $this->object->id) }}"
+                        class="btn-ghost btn-sm"
+                        icon="fas.user"
+                        label="Person page"
+                        wire:navigate />
+                    @endif
                     <x-button
                         @click="drawerOpen = !drawerOpen"
                         class="btn-ghost btn-sm"

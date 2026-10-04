@@ -84,6 +84,7 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/updates', 'updates.index')->name('updates.index');
     Volt::route('/events/{event}', 'events.show')->name('events.show');
     Volt::route('/objects/{object}', 'objects.show')->name('objects.show');
+    Volt::route('/people/{person}', 'people.show')->name('people.show');
     Volt::route('/blocks/{block}', 'blocks.show')->name('blocks.show');
     Volt::route('/tags', 'tags.index')->name('tags.index');
     Volt::route('/tags/{type}/{slug}/{id}', 'tags.show')->name('tags.show');
