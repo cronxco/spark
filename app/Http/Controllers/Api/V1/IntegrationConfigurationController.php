@@ -9,6 +9,7 @@ use App\Services\Api\ResourceVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class IntegrationConfigurationController extends Controller
 {
@@ -75,12 +76,30 @@ class IntegrationConfigurationController extends Controller
                 case 'boolean':
                     $fieldRules[] = 'boolean';
                     break;
+                case 'text':
+                case 'textarea':
+                case 'password':
+                case 'select':
                 case 'string':
                     $fieldRules[] = 'string';
+                    break;
+                case 'number':
+                    $fieldRules[] = 'numeric';
                     break;
                 case 'integer':
                     $fieldRules[] = 'integer';
                     break;
+            }
+
+            foreach (['min', 'max'] as $bound) {
+                if (isset($config[$bound])) {
+                    $fieldRules[] = "{$bound}:{$config[$bound]}";
+                }
+            }
+
+            if (($config['type'] ?? null) === 'select' && isset($config['options'])) {
+                $options = $config['options'];
+                $fieldRules[] = Rule::in(array_is_list($options) ? $options : array_keys($options));
             }
 
             $rules[$field] = $fieldRules;

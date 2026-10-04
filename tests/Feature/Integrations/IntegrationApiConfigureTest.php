@@ -90,4 +90,27 @@ class IntegrationApiConfigureTest extends TestCase
         $this->patchJson($url, [])->assertStatus(428);
         $this->withHeader('If-Match', '"stale"')->patchJson($url, [])->assertStatus(412);
     }
+    #[Test]
+    public function invalid_select_number_and_range_values_do_not_change_configuration(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'hevy',
+            'instance_type' => 'workouts',
+            'configuration' => ['api_key' => 'hevy-key', 'units' => 'kg', 'update_frequency_minutes' => 60],
+        ]);
+        $before = $integration->configuration;
+        Sanctum::actingAs($user, ['integrations:manage']);
+
+        $this->withHeader('If-Match', app(ResourceVersion::class)->etag($integration))
+            ->patchJson("/api/v1/integrations/{$integration->id}/configure", [
+                'units' => 'oz',
+                'update_frequency_minutes' => 1,
+                'weight_increment_kg' => ['invalid'],
+            ])->assertUnprocessable()->assertJsonValidationErrors(['units', 'update_frequency_minutes', 'weight_increment_kg']);
+
+        $this->assertSame($before, $integration->fresh()->configuration);
+    }
+
 }
