@@ -117,7 +117,7 @@ class RecencyRanking
     public function orderByText(Builder $query, string $term, string $primaryColumn, string $timeColumn = 'time'): Builder
     {
         $model = $query->getModel();
-        $column = $model->qualifyColumn($primaryColumn);
+        $column = $query->getQuery()->getGrammar()->wrap($model->qualifyColumn($primaryColumn));
         $term = trim($term);
         $escaped = addcslashes($term, '\\%_');
 
@@ -145,13 +145,14 @@ class RecencyRanking
     public function orderBySemantic(Builder $query, array $embedding, string $timeColumn = 'time'): Builder
     {
         $model = $query->getModel();
+        $grammar = $query->getQuery()->getGrammar();
         $embeddingString = '[' . implode(',', $embedding) . ']';
-        $relevanceSql = sprintf('GREATEST(0, 1 - (%s <=> ?) / 2)', $model->qualifyColumn('embeddings'));
+        $relevanceSql = sprintf('GREATEST(0, 1 - (%s <=> ?) / 2)', $grammar->wrap($model->qualifyColumn('embeddings')));
 
         $query->selectRaw(sprintf(
             '(%d - EXTRACT(EPOCH FROM %s)) / 86400.0 as days_ago',
             now()->getTimestamp(),
-            $model->qualifyColumn($timeColumn),
+            $grammar->wrap($model->qualifyColumn($timeColumn)),
         ));
 
         return $this->applyOrder($query, $relevanceSql, [$embeddingString], $timeColumn);
@@ -163,6 +164,7 @@ class RecencyRanking
     protected function applyOrder(Builder $query, string $relevanceSql, array $relevanceBindings, string $timeColumn): Builder
     {
         $model = $query->getModel();
+        $grammar = $query->getQuery()->getGrammar();
         $query->reorder();
 
         if (! $this->enabled()) {
@@ -174,7 +176,7 @@ class RecencyRanking
         $recencySql = sprintf(
             'COALESCE(POWER(0.5, GREATEST((%d - EXTRACT(EPOCH FROM %s)) / 86400.0, 0) / %F), 0)',
             now()->getTimestamp(),
-            $model->qualifyColumn($timeColumn),
+            $grammar->wrap($model->qualifyColumn($timeColumn)),
             $this->halfLifeDays,
         );
 
