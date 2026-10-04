@@ -4,7 +4,9 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Event;
+use App\Services\EffectiveTimezoneResolver;
 use App\Support\FlintBlockPresenter;
+use App\Support\FlintDigestDay;
 use App\Support\FlintDigestKind;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -45,17 +47,12 @@ class GetLatestFlintDigestTool extends Tool
             return Response::error('Authentication required.');
         }
 
-        // Digests are filed at the start of the user's local day, which for
-        // anyone east or west of UTC is a different UTC calendar date — so a
-        // timezone-aware date has to be paired with a UTC range, not
-        // whereDate(). See UpToSpeedController::localDayRange().
-        $timezone = $user->getTimezone();
+        // Digests are matched on the local day they were written for (D-F2).
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($user);
         $date = $request->get('date', 'today');
         $parsedDate = $date === 'today'
             ? Carbon::today($timezone)
             : Carbon::parse($date, $timezone);
-        $dayStart = $parsedDate->copy()->timezone($timezone)->startOfDay();
-        $dayEnd = $dayStart->copy()->addDay();
         $period = $request->get('period');
         $all = $request->boolean('all', false);
 
@@ -64,8 +61,7 @@ class GetLatestFlintDigestTool extends Tool
         $query = Event::whereIn('integration_id', $integrationIds)
             ->where('service', 'flint')
             ->where('action', 'had_summary')
-            ->where('time', '>=', $dayStart->copy()->setTimezone('UTC'))
-            ->where('time', '<', $dayEnd->copy()->setTimezone('UTC'))
+            ->tap(fn ($query) => FlintDigestDay::on($query, $parsedDate->toDateString()))
             ->with('blocks')
             // A day's digests all share `time` (the local day); `created_at`
             // decides which one is the latest.

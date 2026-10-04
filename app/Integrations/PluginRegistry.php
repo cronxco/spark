@@ -5,6 +5,7 @@ namespace App\Integrations;
 use App\Integrations\Contracts\IntegrationPlugin;
 use App\Integrations\Contracts\SupportsEffects;
 use App\Integrations\Contracts\SupportsSpotlightCommands;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -40,6 +41,25 @@ class PluginRegistry
     public static function getAllPlugins(): Collection
     {
         return collect(self::$plugins);
+    }
+
+    /**
+     * Whether the user may see and add this plugin. A plugin opts in to
+     * being admin-only with a static `isAdminOnly()` returning true.
+     */
+    public static function isAvailableTo(string $pluginClass, ?User $user): bool
+    {
+        $isAdminOnly = method_exists($pluginClass, 'isAdminOnly') && $pluginClass::isAdminOnly();
+
+        return ! $isAdminOnly || (bool) $user?->is_admin;
+    }
+
+    /**
+     * The plugins the user may see and add, for add-integration lists.
+     */
+    public static function getPluginsAvailableTo(?User $user): Collection
+    {
+        return self::getAllPlugins()->filter(fn (string $pluginClass): bool => self::isAvailableTo($pluginClass, $user));
     }
 
     public static function getOAuthPlugins(): Collection

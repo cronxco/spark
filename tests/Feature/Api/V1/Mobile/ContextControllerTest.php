@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -21,7 +22,7 @@ class ContextControllerTest extends TestCase
     #[Test]
     public function day_is_marked_deprecated_in_favour_of_briefing_today(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/context/day')
             ->assertOk()
@@ -33,7 +34,7 @@ class ContextControllerTest extends TestCase
     #[Test]
     public function service_status_is_marked_deprecated_in_favour_of_briefing_today(): void
     {
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/context/service-status')
             ->assertOk()

@@ -10,6 +10,7 @@ use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
 use App\Services\MetricPresentation;
+use App\Support\FlintDigestDay;
 use App\Support\FlintDigestKind;
 use App\Support\FlintQuestion;
 use Carbon\Carbon;
@@ -153,7 +154,7 @@ class UpToSpeedController extends Controller
         $events = Event::whereIn('integration_id', $integrationIds)
             ->where('service', 'flint')
             ->where('action', 'had_summary')
-            ->whereBetween('time', $this->localDayRange($today, $timezone))
+            ->tap(fn ($query) => FlintDigestDay::on($query, $today->copy()->timezone($timezone)->toDateString()))
             ->with('blocks')
             // All of a day's digests share the same `time` (the local day),
             // so the run order comes from `created_at`.
@@ -172,7 +173,7 @@ class UpToSpeedController extends Controller
                 '_subject_id' => $event->id,
                 '_subject_key' => Event::class . ':' . $event->id,
                 'payload' => [
-                    'date' => Carbon::parse($event->time)->toDateString(),
+                    'date' => $meta['local_date'] ?? $event->time->toDateString(),
                     'period' => $meta['period'] ?? null,
                     'title' => $meta['title'] ?? null,
                     'kind' => $this->digestKind($event, $meta),

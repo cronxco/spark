@@ -7,6 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -20,7 +21,7 @@ class ConditionalWritesTest extends TestCase
     public function an_owned_entity_write_requires_a_current_strong_etag(): void
     {
         [$user, $event] = $this->eventForUser();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $this->patchJson("/api/v1/mobile/events/{$event->id}", ['action' => 'changed'])
             ->assertStatus(428)->assertHeader('ETag');
@@ -40,7 +41,7 @@ class ConditionalWritesTest extends TestCase
     public function conditional_writes_do_not_disclose_another_users_entity(): void
     {
         [, $event] = $this->eventForUser();
-        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_SESSION);
 
         $this->patchJson("/api/v1/mobile/events/{$event->id}", ['action' => 'changed'], ['If-Match' => '"anything"'])
             ->assertNotFound();

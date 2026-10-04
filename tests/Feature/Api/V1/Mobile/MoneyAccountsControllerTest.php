@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Services\Api\ResourceVersion;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -28,7 +29,7 @@ class MoneyAccountsControllerTest extends TestCase
     public function pins_a_manual_account_and_reports_it_on_index(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $account = $this->makeManualAccount($user, 'Current Account');
 
@@ -45,7 +46,7 @@ class MoneyAccountsControllerTest extends TestCase
     public function pinning_one_account_unpins_the_previous_one(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $first = $this->makeManualAccount($user, 'First');
         $second = $this->makeManualAccount($user, 'Second');
@@ -69,7 +70,7 @@ class MoneyAccountsControllerTest extends TestCase
     public function index_paginates_with_the_shared_cursor_envelope(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_READ);
 
         $this->makeManualAccount($user, 'First');
         $this->makeManualAccount($user, 'Second');
@@ -94,7 +95,7 @@ class MoneyAccountsControllerTest extends TestCase
     public function add_balance_with_idempotency_key_replays_instead_of_double_writing(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
         $account = $this->makeManualAccount($user, 'Current Account');
 
         $payload = ['balance' => 123.45, 'date' => now()->toDateString()];
@@ -119,7 +120,7 @@ class MoneyAccountsControllerTest extends TestCase
     public function pinning_a_non_manual_account_is_allowed(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'monzo']);
         $integration = Integration::factory()->create([
@@ -146,7 +147,7 @@ class MoneyAccountsControllerTest extends TestCase
     public function editing_account_data_on_a_non_manual_account_is_still_rejected(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($user, SparkAbility::MOBILE_SESSION);
 
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'monzo']);
         $integration = Integration::factory()->create([

@@ -252,7 +252,7 @@ class FlintDigestSchedulingTest extends TestCase
         $user = User::factory()->create([
             'settings' => [
                 'timezone' => 'Europe/London',
-                'flint' => ['digests_enabled' => true],
+                'flint' => ['morning_digest_enabled' => true, 'evening_digest_enabled' => true],
             ],
         ]);
         $integration = Integration::factory()->create([
@@ -286,6 +286,22 @@ class FlintDigestSchedulingTest extends TestCase
     }
 
     #[Test]
+    public function the_legacy_all_routines_key_alone_schedules_nothing(): void
+    {
+        Bus::fake();
+        $user = $this->newYorkUser();
+        $user->update(['settings' => array_merge($user->settings, ['flint' => ['digests_enabled' => true]])]);
+        $this->seedSleepScore($user, '2026-06-15');
+        Carbon::setTestNow('2026-06-15 23:30:00');
+
+        $this->runDispatcher();
+        $this->runRoutineDispatcher();
+
+        Bus::assertNotDispatched(TriggerFlintDigestRoutineJob::class);
+        Bus::assertNotDispatched(TriggerFlintRoutineJob::class);
+    }
+
+    #[Test]
     public function morning_and_evening_briefing_switches_are_independent(): void
     {
         Bus::fake();
@@ -310,7 +326,6 @@ class FlintDigestSchedulingTest extends TestCase
         $user = $this->newYorkUser();
         $settings = $user->settings;
         $settings['flint'] = array_merge($settings['flint'], [
-            'digests_enabled' => true,
             'topics_enabled' => true,
             'reading_list_enabled' => false,
             'news_roundup_enabled' => false,
@@ -333,7 +348,7 @@ class FlintDigestSchedulingTest extends TestCase
         $user = User::factory()->create([
             'settings' => [
                 'timezone' => 'Europe/London',
-                'flint' => ['digests_enabled' => true],
+                'flint' => ['morning_digest_enabled' => true, 'evening_digest_enabled' => true],
             ],
         ]);
 

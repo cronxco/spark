@@ -27,6 +27,8 @@ class GenerateEmbeddingTask extends BaseTaskJob
                 'model_id' => $this->model->id,
             ]);
 
+            $this->recordOutcome('not_applicable');
+
             return;
         }
 

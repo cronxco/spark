@@ -44,11 +44,7 @@ class MetricTrendsQuery
                         ->setIcon('chart-bar')
                         ->setGroup('metrics')
                         ->setPriority($trend->acknowledged_at ? 2 : 1)
-                        ->setAction('dispatch_event', [
-                            'name' => 'view-trend',
-                            'data' => ['trendId' => $trend->id],
-                            'close' => true,
-                        ]);
+                        ->setAction('jump_to', ['path' => route('metrics.show', $trend->metric_statistic_id)]);
                 });
         });
     }

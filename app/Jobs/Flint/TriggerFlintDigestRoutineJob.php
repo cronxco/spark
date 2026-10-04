@@ -11,6 +11,7 @@ use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\FlintDigestService;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Support\FlintDigestDay;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -285,9 +286,6 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
      */
     private function digestAlreadyExists(): bool
     {
-        $start = Carbon::parse($this->localDate, $this->timezone)->startOfDay()->utc();
-        $end = Carbon::parse($this->localDate, $this->timezone)->endOfDay()->utc();
-
         return Event::query()
             ->where('service', 'flint')
             ->where('action', 'had_summary')
@@ -295,7 +293,7 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
             ->whereJsonContains('event_metadata->period', $this->period)
             ->where('event_metadata->routine', 'digest')
             ->where('event_metadata->trigger_source', 'scheduled')
-            ->whereBetween('time', [$start, $end])
+            ->tap(fn ($query) => FlintDigestDay::on($query, $this->localDate))
             ->exists();
     }
 

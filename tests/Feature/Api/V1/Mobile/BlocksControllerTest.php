@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -52,7 +53,7 @@ class BlocksControllerTest extends TestCase
     public function returns_compact_block_shape(): void
     {
         $block = $this->createBlock();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/blocks/{$block->id}")
             ->assertOk()
@@ -68,7 +69,7 @@ class BlocksControllerTest extends TestCase
         $block = $this->createBlock([
             'metadata' => ['content' => $content],
         ]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/blocks/{$block->id}")
             ->assertOk()
@@ -80,7 +81,7 @@ class BlocksControllerTest extends TestCase
     {
         $block = $this->createBlock();
         $otherUser = User::factory()->create();
-        Sanctum::actingAs($otherUser, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($otherUser, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/blocks/{$block->id}")->assertStatus(404);
     }
@@ -88,7 +89,7 @@ class BlocksControllerTest extends TestCase
     #[Test]
     public function returns_404_for_malformed_id(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
         $this->getJson('/api/v1/mobile/blocks/not-a-uuid')->assertStatus(404);
     }
 
@@ -96,7 +97,7 @@ class BlocksControllerTest extends TestCase
     public function etag_returns_304_on_match(): void
     {
         $block = $this->createBlock();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $first = $this->getJson("/api/v1/mobile/blocks/{$block->id}")->assertOk();
         $etag = $first->headers->get('ETag');

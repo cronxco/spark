@@ -4,6 +4,7 @@ namespace App\Spotlight\Queries\Search;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
+use App\Services\Search\RecencyRanking;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
@@ -21,13 +22,14 @@ class EventSearchQuery
                 return collect();
             }
 
-            return Event::forUser(Auth::id())
+            $events = Event::forUser(Auth::id())
                 ->with(['actor', 'target', 'integration'])
                 ->where('action', 'ilike', "%{$query}%")
-                ->latest('time')
-                ->limit(5)
+                ->limit(5);
+
+            return app(RecencyRanking::class)->orderByText($events, $query, 'action')
                 ->get()
-                ->map(function (Event $event) {
+                ->map(function (Event $event, int $rank) {
                     // Get formatted value
                     $formattedValue = format_event_value_display(
                         $event->formatted_value,
@@ -87,17 +89,13 @@ class EventSearchQuery
 
                     $subtitle = implode(' • ', $subtitleParts);
 
-                    // Boost priority for events from today or last week
-                    $priority = $event->time->isToday() ? 1 :
-                        ($event->time->isAfter(now()->subWeek()) ? 2 : 3);
-
                     return SpotlightResult::make()
                         ->setTitle(format_action_title($event->action))
                         ->setSubtitle($subtitle)
                         ->setTypeahead('Event: ' . $event->action . ' at ' . $event->time->format('M j, g:ia'))
                         ->setIcon($actionIcon)
                         ->setGroup('events')
-                        ->setPriority($priority)
+                        ->setPriority($rank + 1)
                         ->setAction('jump_to', ['path' => route('events.show', $event)])
                         ->setTokens(['event' => $event]);
                 });

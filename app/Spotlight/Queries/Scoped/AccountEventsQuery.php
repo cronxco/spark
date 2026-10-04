@@ -3,8 +3,7 @@
 namespace App\Spotlight\Queries\Scoped;
 
 use App\Integrations\PluginRegistry;
-use App\Models\Event;
-use App\Models\EventObject;
+use App\Spotlight\Support\OwnedRecords;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -22,13 +21,13 @@ class AccountEventsQuery
                 return collect();
             }
 
-            $account = EventObject::find($accountId);
+            $account = OwnedRecords::objects()->find($accountId);
             if (! $account) {
                 return collect();
             }
 
             // Get recent balance updates and transactions
-            $events = Event::with(['integration'])
+            $events = OwnedRecords::events()->with(['integration'])
                 ->where('actor_id', $accountId)
                 ->when(! blank($query), function ($q) use ($query) {
                     $q->where('action', 'ilike', "%{$query}%");

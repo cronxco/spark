@@ -16,7 +16,7 @@ class ApiTokensController extends Controller
      * the mobile app's own OAuth-issued tokens carry these abilities and
      * managing them here would let the app revoke its own session.
      */
-    private const HIDDEN_ABILITIES = ['ios:read', 'ios:write'];
+    private const HIDDEN_ABILITIES = [SparkAbility::MOBILE_SESSION_MARKER, 'ios:read', 'ios:write'];
 
     /**
      * GET /api/v1/mobile/api-tokens
@@ -90,7 +90,8 @@ class ApiTokensController extends Controller
     }
 
     /**
-     * An app-session token is one issued for the iOS app itself (ios:* scopes).
+     * An app-session token is one issued for the iOS app itself: it carries the
+     * mobile session marker, or the retired ios:* scopes.
      */
     private function isAppToken(object $token): bool
     {

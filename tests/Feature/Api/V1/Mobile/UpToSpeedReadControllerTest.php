@@ -8,6 +8,7 @@ use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -44,7 +45,7 @@ class UpToSpeedReadControllerTest extends TestCase
     #[Test]
     public function requires_ios_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', ['items' => []])
             ->assertStatus(403);
@@ -57,7 +58,7 @@ class UpToSpeedReadControllerTest extends TestCase
     #[Test]
     public function rejects_missing_items(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [])
             ->assertStatus(422);
@@ -66,7 +67,7 @@ class UpToSpeedReadControllerTest extends TestCase
     #[Test]
     public function rejects_unknown_type(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [['type' => 'invalid_type', 'id' => '00000000-0000-0000-0000-000000000001']],
@@ -76,7 +77,7 @@ class UpToSpeedReadControllerTest extends TestCase
     #[Test]
     public function rejects_non_uuid_id(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [['type' => 'flint_digest', 'id' => 'not-a-uuid']],
@@ -96,7 +97,7 @@ class UpToSpeedReadControllerTest extends TestCase
             'action' => 'had_summary',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [['type' => 'flint_digest', 'id' => $event->id]],
@@ -119,7 +120,7 @@ class UpToSpeedReadControllerTest extends TestCase
             'action' => 'had_summary',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $payload = ['items' => [['type' => 'flint_digest', 'id' => $event->id]]];
 
@@ -145,7 +146,7 @@ class UpToSpeedReadControllerTest extends TestCase
             'action' => 'had_summary',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [['type' => 'flint_digest', 'id' => $event->id]],
@@ -167,7 +168,7 @@ class UpToSpeedReadControllerTest extends TestCase
             'type' => 'anomaly_high',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [['type' => 'anomaly', 'id' => $anomaly->id]],
@@ -190,7 +191,7 @@ class UpToSpeedReadControllerTest extends TestCase
             'type' => 'anomaly_high',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $payload = ['items' => [['type' => 'anomaly', 'id' => $anomaly->id]]];
 
@@ -210,7 +211,7 @@ class UpToSpeedReadControllerTest extends TestCase
             'type' => 'anomaly_high',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [['type' => 'anomaly', 'id' => $anomaly->id]],
@@ -232,7 +233,7 @@ class UpToSpeedReadControllerTest extends TestCase
             'action' => 'bookmarked',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [['type' => 'news_summary', 'id' => $event->id]],
@@ -271,7 +272,7 @@ class UpToSpeedReadControllerTest extends TestCase
             'action' => 'bookmarked',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [
@@ -287,7 +288,7 @@ class UpToSpeedReadControllerTest extends TestCase
     #[Test]
     public function skips_nonexistent_ids_without_error(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [
