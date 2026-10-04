@@ -9,10 +9,13 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Notifications\MigrationCompleted;
+use App\Services\Notifications\NotificationIncidentResolver;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Mockery;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 class CompleteMigrationTest extends TestCase
@@ -188,6 +191,34 @@ class CompleteMigrationTest extends TestCase
         // This should complete without throwing, even if notification has issues
         $this->expectNotToPerformAssertions();
         $job->handle();
+    }
+
+    #[Test]
+    public function complete_migration_lets_incident_resolution_failures_bubble_for_retry(): void
+    {
+        Notification::fake();
+
+        $integration = $this->makeMonzoIntegration();
+
+        $resolver = Mockery::mock(NotificationIncidentResolver::class);
+        $resolver->shouldReceive('resolve')
+            ->once()
+            ->with($integration->user, ["migration_failed:{$integration->id}"])
+            ->andThrow(new RuntimeException('database unavailable'));
+        $this->app->instance(NotificationIncidentResolver::class, $resolver);
+
+        $job = new CompleteMigration($integration, 'monzo');
+
+        try {
+            $job->handle();
+            $this->fail('Expected the incident resolver failure to bubble out of handle().');
+        } catch (RuntimeException $e) {
+            $this->assertSame('database unavailable', $e->getMessage());
+        }
+
+        // The completion notification must still have been sent before the
+        // resolver failure, since it lives in its own error boundary.
+        Notification::assertSentTo($integration->user, MigrationCompleted::class);
     }
 
     private function makeMonzoIntegration(): Integration

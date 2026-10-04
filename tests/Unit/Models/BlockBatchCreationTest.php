@@ -7,15 +7,14 @@ use App\Models\Event;
 use App\Models\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BlockBatchCreationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function it_creates_blocks_in_batch_without_n_plus_one()
     {
         $integration = Integration::factory()->create();
@@ -45,9 +44,7 @@ class BlockBatchCreationTest extends TestCase
         $this->assertNotNull($event->blocks()->where('title', 'Steps')->first());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function it_updates_existing_blocks_in_batch()
     {
         $integration = Integration::factory()->create();
@@ -88,9 +85,7 @@ class BlockBatchCreationTest extends TestCase
         $this->assertEquals(5000, $event->blocks()->where('title', 'Steps')->first()->value);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function it_handles_empty_blocks_data_gracefully()
     {
         $integration = Integration::factory()->create();

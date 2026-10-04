@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Jobs\CheckIntegrationUpdates;
+use App\Jobs\OAuth\GitHub\GitHubActivityPull;
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\TaskExecution;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -85,10 +87,57 @@ class CheckIntegrationUpdatesJobTest extends TestCase
         Queue::assertPushed(ProcessTaskPipelineJob::class, 2);
 
         Queue::assertPushed(ProcessTaskPipelineJob::class, function ($job) use ($integration1) {
-            return $job->model->is($integration1) && $job->taskFilter === ['run_integration_update'];
+            return $job->model->is($integration1) && $job->taskFilter === ['run_integration_update'] && $job->force === true;
         });
         Queue::assertPushed(ProcessTaskPipelineJob::class, function ($job) use ($integration2) {
-            return $job->model->is($integration2) && $job->taskFilter === ['run_integration_update'];
+            return $job->model->is($integration2) && $job->taskFilter === ['run_integration_update'] && $job->force === true;
+        });
+    }
+
+    #[Test]
+    public function job_still_dispatches_for_an_integration_that_already_succeeded_once(): void
+    {
+        // Regression test for the force:true fix. Previously, an integration's
+        // run_integration_update task_execution row permanently showed
+        // 'success' after its first run, and ProcessTaskPipelineJob's default
+        // "skip already-succeeded" behavior silently rejected every
+        // subsequent scheduled dispatch forever, with no error anywhere -
+        // real integrations simply stopped updating after their first
+        // successful cycle. This lets the real cascade run end to end
+        // (CheckIntegrationUpdates -> ProcessTaskPipelineJob ->
+        // RunIntegrationUpdateTask -> the real fetch job) rather than faking
+        // ProcessTaskPipelineJob's own dispatch, since the bug lived inside it.
+        Queue::fake([GitHubActivityPull::class]);
+
+        $user = User::factory()->create();
+        $group = IntegrationGroup::create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'access_token' => 'test-token',
+        ]);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'integration_group_id' => $group->id,
+            'configuration' => ['update_frequency_minutes' => 15],
+            'last_successful_update_at' => Carbon::now()->subMinutes(20),
+            'last_triggered_at' => Carbon::now()->subMinutes(20),
+        ]);
+
+        // A prior successful run_integration_update execution for this integration.
+        TaskExecution::factory()->create([
+            'user_id' => $user->id,
+            'entity_type' => 'integration',
+            'entity_id' => $integration->id,
+            'task_key' => 'run_integration_update',
+            'status' => 'success',
+        ]);
+
+        $job = new CheckIntegrationUpdates;
+        $job->handle();
+
+        Queue::assertPushed(GitHubActivityPull::class, function ($job) use ($integration) {
+            return $job->getIntegration()->id === $integration->id;
         });
     }
 

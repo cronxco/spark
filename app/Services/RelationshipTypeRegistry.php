@@ -135,6 +135,20 @@ class RelationshipTypeRegistry
                 'description' => 'Person appears in photo cluster',
                 'supports_value' => false,
             ],
+            'discussed_in' => [
+                'display_name' => 'Discussed In',
+                'icon' => 'fas.comments',
+                'is_directional' => true,
+                'description' => 'A digest event or block that touched this topic',
+                'supports_value' => false,
+            ],
+            'references' => [
+                'display_name' => 'References',
+                'icon' => 'fas.link',
+                'is_directional' => true,
+                'description' => 'A user-authored document references another owned entity',
+                'supports_value' => false,
+            ],
         ];
     }
 

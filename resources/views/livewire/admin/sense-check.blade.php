@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
@@ -14,6 +15,17 @@ use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
 
+/**
+ * Every query on this page is scoped to the signed-in user.
+ *
+ * The `admin` middleware gates power-user tooling, not cross-tenant access:
+ * every sibling page under resources/views/livewire/admin/ already scopes the
+ * same way. Rows whose only owner was a hard-deleted parent — a block whose
+ * event row is gone, an event whose integration row is gone — have no
+ * resolvable owner and so cannot appear here at all. A cross-tenant integrity
+ * sweep belongs in an artisan command run by an operator, not in a per-user
+ * page.
+ */
 new class extends Component
 {
     use Toast;
@@ -63,8 +75,6 @@ new class extends Component
 
     /**
      * Get all issues as structured JSON for export (action method for clipboard)
-     *
-     * @return string
      */
     public function getIssuesJson(): string
     {
@@ -73,8 +83,6 @@ new class extends Component
 
     /**
      * Get all issues as structured JSON for export
-     *
-     * @return string
      */
     public function getIssuesJsonProperty(): string
     {
@@ -295,11 +303,20 @@ new class extends Component
     }
 
     /**
-     * @return array{count: int, records: \Illuminate\Database\Eloquent\Collection}
+     * @return array{count: int, records: Illuminate\Database\Eloquent\Collection}
      */
     public function getOrphanedEventsProperty(): array
     {
+        $userId = Auth::id();
+
+        // integration() is a withTrashed() relation, so an event only counts as
+        // orphaned once the integration row is gone outright — which takes its
+        // user_id with it. The actor/target objects are the surviving ownership
+        // signal, because those carry user_id directly.
         $orphanedEvents = Event::whereDoesntHave('integration')
+            ->where(fn ($q) => $q
+                ->whereHas('actor', fn ($a) => $a->where('user_id', $userId))
+                ->orWhereHas('target', fn ($t) => $t->where('user_id', $userId)))
             ->with(['actor', 'target', 'blocks'])
             ->get();
 
@@ -310,11 +327,16 @@ new class extends Component
     }
 
     /**
-     * @return array{count: int, records: \Illuminate\Database\Eloquent\Collection}
+     * @return array{count: int, records: Illuminate\Database\Eloquent\Collection}
      */
     public function getOrphanedBlocksProperty(): array
     {
+        // event() is likewise withTrashed(), so these are blocks whose event row
+        // has gone. A block carries no user_id and no other foreign key, so a
+        // truly dangling one cannot be attributed to anybody and is shown to
+        // nobody — an operator-level integrity sweep, not a per-user page.
         $orphanedBlocks = Block::whereDoesntHave('event')
+            ->whereIn('event_id', Event::withTrashed()->forUser(Auth::id())->select('id'))
             ->with('event')
             ->get();
 
@@ -325,11 +347,12 @@ new class extends Component
     }
 
     /**
-     * @return array{count: int, records: \Illuminate\Database\Eloquent\Collection}
+     * @return array{count: int, records: Illuminate\Database\Eloquent\Collection}
      */
     public function getOrphanedObjectsProperty(): array
     {
-        $orphanedObjects = EventObject::whereDoesntHave('actorEvents')
+        $orphanedObjects = EventObject::where('user_id', Auth::id())
+            ->whereDoesntHave('actorEvents')
             ->whereDoesntHave('targetEvents')
             ->with('tags')
             ->get();
@@ -346,12 +369,14 @@ new class extends Component
     public function getInvalidIntegrationsProperty(): array
     {
         $issues = [];
+        $userId = Auth::id();
 
         // Integrations with unknown services
-        $unknownServices = Integration::whereNotIn(
-            'service',
-            PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()
-        )->get();
+        $unknownServices = Integration::where('user_id', $userId)
+            ->whereNotIn(
+                'service',
+                PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()
+            )->get();
 
         if ($unknownServices->count() > 0) {
             $issues[] = [
@@ -362,8 +387,10 @@ new class extends Component
         }
 
         // Integrations without groups
-        $noGroup = Integration::whereNull('integration_group_id')
-            ->orWhereDoesntHave('group')
+        // The owner predicate has to sit outside the OR group, or the
+        // orWhereDoesntHave() would escape it and match every user's rows.
+        $noGroup = Integration::where('user_id', $userId)
+            ->where(fn ($q) => $q->whereNull('integration_group_id')->orWhereDoesntHave('group'))
             ->get();
 
         if ($noGroup->count() > 0) {
@@ -409,7 +436,7 @@ new class extends Component
                 if (! method_exists($pluginClass, 'getAccentColor')) {
                     $pluginIssues[] = 'Missing getAccentColor method';
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $pluginIssues[] = 'Exception during validation: ' . $e->getMessage();
             }
 
@@ -477,19 +504,24 @@ new class extends Component
      */
     public function getEmbeddingHealthProperty(): array
     {
+        $userId = Auth::id();
+        $ownedEvents = fn () => Event::forUser($userId);
+        $ownedBlocks = fn () => Block::whereHas('event.integration', fn ($q) => $q->where('user_id', $userId));
+        $ownedObjects = fn () => EventObject::where('user_id', $userId);
+
         // Events stats
-        $totalEvents = Event::count();
-        $eventsWithEmbeddings = Event::whereNotNull('embeddings')->count();
+        $totalEvents = $ownedEvents()->count();
+        $eventsWithEmbeddings = $ownedEvents()->whereNotNull('embeddings')->count();
         $eventsCoverage = $totalEvents > 0 ? round(($eventsWithEmbeddings / $totalEvents) * 100, 1) : 0;
 
         // Blocks stats
-        $totalBlocks = Block::count();
-        $blocksWithEmbeddings = Block::whereNotNull('embeddings')->count();
+        $totalBlocks = $ownedBlocks()->count();
+        $blocksWithEmbeddings = $ownedBlocks()->whereNotNull('embeddings')->count();
         $blocksCoverage = $totalBlocks > 0 ? round(($blocksWithEmbeddings / $totalBlocks) * 100, 1) : 0;
 
         // Objects stats
-        $totalObjects = EventObject::count();
-        $objectsWithEmbeddings = EventObject::whereNotNull('embeddings')->count();
+        $totalObjects = $ownedObjects()->count();
+        $objectsWithEmbeddings = $ownedObjects()->whereNotNull('embeddings')->count();
         $objectsCoverage = $totalObjects > 0 ? round(($objectsWithEmbeddings / $totalObjects) * 100, 1) : 0;
 
         // Overall coverage
@@ -498,13 +530,14 @@ new class extends Component
         $overallCoverage = $totalAll > 0 ? round(($totalWithEmbeddings / $totalAll) * 100, 1) : 0;
 
         // Coverage by service
-        $eventsByService = Event::selectRaw('service, COUNT(*) as total, COUNT(embeddings) as with_embeddings')
+        $eventsByService = $ownedEvents()->selectRaw('service, COUNT(*) as total, COUNT(embeddings) as with_embeddings')
             ->groupBy('service')
             ->orderByDesc('total')
             ->limit(10)
             ->get()
             ->map(function ($row) {
                 $coverage = $row->total > 0 ? round(($row->with_embeddings / $row->total) * 100, 1) : 0;
+
                 return [
                     'service' => $row->service,
                     'total' => $row->total,
@@ -515,12 +548,13 @@ new class extends Component
             ->toArray();
 
         // Coverage by domain
-        $eventsByDomain = Event::selectRaw('domain, COUNT(*) as total, COUNT(embeddings) as with_embeddings')
+        $eventsByDomain = $ownedEvents()->selectRaw('domain, COUNT(*) as total, COUNT(embeddings) as with_embeddings')
             ->groupBy('domain')
             ->orderByDesc('total')
             ->get()
             ->map(function ($row) {
                 $coverage = $row->total > 0 ? round(($row->with_embeddings / $row->total) * 100, 1) : 0;
+
                 return [
                     'domain' => $row->domain,
                     'total' => $row->total,
@@ -682,8 +716,11 @@ new class extends Component
             })
             ->toArray();
 
+        $userId = Auth::id();
+
         // DB actions grouped by service
         $actions = Event::query()
+            ->forUser($userId)
             ->select('service', 'action')
             ->distinct()
             ->get()
@@ -696,6 +733,7 @@ new class extends Component
         $blockTypes = Block::query()
             ->select('events.service', 'blocks.block_type')
             ->join('events', 'events.id', '=', 'blocks.event_id')
+            ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId))
             ->whereNotNull('blocks.block_type')
             ->distinct()
             ->get()
@@ -706,6 +744,7 @@ new class extends Component
 
         // DB object types (actor/target) grouped by service (via events)
         $actorTypes = Event::query()
+            ->forUser($userId)
             ->select('events.service', 'ao.type as object_type')
             ->leftJoin('objects as ao', 'ao.id', '=', 'events.actor_id')
             ->whereNotNull('ao.type')
@@ -713,6 +752,7 @@ new class extends Component
             ->get();
 
         $targetTypes = Event::query()
+            ->forUser($userId)
             ->select('events.service', 'to.type as object_type')
             ->leftJoin('objects as to', 'to.id', '=', 'events.target_id')
             ->whereNotNull('to.type')
@@ -747,6 +787,7 @@ new class extends Component
         // Block counts by type
         $this->blockCountsByType = Block::query()
             ->select('block_type', DB::raw('COUNT(*) as count'))
+            ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId))
             ->whereNotNull('block_type')
             ->groupBy('block_type')
             ->pluck('count', 'block_type')

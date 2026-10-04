@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Block;
+use App\Support\FlintQuestion;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -61,6 +62,13 @@ class BlockResource extends JsonResource
         if ($content) {
             $data['content'] = $content;
         }
+
+        // Flint blocks keep their payload in metadata rather than content — a
+        // question's text and answer, a day context's calendar and weather.
+        // Without this the block reads back as a bare title, which made
+        // `get-block-tool` useless for exactly the blocks a Flint routine is
+        // told to link to by id.
+        $data += $this->flintPayload();
 
         if ($this->url) {
             $data['url'] = $this->url;
@@ -121,5 +129,37 @@ class BlockResource extends JsonResource
         }
 
         return $data;
+    }
+
+    /**
+     * The structured payload a Flint block carries in metadata, keyed for the
+     * block type. Empty for every other block type.
+     *
+     * @return array<string, mixed>
+     */
+    protected function flintPayload(): array
+    {
+        $meta = $this->metadata ?? [];
+
+        return match ($this->block_type) {
+            'flint_user_question' => [
+                'question' => $meta['question'] ?? null,
+                'topic' => $meta['topic'] ?? null,
+                'priority' => $meta['priority'] ?? null,
+                'answer_options' => $meta['answer_options'] ?? null,
+                'answer' => $meta['answer'] ?? null,
+                'answer_note' => $meta['answer_note'] ?? null,
+                'answered_at' => $meta['answered_at'] ?? null,
+                'answered' => FlintQuestion::isAnswered($this->resource),
+                'retired_at' => $meta['retired_at'] ?? null,
+                'retired' => FlintQuestion::isRetired($this->resource),
+            ],
+            'flint_day_context' => [
+                'day_context' => $meta['day_context'] ?? null,
+            ],
+            default => array_filter([
+                'referenced_event_ids' => $meta['referenced_event_ids'] ?? null,
+            ]),
+        };
     }
 }

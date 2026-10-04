@@ -15,6 +15,7 @@ The Fetch integration is a web content archival system that fetches URLs, extrac
 - Cookie management for paywalled/authenticated content
 - PDF download support
 - Automatic URL discovery from other integrations
+- List pages and digest newsletters expanded into bookmarks for each article they list
 - Change detection via content hashing
 - Spotlight command integration
 
@@ -59,21 +60,23 @@ Add to `config/services.php`:
 
 ### Action Types
 
-| Action       | Description             | Hidden |
-| ------------ | ----------------------- | ------ |
-| `fetched`    | URL content was fetched | Yes    |
-| `bookmarked` | URL was bookmarked      | No     |
-| `updated`    | URL content was updated | Yes    |
+| Action       | Description                                           | Hidden |
+| ------------ | ----------------------------------------------------- | ------ |
+| `fetched`    | URL content was fetched                               | Yes    |
+| `bookmarked` | URL was bookmarked                                    | No     |
+| `updated`    | URL content was updated                               | Yes    |
+| `expanded`   | New articles were found on a list page and bookmarked | Yes    |
 
 ### Block Types
 
-| Block Type                | Description                         |
-| ------------------------- | ----------------------------------- |
-| `fetch_summary_tweet`     | Ultra-concise 280 character summary |
-| `fetch_summary_short`     | 40 word summary                     |
-| `fetch_summary_paragraph` | 150 word detailed summary           |
-| `fetch_key_takeaways`     | 3-5 actionable bullet points        |
-| `fetch_tldr`              | One sentence summary                |
+| Block Type                | Description                                             |
+| ------------------------- | ------------------------------------------------------- |
+| `fetch_summary_tweet`     | Ultra-concise 280 character summary                     |
+| `fetch_summary_short`     | 40 word summary                                         |
+| `fetch_summary_paragraph` | 150 word detailed summary                               |
+| `fetch_key_takeaways`     | 3-5 actionable bullet points                            |
+| `fetch_tldr`              | One sentence summary                                    |
+| `fetch_link_list`         | Articles found on a list page and what happened to each |
 
 ### Object Types
 
@@ -126,6 +129,19 @@ sail artisan tinker
 >>> $webpage = App\Models\EventObject::find('webpage-uuid');
 >>> App\Jobs\Fetch\FetchSingleUrl::dispatch($integration, $webpage->id, $webpage->url, true);
 ```
+
+### Authenticated browser capture
+
+The Manifest V3 extension in `browser-extension/` captures the rendered DOM
+from the active Chrome tab and submits it to
+`POST /api/v1/bookmarks/capture`. This is intended for content that Spark
+cannot fetch directly because the user is already authenticated in their main
+browser.
+
+The extension uses a personal access token limited to `bookmark:write`. It
+does not export site cookies. Spark applies Readability to the supplied HTML
+and dispatches the normal `ProcessFetchedContent` revision and enrichment
+pipeline without requesting the source URL.
 
 ## Fetch Engine
 
@@ -218,6 +234,82 @@ FetchScheduledUrls
                     ├── ExtractContentJob
                     └── GenerateSummariesJob
 ```
+
+## List Pages & Expansion
+
+Some bookmarks are not articles but lists of them: a blog index, a section
+front, a "latest" page, or a digest newsletter. When list detection is on,
+Spark recognises these and bookmarks each listed article instead of
+summarising the list itself.
+
+Disabled by default. Enable with `FETCH_LIST_DETECTION_ENABLED=true`, `JEV_ENABLED=true`
+and `TYPESAFE_API_KEY`. `FETCH_LIST_DETECTION_SHADOW=true` (the default) records
+every verdict on the bookmark (`metadata.list_detection`) or newsletter event
+(`event_metadata.link_assessment`) without acting on it, so thresholds can be
+checked against real pages before switching it off.
+
+### How a page is judged
+
+Deterministic code finds the candidates; [Jev](https://docs.typesafe.ai) (TypeSafe's
+typed classifier) only answers narrow questions about them; code applies the
+thresholds in `config/fetch.php` (`list_detection.thresholds`, tuned for the
+pinned `JEV_MODEL`).
+
+1. `LinkCandidateExtractor` reads every link in the rendered DOM with its
+   context: landmark (nav, footer, aside, "related", share…), heading, nearby
+   date, DOM path.
+2. `LinkClusterer` groups links that share both a DOM path and a URL shape
+   (e.g. `example.com/{n}/{n}/{slug}`). Navigation and footers are excluded; a
+   JSON-LD `ItemList` becomes its own group. A loose structural check stops
+   obvious articles (a long article with only a "related" rail) here.
+3. One Jev call asks: what kind of page is this; does it exist to list
+   articles; for each group, is it the page's main list; for each link in those
+   groups, is it an individual article (not a sponsor, promo, category or author).
+4. Code decides. Any Jev failure means "not a list", and the page takes the
+   normal article path unchanged.
+
+Only pages the user chose are judged (API, mobile, MCP, browser capture,
+Spotlight, manual and legacy subscriptions). Pages found by discovery or by an
+earlier expansion never expand, so expansion cannot chain into a crawl.
+Recurring lists reuse their chosen groups for 7 days without asking Jev again;
+pages judged to be articles are not re-asked for 14 days.
+
+Per bookmark, the URLs tab offers **Treat as list of articles** (skip the
+structural check), **Always treat as one article** and **Detect lists
+automatically**.
+
+### What happens to a list
+
+- The list page is recorded as fetched (one-time lists are then disabled) and
+  gets no revision or AI summaries.
+- `ExpandLinkListJob` bookmarks the articles as one-time, discovered bookmarks
+  (`found_in: list_expansion`, visible in the Discovery tab), links them from
+  the list with `linked_to`, and dispatches their fetches, staggered per host.
+- **What's new** is decided from the list's `fetch_link_list` blocks, which
+  record every URL's outcome (`queued`, `baseline_seen`, `existing`,
+  `rejected`, `disabled`). The first scan records everything and fetches the
+  top `FETCH_LIST_INITIAL_BACKFILL` (5); later scans fetch only new items, at
+  most `FETCH_LIST_MAX_NEW_PER_RUN` (20) per run, and leave the rest for the
+  next run.
+- URLs are compared by a canonical identity (`metadata.canonical_url`: tracking
+  parameters, fragments and trailing slashes removed), so a `?utm_source=`
+  variant of an existing bookmark is linked rather than bookmarked again.
+- Users who prefer to review first can turn off auto-fetch of found articles
+  (`fetch_list_expansion_auto_fetch` user setting); articles are then bookmarked
+  disabled.
+
+### Digest newsletters
+
+The Newsletter integration's `newsletter_expand_links` task (per-integration
+`expand_links` setting, on by default) does the same for digest issues:
+housekeeping links (the `List-Unsubscribe` header's URLs, unsubscribe and
+preference links, share and app links) are removed before anything else sees
+them; Jev judges whether the issue is a link digest and which links are
+recommended articles; accepted tracking links are resolved to their target
+(every redirect hop SSRF-checked, no cookies, no body read) and bookmarked,
+linked from the issue event. Extraction and summaries still run for every
+issue. When expansion is on, generic discovery no longer scans the
+newsletter's HTML.
 
 ## Event Structure
 

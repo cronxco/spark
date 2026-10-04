@@ -6,6 +6,7 @@ use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class KarakeepHelpersTest extends TestCase
@@ -16,9 +17,7 @@ class KarakeepHelpersTest extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function truncate_to_words_returns_original_if_under_limit(): void
     {
         $text = 'This is a short text with only ten words here.';
@@ -27,9 +26,7 @@ class KarakeepHelpersTest extends TestCase
         $this->assertEquals($text, $result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function truncate_to_words_truncates_long_text(): void
     {
         $text = str_repeat('word ', 200); // 200 words
@@ -40,9 +37,7 @@ class KarakeepHelpersTest extends TestCase
         $this->assertLessThanOrEqual(155, $wordCount);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function truncate_to_words_handles_custom_limit(): void
     {
         $text = str_repeat('word ', 100);
@@ -53,18 +48,14 @@ class KarakeepHelpersTest extends TestCase
         $this->assertLessThanOrEqual(55, $wordCount);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function truncate_to_words_handles_empty_string(): void
     {
         $result = truncate_to_words('', 150);
         $this->assertEquals('', $result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function karakeep_add_bookmark_returns_null_when_config_missing(): void
     {
         Log::shouldReceive('error')
@@ -79,9 +70,7 @@ class KarakeepHelpersTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function karakeep_add_bookmark_posts_to_api_successfully(): void
     {
         config([
@@ -116,9 +105,7 @@ class KarakeepHelpersTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function karakeep_add_bookmark_handles_api_failure(): void
     {
         config([
@@ -141,9 +128,7 @@ class KarakeepHelpersTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function karakeep_add_bookmark_handles_exception(): void
     {
         config([
@@ -164,9 +149,7 @@ class KarakeepHelpersTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function karakeep_add_bookmark_with_minimal_parameters(): void
     {
         config([
@@ -193,9 +176,7 @@ class KarakeepHelpersTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function karakeep_add_bookmark_trims_trailing_slash_from_url(): void
     {
         config([

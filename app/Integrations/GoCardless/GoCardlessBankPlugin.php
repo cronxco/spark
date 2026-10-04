@@ -4,6 +4,7 @@ namespace App\Integrations\GoCardless;
 
 use App\Exceptions\GoCardlessEuaExpiredException;
 use App\Integrations\Base\OAuthPlugin;
+use App\Integrations\Contracts\SupportsSweeps;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -23,7 +24,7 @@ use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
 
-class GoCardlessBankPlugin extends OAuthPlugin
+class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 {
     // Cache configuration constants
     private const ACCOUNT_DETAILS_CACHE_TTL = 86400; // 24 hours
@@ -74,6 +75,19 @@ class GoCardlessBankPlugin extends OAuthPlugin
         if (! app()->environment('testing') && ! app()->runningUnitTests() && (empty($this->secretId) || empty($this->secretKey))) {
             throw new InvalidArgumentException('GoCardless credentials are not configured');
         }
+    }
+
+    /**
+     * @return array{label: string, window: string, period_hours: int, config_key: string}
+     */
+    public static function getSweepSchedule(): array
+    {
+        return [
+            'label' => 'Weekly sweep',
+            'window' => 'last 60 days',
+            'period_hours' => 24 * 6,
+            'config_key' => 'gocardless_last_sweep_at',
+        ];
     }
 
     public static function getIdentifier(): string
@@ -182,11 +196,18 @@ class GoCardlessBankPlugin extends OAuthPlugin
                 'description' => 'Account balance was updated',
                 'display_with_object' => false,
                 'value_unit' => 'GBP',
+                'value_units' => ['GBP', 'EUR', 'USD'],
                 'value_formatter' => '@if($unit == "GBP")£@elseif($unit == "EUR")€@elseif($unit == "USD")$@endif{{ number_format($value, 2) }}',
+                'higher_is_better' => [self::class, 'balanceHigherIsBetter'],
                 'hidden' => true,
                 'exclude_from_flint' => true,
             ],
         ];
+    }
+
+    public static function balanceHigherIsBetter(EventObject $account): bool
+    {
+        return ! in_array($account->metadata['account_type'] ?? null, ['credit_card', 'loan'], true);
     }
 
     public static function getBlockTypes(): array
