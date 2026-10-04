@@ -10,6 +10,10 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Services\Fetch\Assessment\ListPageDetector;
+use App\Services\Fetch\FetchMetadata;
+use App\Services\Fetch\Links\UrlCanonicalizer;
+use App\Services\Fetch\UrlSafetyValidator;
 use App\Services\PlaywrightHealthMetrics;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -239,6 +243,10 @@ new class extends Component
 
     public function getBookmarkUrl(Event $event): ?string
     {
+        if ($event->service === 'fetch' && $event->displayTargetUrl()) {
+            return $event->displayTargetUrl();
+        }
+
         // Check target metadata for URL
         if ($event->target && ! empty($event->target->metadata['url'])) {
             return $event->target->metadata['url'];
@@ -265,6 +273,10 @@ new class extends Component
 
     public function getBookmarkTitle(Event $event): string
     {
+        if ($event->service === 'fetch' && $event->displayTargetTitle()) {
+            return $event->displayTargetTitle();
+        }
+
         // Try target title first
         if ($event->target && ! empty($event->target->title)) {
             return $event->target->title;
@@ -281,6 +293,10 @@ new class extends Component
 
     public function getBookmarkImage(Event $event): ?string
     {
+        if ($event->service === 'fetch' && $event->displayTargetMediaUrl()) {
+            return $event->displayTargetMediaUrl();
+        }
+
         // Check Fetch metadata block
         $metadataBlock = $event->blocks->firstWhere('block_type', 'fetch_metadata');
         if ($metadataBlock && ! empty($metadataBlock->metadata['image'])) {
@@ -605,6 +621,12 @@ new class extends Component
                 'last_playwright_worker_status' => $metadata['last_playwright_worker_status'] ?? null,
                 'error_screenshot_url' => get_media_temporary_url($obj, 'error_screenshots'),
                 'playwright_history' => array_slice($metadata['playwright_history'] ?? [], -10), // Last 10 entries
+                'is_list' => ($metadata['list_detection']['kind'] ?? null) === 'list' && ! ($metadata['list_detection']['shadow'] ?? false),
+                'list_new_count' => $metadata['list_detection']['last_new_count'] ?? null,
+                'list_mode' => ListPageDetector::mode($obj),
+                'list_expandable' => ListPageDetector::isEnabled()
+                    && (ListPageDetector::isEligibleForListExpansion($obj)
+                        || ListPageDetector::mode($obj) === 'off'),
             ];
         });
     }
@@ -799,6 +821,7 @@ new class extends Component
             'content' => 'Object Content',
             'event_url_field' => 'Event URL',
             'event_metadata' => 'Event Metadata',
+            'list_expansion' => 'List page',
         ];
 
         $contextParts[] = $foundInMap[$foundIn] ?? ucfirst(str_replace('_', ' ', $foundIn));
@@ -924,7 +947,7 @@ new class extends Component
             'newUrl' => 'required|url|max:2048',
         ]);
 
-        if (! app(\App\Services\Fetch\UrlSafetyValidator::class)->isSafe($this->newUrl)) {
+        if (! app(UrlSafetyValidator::class)->isSafe($this->newUrl)) {
             $this->error('This URL is not allowed.');
 
             return;
@@ -961,6 +984,7 @@ new class extends Component
                     'domain' => $domain,
                     'fetch_integration_id' => $this->integration->id,
                     'subscription_source' => 'subscribed',
+                    'canonical_url' => UrlCanonicalizer::canonicalize($this->newUrl),
                     'fetch_mode' => 'recurring', // Subscribed URLs are fetched repeatedly
                     'subscribed_at' => now()->toIso8601String(),
                     'enabled' => true,
@@ -999,6 +1023,42 @@ new class extends Component
         $eventObject->update(['metadata' => $metadata]);
 
         $this->success($metadata['enabled'] ? 'URL enabled.' : 'URL disabled.');
+        $this->loadData();
+    }
+
+    public function setListDetectionMode(string $id, string $mode): void
+    {
+        $eventObject = EventObject::find($id);
+
+        if (! $eventObject || $eventObject->user_id !== Auth::id()) {
+            $this->error('URL not found.');
+
+            return;
+        }
+
+        if (! in_array($mode, ['auto', 'off', 'force'], true)) {
+            $this->error('Unknown list detection mode.');
+
+            return;
+        }
+
+        FetchMetadata::mutate($eventObject, function (array $metadata) use ($mode): array {
+            $listDetection = $metadata['list_detection'] ?? [];
+            $listDetection['mode'] = $mode;
+
+            // A changed mode should take effect on the next fetch, not after a memo expires
+            unset($listDetection['assessed_at']);
+
+            $metadata['list_detection'] = $listDetection;
+
+            return $metadata;
+        });
+
+        $this->success(match ($mode) {
+            'force' => 'This page will be treated as a list of articles when it looks like one.',
+            'off' => 'This page will always be treated as a single article.',
+            default => 'List detection is automatic for this page.',
+        });
         $this->loadData();
     }
 
@@ -1843,3 +1903,4 @@ new class extends Component
         </div>
     </div>
     @endif
+

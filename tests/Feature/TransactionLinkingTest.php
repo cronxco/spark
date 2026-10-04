@@ -12,6 +12,7 @@ use App\Services\TransactionLinking\Strategies\CrossProviderStrategy;
 use App\Services\TransactionLinking\Strategies\ExplicitReferenceStrategy;
 use App\Services\TransactionLinking\TransactionLinkingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -35,7 +36,7 @@ class TransactionLinkingTest extends TestCase
     // ExplicitReferenceStrategy Tests
     // ==========================================
 
-    /** @test */
+    #[Test]
     public function explicit_strategy_finds_transaction_id_reference(): void
     {
         $strategy = new ExplicitReferenceStrategy;
@@ -70,7 +71,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertEquals(100.0, $links->first()['confidence']);
     }
 
-    /** @test */
+    #[Test]
     public function explicit_strategy_ignores_coin_jar_transaction_to_prevent_wrong_direction(): void
     {
         $strategy = new ExplicitReferenceStrategy;
@@ -106,7 +107,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertCount(0, $links, 'coin_jar_transaction should not create links (wrong direction)');
     }
 
-    /** @test */
+    #[Test]
     public function explicit_strategy_finds_triggered_by_reference(): void
     {
         $strategy = new ExplicitReferenceStrategy;
@@ -137,7 +138,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertEquals($trigger->id, $links->first()['target_event']->id);
     }
 
-    /** @test */
+    #[Test]
     public function explicit_strategy_ignores_non_tx_references(): void
     {
         $strategy = new ExplicitReferenceStrategy;
@@ -158,7 +159,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertCount(0, $links);
     }
 
-    /** @test */
+    #[Test]
     public function explicit_strategy_only_processes_monzo_events_with_metadata(): void
     {
         $strategy = new ExplicitReferenceStrategy;
@@ -183,7 +184,7 @@ class TransactionLinkingTest extends TestCase
     // BacsRecordStrategy Tests
     // ==========================================
 
-    /** @test */
+    #[Test]
     public function bacs_strategy_finds_pot_withdrawal_for_direct_debit(): void
     {
         $strategy = new BacsRecordStrategy;
@@ -224,7 +225,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertEquals(100.0, $links->first()['confidence']);
     }
 
-    /** @test */
+    #[Test]
     public function bacs_strategy_finds_direct_debit_from_pot_withdrawal(): void
     {
         $strategy = new BacsRecordStrategy;
@@ -263,7 +264,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertEquals($directDebit->id, $links->first()['target_event']->id);
     }
 
-    /** @test */
+    #[Test]
     public function bacs_strategy_only_processes_monzo_with_bacs_metadata(): void
     {
         $strategy = new BacsRecordStrategy;
@@ -305,7 +306,7 @@ class TransactionLinkingTest extends TestCase
     // CrossProviderStrategy Tests
     // ==========================================
 
-    /** @test */
+    #[Test]
     public function cross_provider_strategy_identifies_credit_card_payment(): void
     {
         $strategy = new CrossProviderStrategy;
@@ -322,7 +323,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertTrue($strategy->canProcess($amexPayment));
     }
 
-    /** @test */
+    #[Test]
     public function cross_provider_strategy_rejects_non_credit_card_payments(): void
     {
         $strategy = new CrossProviderStrategy;
@@ -339,7 +340,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertFalse($strategy->canProcess($normalPayment));
     }
 
-    /** @test */
+    #[Test]
     public function cross_provider_strategy_extracts_card_identification(): void
     {
         $strategy = new CrossProviderStrategy;
@@ -367,7 +368,7 @@ class TransactionLinkingTest extends TestCase
     // TransactionLinkingService Tests
     // ==========================================
 
-    /** @test */
+    #[Test]
     public function service_auto_approves_high_confidence_links(): void
     {
         $service = app(TransactionLinkingService::class);
@@ -408,7 +409,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertFalse($relationship->isPending());
     }
 
-    /** @test */
+    #[Test]
     public function service_skips_when_reverse_relationship_exists(): void
     {
         $service = app(TransactionLinkingService::class);
@@ -448,7 +449,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertEquals(1, $result['skipped']);
     }
 
-    /** @test */
+    #[Test]
     public function service_skips_when_reverse_pending_link_exists(): void
     {
         $service = app(TransactionLinkingService::class);
@@ -493,7 +494,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertEquals(1, $result['skipped']);
     }
 
-    /** @test */
+    #[Test]
     public function service_returns_stats(): void
     {
         $service = app(TransactionLinkingService::class);
@@ -553,7 +554,7 @@ class TransactionLinkingTest extends TestCase
     // Pending Relationship Tests
     // ==========================================
 
-    /** @test */
+    #[Test]
     public function pending_relationship_can_be_approved(): void
     {
         $sourceEvent = $this->createMonzoEvent();
@@ -581,7 +582,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertNotNull($relationship->fresh()->metadata['approved_at']);
     }
 
-    /** @test */
+    #[Test]
     public function pending_relationship_can_be_rejected(): void
     {
         $sourceEvent = $this->createMonzoEvent();
@@ -611,7 +612,7 @@ class TransactionLinkingTest extends TestCase
         $this->assertNotNull($deletedRelationship->metadata['rejected_at']);
     }
 
-    /** @test */
+    #[Test]
     public function pending_relationship_scopes_work_correctly(): void
     {
         $sourceEvent = $this->createMonzoEvent();

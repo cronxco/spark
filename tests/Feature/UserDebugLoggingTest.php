@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\LoggingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class UserDebugLoggingTest extends TestCase
@@ -22,7 +23,7 @@ class UserDebugLoggingTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    /** @test */
+    #[Test]
     public function has_debug_logging_enabled_returns_true_by_default(): void
     {
         config(['logging.debug_logging_default' => true]);
@@ -30,7 +31,7 @@ class UserDebugLoggingTest extends TestCase
         $this->assertTrue($this->user->hasDebugLoggingEnabled());
     }
 
-    /** @test */
+    #[Test]
     public function has_debug_logging_enabled_returns_false_when_default_is_false(): void
     {
         config(['logging.debug_logging_default' => false]);
@@ -40,7 +41,7 @@ class UserDebugLoggingTest extends TestCase
         $this->assertFalse($user->hasDebugLoggingEnabled());
     }
 
-    /** @test */
+    #[Test]
     public function has_debug_logging_enabled_respects_user_preference(): void
     {
         $this->user->enableDebugLogging();
@@ -52,7 +53,7 @@ class UserDebugLoggingTest extends TestCase
         $this->assertFalse($this->user->hasDebugLoggingEnabled());
     }
 
-    /** @test */
+    #[Test]
     public function enable_debug_logging_updates_settings_correctly(): void
     {
         $this->user->enableDebugLogging();
@@ -64,7 +65,7 @@ class UserDebugLoggingTest extends TestCase
         $this->assertTrue($settings['debug_logging_enabled']);
     }
 
-    /** @test */
+    #[Test]
     public function disable_debug_logging_updates_settings_correctly(): void
     {
         $this->user->disableDebugLogging();
@@ -76,7 +77,7 @@ class UserDebugLoggingTest extends TestCase
         $this->assertFalse($settings['debug_logging_enabled']);
     }
 
-    /** @test */
+    #[Test]
     public function settings_column_stores_json_correctly(): void
     {
         $this->user->update([
@@ -96,7 +97,7 @@ class UserDebugLoggingTest extends TestCase
         $this->assertFalse($settings['notifications']['sms']);
     }
 
-    /** @test */
+    #[Test]
     public function debug_logs_are_written_when_enabled(): void
     {
         $this->user->enableDebugLogging();
@@ -113,7 +114,7 @@ class UserDebugLoggingTest extends TestCase
         Log::shouldHaveReceived('log')->once();
     }
 
-    /** @test */
+    #[Test]
     public function debug_logs_are_not_written_when_disabled(): void
     {
         $this->user->disableDebugLogging();
@@ -130,7 +131,7 @@ class UserDebugLoggingTest extends TestCase
         Log::shouldNotHaveReceived('log');
     }
 
-    /** @test */
+    #[Test]
     public function info_and_above_logs_are_written_regardless_of_debug_setting(): void
     {
         $this->user->disableDebugLogging();
@@ -149,7 +150,7 @@ class UserDebugLoggingTest extends TestCase
         Log::shouldHaveReceived('log')->times(3);
     }
 
-    /** @test */
+    #[Test]
     public function get_uuid_block_returns_first_segment(): void
     {
         $uuidBlock = $this->user->getUuidBlock();
@@ -159,7 +160,7 @@ class UserDebugLoggingTest extends TestCase
         $this->assertEquals(8, strlen($uuidBlock));
     }
 
-    /** @test */
+    #[Test]
     public function user_preference_overrides_default_config(): void
     {
         config(['logging.debug_logging_default' => false]);
@@ -169,7 +170,7 @@ class UserDebugLoggingTest extends TestCase
         $this->assertTrue($this->user->hasDebugLoggingEnabled());
     }
 
-    /** @test */
+    #[Test]
     public function user_can_change_preference_multiple_times(): void
     {
         $this->user->enableDebugLogging();
@@ -182,7 +183,7 @@ class UserDebugLoggingTest extends TestCase
         $this->assertTrue($this->user->fresh()->hasDebugLoggingEnabled());
     }
 
-    /** @test */
+    #[Test]
     public function settings_persists_across_sessions(): void
     {
         $this->user->disableDebugLogging();

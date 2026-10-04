@@ -10,6 +10,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 use Throwable;
 
@@ -44,9 +45,7 @@ class MonzoSweepTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_sweep_if_needed_runs_when_no_previous_sweep(): void
     {
         // Mock API responses
@@ -110,9 +109,7 @@ class MonzoSweepTest extends TestCase
         $this->assertGreaterThan(0, Event::where('integration_id', $this->integration->id)->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_sweep_if_needed_skips_when_recent_sweep(): void
     {
         // Set recent sweep timestamp (10 hours ago)
@@ -135,9 +132,7 @@ class MonzoSweepTest extends TestCase
         $this->assertEquals($recentSweepTime, $this->integration->configuration['monzo_last_sweep_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_sweep_if_needed_runs_when_old_sweep(): void
     {
         // Set old sweep timestamp (25 hours ago)
@@ -162,9 +157,7 @@ class MonzoSweepTest extends TestCase
         $this->assertNotEquals($oldSweepTime, $this->integration->configuration['monzo_last_sweep_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_data_sweep_processes_all_data_types(): void
     {
         // Mock API responses with data for all types
@@ -221,9 +214,7 @@ class MonzoSweepTest extends TestCase
         $this->assertContains('other_debit_to', $eventTypes->toArray());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_data_sweep_handles_no_accounts(): void
     {
         // Mock API response with no accounts
@@ -245,9 +236,7 @@ class MonzoSweepTest extends TestCase
         $this->assertNotNull($this->integration->configuration['monzo_last_sweep_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function perform_data_sweep_handles_api_errors_gracefully(): void
     {
         // Mock API responses - accounts works but transactions fails
@@ -276,9 +265,7 @@ class MonzoSweepTest extends TestCase
         $this->plugin->fetchData($this->integration);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_works_for_different_instance_types(): void
     {
         // Test with different instance types
@@ -311,9 +298,7 @@ class MonzoSweepTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_timestamp_format_is_correct(): void
     {
         // Mock API responses
@@ -339,9 +324,7 @@ class MonzoSweepTest extends TestCase
         $this->assertTrue(Carbon::parse($sweepTimestamp)->isAfter(now()->subMinutes(1)));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_uses_correct_date_range(): void
     {
         // Mock API responses
@@ -370,9 +353,7 @@ class MonzoSweepTest extends TestCase
         $this->assertNotNull($this->integration->configuration['monzo_last_sweep_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function sweep_skips_accounts_instance_type(): void
     {
         // Create integration with accounts instance type

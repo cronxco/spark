@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\LoggingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class LogViewerTest extends TestCase
@@ -40,7 +41,7 @@ class LogViewerTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function component_mounts_with_user_logs(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -52,7 +53,7 @@ class LogViewerTest extends TestCase
             ->assertSet('entityId', $this->user->id);
     }
 
-    /** @test */
+    #[Test]
     public function component_mounts_with_group_logs(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -64,7 +65,7 @@ class LogViewerTest extends TestCase
             ->assertSet('entityId', $this->group->id);
     }
 
-    /** @test */
+    #[Test]
     public function component_mounts_with_integration_logs(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -76,7 +77,7 @@ class LogViewerTest extends TestCase
             ->assertSet('entityId', $this->integration->id);
     }
 
-    /** @test */
+    #[Test]
     public function component_uses_current_date_when_not_provided(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -87,7 +88,7 @@ class LogViewerTest extends TestCase
         $component->assertSet('date', now()->format('Y-m-d'));
     }
 
-    /** @test */
+    #[Test]
     public function date_filter_updates_logs(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -99,7 +100,7 @@ class LogViewerTest extends TestCase
             ->assertSet('date', '2025-01-15');
     }
 
-    /** @test */
+    #[Test]
     public function level_filter_updates_logs(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -111,7 +112,7 @@ class LogViewerTest extends TestCase
             ->assertSet('levelFilter', 'error');
     }
 
-    /** @test */
+    #[Test]
     public function search_filter_updates_logs(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -123,7 +124,7 @@ class LogViewerTest extends TestCase
             ->assertSet('search', 'test query');
     }
 
-    /** @test */
+    #[Test]
     public function refresh_logs_method_works(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -135,7 +136,7 @@ class LogViewerTest extends TestCase
             ->assertOk();
     }
 
-    /** @test */
+    #[Test]
     public function get_level_badge_class_returns_correct_classes(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -151,7 +152,7 @@ class LogViewerTest extends TestCase
         $this->assertEquals('badge-error', $component->instance()->getLevelBadgeClass('critical'));
     }
 
-    /** @test */
+    #[Test]
     public function empty_log_file_displays_correctly(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -162,7 +163,7 @@ class LogViewerTest extends TestCase
         $component->assertSet('logLines', []);
     }
 
-    /** @test */
+    #[Test]
     public function available_dates_are_loaded(): void
     {
         $component = Livewire::test(LogViewer::class, [
@@ -173,7 +174,7 @@ class LogViewerTest extends TestCase
         $component->assertSet('availableDates', []);
     }
 
-    /** @test */
+    #[Test]
     public function component_renders_successfully(): void
     {
         Livewire::test(LogViewer::class, [
@@ -182,7 +183,7 @@ class LogViewerTest extends TestCase
         ])->assertStatus(200);
     }
 
-    /** @test */
+    #[Test]
     public function component_with_logs_parses_correctly(): void
     {
         // Write a sample log file
@@ -211,7 +212,7 @@ class LogViewerTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function level_filter_filters_log_lines(): void
     {
         // Write multiple log levels
@@ -247,7 +248,7 @@ class LogViewerTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function search_filter_filters_log_lines(): void
     {
         // Write logs with different messages

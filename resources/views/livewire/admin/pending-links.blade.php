@@ -83,7 +83,7 @@ new class extends Component
     public function approveLink(string $linkId): void
     {
         try {
-            $relationship = Relationship::findOrFail($linkId);
+            $relationship = Relationship::where('user_id', Auth::id())->findOrFail($linkId);
 
             if (!$relationship->isPending()) {
                 $this->warning('This link has already been processed.');
@@ -100,7 +100,7 @@ new class extends Component
     public function rejectLink(string $linkId): void
     {
         try {
-            $relationship = Relationship::findOrFail($linkId);
+            $relationship = Relationship::where('user_id', Auth::id())->findOrFail($linkId);
 
             if (!$relationship->isPending()) {
                 $this->warning('This link has already been processed.');
@@ -124,7 +124,7 @@ new class extends Component
         $approved = 0;
         foreach ($this->selectedLinks as $linkId) {
             try {
-                $relationship = Relationship::find($linkId);
+                $relationship = Relationship::where('user_id', Auth::id())->find($linkId);
                 if ($relationship && $relationship->isPending()) {
                     $relationship->approve();
                     $approved++;
@@ -148,7 +148,7 @@ new class extends Component
         $rejected = 0;
         foreach ($this->selectedLinks as $linkId) {
             try {
-                $relationship = Relationship::find($linkId);
+                $relationship = Relationship::where('user_id', Auth::id())->find($linkId);
                 if ($relationship && $relationship->isPending()) {
                     $relationship->reject();
                     $rejected++;

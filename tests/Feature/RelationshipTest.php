@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\RelationshipTypeRegistry;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class RelationshipTest extends TestCase
@@ -29,7 +30,7 @@ class RelationshipTest extends TestCase
         $this->integration = Integration::factory()->create(['user_id' => $this->user->id]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_a_directional_relationship(): void
     {
         $object1 = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -56,7 +57,7 @@ class RelationshipTest extends TestCase
         $this->assertTrue($relationship->isDirectional());
     }
 
-    /** @test */
+    #[Test]
     public function it_can_create_a_bidirectional_relationship(): void
     {
         $object1 = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -87,7 +88,7 @@ class RelationshipTest extends TestCase
         $this->assertEquals(1, Relationship::count());
     }
 
-    /** @test */
+    #[Test]
     public function it_prevents_duplicate_directional_relationships(): void
     {
         $object1 = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -114,7 +115,7 @@ class RelationshipTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_relate_different_model_types(): void
     {
         $event = Event::factory()->create(['integration_id' => $this->integration->id]);
@@ -135,7 +136,7 @@ class RelationshipTest extends TestCase
         $this->assertInstanceOf(EventObject::class, $relationship->to);
     }
 
-    /** @test */
+    #[Test]
     public function it_supports_value_fields_for_monetary_relationships(): void
     {
         $object1 = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -159,7 +160,7 @@ class RelationshipTest extends TestCase
         $this->assertEquals(100.0, $relationship->formatted_value);
     }
 
-    /** @test */
+    #[Test]
     public function it_stores_metadata(): void
     {
         $object1 = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -184,7 +185,7 @@ class RelationshipTest extends TestCase
         $this->assertEquals($metadata, $relationship->metadata);
     }
 
-    /** @test */
+    #[Test]
     public function it_soft_deletes_relationships(): void
     {
         $object1 = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -205,7 +206,7 @@ class RelationshipTest extends TestCase
         $this->assertNotNull($relationship->fresh()->deleted_at);
     }
 
-    /** @test */
+    #[Test]
     public function event_can_access_relationships(): void
     {
         $event = Event::factory()->create(['integration_id' => $this->integration->id]);
@@ -225,7 +226,7 @@ class RelationshipTest extends TestCase
         $this->assertEquals(1, $event->allRelationships()->count());
     }
 
-    /** @test */
+    #[Test]
     public function event_object_can_access_relationships(): void
     {
         $object1 = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -244,7 +245,7 @@ class RelationshipTest extends TestCase
         $this->assertEquals(1, $object2->relationshipsTo()->count());
     }
 
-    /** @test */
+    #[Test]
     public function block_can_access_relationships(): void
     {
         $event = Event::factory()->create(['integration_id' => $this->integration->id]);
@@ -263,7 +264,7 @@ class RelationshipTest extends TestCase
         $this->assertEquals(1, $block->relationshipsFrom()->count());
     }
 
-    /** @test */
+    #[Test]
     public function it_can_query_related_objects(): void
     {
         $object1 = EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'Object 1']);
@@ -296,7 +297,7 @@ class RelationshipTest extends TestCase
         $this->assertEquals('Object 2', $linkedObjects->first()->title);
     }
 
-    /** @test */
+    #[Test]
     public function relationship_type_registry_returns_correct_config(): void
     {
         $this->assertTrue(RelationshipTypeRegistry::typeExists('linked_to'));
@@ -313,7 +314,7 @@ class RelationshipTest extends TestCase
         $this->assertNull(RelationshipTypeRegistry::getDefaultValueUnit('linked_to'));
     }
 
-    /** @test */
+    #[Test]
     public function it_gets_type_config_from_relationship_instance(): void
     {
         $object1 = EventObject::factory()->create(['user_id' => $this->user->id]);

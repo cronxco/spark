@@ -55,9 +55,6 @@ class HasOuraBlocksTest extends TestCase
         {
             use HasOuraBlocks;
 
-            /**
-             * @test
-             */
             public function create_contributor_blocks($event, $contributors, $plugin)
             {
                 $this->createContributorBlocks($event, $contributors, $plugin);
@@ -98,9 +95,6 @@ class HasOuraBlocksTest extends TestCase
         {
             use HasOuraBlocks;
 
-            /**
-             * @test
-             */
             public function create_activity_metric_blocks($event, $item, $metrics, $plugin)
             {
                 $this->createActivityMetricBlocks($event, $item, $metrics, $plugin);
@@ -162,9 +156,6 @@ class HasOuraBlocksTest extends TestCase
         {
             use HasOuraBlocks;
 
-            /**
-             * @test
-             */
             public function create_sleep_stage_blocks($event, $item, $metrics, $plugin)
             {
                 $this->createSleepStageBlocks($event, $item, $metrics, $plugin);
@@ -226,9 +217,6 @@ class HasOuraBlocksTest extends TestCase
         {
             use HasOuraBlocks;
 
-            /**
-             * @test
-             */
             public function create_heart_rate_blocks($event, $heartRateData, $plugin)
             {
                 $this->createHeartRateBlocks($event, $heartRateData, $plugin);
@@ -276,9 +264,6 @@ class HasOuraBlocksTest extends TestCase
         {
             use HasOuraBlocks;
 
-            /**
-             * @test
-             */
             public function create_sleep_timing_blocks($event, $item, $fields, $plugin)
             {
                 $this->createSleepTimingBlocks($event, $item, $fields, $plugin);
@@ -319,9 +304,6 @@ class HasOuraBlocksTest extends TestCase
         {
             use HasOuraBlocks;
 
-            /**
-             * @test
-             */
             public function create_activity_metric_blocks($event, $item, $metrics, $plugin)
             {
                 $this->createActivityMetricBlocks($event, $item, $metrics, $plugin);

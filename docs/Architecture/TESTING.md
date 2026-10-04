@@ -130,11 +130,12 @@ Unit tests test individual classes and methods in isolation.
 namespace Tests\Unit;
 
 use App\Integrations\Fetch\ContentExtractor;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ContentExtractorTest extends TestCase
 {
-    /** @test */
+    #[Test]
     public function it_extracts_content_from_valid_html(): void
     {
         $html = '<html><head><title>Test</title></head>...</html>';

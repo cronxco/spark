@@ -339,7 +339,7 @@ class DetectMetricTrendsJob implements ShouldQueue
     protected function getAverageForPeriod(MetricStatistic $metric, $startDate, $endDate): ?float
     {
         // Events don't have a user_id column; filter via the integration's user_id
-        $events = Event::whereHas('integration', function ($q) use ($metric) {
+        $events = Event::withoutInternal()->whereHas('integration', function ($q) use ($metric) {
             $q->where('user_id', $metric->user_id)
                 ->whereNull('deleted_at');
         })

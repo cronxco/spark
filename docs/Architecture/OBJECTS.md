@@ -86,6 +86,7 @@ EventObjects are soft-deletable and support tags, media, activity logging, and v
 - **Warning — unsupported relationship:** `integration()` is a legacy model method with no `integration_id` column backing it. EventObjects are user-scoped and this is not a supported Integration relationship or contract.
 - `actorEvents()` - HasMany Event (where this is `actor_id`)
 - `targetEvents()` - HasMany Event (where this is `target_id`)
+- `latestTargetEvent()` - Most recent non-deleted target Event by event time
 - `events()` - Union of actorEvents and targetEvents
 - `relationshipsFrom()` - MorphMany Relationship
 - `relationshipsTo()` - MorphMany Relationship

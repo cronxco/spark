@@ -2,6 +2,7 @@
 
 @php
 use App\Integrations\PluginRegistry;
+use App\Support\FlintQuestion;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $serviceName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
@@ -12,6 +13,7 @@ $question = $block->metadata['question'] ?? $block->title;
 $topic = $block->metadata['topic'] ?? null;
 $priority = $block->metadata['priority'] ?? 'medium';
 $answeredAt = $block->metadata['answered_at'] ?? null;
+$retired = FlintQuestion::isRetired($block);
 
 $priorityBadgeClass = match ($priority) {
     'high' => 'badge-error',
@@ -43,9 +45,14 @@ $iconColorClass = match ($accentColor) {
                 @if ($topic)
                     <div class="badge badge-neutral badge-outline badge-sm">{{ ucfirst($topic) }}</div>
                 @endif
+                @if ($retired)
+                    {{-- Still answerable: retirement stops it presenting as
+                         outstanding, it does not close the question. --}}
+                    <div class="badge badge-ghost badge-sm">Stale</div>
+                @endif
             </div>
             <div class="text-xs text-base-content/50">
-                {{ $block->time->diffForHumans() }}
+                {{ $block->time?->diffForHumans() }}
             </div>
         </div>
 

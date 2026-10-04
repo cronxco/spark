@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Services\PhotoClusteringService;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class PhotoClusteringServiceTest extends TestCase
@@ -15,7 +16,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->service = new PhotoClusteringService;
     }
 
-    /** @test */
+    #[Test]
     public function it_clusters_photos_by_time_and_location()
     {
         $photos = [
@@ -36,7 +37,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertCount(2, $clusters[1]['photos']);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_separate_clusters_for_photos_beyond_distance_threshold()
     {
         $photos = [
@@ -52,7 +53,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertCount(2, $clusters);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_separate_clusters_for_photos_beyond_time_threshold()
     {
         $photos = [
@@ -68,7 +69,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertCount(2, $clusters);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_time_only_clustering_for_photos_without_gps()
     {
         $photos = [
@@ -85,7 +86,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertFalse($clusters[0]['has_location']);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_titles_with_location_names()
     {
         $photos = [
@@ -98,7 +99,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertStringContainsString('10am', $clusters[0]['title']);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_generic_titles_without_location()
     {
         $photos = [
@@ -110,7 +111,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertEquals('Photos at 2pm', $clusters[0]['title']);
     }
 
-    /** @test */
+    #[Test]
     public function it_assigns_photos_to_nearest_cluster()
     {
         $photos = [
@@ -126,7 +127,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertCount(2, $clusters[0]['photos']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_mixed_gps_and_no_gps_photos()
     {
         $photos = [
@@ -143,7 +144,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertCount(2, $clusters[0]['photos']);
     }
 
-    /** @test */
+    #[Test]
     public function it_generates_stable_cluster_ids()
     {
         $photos = [
@@ -157,7 +158,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertEquals($clusters1[0]['cluster_id'], $clusters2[0]['cluster_id']);
     }
 
-    /** @test */
+    #[Test]
     public function it_counts_photos_and_videos_separately()
     {
         $photos = [
@@ -172,7 +173,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertEquals(1, $clusters[0]['video_count']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_empty_photo_array()
     {
         $clusters = $this->service->clusterPhotos([], 5, 60);
@@ -180,7 +181,7 @@ class PhotoClusteringServiceTest extends TestCase
         $this->assertEmpty($clusters);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_single_photo()
     {
         $photos = [
