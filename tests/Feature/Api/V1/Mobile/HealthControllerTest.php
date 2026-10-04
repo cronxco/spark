@@ -7,6 +7,7 @@ use App\Jobs\Data\AppleHealth\AppleHealthWorkoutData;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -36,7 +37,7 @@ class HealthControllerTest extends TestCase
     #[Test]
     public function samples_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/health/samples', ['samples' => [$this->stepSample('a')]])
             ->assertStatus(403);
@@ -45,7 +46,7 @@ class HealthControllerTest extends TestCase
     #[Test]
     public function samples_rejects_empty_payload(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/health/samples', ['samples' => []])
             ->assertStatus(422);
@@ -55,7 +56,7 @@ class HealthControllerTest extends TestCase
     public function samples_accepts_new_samples_and_dispatches_metric_job(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $samples = [];
         for ($day = 1; $day <= 20; $day++) {
@@ -86,7 +87,7 @@ class HealthControllerTest extends TestCase
     public function samples_reports_duplicates_on_replay(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // The reading on record was taken at 08:00; replaying it changes nothing.
         $this->seedStepDay('2026-04-19', 1234, '2026-04-19T08:00:00+00:00');
@@ -102,7 +103,7 @@ class HealthControllerTest extends TestCase
     public function samples_replace_a_days_total_with_a_later_reading(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // 1,234 steps by 08:00 are on record; by 20:00 the phone has 8,064.
         $this->seedStepDay('2026-04-19', 1234, '2026-04-19T08:00:00+00:00');
@@ -126,7 +127,7 @@ class HealthControllerTest extends TestCase
     public function samples_replace_a_day_recorded_before_readings_carried_as_of(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->seedStepDay('2026-04-19', 1234, null);
 
@@ -141,7 +142,7 @@ class HealthControllerTest extends TestCase
     public function samples_keep_the_latest_reading_for_a_day_within_a_batch(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $noon = $this->stepSample('noon', '2026-04-19T00:00:00Z', ['as_of' => '2026-04-19T12:00:00Z']);
         $noon['value'] = 5000;
@@ -166,7 +167,7 @@ class HealthControllerTest extends TestCase
     public function samples_file_a_reading_under_the_clients_local_day(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // Local midnight in London (BST) is 23:00 UTC the day before.
         $sample = $this->stepSample('steps', '2026-04-18T23:00:00Z', ['date' => '2026-04-19']);
@@ -182,7 +183,7 @@ class HealthControllerTest extends TestCase
     public function samples_accepts_workout_and_dispatches_workout_job(): void
     {
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $workout = [
             'external_id' => 'workout-1',
@@ -212,7 +213,7 @@ class HealthControllerTest extends TestCase
     #[Test]
     public function samples_rejects_unknown_type(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $sample = [
             'external_id' => 'x',

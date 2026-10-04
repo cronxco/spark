@@ -48,14 +48,14 @@ class MetricsOverview extends Component
 
     public function calculateStatistics(): void
     {
-        CalculateMetricStatisticsJob::dispatch();
+        CalculateMetricStatisticsJob::dispatch(Auth::id());
 
         $this->success('Statistics calculation job dispatched. This may take a few minutes.');
     }
 
     public function detectTrends(): void
     {
-        DetectMetricTrendsJob::dispatch();
+        DetectMetricTrendsJob::dispatch(Auth::id());
 
         $this->success('Trend detection job dispatched. This may take a few minutes.');
     }

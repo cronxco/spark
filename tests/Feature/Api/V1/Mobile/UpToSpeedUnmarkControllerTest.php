@@ -8,6 +8,7 @@ use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -50,7 +51,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     #[Test]
     public function requires_ios_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/up-to-speed/unmark', ['items' => []])
             ->assertStatus(403);
@@ -59,7 +60,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     #[Test]
     public function rejects_missing_items(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/unmark', [])
             ->assertStatus(422);
@@ -68,7 +69,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     #[Test]
     public function rejects_check_in_type(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/unmark', [
             'items' => [['type' => 'check_in', 'id' => '00000000-0000-4000-8000-000000000000']],
@@ -78,7 +79,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     #[Test]
     public function rejects_non_uuid_id(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/unmark', [
             'items' => [['type' => 'flint_digest', 'id' => 'not-a-uuid']],
@@ -93,7 +94,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     public function unmarking_a_digest_removes_its_caught_up_row(): void
     {
         $event = $this->digest();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $payload = ['items' => [['type' => 'flint_digest', 'id' => $event->id]]];
         $this->postJson('/api/v1/mobile/up-to-speed/read', $payload)->assertOk();
@@ -113,7 +114,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     public function an_unmarked_digest_returns_to_the_feed_as_unread(): void
     {
         $event = $this->digest();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $payload = ['items' => [['type' => 'flint_digest', 'id' => $event->id]]];
         $this->postJson('/api/v1/mobile/up-to-speed/read', $payload)->assertOk();
@@ -131,7 +132,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     public function unmarking_something_already_unread_is_a_no_op(): void
     {
         $event = $this->digest();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/unmark', [
             'items' => [['type' => 'flint_digest', 'id' => $event->id]],
@@ -142,7 +143,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     public function unmarking_is_idempotent(): void
     {
         $event = $this->digest();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $payload = ['items' => [['type' => 'flint_digest', 'id' => $event->id]]];
         $this->postJson('/api/v1/mobile/up-to-speed/read', $payload)->assertOk();
@@ -159,7 +160,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     public function unmarking_an_anomaly_clears_its_acknowledgement(): void
     {
         $anomaly = $this->anomaly();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/anomalies/{$anomaly->id}/acknowledge", [])->assertOk();
         $this->assertNotNull($anomaly->fresh()->acknowledged_at);
@@ -175,7 +176,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     public function unmarking_an_anomaly_lifts_its_suppression_window(): void
     {
         $anomaly = $this->anomaly();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/anomalies/{$anomaly->id}/acknowledge", [
             'suppress_until' => now()->addDays(7)->toDateString(),
@@ -204,7 +205,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
         ]);
         $remainingSuppression = now()->addDays(7)->endOfDay();
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/anomalies/{$first->id}/acknowledge", [
             'suppress_until' => $remainingSuppression->toDateString(),
@@ -230,7 +231,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
     public function a_recovered_anomaly_returns_to_the_unread_feed(): void
     {
         $anomaly = $this->anomaly();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/anomalies/{$anomaly->id}/acknowledge", [])->assertOk();
 
@@ -271,7 +272,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
             ->event('caught_up')
             ->log('caught_up');
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/unmark', [
             'items' => [['type' => 'flint_digest', 'id' => $otherEvent->id]],

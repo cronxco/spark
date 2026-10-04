@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Services\Ai\Knowledge\ContentExtractor;
 use Exception;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Log;
 
 class ExtractContentJob implements ShouldQueue
 {
-    use Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 300; // 5 minutes for AI processing
 

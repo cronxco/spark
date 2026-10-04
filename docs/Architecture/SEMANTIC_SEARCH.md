@@ -58,7 +58,7 @@ Press `Cmd+K` (or `Ctrl+K`) and type a natural language query with 3+ words. Sem
 
 **Dedicated Semantic Mode:**
 
-Type `~` followed by your query (e.g., `~payment issues`) for semantic-only results with broader matching and stronger temporal weighting.
+Type `~` followed by your query (e.g., `~payment issues`) for semantic-only results with broader matching.
 
 **Model Methods:**
 
@@ -139,11 +139,22 @@ POST /api/search
 
 **Temporal Weighting:**
 
+The `temporalWeight` scope argument applies a linear penalty per day old. It is still used by the REST `/api/search` endpoints:
+
 | Days Ago | Weight 0.01 | Weight 0.015  | Weight 0.02 |
 | -------- | ----------- | ------------- | ----------- |
 | Today    | 0% penalty  | 0% penalty    | 0% penalty  |
 | 7 days   | 7% penalty  | 10.5% penalty | 14% penalty |
 | 30 days  | 30% penalty | 45% penalty   | 60% penalty |
+
+**Recency in Spotlight and mobile search:**
+
+Spotlight (text and `~` semantic) and the mobile `/api/v1/mobile/search` and `/search/{type}` endpoints call the scopes with `temporalWeight: 0` and rank with `App\Services\Search\RecencyRanking` instead: `score = (1 - weight) * relevance + weight * recency`, where relevance is `1 - distance / 2` (semantic) or the text-match tier (exact 1.0, prefix 0.8, contains 0.6, other field 0.4), and recency halves every `half_life_days`. Tune it in `config/spark.php` (`spark.search.recency`, env `SEARCH_RECENCY_WEIGHT` default 0.2, `SEARCH_RECENCY_HALF_LIFE_DAYS` default 30); weight 0 turns recency off. Compare settings against real searches with:
+
+```bash
+php artisan search:recency-check you@example.com "tesco" "run" --weight=0.3
+php artisan search:recency-check you@example.com --file=queries.txt --mode=semantic
+```
 
 **Duplicate Detection:**
 

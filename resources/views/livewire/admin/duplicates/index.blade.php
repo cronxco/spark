@@ -1,8 +1,10 @@
 <?php
 
 use App\Services\DuplicateDetectionService;
-use Livewire\Volt\Component;
-use function Livewire\Volt\{layout, state};
+use App\Support\AdminTenant;
+
+use function Livewire\Volt\layout;
+use function Livewire\Volt\state;
 
 layout('components.layouts.app');
 
@@ -19,7 +21,7 @@ $search = function () {
     $this->duplicates = [];
 
     $service = app(DuplicateDetectionService::class);
-    $userId = auth()->id();
+    $userId = AdminTenant::id();
 
     $results = match ($this->modelType) {
         'Event' => $service->findDuplicateEvents($userId, $this->threshold, $this->limit),

@@ -10,6 +10,19 @@ use Illuminate\Support\Facades\Log;
 class FindReceiptForTransactionTask extends BaseTaskJob
 {
     /**
+     * Monzo and GoCardless actions a receipt can belong to.
+     *
+     * @var list<string>
+     */
+    public const TRANSACTION_ACTIONS = [
+        'card_payment_to',
+        'payment_to',
+        'made_transaction',
+        'card_refund_from',
+        'payment_from',
+    ];
+
+    /**
      * Execute the find-receipt-for-transaction task
      */
     protected function execute(): void
@@ -43,7 +56,7 @@ class FindReceiptForTransactionTask extends BaseTaskJob
             ->whereBetween('time', [$startTime, $endTime])
             ->where(function ($query) {
                 // Amount within ±10% of transaction
-                $tolerance = $this->model->value * 0.1;
+                $tolerance = (int) ($this->model->value * 0.1);
                 $query->whereBetween('value', [
                     max(0, $this->model->value - $tolerance),
                     $this->model->value + $tolerance,
@@ -64,6 +77,8 @@ class FindReceiptForTransactionTask extends BaseTaskJob
                 'transaction_id' => $this->model->id,
             ]);
 
+            $this->recordOutcome('no_candidate');
+
             return;
         }
 
@@ -77,7 +92,7 @@ class FindReceiptForTransactionTask extends BaseTaskJob
 
         // Try to match each receipt
         foreach ($unmatchedReceipts as $receipt) {
-            $confidence = $this->calculateReverseMatchConfidence($receipt, $this->model);
+            $confidence = $matcher->calculateReverseMatchConfidence($receipt, $this->model);
 
             if ($confidence >= $autoMatchThreshold) {
                 $matcher->createReceiptRelationship(
@@ -93,39 +108,13 @@ class FindReceiptForTransactionTask extends BaseTaskJob
                     'confidence' => $confidence,
                 ]);
 
+                $this->recordOutcome('matched');
+
                 // Only match one receipt per transaction
-                break;
+                return;
             }
         }
-    }
 
-    /**
-     * Calculate confidence score for reverse matching
-     */
-    protected function calculateReverseMatchConfidence(Event $receipt, Event $transaction): float
-    {
-        $confidence = 0.0;
-
-        // Time proximity (max 0.3)
-        $timeDiff = abs($receipt->time->diffInMinutes($transaction->time));
-        if ($timeDiff <= 60) {
-            $confidence += 0.3 * (1 - ($timeDiff / 60));
-        }
-
-        // Amount match (max 0.4)
-        $amountDiff = abs($receipt->value - $transaction->value) / max($receipt->value, $transaction->value);
-        if ($amountDiff <= 0.05) {
-            $confidence += 0.4;
-        } elseif ($amountDiff <= 0.10) {
-            $confidence += 0.3;
-        }
-
-        // Merchant name similarity would go here (max 0.3)
-        // For now, add a base score if receipt has merchant info
-        if ($receipt->target && $receipt->target->title) {
-            $confidence += 0.2;
-        }
-
-        return min($confidence, 1.0);
+        $this->recordOutcome('no_candidate');
     }
 }

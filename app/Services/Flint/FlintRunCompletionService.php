@@ -27,7 +27,8 @@ class FlintRunCompletionService
         $integration = Integration::query()
             ->where('user_id', $user->id)
             ->where('service', 'flint')
-            ->where('instance_type', 'digest')
+            ->orderByRaw("CASE WHEN instance_type = 'assistant' THEN 0 ELSE 1 END")
+            ->oldest()
             ->firstOrFail();
         $task = new TaskDefinition(
             key: "flint_routine_{$routine}",
