@@ -11,9 +11,9 @@ use App\Services\Mobile\BlockLookup;
 use App\Services\Mobile\EventLookup;
 use App\Services\Mobile\ObjectLookup;
 use App\Services\RelationshipTypeRegistry;
+use App\Services\SourceFieldGuard;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 use Spatie\Tags\Tag;
 
 /**
@@ -28,6 +28,7 @@ class EntityMutationService
         private ObjectLookup $objects,
         private BlockLookup $blocks,
         private ResourceVersion $versions,
+        private SourceFieldGuard $sourceFields,
     ) {}
 
     /** @return array<string, mixed> */
@@ -69,7 +70,7 @@ class EntityMutationService
         if (! $object) {
             return null;
         }
-        $this->rejectLockedTitleChange($object, $attributes);
+        $this->sourceFields->assertEditable($object, $attributes);
         $object->update($this->only($attributes, ['title', 'type', 'concept', 'url']));
 
         return $object->fresh('tags');
@@ -81,6 +82,7 @@ class EntityMutationService
         if (! $block) {
             return null;
         }
+        $this->sourceFields->assertEditable($block, $attributes);
         $block->update($this->only($attributes, ['title', 'block_type', 'value', 'value_multiplier', 'value_unit', 'time', 'url']));
 
         return $block->fresh(['event.integration', 'event.actor', 'event.target']);
@@ -210,19 +212,6 @@ class EntityMutationService
         return match ($class) {
             Event::class => 'event', EventObject::class => 'object', Block::class => 'block', default => 'unknown'
         };
-    }
-
-    /**
-     * A locked object keeps its title. Say so instead of letting the model
-     * hook quietly restore the old value and reporting success.
-     */
-    private function rejectLockedTitleChange(EventObject $object, array $attributes): void
-    {
-        if ($object->isLocked() && array_key_exists('title', $attributes) && $attributes['title'] !== $object->title) {
-            throw ValidationException::withMessages([
-                'title' => self::LOCKED_TITLE_MESSAGE,
-            ]);
-        }
     }
 
     private function only(array $attributes, array $allowed): array

@@ -652,7 +652,10 @@ see [MCP.md](MCP.md#update-entity) for the exact allowed fields per kind.
 **Response `404`** — Not found or not owned.
 
 **Response `422`** — Disallowed field or invalid value (from
-`EntityMutationService::validateUpdate`). **Response `428`/`412`** —
+`EntityMutationService::validateUpdate`), or a change to a source field of an
+integration-sourced or locked item (`SourceFieldGuard`, see
+[OBJECTS.md](../Architecture/OBJECTS.md#no-overrides-of-source-fields)).
+**Response `428`/`412`** —
 Missing/stale `If-Match`.
 
 ### `PATCH /api/v1/events/{id}/note`

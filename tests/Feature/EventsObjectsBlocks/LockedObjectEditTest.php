@@ -14,6 +14,7 @@ use Tests\TestCase;
 
 /**
  * EOB-04: a locked object's title edit was quietly reverted and reported as saved.
+ * EOB-D2/D3: the lock covers every source field (title, concept, type, content, URL).
  */
 class LockedObjectEditTest extends TestCase
 {
@@ -35,18 +36,19 @@ class LockedObjectEditTest extends TestCase
     }
 
     #[Test]
-    public function the_web_editor_still_saves_other_fields_on_a_locked_object(): void
+    public function the_web_editor_rejects_any_source_field_change_on_a_locked_object(): void
     {
         [$user, $object] = $this->lockedObject();
         $this->actingAs($user);
 
         Livewire::test(EditObject::class, ['object' => $object])
+            ->assertSet('sourceFieldsEditable', false)
             ->set('url', 'https://example.com/new')
             ->call('save')
-            ->assertHasNoErrors()
-            ->assertDispatched('object-updated');
+            ->assertHasErrors(['url'])
+            ->assertNotDispatched('object-updated');
 
-        $this->assertSame('https://example.com/new', $object->fresh()->url);
+        $this->assertNull($object->fresh()->url);
     }
 
     #[Test]

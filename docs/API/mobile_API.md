@@ -1791,7 +1791,10 @@ per kind.
 **Response `200`**: the updated entity in its Compact resource shape.
 
 **Response `404`** — Not found or not owned. **Response `422`** — Disallowed
-field or invalid value. **Response `428`/`412`** — Missing/stale `If-Match`.
+field or invalid value, or a change to a source field (object `title`,
+`concept`, `type`, `url`; block `title`, `block_type`, `url`) of an
+integration-sourced or locked item; `errors.{field}` says why. The event note
+stays editable. **Response `428`/`412`** — Missing/stale `If-Match`.
 
 ---
 
