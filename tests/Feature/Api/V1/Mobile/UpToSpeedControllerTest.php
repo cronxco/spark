@@ -10,6 +10,7 @@ use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -76,7 +77,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function returns_empty_items_when_nothing_exists(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $response = $this->getJson('/api/v1/mobile/up-to-speed')
             ->assertOk()
@@ -104,7 +105,7 @@ class UpToSpeedControllerTest extends TestCase
             'event_metadata' => ['period' => 'morning', 'title' => 'Morning Digest', 'summary' => 'Summary text'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $response = $this->getJson('/api/v1/mobile/up-to-speed')->assertOk();
         $items = collect($response->json('items'));
@@ -127,7 +128,7 @@ class UpToSpeedControllerTest extends TestCase
             'time' => now()->subDays(2),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'flint_digest'));
@@ -154,7 +155,7 @@ class UpToSpeedControllerTest extends TestCase
             'properties' => [],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $digest = $items->firstWhere('type', 'flint_digest');
@@ -168,7 +169,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function includes_both_check_in_periods(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $checkIns = $items->where('type', 'check_in')->values();
@@ -181,7 +182,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function check_in_uses_synthetic_id_format(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $today = Carbon::today('UTC')->toDateString();
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
@@ -213,7 +214,7 @@ class UpToSpeedControllerTest extends TestCase
             'event_metadata' => ['date' => $today],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $morning = $items->first(fn ($i) => $i['type'] === 'check_in' && $i['payload']['period'] === 'morning');
@@ -226,7 +227,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function incomplete_check_in_has_null_caught_up_at(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $morning = $items->first(fn ($i) => $i['type'] === 'check_in' && $i['payload']['period'] === 'morning');
@@ -250,7 +251,7 @@ class UpToSpeedControllerTest extends TestCase
             'acknowledged_at' => null,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $anomalyItem = $items->firstWhere('type', 'anomaly');
@@ -272,7 +273,7 @@ class UpToSpeedControllerTest extends TestCase
             'acknowledged_at' => now(),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'anomaly'));
@@ -289,7 +290,7 @@ class UpToSpeedControllerTest extends TestCase
             'metadata' => ['suppress_until' => now()->addDay()->toDateString()],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'anomaly'));
@@ -316,7 +317,7 @@ class UpToSpeedControllerTest extends TestCase
             'properties' => [],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $anomalyItem = $items->firstWhere('type', 'anomaly');
@@ -344,7 +345,7 @@ class UpToSpeedControllerTest extends TestCase
             'metadata' => ['text' => 'Short summary'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $newsItem = $items->firstWhere('type', 'news_summary');
@@ -386,7 +387,7 @@ class UpToSpeedControllerTest extends TestCase
             'metadata' => ['content' => 'Oil disruption dominates the headlines.'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $newsItem = $items->firstWhere('type', 'news_summary');
@@ -426,7 +427,7 @@ class UpToSpeedControllerTest extends TestCase
             'metadata' => ['content' => 'The commission found against City.'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $newsItem = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
             ->firstWhere('type', 'news_summary');
@@ -460,7 +461,7 @@ class UpToSpeedControllerTest extends TestCase
             'metadata' => ['content' => 'Short summary'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $newsItem = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
             ->firstWhere('type', 'news_summary');
@@ -486,7 +487,7 @@ class UpToSpeedControllerTest extends TestCase
             'metadata' => ['content' => 'Short summary'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $newsItem = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
             ->firstWhere('type', 'news_summary');
@@ -530,7 +531,7 @@ class UpToSpeedControllerTest extends TestCase
         ]);
         Block::factory()->create(['event_id' => $otherEvent->id, 'block_type' => 'fetch_tldr']);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $newsItems = collect($this->getJson('/api/v1/mobile/up-to-speed?news_limit=2')
             ->assertOk()
@@ -575,7 +576,7 @@ class UpToSpeedControllerTest extends TestCase
             $newest = $event;
         }
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $newsItems = $items->where('type', 'news_summary')->values();
@@ -607,7 +608,7 @@ class UpToSpeedControllerTest extends TestCase
             'metadata' => ['content' => 'A saved article.'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
 
@@ -624,7 +625,7 @@ class UpToSpeedControllerTest extends TestCase
             'time' => now()->subHours(12),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'news_summary'));
@@ -644,7 +645,7 @@ class UpToSpeedControllerTest extends TestCase
             'block_type' => 'fetch_tldr',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'news_summary'));
@@ -675,7 +676,7 @@ class UpToSpeedControllerTest extends TestCase
             'properties' => [],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $newsItem = $items->firstWhere('type', 'news_summary');
@@ -712,7 +713,7 @@ class UpToSpeedControllerTest extends TestCase
         ]);
         Block::factory()->create(['event_id' => $newsEvent->id, 'block_type' => 'fetch_tldr']);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $types = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
             ->pluck('type')
@@ -746,7 +747,7 @@ class UpToSpeedControllerTest extends TestCase
             'baseline_value' => 38.87,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $payload = $this->firstAnomalyPayload();
 
@@ -772,7 +773,7 @@ class UpToSpeedControllerTest extends TestCase
             'baseline_value' => 85,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $payload = $this->firstAnomalyPayload();
 
@@ -801,7 +802,7 @@ class UpToSpeedControllerTest extends TestCase
             'baseline_value' => 38.87,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $payload = $this->firstAnomalyPayload();
 
@@ -826,7 +827,7 @@ class UpToSpeedControllerTest extends TestCase
             'baseline_value' => 3.2,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $payload = $this->firstAnomalyPayload();
 
@@ -855,7 +856,7 @@ class UpToSpeedControllerTest extends TestCase
             'detected_at' => now(),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'anomaly'));
@@ -874,7 +875,7 @@ class UpToSpeedControllerTest extends TestCase
             'detected_at' => now(),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertCount(1, $items->where('type', 'anomaly'));
@@ -901,7 +902,7 @@ class UpToSpeedControllerTest extends TestCase
             ]);
         }
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'anomaly'));
@@ -927,7 +928,7 @@ class UpToSpeedControllerTest extends TestCase
             'baseline_value' => 241.68,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'anomaly'));
@@ -953,7 +954,7 @@ class UpToSpeedControllerTest extends TestCase
             'time' => now(),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/up-to-speed/read', [
             'items' => [['type' => 'flint_digest', 'id' => $event->id]],
@@ -975,7 +976,7 @@ class UpToSpeedControllerTest extends TestCase
     {
         $anomaly = $this->acknowledgedAnomaly();
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertNull($items->firstWhere('id', $anomaly->id));
@@ -986,7 +987,7 @@ class UpToSpeedControllerTest extends TestCase
     {
         $anomaly = $this->acknowledgedAnomaly();
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect(
             $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
@@ -1012,7 +1013,7 @@ class UpToSpeedControllerTest extends TestCase
             'acknowledged_at' => null,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect(
             $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
@@ -1050,7 +1051,7 @@ class UpToSpeedControllerTest extends TestCase
             'metadata' => ['event_id' => $event->id],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect(
             $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
@@ -1070,7 +1071,7 @@ class UpToSpeedControllerTest extends TestCase
             'metadata' => ['suppress_until' => now()->addDays(7)->toDateString()],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $default = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertNull($default->firstWhere('id', $anomaly->id));
@@ -1091,7 +1092,7 @@ class UpToSpeedControllerTest extends TestCase
             'time' => now(),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = $this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items');
 
@@ -1123,7 +1124,7 @@ class UpToSpeedControllerTest extends TestCase
             'time' => now(),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
         $this->assertEmpty($items->where('type', 'flint_digest'));

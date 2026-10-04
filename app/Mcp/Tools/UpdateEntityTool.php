@@ -39,11 +39,15 @@ class UpdateEntityTool extends Tool
         } catch (ValidationException $exception) {
             return Response::error($exception->validator->errors()->first());
         }
-        $entity = match ($kind) {
-            'event' => $this->mutations->updateEvent($request->user(), $id, $attributes),
-            'object' => $this->mutations->updateObject($request->user(), $id, $attributes),
-            'block' => $this->mutations->updateBlock($request->user(), $id, $attributes),
-        };
+        try {
+            $entity = match ($kind) {
+                'event' => $this->mutations->updateEvent($request->user(), $id, $attributes),
+                'object' => $this->mutations->updateObject($request->user(), $id, $attributes),
+                'block' => $this->mutations->updateBlock($request->user(), $id, $attributes),
+            };
+        } catch (ValidationException $exception) {
+            return Response::error($exception->validator->errors()->first());
+        }
         if (! $entity) {
             return Response::error(ucfirst($kind) . ' not found or access denied.');
         }

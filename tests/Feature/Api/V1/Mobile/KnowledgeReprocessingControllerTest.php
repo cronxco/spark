@@ -11,6 +11,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Services\Knowledge\KnowledgeReprocessingService;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
@@ -36,7 +37,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
     public function reprocess_requires_write_ability(): void
     {
         $event = $this->createFetchEvent();
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess")
             ->assertStatus(403);
@@ -47,7 +48,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
     {
         $otherUser = User::factory()->create();
         $event = $this->createFetchEvent($otherUser);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess")
             ->assertStatus(404);
@@ -63,7 +64,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
             'domain' => 'money',
             'action' => 'card_payment_to',
         ]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [], $this->ifMatch($event))
             ->assertStatus(422);
@@ -74,7 +75,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
     {
         $event = $this->createFetchEvent();
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [
             'mode' => 'refetch',
@@ -92,7 +93,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
     {
         $event = $this->createFetchEvent(webpageContent: 'Existing extracted markdown.');
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [
             'mode' => 'summary_only',
@@ -108,7 +109,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
     {
         $event = $this->createNewsletterEvent(rawHtml: '<main>Newsletter body</main>');
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [], $this->ifMatch($event))
             ->assertAccepted()
@@ -124,7 +125,7 @@ class KnowledgeReprocessingControllerTest extends TestCase
     {
         $event = $this->createNewsletterEvent(rawHtml: null, publicationContent: null);
         Queue::fake();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/knowledge/events/{$event->id}/reprocess", [], $this->ifMatch($event))
             ->assertAccepted();

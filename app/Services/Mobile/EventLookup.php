@@ -39,4 +39,24 @@ class EventLookup
             ->with(['integration', 'actor', 'target', 'blocks', 'tags'])
             ->first();
     }
+
+    /**
+     * Find a soft-deleted event owned by the user, for restoring it.
+     */
+    public function findTrashed(User $user, string $eventId): ?Event
+    {
+        if (! preg_match(self::UUID_REGEX, $eventId)) {
+            return null;
+        }
+
+        $integrationIds = $user->integrations()->pluck('id')->all();
+        if (empty($integrationIds)) {
+            return null;
+        }
+
+        return Event::onlyTrashed()
+            ->whereIn('integration_id', $integrationIds)
+            ->where('id', $eventId)
+            ->first();
+    }
 }

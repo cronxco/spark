@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use App\Services\FlintTopicService;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -39,7 +40,7 @@ class FlintTopicsControllerTest extends TestCase
 
         $newer = $this->topic('US–Iran escalation', kind: 'strategic', status: 'active');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/topics')
             ->assertOk()
@@ -58,7 +59,7 @@ class FlintTopicsControllerTest extends TestCase
         $this->topic('Second');
         $this->topic('Third');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $first = $this->getJson('/api/v1/mobile/flint/topics?limit=2')
             ->assertOk()
@@ -81,7 +82,7 @@ class FlintTopicsControllerTest extends TestCase
         $this->topic('Active thread', status: 'active');
         $this->topic('Dormant thread', status: 'dormant');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/topics?status=dormant')
             ->assertOk()
@@ -101,7 +102,7 @@ class FlintTopicsControllerTest extends TestCase
             'metadata' => ['kind' => 'thematic', 'status' => 'active'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/flint/topics')
             ->assertOk()
@@ -120,7 +121,7 @@ class FlintTopicsControllerTest extends TestCase
             'event_metadata' => ['title' => 'Morning Digest', 'local_date' => '2026-09-14', 'period' => 'morning'],
         ]);
         app(FlintTopicService::class)->update($this->user, $topic->id, ['related_event_id' => $event->id]);
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")
             ->assertOk()
@@ -140,7 +141,7 @@ class FlintTopicsControllerTest extends TestCase
             'type' => 'topic',
             'title' => 'Private thread',
         ]);
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->assertNotFound();
     }
@@ -161,7 +162,7 @@ class FlintTopicsControllerTest extends TestCase
             'related_event_id' => $event->id,
             'related_block_id' => $block->id,
         ]);
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $response = $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->assertOk();
         $mentions = collect($response->json('data.mentions'));
@@ -179,7 +180,7 @@ class FlintTopicsControllerTest extends TestCase
     {
         $topic = $this->topic('Work/life balance & resilience', kind: 'tactical');
         $topic->update(['content' => 'NWDs can be skipped when work needs it.']);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
         $version = $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->json('data.version');
 
         $this->patchJson("/api/v1/mobile/flint/topics/{$topic->id}", ['kind' => 'thematic'])
@@ -198,7 +199,7 @@ class FlintTopicsControllerTest extends TestCase
     public function task_blocks_have_independent_due_and_review_dates_and_can_be_completed(): void
     {
         $topic = $this->topic('Canada trip', kind: 'strategic');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
         $body = [
             'client_mutation_id' => (string) Str::uuid(),
             'title' => 'Book final Vancouver hotel night',
@@ -233,7 +234,7 @@ class FlintTopicsControllerTest extends TestCase
             'user_id' => $other->id, 'concept' => 'flint', 'type' => 'topic',
             'title' => 'Private', 'metadata' => ['kind' => 'thematic'],
         ]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
         $this->postJson("/api/v1/mobile/flint/topics/{$foreign->id}/tasks", [
             'client_mutation_id' => (string) Str::uuid(), 'title' => 'Intrusion',
         ])->assertNotFound();

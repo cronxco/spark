@@ -1,0 +1,22 @@
+name: Playwright worker tests
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+      - name: Install worker dependencies
+        run: npm install --prefix docker/playwright --ignore-scripts --no-package-lock
+      - name: Test worker HTTP and URL safety contracts
+        run: npm test --prefix docker/playwright

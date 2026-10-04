@@ -13,20 +13,29 @@ class BookmarksController extends Controller
     public function __construct(protected BookmarkUrlService $bookmarks) {}
 
     /**
-     * POST /api/v1/mobile/bookmarks
+     * POST /api/v1/bookmarks and /api/v1/mobile/bookmarks
      *
-     * Bookmarks a URL shared from the iOS share extension. Delegates to the
-     * same service as FetchApiController::bookmarkUrl so dedupe and fetch-job
-     * dispatch behaviour is identical. The client only needs a 2xx.
+     * Bookmarks a URL, from the iOS share extension or a bookmark API token.
+     * The optional fetch flags carry over from the retired /api/fetch/bookmarks
+     * route; the share extension sends none and only needs a 2xx.
      */
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:2048'],
+            'fetch_immediately' => ['sometimes', 'boolean'],
+            'force_refresh' => ['sometimes', 'boolean'],
+            'fetch_mode' => ['sometimes', 'string', 'in:once,recurring'],
         ]);
 
         try {
-            $result = $this->bookmarks->bookmark($request->user(), $validated['url']);
+            $result = $this->bookmarks->bookmark(
+                $request->user(),
+                $validated['url'],
+                $validated['fetch_immediately'] ?? true,
+                $validated['force_refresh'] ?? false,
+                $validated['fetch_mode'] ?? 'once',
+            );
         } catch (UnsafeUrlException $e) {
             return response()->json(['message' => 'This URL is not allowed.'], 422);
         }
@@ -39,6 +48,7 @@ class BookmarksController extends Controller
                 'id' => $bookmark->id,
                 'url' => $bookmark->url,
             ],
+            'job_dispatched' => $result['job_dispatched'],
         ], $result['created'] ? 201 : 200);
     }
 }

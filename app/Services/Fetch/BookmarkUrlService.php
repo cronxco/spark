@@ -8,10 +8,10 @@ use App\Models\EventObject;
 use App\Models\User;
 
 /**
- * Shared bookmark-creation logic used by both the public fetch API
- * (FetchApiController::bookmarkUrl) and the mobile share-extension endpoint
- * (Api\V1\Mobile\BookmarksController). Keeping it here guarantees dedupe and
- * fetch-job dispatch behaviour stays identical across both surfaces.
+ * Shared bookmark-creation logic behind POST /api/v1/bookmarks and the mobile
+ * share-extension endpoint (both Api\V1\Mobile\BookmarksController), and
+ * the MCP bookmark tools. Keeping it here guarantees dedupe and fetch-job
+ * dispatch behaviour stays identical across every surface.
  */
 class BookmarkUrlService
 {

@@ -1,8 +1,17 @@
 <div>
     <x-form wire:submit="save">
+        @unless ($sourceFieldsEditable)
+            <x-alert
+                title="Some fields come from the source"
+                description="This block comes from an integration, so its title, type and URL follow the source."
+                icon="fas.lock"
+            />
+        @endunless
+
         <x-input
             label="Title"
             wire:model="title"
+            :readonly="! $sourceFieldsEditable"
             placeholder="Block title"
             hint="Display name for this block"
         />
@@ -10,6 +19,7 @@
         <x-input
             label="Block Type"
             wire:model="block_type"
+            :readonly="! $sourceFieldsEditable"
             placeholder="e.g., daily_summary, workout_detail"
             hint="Type classification for this block"
         />
@@ -51,6 +61,7 @@
         <x-input
             label="URL"
             wire:model="url"
+            :readonly="! $sourceFieldsEditable"
             type="url"
             placeholder="https://..."
             hint="External link"

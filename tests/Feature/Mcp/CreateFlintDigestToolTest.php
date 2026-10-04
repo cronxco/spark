@@ -122,7 +122,7 @@ class CreateFlintDigestToolTest extends TestCase
         $this->assertDatabaseHas('integrations', [
             'user_id' => $this->user->id,
             'service' => 'flint',
-            'instance_type' => 'digest',
+            'instance_type' => 'assistant',
         ]);
 
         $this->assertDatabaseHas('objects', [

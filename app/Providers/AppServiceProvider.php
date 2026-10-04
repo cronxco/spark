@@ -4,17 +4,18 @@ namespace App\Providers;
 
 use App\Events\Mobile\NewEventBroadcast;
 use App\Events\Mobile\NotificationReceived;
-use App\Jobs\Data\Receipt\FindReceiptForTransactionJob;
 use App\Models\Block;
 use App\Models\Event as EventModel;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\User;
 use App\Notifications\SparkNotification;
 use App\Observers\BlockObserver;
 use App\Observers\EventObjectObserver;
 use App\Observers\EventObserver;
 use App\Observers\NotificationEntityObserver;
 use App\Services\EffectiveTimezoneResolver;
+use App\Services\Notifications\NotificationDeliveryRecorder;
 use App\Services\Notifications\NotificationIncidentResolver;
 use App\Services\Notifications\NotificationOccurrence;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -75,23 +76,6 @@ class AppServiceProvider extends ServiceProvider
             $event->extendSocialite('authelia', AutheliaProvider::class);
         });
 
-        // Receipt reverse matching: When a transaction is created, look for matching receipts
-        // Skip during testing to avoid cascading errors with sync queue
-        EventModel::created(function (EventModel $event) {
-            if (app()->runningUnitTests()) {
-                return;
-            }
-
-            if (in_array($event->service, ['monzo', 'gocardless'])
-                && $event->domain === 'money'
-                && in_array($event->action, [
-                    'card_payment_to', 'payment_to', 'made_transaction',
-                    'card_refund_from', 'payment_from',
-                ])) {
-                FindReceiptForTransactionJob::dispatch($event);
-            }
-        });
-
         // iOS broadcast on new Event creation. Throttled per-user via Redis to avoid
         // flooding subscribers when bulk ingestion creates many events in quick succession.
         // The 2-second SETNX window means we only emit one ping per user per burst —
@@ -122,11 +106,15 @@ class AppServiceProvider extends ServiceProvider
         // built-in NotificationSent event with channel='database' so the inbox
         // mirror in the app updates in real time alongside the database insert.
         Event::listen(function (NotificationSent $event) {
-            if ($event->channel !== 'database') {
+            if (! $event->notification instanceof SparkNotification) {
                 return;
             }
 
-            if (! $event->notification instanceof SparkNotification) {
+            if ($event->channel !== 'database') {
+                if ($event->notifiable instanceof User) {
+                    app(NotificationDeliveryRecorder::class)->sent($event->notifiable, $event->notification, $event->channel, $event->response);
+                }
+
                 return;
             }
 
@@ -167,6 +155,8 @@ class AppServiceProvider extends ServiceProvider
                         $existing->forceFill([
                             'data' => [
                                 ...($isNewer ? $payload : $existingData),
+                                'delivery' => $existingData['delivery'] ?? [],
+                                'receipts' => $existingData['receipts'] ?? [],
                                 'occurrence_count' => max(1, (int) ($existingData['occurrence_count'] ?? 1)) + 1,
                             ],
                             'read_at' => $isNewer ? null : $existing->read_at,

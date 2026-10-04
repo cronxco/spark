@@ -63,6 +63,11 @@ class IntegrationFailed extends SparkNotification
         return (string) $this->integration->id;
     }
 
+    public function isIncidentAlert(): bool
+    {
+        return true;
+    }
+
     public function getGroupKey(): ?string
     {
         return "integration_failed:{$this->integration->id}";

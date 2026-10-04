@@ -5,8 +5,8 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Support\AdminTenant;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
@@ -307,7 +307,7 @@ new class extends Component
      */
     public function getOrphanedEventsProperty(): array
     {
-        $userId = Auth::id();
+        $userId = AdminTenant::id();
 
         // integration() is a withTrashed() relation, so an event only counts as
         // orphaned once the integration row is gone outright — which takes its
@@ -336,7 +336,7 @@ new class extends Component
         // truly dangling one cannot be attributed to anybody and is shown to
         // nobody — an operator-level integrity sweep, not a per-user page.
         $orphanedBlocks = Block::whereDoesntHave('event')
-            ->whereIn('event_id', Event::withTrashed()->forUser(Auth::id())->select('id'))
+            ->whereIn('event_id', Event::withTrashed()->forUser(AdminTenant::id())->select('id'))
             ->with('event')
             ->get();
 
@@ -351,7 +351,7 @@ new class extends Component
      */
     public function getOrphanedObjectsProperty(): array
     {
-        $orphanedObjects = EventObject::where('user_id', Auth::id())
+        $orphanedObjects = EventObject::where('user_id', AdminTenant::id())
             ->whereDoesntHave('actorEvents')
             ->whereDoesntHave('targetEvents')
             ->with('tags')
@@ -369,7 +369,7 @@ new class extends Component
     public function getInvalidIntegrationsProperty(): array
     {
         $issues = [];
-        $userId = Auth::id();
+        $userId = AdminTenant::id();
 
         // Integrations with unknown services
         $unknownServices = Integration::where('user_id', $userId)
@@ -504,7 +504,7 @@ new class extends Component
      */
     public function getEmbeddingHealthProperty(): array
     {
-        $userId = Auth::id();
+        $userId = AdminTenant::id();
         $ownedEvents = fn () => Event::forUser($userId);
         $ownedBlocks = fn () => Block::whereHas('event.integration', fn ($q) => $q->where('user_id', $userId));
         $ownedObjects = fn () => EventObject::where('user_id', $userId);
@@ -716,7 +716,7 @@ new class extends Component
             })
             ->toArray();
 
-        $userId = Auth::id();
+        $userId = AdminTenant::id();
 
         // DB actions grouped by service
         $actions = Event::query()

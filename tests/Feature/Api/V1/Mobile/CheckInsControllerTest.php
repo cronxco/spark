@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
@@ -34,7 +35,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function store_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload())
             ->assertStatus(403);
@@ -43,7 +44,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function store_creates_event_via_plugin(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload())
             ->assertStatus(201);
@@ -58,7 +59,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function store_rejects_out_of_range_ratings(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload(['physical' => 9]))
             ->assertStatus(422);
@@ -67,7 +68,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function store_is_idempotent_for_same_period_and_date(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload())->assertStatus(201);
         $this->postJson('/api/v1/mobile/check-ins', $this->payload(['physical' => 5]))->assertStatus(201);
@@ -78,7 +79,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function store_persists_notes_in_event_metadata(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload(['notes' => 'Feeling great today']))
             ->assertStatus(201);
@@ -90,7 +91,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function store_works_without_notes(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload())
             ->assertStatus(201);
@@ -102,7 +103,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function store_rejects_notes_exceeding_max_length(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload(['notes' => str_repeat('a', 1001)]))
             ->assertStatus(422)
@@ -116,7 +117,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function index_returns_completion_status_for_date(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/check-ins?date=2026-04-19')
             ->assertStatus(200)
@@ -130,7 +131,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function index_shows_completed_when_event_exists(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload())->assertStatus(201);
 
@@ -146,7 +147,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function index_requires_date_parameter(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/check-ins')
             ->assertStatus(422)
@@ -156,7 +157,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function index_requires_valid_date_format(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/check-ins?date=not-a-date')
             ->assertStatus(422)
@@ -170,7 +171,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function history_returns_day_by_day_summary(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload(['date' => '2026-04-19']))->assertStatus(201);
         $this->postJson('/api/v1/mobile/check-ins', $this->payload(['date' => '2026-04-19', 'period' => 'afternoon', 'physical' => 3, 'mental' => 4]))->assertStatus(201);
@@ -196,7 +197,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function history_rejects_range_exceeding_90_days(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/check-ins/history?from=2026-01-01&to=2026-04-15')
             ->assertStatus(422);
@@ -205,7 +206,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function history_rejects_to_before_from(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/check-ins/history?from=2026-04-20&to=2026-04-10')
             ->assertStatus(422)
@@ -215,7 +216,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function history_requires_read_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_WRITE);
 
         $this->getJson('/api/v1/mobile/check-ins/history?from=2026-04-10&to=2026-04-19')
             ->assertStatus(403);
@@ -224,7 +225,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function history_includes_notes_when_present(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins', $this->payload(['notes' => 'Great morning']))->assertStatus(201);
 
@@ -247,7 +248,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function media_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->uploadImage($this->createTestImageContent())->assertStatus(403);
     }
@@ -308,7 +309,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function timezone_show_requires_read_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_WRITE);
 
         $this->getJson('/api/v1/mobile/check-ins/timezone')->assertStatus(403);
     }
@@ -317,7 +318,7 @@ class CheckInsControllerTest extends TestCase
     public function timezone_show_falls_back_to_profile_timezone(): void
     {
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/check-ins/timezone')
             ->assertStatus(200)
@@ -333,7 +334,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function timezone_show_defaults_to_utc_without_profile_timezone(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/check-ins/timezone')
             ->assertStatus(200)
@@ -345,7 +346,7 @@ class CheckInsControllerTest extends TestCase
     public function timezone_show_returns_latest_acknowledged_event(): void
     {
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins/timezone', [
             'timezone' => 'America/New_York',
@@ -366,7 +367,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function timezone_store_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/check-ins/timezone', ['timezone' => 'America/New_York'])
             ->assertStatus(403);
@@ -376,7 +377,7 @@ class CheckInsControllerTest extends TestCase
     public function timezone_store_creates_single_time_travel_event(): void
     {
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->postJson('/api/v1/mobile/check-ins/timezone', [
             'timezone' => 'America/New_York',
@@ -397,7 +398,7 @@ class CheckInsControllerTest extends TestCase
     public function timezone_store_persists_device_id(): void
     {
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins/timezone', [
             'timezone' => 'America/New_York',
@@ -413,7 +414,7 @@ class CheckInsControllerTest extends TestCase
     public function timezone_store_derives_previous_timezone_ignoring_client_value(): void
     {
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins/timezone', [
             'timezone' => 'America/New_York',
@@ -427,7 +428,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function timezone_store_rejects_invalid_identifier(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins/timezone', ['timezone' => 'Mars/Phobos'])
             ->assertStatus(422)
@@ -437,7 +438,7 @@ class CheckInsControllerTest extends TestCase
     #[Test]
     public function timezone_store_rejects_utc_offset_only_value(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins/timezone', ['timezone' => '+05:00'])
             ->assertStatus(422)
@@ -448,7 +449,7 @@ class CheckInsControllerTest extends TestCase
     public function timezone_store_is_idempotent_for_already_effective_zone(): void
     {
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // Submitting the already-effective profile timezone is a no-op.
         $this->postJson('/api/v1/mobile/check-ins/timezone', ['timezone' => 'Europe/London'])
@@ -470,7 +471,7 @@ class CheckInsControllerTest extends TestCase
     public function timezone_store_records_subsequent_changes_with_latest_winning(): void
     {
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins/timezone', ['timezone' => 'America/New_York'])
             ->assertStatus(201);
@@ -493,7 +494,7 @@ class CheckInsControllerTest extends TestCase
     public function timezone_store_does_not_mutate_profile_timezone(): void
     {
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/check-ins/timezone', ['timezone' => 'America/New_York'])
             ->assertStatus(201);
@@ -505,13 +506,13 @@ class CheckInsControllerTest extends TestCase
     public function timezone_state_is_scoped_to_the_authenticated_user(): void
     {
         $this->user->setTimezone('Europe/London');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
         $this->postJson('/api/v1/mobile/check-ins/timezone', ['timezone' => 'America/New_York'])
             ->assertStatus(201);
 
         $other = User::factory()->create();
         $other->setTimezone('Australia/Sydney');
-        Sanctum::actingAs($other, ['ios:read']);
+        Sanctum::actingAs($other, SparkAbility::MOBILE_READ);
 
         // The other user sees only their own profile fallback, never the first
         // user's acknowledged travel timezone.
@@ -527,7 +528,7 @@ class CheckInsControllerTest extends TestCase
 
     protected function prepareMediaTest(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
         Storage::fake('public');
         config(['media-library.disk_name' => 'public']);
         // The photo event/block dispatches the task pipeline on create; keep it out.
@@ -565,7 +566,7 @@ class CheckInsControllerTest extends TestCase
 
     protected function actingAsUserWithIntegration(): Integration
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $group = IntegrationGroup::factory()->create([
             'user_id' => $this->user->id,

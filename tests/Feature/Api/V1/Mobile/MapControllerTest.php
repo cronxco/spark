@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -34,7 +35,7 @@ class MapControllerTest extends TestCase
     #[Test]
     public function rejects_malformed_bbox(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/map/data?bbox=bad')
             ->assertStatus(422);
@@ -43,7 +44,7 @@ class MapControllerTest extends TestCase
     #[Test]
     public function rejects_inverted_bbox(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // sw > ne should fail validation
         $this->getJson('/api/v1/mobile/map/data?bbox=52.0,0.5,51.0,-0.5')
@@ -67,7 +68,7 @@ class MapControllerTest extends TestCase
             'location' => Point::makeGeodetic(48.8, 2.3),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/map/data?bbox=51.0,-0.5,52.0,0.5')
             ->assertOk()
@@ -119,7 +120,7 @@ class MapControllerTest extends TestCase
             'location' => null,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/map/data?bbox=51.0,-0.5,52.0,0.5')
             ->assertOk()
@@ -158,7 +159,7 @@ class MapControllerTest extends TestCase
             'location' => Point::makeGeodetic(51.6, 0.2),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $markers = collect(
             $this->getJson('/api/v1/mobile/map/data?bbox=51.0,-0.5,52.0,0.5')
@@ -173,7 +174,7 @@ class MapControllerTest extends TestCase
     #[Test]
     public function returns_empty_marker_arrays_when_nothing_in_bbox(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/map/data?bbox=10.0,10.0,11.0,11.0')
             ->assertOk()
