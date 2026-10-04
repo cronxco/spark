@@ -1,11 +1,9 @@
 <?php
 
 use App\Models\Event;
-use App\Models\EventObject;
 use App\Models\Person;
 use App\Models\Relationship;
 use App\Services\PersonProfileService;
-use App\Services\RelationshipTypeRegistry;
 use App\Traits\AuthorizesOwnership;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -127,16 +125,16 @@ new class extends Component
         @forelse ($this->connections as $type => $connections)
             <div class="mb-4 last:mb-0" wire:key="connections-{{ $type }}">
                 <div class="mb-2 flex items-center gap-2 text-sm font-medium text-base-content/70">
-                    <x-icon name="{{ RelationshipTypeRegistry::getIcon($type) ?? 'fas.link' }}" class="h-4 w-4 text-accent" />
-                    {{ RelationshipTypeRegistry::getDisplayName($type) ?? Str::headline($type) }}
+                    <x-icon name="{{ \App\Services\RelationshipTypeRegistry::getIcon($type) ?? 'fas.link' }}" class="h-4 w-4 text-accent" />
+                    {{ \App\Services\RelationshipTypeRegistry::getDisplayName($type) ?? Str::headline($type) }}
                     <span class="badge badge-ghost badge-sm">{{ $connections->count() }}</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     @foreach ($connections as $connection)
                         <span wire:key="connection-{{ $connection['relationship']->id }}">
-                            @if ($connection['related'] instanceof Event)
+                            @if ($connection['related'] instanceof \App\Models\Event)
                                 <x-event-ref :event="$connection['related']" :showService="true" />
-                            @elseif ($connection['related'] instanceof EventObject)
+                            @elseif ($connection['related'] instanceof \App\Models\EventObject)
                                 <x-object-ref :object="$connection['related']" :showType="true" />
                             @else
                                 <x-block-ref :block="$connection['related']" :showType="true" />
