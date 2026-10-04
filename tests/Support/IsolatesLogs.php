@@ -3,6 +3,7 @@
 namespace Tests\Support;
 
 use Illuminate\Support\Facades\File;
+use Mockery\MockInterface;
 
 trait IsolatesLogs
 {
@@ -28,7 +29,7 @@ trait IsolatesLogs
     protected function tearDownIsolatesLogs(): void
     {
         $manager = $this->app['log'];
-        if (! $manager instanceof \Mockery\MockInterface) {
+        if (! ($manager instanceof MockInterface)) {
             foreach (array_keys(config('logging.channels')) as $name) {
                 $manager->forgetChannel($name);
             }

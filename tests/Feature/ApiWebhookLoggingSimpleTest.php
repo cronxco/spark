@@ -10,7 +10,6 @@ class ApiWebhookLoggingSimpleTest extends FrameworkTestCase
 {
     use IsolatesLogs;
 
-
     #[Test]
     public function it_creates_per_instance_log_files_automatically()
     {

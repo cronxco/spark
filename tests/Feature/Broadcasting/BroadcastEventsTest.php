@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 class BroadcastEventsTest extends TestCase
@@ -116,7 +117,7 @@ class BroadcastEventsTest extends TestCase
     public function event_creation_broadcasts_when_redis_is_unavailable(): void
     {
         Event::fake([NewEventBroadcast::class]);
-        Redis::shouldReceive('set')->once()->andThrow(new \RuntimeException('Redis unavailable'));
+        Redis::shouldReceive('set')->once()->andThrow(new RuntimeException('Redis unavailable'));
 
         $event = EventModel::factory()->create();
 

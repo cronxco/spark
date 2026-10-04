@@ -11,7 +11,6 @@ class ApiWebhookLoggingHelpersTest extends FrameworkTestCase
 {
     use IsolatesLogs;
 
-
     #[Test]
     public function get_integration_log_channel_creates_per_instance_channels()
     {
