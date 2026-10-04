@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class FeedControllerTest extends TestCase
@@ -318,7 +319,7 @@ class FeedControllerTest extends TestCase
         $this->seedEventsAtTime(1, Carbon::parse('2026-07-01 20:00:00', 'UTC'));
         // 14:30 UTC on 1 July is 23:30 on 1 July in Tokyo.
         $this->seedEventsAtTime(1, Carbon::parse('2026-07-01 14:30:00', 'UTC'));
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
 
         $second = $this->getJson('/api/v1/mobile/feed?date=2026-07-02')->assertOk();
         $this->assertCount(1, $second->json('data'));

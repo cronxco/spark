@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class HealthDashboardControllerTest extends TestCase
@@ -78,7 +79,7 @@ class HealthDashboardControllerTest extends TestCase
             'duration_seconds' => 600,
         ], targetTitle: 'Walk');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
 
         $this->getJson('/api/v1/mobile/health/dashboard')
             ->assertOk()
