@@ -23,6 +23,7 @@ use App\Livewire\ReceiptDetail;
 use App\Livewire\Receipts;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\AdminTenant;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -318,7 +319,14 @@ Route::get('auth/authelia/callback', function () {
 });
 
 // Admin routes
-Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'verified', 'admin', 'admin.operator.audit'])->prefix('admin')->name('admin.')->group(function () {
+    Volt::route('operator', 'admin.operator')->middleware('password.confirm:password.confirm,900')->name('operator.index');
+    Route::post('operator/stop', function () {
+        AdminTenant::end();
+
+        return redirect()->route('admin.operator.index');
+    })->name('operator.stop');
+
     Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
     Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
     Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
@@ -339,7 +347,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
     Route::get('block-view', [BlockViewController::class, 'index'])->name('block-view.index');
     Route::post('bin/delete', function () {
-        DeleteBinItemsBatch::dispatch(Auth::id());
+        DeleteBinItemsBatch::dispatch(AdminTenant::id());
 
         return response()->json([
             'message' => 'Deletion process started. All items will be permanently deleted.',

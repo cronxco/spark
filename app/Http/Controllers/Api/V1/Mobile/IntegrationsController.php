@@ -89,8 +89,7 @@ class IntegrationsController extends Controller
     /**
      * POST /api/v1/mobile/integrations/{id}/sync
      *
-     * Triggers an immediate fetch for the integration. Mirrors the logic
-     * behind IntegrationApiController::trigger.
+     * Triggers an immediate fetch for the integration.
      */
     public function sync(Request $request, string $id): JsonResponse
     {

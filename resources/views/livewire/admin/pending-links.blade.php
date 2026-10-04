@@ -4,7 +4,7 @@ use App\Models\Event;
 use App\Models\Relationship;
 use App\Services\RelationshipTypeRegistry;
 use App\Services\TransactionLinking\TransactionLinkingService;
-use Illuminate\Support\Facades\Auth;
+use App\Support\AdminTenant;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
@@ -83,16 +83,17 @@ new class extends Component
     public function approveLink(string $linkId): void
     {
         try {
-            $relationship = Relationship::where('user_id', Auth::id())->findOrFail($linkId);
+            $relationship = Relationship::where('user_id', AdminTenant::id())->findOrFail($linkId);
 
-            if (!$relationship->isPending()) {
+            if (! $relationship->isPending()) {
                 $this->warning('This link has already been processed.');
+
                 return;
             }
 
             $relationship->approve();
             $this->success('Link approved!');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Failed to approve link: ' . $e->getMessage());
         }
     }
@@ -100,16 +101,17 @@ new class extends Component
     public function rejectLink(string $linkId): void
     {
         try {
-            $relationship = Relationship::where('user_id', Auth::id())->findOrFail($linkId);
+            $relationship = Relationship::where('user_id', AdminTenant::id())->findOrFail($linkId);
 
-            if (!$relationship->isPending()) {
+            if (! $relationship->isPending()) {
                 $this->warning('This link has already been processed.');
+
                 return;
             }
 
             $relationship->reject();
             $this->success('Link rejected.');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Failed to reject link: ' . $e->getMessage());
         }
     }
@@ -118,18 +120,19 @@ new class extends Component
     {
         if (empty($this->selectedLinks)) {
             $this->error('No links selected.');
+
             return;
         }
 
         $approved = 0;
         foreach ($this->selectedLinks as $linkId) {
             try {
-                $relationship = Relationship::where('user_id', Auth::id())->find($linkId);
+                $relationship = Relationship::where('user_id', AdminTenant::id())->find($linkId);
                 if ($relationship && $relationship->isPending()) {
                     $relationship->approve();
                     $approved++;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Continue with next
             }
         }
@@ -142,18 +145,19 @@ new class extends Component
     {
         if (empty($this->selectedLinks)) {
             $this->error('No links selected.');
+
             return;
         }
 
         $rejected = 0;
         foreach ($this->selectedLinks as $linkId) {
             try {
-                $relationship = Relationship::where('user_id', Auth::id())->find($linkId);
+                $relationship = Relationship::where('user_id', AdminTenant::id())->find($linkId);
                 if ($relationship && $relationship->isPending()) {
                     $relationship->reject();
                     $rejected++;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Continue with next
             }
         }
@@ -165,7 +169,7 @@ new class extends Component
     public function getPendingLinks()
     {
         $query = Relationship::with(['from', 'to'])
-            ->where('user_id', Auth::id())
+            ->where('user_id', AdminTenant::id())
             ->where('from_type', Event::class)
             ->where('to_type', Event::class);
 
@@ -187,7 +191,7 @@ new class extends Component
             match ($this->confidenceFilter) {
                 'high' => $query->aboveConfidence(80),
                 'medium' => $query->whereRaw("(metadata->>'confidence')::numeric >= 50")
-                                  ->whereRaw("(metadata->>'confidence')::numeric < 80"),
+                    ->whereRaw("(metadata->>'confidence')::numeric < 80"),
                 'low' => $query->whereRaw("(metadata->>'confidence')::numeric < 50"),
                 default => null,
             };
@@ -198,12 +202,12 @@ new class extends Component
             $query->where(function ($q) {
                 $q->whereHas('from', function ($eq) {
                     $eq->where('action', 'ilike', '%' . $this->search . '%')
-                        ->orWhereRaw("event_metadata::text ilike ?", ['%' . $this->search . '%']);
+                        ->orWhereRaw('event_metadata::text ilike ?', ['%' . $this->search . '%']);
                 })
-                ->orWhereHas('to', function ($eq) {
-                    $eq->where('action', 'ilike', '%' . $this->search . '%')
-                        ->orWhereRaw("event_metadata::text ilike ?", ['%' . $this->search . '%']);
-                });
+                    ->orWhereHas('to', function ($eq) {
+                        $eq->where('action', 'ilike', '%' . $this->search . '%')
+                            ->orWhereRaw('event_metadata::text ilike ?', ['%' . $this->search . '%']);
+                    });
             });
         }
 
@@ -218,12 +222,13 @@ new class extends Component
     public function getStats(): array
     {
         $linkingService = app(TransactionLinkingService::class);
-        return $linkingService->getPendingStats(Auth::id());
+
+        return $linkingService->getPendingStats(AdminTenant::id());
     }
 
     public function getUniqueStrategies()
     {
-        return Relationship::where('user_id', Auth::id())
+        return Relationship::where('user_id', AdminTenant::id())
             ->where('from_type', Event::class)
             ->where('to_type', Event::class)
             ->whereNotNull('metadata')
@@ -236,7 +241,7 @@ new class extends Component
 
     public function formatTransactionTitle($event): string
     {
-        if (!$event) {
+        if (! $event) {
             return '-';
         }
 
@@ -253,9 +258,10 @@ new class extends Component
 
     public function formatStrategy(?string $strategy): string
     {
-        if (!$strategy) {
+        if (! $strategy) {
             return '-';
         }
+
         return Str::title(str_replace('_', ' ', $strategy));
     }
 
@@ -275,6 +281,7 @@ new class extends Component
         if ($confidence >= 50) {
             return 'badge-warning';
         }
+
         return 'badge-error';
     }
 };

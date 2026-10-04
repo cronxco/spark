@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -49,17 +50,17 @@ class HealthDashboardControllerTest extends TestCase
     {
         $this->getJson('/api/v1/mobile/health/dashboard')->assertStatus(401);
 
-        Sanctum::actingAs($this->user, ['ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_WRITE);
         $this->getJson('/api/v1/mobile/health/dashboard')->assertStatus(403);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
         $this->getJson('/api/v1/mobile/health/dashboard')->assertOk();
     }
 
     #[Test]
     public function validates_date_and_range_like_briefing(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date[]=2026-05-18')->assertStatus(422);
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-5-18')->assertStatus(422);
@@ -95,7 +96,7 @@ class HealthDashboardControllerTest extends TestCase
     #[Test]
     public function empty_data_returns_stable_shape(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -127,7 +128,7 @@ class HealthDashboardControllerTest extends TestCase
         ]);
         $this->event('oura', 'had_sleep_score', 78, 'percent', '2026-05-18 07:00:00');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -155,7 +156,7 @@ class HealthDashboardControllerTest extends TestCase
         $this->block($workout, 'energy', 135.695, 'kcal');
         $this->block($workout, 'intensity', 9.498, 'kcal/hr·kg');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -184,7 +185,7 @@ class HealthDashboardControllerTest extends TestCase
             'value_unit' => 'kg',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -207,7 +208,7 @@ class HealthDashboardControllerTest extends TestCase
             'end_datetime' => '2026-05-18T10:22:40+00:00',
         ], targetTitle: 'Run');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -222,7 +223,7 @@ class HealthDashboardControllerTest extends TestCase
         $this->stat('apple_health', 'had_step_count', 'steps', mean: 8000, lower: 6000, upper: 10000);
         $this->event('apple_health', 'had_step_count', 7411, 'steps', '2026-05-18 18:00:00');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18&range=7d')
             ->assertOk()
@@ -246,7 +247,7 @@ class HealthDashboardControllerTest extends TestCase
             ]);
         }
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -271,7 +272,7 @@ class HealthDashboardControllerTest extends TestCase
             ]);
         }
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()

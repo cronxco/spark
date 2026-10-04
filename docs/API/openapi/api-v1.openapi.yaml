@@ -874,6 +874,38 @@ paths:
           }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /integrations/{id}/configure:
+    patch:
+      operationId: configureIntegration
+      tags: [integrations]
+      x-spark-ability: integrations:manage
+      summary: Update schema-defined configuration fields for an owned integration
+      description: Partial updates are merged with existing configuration and validated against the integration instance schema. Unknown fields are ignored and stored credentials are not returned.
+      parameters:
+        - { $ref: "#/components/parameters/EntityId" }
+        - { $ref: "#/components/parameters/IfMatch" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Updated integration with its current ETag
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [integration]
+                properties:
+                  integration: { $ref: "#/components/schemas/CompactIntegration" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: Configuration failed instance-schema validation }
+        "428": { $ref: "#/components/responses/PreconditionRequired" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+
   /integrations/{id}/sync:
     post:
       operationId: syncIntegration

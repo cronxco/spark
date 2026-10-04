@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\User;
 use App\Notifications\NotificationCatalogue;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -31,7 +32,7 @@ class NotificationSettingsControllerTest extends TestCase
     #[Test]
     public function show_returns_default_mobile_notification_preferences(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/settings/notifications')
             ->assertOk()
@@ -55,7 +56,7 @@ class NotificationSettingsControllerTest extends TestCase
             ],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/settings/notifications')
             ->assertOk()
@@ -69,7 +70,7 @@ class NotificationSettingsControllerTest extends TestCase
     #[Test]
     public function update_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->patchJson('/api/v1/mobile/settings/notifications', $this->payload())
             ->assertStatus(403);
@@ -78,7 +79,7 @@ class NotificationSettingsControllerTest extends TestCase
     #[Test]
     public function update_saves_mobile_notification_preferences(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $payload = $this->payload([
             'categories' => [
@@ -104,7 +105,7 @@ class NotificationSettingsControllerTest extends TestCase
     #[Test]
     public function update_validates_contract_shape(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // Every configurable type but the one supplied must be reported
         // missing, so the contract is derived from the catalogue rather than

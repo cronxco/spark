@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -35,7 +36,7 @@ class NotificationPreferencesControllerTest extends TestCase
             ],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/settings/notifications')
             ->assertOk()
@@ -50,7 +51,7 @@ class NotificationPreferencesControllerTest extends TestCase
     #[Test]
     public function update_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->patchJson('/api/v1/mobile/settings/notifications', $this->payload())
             ->assertStatus(403);
@@ -59,7 +60,7 @@ class NotificationPreferencesControllerTest extends TestCase
     #[Test]
     public function update_stores_mobile_notification_preferences(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->patchJson('/api/v1/mobile/settings/notifications', $this->payload(), $this->ifMatchUser())
             ->assertStatus(204);

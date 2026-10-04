@@ -91,7 +91,7 @@ class EventRouteTest extends TestCase
     #[Test]
     public function a_token_with_the_data_read_capability_can_read_a_route(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'data:read']);
+        Sanctum::actingAs($this->user, ['mobile:session', 'data:read']);
         $event = $this->workout([['lat' => 1, 'lng' => 2]]);
 
         $this->getJson("/api/v1/mobile/events/{$event->id}/route")->assertOk()->assertJsonPath('total_points', 1);
@@ -100,7 +100,7 @@ class EventRouteTest extends TestCase
     #[Test]
     public function a_token_without_read_scope_is_forbidden(): void
     {
-        Sanctum::actingAs($this->user, ['flint:write']);
+        Sanctum::actingAs($this->user, ['mobile:session', 'flint:write']);
         $event = $this->workout([['lat' => 1, 'lng' => 2]]);
 
         $this->getJson("/api/v1/mobile/events/{$event->id}/route")->assertForbidden();

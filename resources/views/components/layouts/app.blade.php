@@ -206,6 +206,7 @@
                     <x-menu-item title="Migrations" icon="fas.cog" link="{{ route('admin.migrations.index') }}" :active="request()->routeIs('admin.migrations.*')" />
                     <x-menu-item title="Logs" icon="fas.file-lines" link="{{ route('admin.logs.index') }}" :active="request()->routeIs('admin.logs.*')" />
                     <x-menu-item title="Bin" icon="fas.trash" link="{{ route('admin.bin.index') }}" :active="request()->routeIs('admin.bin.*')" />
+                    <x-menu-item title="Operator Access" icon="fas.user-shield" link="{{ route('admin.operator.index') }}" :active="request()->routeIs('admin.operator.*')" />
                 </x-menu-sub>
                 @endif
                 <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
@@ -214,6 +215,16 @@
 
         {{-- The `$slot` goes here --}}
         <x-slot:content class="bg-base-100">
+            @if (auth()->user()?->is_admin && ($operatorContext = \App\Support\AdminTenant::context()))
+                <div class="alert alert-warning mb-4" role="status">
+                    <x-icon name="fas.user-shield" class="w-5 h-5" />
+                    <span>Admin pages are showing another user's data. Every page you open is logged.</span>
+                    <form method="POST" action="{{ route('admin.operator.stop') }}">
+                        @csrf
+                        <button type="submit" class="btn btn-sm">Back to my data</button>
+                    </form>
+                </div>
+            @endif
             {{ $slot }}
         </x-slot:content>
 

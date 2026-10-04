@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Collection;
@@ -25,7 +26,7 @@ class SentryMobileApiLoggingTest extends TestCase
     {
         $logs = $this->collectLogs();
 
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
         $this->getJson('/api/v1/mobile/ping')->assertOk();
 
         $entry = $this->findMobileApiLog($logs);
@@ -41,7 +42,7 @@ class SentryMobileApiLoggingTest extends TestCase
     {
         $logs = $this->collectLogs();
 
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
         $this->getJson('/api/v1/mobile/integrations')->assertOk();
 
         $entry = $this->findMobileApiLog($logs);
@@ -55,7 +56,7 @@ class SentryMobileApiLoggingTest extends TestCase
     {
         $logs = $this->collectLogs();
 
-        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_SESSION);
 
         $canary = str_repeat('a', 64);
 
@@ -79,7 +80,7 @@ class SentryMobileApiLoggingTest extends TestCase
     {
         $logs = $this->collectLogs();
 
-        Sanctum::actingAs(User::factory()->create(), ['ios:read', 'ios:write']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_SESSION);
 
         $samples = array_map(fn ($i) => [
             'external_id' => "sample-{$i}",
@@ -103,7 +104,7 @@ class SentryMobileApiLoggingTest extends TestCase
     {
         $logs = $this->collectLogs();
 
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
         $this->freezeTime();
 
         $first = $this->getJson('/api/v1/mobile/ping')->assertOk();
@@ -136,7 +137,7 @@ class SentryMobileApiLoggingTest extends TestCase
     {
         $logs = $this->collectLogs();
 
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
         $this->getJson('/api/v1/mobile/briefing/today?date=2025-01-01')->assertOk();
 
         $entry = $this->findMobileApiLog($logs);
@@ -153,7 +154,7 @@ class SentryMobileApiLoggingTest extends TestCase
         $logs = $this->collectLogs();
         $canary = '11111111-2222-4333-8444-555555555555';
 
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
         $this->getJson("/api/v1/mobile/events/{$canary}")->assertNotFound();
 
         $entry = $this->findMobileApiLog($logs);
@@ -170,7 +171,7 @@ class SentryMobileApiLoggingTest extends TestCase
         $logs = $this->collectLogs();
 
         $user = User::factory()->create();
-        Sanctum::actingAs($user, ['ios:read', 'tokens:manage', 'data:read']);
+        Sanctum::actingAs($user, [...SparkAbility::MOBILE_READ, 'tokens:manage', 'data:read']);
 
         $response = $this->postJson('/api/v1/mobile/api-tokens', [
             'name' => 'Canary',
@@ -193,7 +194,7 @@ class SentryMobileApiLoggingTest extends TestCase
     {
         $logs = $this->collectLogs();
 
-        Sanctum::actingAs(User::factory()->create(), ['ios:read']);
+        Sanctum::actingAs(User::factory()->create(), SparkAbility::MOBILE_READ);
         $this->getJson('/api/v1/mobile/ping')->assertOk();
 
         $entry = $this->findMobileApiLog($logs);

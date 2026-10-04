@@ -8,6 +8,7 @@ use App\Models\PushSubscription;
 use App\Models\User;
 use App\Notifications\Channels\ApnsChannel;
 use App\Services\ApnsLiveActivityService;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -49,7 +50,7 @@ class Phase0SmokeTest extends TestCase
     #[Test]
     public function phase0_end_to_end_flow(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         // 1. Device registration.
         $this->postJson('/api/v1/mobile/devices', [

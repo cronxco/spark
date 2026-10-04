@@ -6,6 +6,7 @@ use App\Events\Mobile\LiveActivityUpdate;
 use App\Models\LiveActivityToken;
 use App\Models\User;
 use App\Services\ApnsLiveActivityService;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
@@ -41,7 +42,7 @@ class LiveActivitiesControllerTest extends TestCase
     #[Test]
     public function start_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/live-activities', [
             'activity_id' => '00000000-0000-4000-8000-000000000001',
@@ -54,7 +55,7 @@ class LiveActivitiesControllerTest extends TestCase
     public function start_creates_token_row_and_broadcasts(): void
     {
         Event::fake([LiveActivityUpdate::class]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $activityId = '00000000-0000-4000-8000-000000000001';
 
@@ -80,7 +81,7 @@ class LiveActivitiesControllerTest extends TestCase
     #[Test]
     public function update_respects_rate_limit(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $token = LiveActivityToken::create([
             'user_id' => $this->user->id,
@@ -105,7 +106,7 @@ class LiveActivitiesControllerTest extends TestCase
     #[Test]
     public function end_marks_activity_as_ended(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $token = LiveActivityToken::create([
             'user_id' => $this->user->id,
@@ -124,7 +125,7 @@ class LiveActivitiesControllerTest extends TestCase
     #[Test]
     public function register_token_rotates_push_token(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $token = LiveActivityToken::create([
             'user_id' => $this->user->id,
@@ -154,7 +155,7 @@ class LiveActivitiesControllerTest extends TestCase
             'starts_at' => now(),
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->patchJson('/api/v1/mobile/live-activities/' . $token->activity_id, [
             'content_state' => ['foo' => 'bar'],
