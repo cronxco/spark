@@ -649,10 +649,7 @@ evenly, keeping the first and last point. Accepts `ios:read` or `data:read`.
 
 ```json
 {
-    "points": [
-        { "lat": 51.5, "lng": -0.12 },
-        { "lat": 51.51, "lng": -0.13 }
-    ],
+    "points": [{ "lat": 51.5, "lng": -0.12 }, { "lat": 51.51, "lng": -0.13 }],
     "total_points": 2,
     "distance": 5.02,
     "distance_unit": "km",

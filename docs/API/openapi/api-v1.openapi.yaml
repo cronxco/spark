@@ -894,8 +894,7 @@ paths:
                 type: object
                 required: [integration]
                 properties:
-                  integration:
-                    { $ref: "#/components/schemas/CompactIntegration" }
+                  integration: { $ref: "#/components/schemas/CompactIntegration" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: Configuration failed instance-schema validation }
         "428": { $ref: "#/components/responses/PreconditionRequired" }

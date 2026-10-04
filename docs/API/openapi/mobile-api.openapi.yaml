@@ -327,12 +327,7 @@ paths:
         As /notifications/receipts for a single notification named in the
         path. Answers 404 for a notification that is not the user's.
       parameters:
-        - {
-            name: id,
-            in: path,
-            required: true,
-            schema: { type: string, format: uuid },
-          }
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content:
@@ -2617,15 +2612,7 @@ components:
             status:
               {
                 type: string,
-                enum:
-                  [
-                    requested,
-                    fetching,
-                    processing,
-                    up_to_date,
-                    partial,
-                    failed,
-                  ],
+                enum: [requested, fetching, processing, up_to_date, partial, failed],
               }
             requested_at: { type: [string, "null"], format: date-time }
             started_at: { type: [string, "null"], format: date-time }

@@ -941,21 +941,21 @@ request to `/api/events*`, `/api/search*`, `/api/tokens*`,
 `410 Gone` with a pointer to `/api/v1`. Only the iOS OAuth exchange
 (`POST /api/oauth/token`, `POST /api/oauth/refresh`) remains outside `/api/v1`.
 
-| Retired route                                        | Use instead                                                                              |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `GET /api/events[/{event}]`                          | `GET /api/v1/events[/{id}]`                                                              |
-| `POST/PUT/PATCH/DELETE /api/events[/{event}]`        | `PATCH /api/v1/events/{id}` (v1 has no event create/delete)                              |
-| `POST /api/search*`                                  | `GET /api/v1/search` (`mode=semantic` for embeddings only)                               |
-| `POST /api/tokens/create`, `GET/DELETE /api/tokens*` | Web settings (`/settings/api-tokens`)                                                    |
-| `GET /api/integrations[/{integration}]`              | `GET /api/v1/integrations[/{id}]`                                                        |
-| `POST /api/integrations/{integration}/trigger`       | `POST /api/v1/integrations/{id}/sync`                                                    |
-| `POST /api/integrations/{id}/configure`              | `PATCH /api/v1/integrations/{id}/configure` (`integrations:manage`, `If-Match` required) |
-| `DELETE /api/integrations/{id}`                      | Web integration settings (no API equivalent)                                             |
-| `POST /api/fetch/bookmarks`                          | `POST /api/v1/bookmarks` (same body, including the fetch flags)                          |
-| `GET /api/assistant/context`                         | `GET /api/v1/day-summary`                                                                |
-| `POST /api/flint/questions/{block}/answer`           | `POST /api/v1/flint/questions/{block}/answer`                                            |
-| `GET /api/task-executions[/{id}]`                    | — (admin pages only)                                                                     |
-| `GET /api/user`                                      | —                                                                                        |
+| Retired route                                                            | Use instead                                                     |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `GET /api/events[/{event}]`                                              | `GET /api/v1/events[/{id}]`                                     |
+| `POST/PUT/PATCH/DELETE /api/events[/{event}]`                            | `PATCH /api/v1/events/{id}` (v1 has no event create/delete)     |
+| `POST /api/search*`                                                      | `GET /api/v1/search` (`mode=semantic` for embeddings only)      |
+| `POST /api/tokens/create`, `GET/DELETE /api/tokens*`                     | Web settings (`/settings/api-tokens`)                           |
+| `GET /api/integrations[/{integration}]`                                  | `GET /api/v1/integrations[/{id}]`                               |
+| `POST /api/integrations/{integration}/trigger`                           | `POST /api/v1/integrations/{id}/sync`                           |
+| `POST /api/integrations/{id}/configure` | `PATCH /api/v1/integrations/{id}/configure` (`integrations:manage`, `If-Match` required) |
+| `DELETE /api/integrations/{id}` | Web integration settings (no API equivalent) |
+| `POST /api/fetch/bookmarks`                                              | `POST /api/v1/bookmarks` (same body, including the fetch flags) |
+| `GET /api/assistant/context`                                             | `GET /api/v1/day-summary`                                       |
+| `POST /api/flint/questions/{block}/answer`                               | `POST /api/v1/flint/questions/{block}/answer`                   |
+| `GET /api/task-executions[/{id}]`                                        | — (admin pages only)                                            |
+| `GET /api/user`                                                          | —                                                               |
 
 ---
 
