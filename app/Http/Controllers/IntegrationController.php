@@ -29,7 +29,7 @@ class IntegrationController extends Controller
         ]);
 
         $pluginClass = PluginRegistry::getPlugin($service);
-        if (! $pluginClass) {
+        if (! $pluginClass || ! PluginRegistry::isAvailableTo($pluginClass, Auth::user())) {
             abort(404);
         }
 
@@ -353,7 +353,7 @@ class IntegrationController extends Controller
     public function initialize(string $service)
     {
         $pluginClass = PluginRegistry::getPlugin($service);
-        if (! $pluginClass) {
+        if (! $pluginClass || ! PluginRegistry::isAvailableTo($pluginClass, Auth::user())) {
             abort(404);
         }
 
@@ -443,6 +443,9 @@ class IntegrationController extends Controller
             abort(403);
         }
         $pluginClass = PluginRegistry::getPlugin($group->service);
+        if ($pluginClass && ! PluginRegistry::isAvailableTo($pluginClass, Auth::user())) {
+            abort(404);
+        }
         $pluginName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($group->service);
         $types = $pluginClass ? $pluginClass::getInstanceTypes() : [];
         // Extract presets for display in onboarding (task instance types)
@@ -495,7 +498,7 @@ class IntegrationController extends Controller
             abort(403);
         }
         $pluginClass = PluginRegistry::getPlugin($group->service);
-        if (! $pluginClass) {
+        if (! $pluginClass || ! PluginRegistry::isAvailableTo($pluginClass, Auth::user())) {
             abort(404);
         }
         $plugin = new $pluginClass;

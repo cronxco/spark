@@ -10,6 +10,7 @@ use App\Notifications\IntegrationAuthenticationFailed;
 use App\Notifications\IntegrationFailed;
 use App\Notifications\TestPushNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Mockery;
 use NotificationChannels\Apn\ApnMessagePushType;
 use PHPUnit\Framework\Attributes\Test;
@@ -83,6 +84,9 @@ class ApnsChannelTest extends TestCase
         $this->assertSame('Push notifications are working correctly!', $alert['aps']['alert']['body']);
         $this->assertSame('default', $alert['aps']['sound']);
         $this->assertSame(1, $alert['aps']['badge']);
+        // The Notification Service Extension runs on receipt so the app can
+        // report the notification as shown (decision N-8).
+        $this->assertSame(1, $alert['aps']['mutable-content']);
         // The category comes from NotificationCatalogue, which the client's
         // UNNotificationCategory registrations mirror exactly. Sending the raw
         // snake_case type — as this previously did — bound to nothing on the
@@ -133,6 +137,40 @@ class ApnsChannelTest extends TestCase
         $this->assertSame('INTEGRATION_STATUS', $alert['aps']['category']);
         // thread-id is a client-agnostic grouping key and still carries the type.
         $this->assertSame('integration_failed', $alert['aps']['thread-id']);
+    }
+
+    #[Test]
+    public function a_repeat_folded_into_an_open_notification_carries_that_notifications_id(): void
+    {
+        $user = User::factory()->create();
+
+        $user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('d', 64),
+            'device_type' => PushSubscription::DEVICE_TYPE_IOS,
+            'app_environment' => 'sandbox',
+            'bundle_id' => 'co.cronx.spark',
+            'app_version' => '1.0.0',
+            'os_version' => '18.0',
+        ]);
+
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+        $user->notifyNow(new IntegrationFailed($integration, 'Provider returned 500'));
+        $open = $user->notifications()->sole();
+        $this->capturedNotifications = [];
+
+        $repeat = new IntegrationFailed($integration, 'Provider returned 502');
+        $repeat->id = (string) Str::uuid();
+        app(ApnsChannel::class)->send($user, $repeat);
+
+        $alert = json_decode($this->capturedNotifications[0]->getPayload()->toJson(), true);
+        $silent = json_decode($this->capturedNotifications[1]->getPayload()->toJson(), true);
+
+        // The app reports receipts against this id, so it must be the
+        // notification that exists, not the repeat's discarded own id.
+        $this->assertSame($open->id, $alert['spark']['notification_id']);
+        $this->assertSame($open->id, $silent['spark']['notification_id']);
+        $this->assertArrayNotHasKey('title', $alert['spark']);
+        $this->assertArrayNotHasKey('body', $alert['spark']);
     }
 
     #[Test]

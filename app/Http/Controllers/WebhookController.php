@@ -6,6 +6,7 @@ use App\Integrations\PluginRegistry;
 use App\Jobs\Webhook\AppleHealth\AppleHealthWebhookHook;
 use App\Jobs\Webhook\Slack\SlackEventsHook;
 use App\Models\Integration;
+use App\Services\Webhooks\WebhookDeduplicator;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -13,7 +14,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class WebhookController extends Controller
 {
-    public function handle(Request $request, string $service, string $secret)
+    public function handle(Request $request, string $service, string $secret, WebhookDeduplicator $deduplicator)
     {
         $pluginClass = PluginRegistry::getPlugin($service);
         if (! $pluginClass) {
@@ -26,6 +27,14 @@ class WebhookController extends Controller
 
         if ($integrations->isEmpty()) {
             abort(404);
+        }
+
+        $deliveryKey = $deduplicator->claim($request, $service, $secret);
+        if ($deliveryKey === null) {
+            return response()->json([
+                'status' => 'duplicate',
+                'message' => 'Webhook already received',
+            ]);
         }
 
         // Ensure downstream jobs receive the webhook secret header expected by validators
@@ -48,6 +57,8 @@ class WebhookController extends Controller
                     'message' => 'Webhook job dispatched successfully',
                 ];
             } catch (HttpExceptionInterface $e) {
+                $deduplicator->release($deliveryKey);
+
                 // Re-throw HttpExceptions so they result in proper HTTP status codes
                 // This ensures abort(401) results in a 401 response, not 500
                 throw $e;
@@ -70,6 +81,8 @@ class WebhookController extends Controller
 
         // Return appropriate response based on results
         if ($hasFailures) {
+            $deduplicator->release($deliveryKey);
+
             // Some integrations failed - return 207 Multi-Status
             return response()->json([
                 'status' => 'partial_success',

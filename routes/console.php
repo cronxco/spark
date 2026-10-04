@@ -67,6 +67,13 @@ Schedule::command('notifications:maintain-history')
     ->withoutOverlapping()
     ->sentryMonitor();
 
+// Daily Digest email: each user's digest goes out once their local digest time passes.
+Schedule::command('notifications:send-digests')
+    ->everyFifteenMinutes()
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->sentryMonitor();
+
 // Check cookie expiry daily at 6am
 Schedule::job(new CheckCookieExpiryJob)
     ->dailyAt('06:00')

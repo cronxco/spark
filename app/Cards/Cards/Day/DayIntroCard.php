@@ -12,8 +12,9 @@ class DayIntroCard extends BaseCard
 {
     public function isEligible(Carbon $now, User $user, string $date): bool
     {
-        // Only show during the day (12pm - 6pm) for today
-        $isToday = Carbon::parse($date)->isToday();
+        // Only show during the day (12pm - 6pm) for today. "Today" is the
+        // user's local day; $now is already in their timezone (CardRegistry).
+        $isToday = $date === user_today($user)->toDateString();
         $isDay = $now->hour >= 12 && $now->hour < 18;
 
         return $isToday && $isDay;
