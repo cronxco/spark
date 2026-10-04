@@ -2,13 +2,14 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\Support\IsolatesLogs;
+use Tests\FrameworkTestCase;
 
-class ApiWebhookLoggingSimpleTest extends TestCase
+class ApiWebhookLoggingSimpleTest extends FrameworkTestCase
 {
-    use RefreshDatabase;
+    use IsolatesLogs;
+
 
     #[Test]
     public function it_creates_per_instance_log_files_automatically()

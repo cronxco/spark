@@ -7,9 +7,9 @@ use App\Services\Fetch\Links\LinkCandidateExtractor;
 use App\Services\Fetch\Links\NewsletterLinkFilter;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Fixtures\FetchPages;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class NewsletterLinkFilterTest extends TestCase
+class NewsletterLinkFilterTest extends FrameworkTestCase
 {
     #[Test]
     public function it_keeps_stories_and_the_sponsor_but_drops_housekeeping(): void

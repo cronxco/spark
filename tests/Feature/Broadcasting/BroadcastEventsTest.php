@@ -113,6 +113,20 @@ class BroadcastEventsTest extends TestCase
     }
 
     #[Test]
+    public function event_creation_broadcasts_when_redis_is_unavailable(): void
+    {
+        Event::fake([NewEventBroadcast::class]);
+        Redis::shouldReceive('set')->once()->andThrow(new \RuntimeException('Redis unavailable'));
+
+        $event = EventModel::factory()->create();
+
+        Event::assertDispatched(
+            NewEventBroadcast::class,
+            fn (NewEventBroadcast $broadcast) => $broadcast->eventId === (string) $event->id,
+        );
+    }
+
+    #[Test]
     public function database_notification_dispatches_broadcast(): void
     {
         Event::fake([NotificationReceived::class]);

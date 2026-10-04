@@ -4,23 +4,31 @@ namespace Tests\Feature;
 
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class SentryReleaseConfigTest extends TestCase
+class SentryReleaseConfigTest extends FrameworkTestCase
 {
     private string $versionPath;
+
+    private string $fixtureRoot;
+
+    private string|false $originalRelease;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->versionPath = base_path('VERSION');
+        $this->fixtureRoot = sys_get_temp_dir() . '/spark-version-' . bin2hex(random_bytes(12));
+        File::ensureDirectoryExists($this->fixtureRoot);
+        $this->versionPath = $this->fixtureRoot . '/VERSION';
+        $this->originalRelease = getenv('SENTRY_RELEASE');
         $this->removeVersionFile();
     }
 
     protected function tearDown(): void
     {
         $this->removeVersionFile();
-        putenv('SENTRY_RELEASE');
+        File::deleteDirectory($this->fixtureRoot);
+        putenv($this->originalRelease === false ? 'SENTRY_RELEASE' : 'SENTRY_RELEASE=' . $this->originalRelease);
         parent::tearDown();
     }
 
@@ -29,7 +37,7 @@ class SentryReleaseConfigTest extends TestCase
     {
         File::put($this->versionPath, "sparkapp@9.9.9+abcdef\n");
 
-        $this->refreshApplication();
+        $this->reloadSentryConfig();
 
         $this->assertSame('sparkapp@9.9.9+abcdef', config('sentry.release'));
     }
@@ -39,7 +47,7 @@ class SentryReleaseConfigTest extends TestCase
     {
         File::put($this->versionPath, "  sparkapp@3.1.4+abc123 \n\n");
 
-        $this->refreshApplication();
+        $this->reloadSentryConfig();
 
         $this->assertSame('sparkapp@3.1.4+abc123', config('sentry.release'));
     }
@@ -50,7 +58,7 @@ class SentryReleaseConfigTest extends TestCase
         File::put($this->versionPath, "sparkapp@2.0.0+deadbee\n");
         putenv('SENTRY_RELEASE=should-not-be-used');
 
-        $this->refreshApplication();
+        $this->reloadSentryConfig();
 
         $this->assertSame('sparkapp@2.0.0+deadbee', config('sentry.release'));
     }
@@ -60,7 +68,7 @@ class SentryReleaseConfigTest extends TestCase
     {
         putenv('SENTRY_RELEASE');
 
-        $this->refreshApplication();
+        $this->reloadSentryConfig();
 
         $this->assertNull(config('sentry.release'));
     }
@@ -83,6 +91,19 @@ class SentryReleaseConfigTest extends TestCase
             $this->assertStringContainsString("config('sentry.release')", $contents);
             $this->assertStringNotContainsString("env('SENTRY_RELEASE')", $contents);
             $this->assertStringNotContainsString("env('VITE_SENTRY_DSN')", $contents);
+        }
+    }
+
+    private function reloadSentryConfig(): void
+    {
+        $basePath = $this->app->basePath();
+        $configPath = config_path('sentry.php');
+
+        try {
+            $this->app->setBasePath($this->fixtureRoot);
+            config(['sentry' => require $configPath]);
+        } finally {
+            $this->app->setBasePath($basePath);
         }
     }
 

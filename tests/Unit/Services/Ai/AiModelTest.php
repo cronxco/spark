@@ -3,12 +3,15 @@
 namespace Tests\Unit\Services\Ai;
 
 use App\Services\Ai\AiModel;
+use Illuminate\Foundation\Testing\WithCachedConfig;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class AiModelTest extends TestCase
+class AiModelTest extends FrameworkTestCase
 {
+    use WithCachedConfig;
+
     #[Test]
     public function each_role_resolves_its_configured_model(): void
     {
