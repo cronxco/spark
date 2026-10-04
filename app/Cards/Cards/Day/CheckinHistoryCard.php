@@ -38,14 +38,23 @@ class CheckinHistoryCard extends BaseCard
     public function getData(User $user, string $date): array
     {
         // Get last 30 days of check-in events
-        $endDate = Carbon::parse($date);
+        $endDate = Carbon::parse($date)->startOfDay();
         $startDate = $endDate->copy()->subDays(29);
+
+        // A check-in belongs to the day it was submitted for, which is in its
+        // source_id and metadata, not to the UTC date it was recorded at. This
+        // matches the mobile check-in history endpoint.
+        $sourceIds = [];
+        for ($d = $startDate->copy(); $d <= $endDate; $d->addDay()) {
+            $sourceIds[] = 'daily_checkin_morning_' . $d->toDateString();
+            $sourceIds[] = 'daily_checkin_afternoon_' . $d->toDateString();
+        }
 
         $events = Event::whereHas('integration', function ($q) use ($user) {
             $q->where('user_id', $user->id)
                 ->where('service', 'daily_checkin');
         })
-            ->whereBetween('time', [$startDate->startOfDay(), $endDate->endOfDay()])
+            ->whereIn('source_id', $sourceIds)
             ->whereIn('action', ['had_morning_checkin', 'had_afternoon_checkin'])
             ->orderBy('time', 'asc')
             ->get();
@@ -62,9 +71,9 @@ class CheckinHistoryCard extends BaseCard
         }
 
         foreach ($events as $event) {
-            $dateKey = $event->time->format('Y-m-d');
+            $metadata = $event->event_metadata ?? [];
+            $dateKey = $metadata['date'] ?? $event->time->format('Y-m-d');
             if (isset($history[$dateKey])) {
-                $metadata = $event->event_metadata ?? [];
                 $period = $metadata['period'] ?? ($event->action === 'had_morning_checkin' ? 'morning' : 'afternoon');
 
                 $history[$dateKey][$period] = [
