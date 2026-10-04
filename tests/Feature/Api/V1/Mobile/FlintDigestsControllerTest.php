@@ -141,6 +141,41 @@ class FlintDigestsControllerTest extends TestCase
     }
 
     #[Test]
+    public function day_context_blocks_expose_structured_data_without_linkifying(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_day_context',
+            'title' => 'Today at a glance',
+            'metadata' => [
+                'day_context' => [
+                    'calendar' => [
+                        ['title' => 'Will · Office', 'all_day' => false, 'start' => '2026-05-10T09:00:00+01:00', 'person' => 'will'],
+                        ['title' => 'Dan · Office', 'all_day' => false, 'start' => '2026-05-10T09:00:00+01:00', 'person' => 'dan'],
+                    ],
+                    'birthdays' => [
+                        ['title' => "Daniel's birthday"],
+                    ],
+                    'weather' => ['location' => 'London', 'condition' => 'Overcast', 'temp_high_c' => 20, 'rain_probability_pct' => 38],
+                ],
+            ],
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('blocks.0.day_context.calendar.0.person', 'will')
+            ->assertJsonPath('blocks.0.day_context.calendar.1.person', 'dan')
+            ->assertJsonPath('blocks.0.day_context.birthdays.0.title', "Daniel's birthday")
+            ->assertJsonMissingPath('blocks.0.day_context.birthdays.0.person')
+            ->assertJsonPath('blocks.0.day_context.weather.condition', 'Overcast')
+            ->assertJsonMissingPath('blocks.0.content');
+    }
+
+    #[Test]
     public function content_blocks_expose_resolved_references_and_linkified_prose(): void
     {
         $event = $this->createDigestEvent('morning');
@@ -230,7 +265,7 @@ class FlintDigestsControllerTest extends TestCase
             ->assertJsonPath('period', 'morning')
             ->assertJsonPath('blocks.0.block_type', 'flint_user_question')
             ->assertJsonPath('blocks.0.question', 'Did you sleep well?')
-            ->assertJsonPath('blocks.0.priority', 'high')
+            ->assertJsonMissingPath('blocks.0.priority')
             ->assertJsonPath('blocks.0.answered', false);
     }
 
@@ -417,11 +452,128 @@ class FlintDigestsControllerTest extends TestCase
         ])->assertUnauthorized();
     }
 
-    private function createDigestEvent(string $period = 'morning', ?Carbon $date = null, array $meta = []): Event
+    // -------------------------------------------------------------------------
+    // Opener field
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function opener_uses_the_explicit_field_when_the_skill_sends_one(): void
+    {
+        $this->createDigestEvent('morning', meta: [
+            'summary' => "Good morning!\n\nThis is the real lede sentence that is long enough to matter here.",
+            'opener' => 'The lede the skill chose itself.',
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('opener', 'The lede the skill chose itself.');
+    }
+
+    #[Test]
+    public function opener_falls_back_to_deriving_it_from_summary(): void
+    {
+        $this->createDigestEvent('morning', meta: [
+            'summary' => "Good morning!\n\nHEADLINE IN CAPS\n\nHere is the actual lede sentence, long enough to survive the short-paragraph filter easily.",
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath(
+                'opener',
+                'Here is the actual lede sentence, long enough to survive the short-paragraph filter easily.'
+            );
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /flint/digests/latest
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function latest_returns_the_most_recent_digest_across_dates(): void
+    {
+        $this->createDigestEvent('evening', Carbon::yesterday());
+        $today = $this->createDigestEvent('morning', Carbon::today());
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest')
+            ->assertOk()
+            ->assertJsonPath('event_id', $today->id);
+    }
+
+    #[Test]
+    public function latest_before_todays_digest_returns_yesterdays(): void
+    {
+        $yesterday = $this->createDigestEvent('evening', Carbon::yesterday());
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest')
+            ->assertOk()
+            ->assertJsonPath('event_id', $yesterday->id)
+            ->assertJsonPath('period', 'evening');
+    }
+
+    #[Test]
+    public function latest_filters_by_kind(): void
+    {
+        $this->createDigestEvent('morning', meta: ['kind' => 'briefing']);
+        $roundup = $this->createDigestEvent('evening', meta: ['kind' => 'news_roundup']);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest?kind=news_roundup')
+            ->assertOk()
+            ->assertJsonPath('event_id', $roundup->id);
+    }
+
+    #[Test]
+    public function latest_returns_the_last_written_digest_when_a_day_has_several(): void
+    {
+        // Every digest is filed at the start of its local day, so the
+        // morning and evening briefings share `time`. The evening one is
+        // given the lower UUID so an `id` tiebreak would pick the morning.
+        $dayStart = Carbon::today()->startOfDay();
+        $this->createDigestEvent('morning', meta: ['kind' => 'briefing'], overrides: [
+            'id' => 'ffffffff-ffff-4fff-bfff-ffffffffffff',
+            'time' => $dayStart,
+            'created_at' => $dayStart->copy()->setTime(6, 20),
+        ]);
+        $evening = $this->createDigestEvent('evening', meta: ['kind' => 'briefing'], overrides: [
+            'id' => '00000000-0000-4000-8000-000000000000',
+            'time' => $dayStart,
+            'created_at' => $dayStart->copy()->setTime(18, 36),
+        ]);
+
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest?kind=briefing')
+            ->assertOk()
+            ->assertJsonPath('event_id', $evening->id)
+            ->assertJsonPath('period', 'evening');
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('event_id', $evening->id);
+    }
+
+    #[Test]
+    public function latest_returns_404_when_no_digest_exists(): void
+    {
+        Sanctum::actingAs($this->user, ['ios:read']);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest')->assertNotFound();
+    }
+
+    private function createDigestEvent(string $period = 'morning', ?Carbon $date = null, array $meta = [], array $overrides = []): Event
     {
         $date ??= Carbon::today();
 
-        return Event::factory()->create([
+        return Event::factory()->create(array_merge([
             'integration_id' => $this->integration->id,
             'service' => 'flint',
             'action' => 'had_summary',
@@ -430,6 +582,6 @@ class FlintDigestsControllerTest extends TestCase
                 'period' => $period,
                 'title' => ucfirst($period) . ' Digest',
             ], $meta),
-        ]);
+        ], $overrides));
     }
 }

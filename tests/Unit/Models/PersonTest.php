@@ -7,6 +7,7 @@ use App\Models\Person;
 use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class PersonTest extends TestCase
@@ -21,7 +22,7 @@ class PersonTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    /** @test */
+    #[Test]
     public function it_extends_event_object()
     {
         $person = new Person;
@@ -29,7 +30,7 @@ class PersonTest extends TestCase
         $this->assertInstanceOf(EventObject::class, $person);
     }
 
-    /** @test */
+    #[Test]
     public function it_automatically_sets_concept_to_person_on_creation()
     {
         $person = Person::create([
@@ -42,7 +43,7 @@ class PersonTest extends TestCase
         $this->assertEquals('person', $person->concept);
     }
 
-    /** @test */
+    #[Test]
     public function it_applies_global_scope_to_filter_by_concept()
     {
         // Create a person
@@ -67,7 +68,7 @@ class PersonTest extends TestCase
         $this->assertEquals(2, EventObject::withoutGlobalScope('people')->count());
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_photo_clusters_via_relationships()
     {
         $person = Person::create([
@@ -101,7 +102,7 @@ class PersonTest extends TestCase
         $this->assertEquals($cluster->id, $photoClusters->first()->id);
     }
 
-    /** @test */
+    #[Test]
     public function it_orders_photo_clusters_by_time_descending()
     {
         $person = Person::create([
@@ -151,7 +152,7 @@ class PersonTest extends TestCase
         $this->assertEquals($olderCluster->id, $photoClusters->last()->id);
     }
 
-    /** @test */
+    #[Test]
     public function it_filters_visible_people_excluding_hidden()
     {
         Person::create([
@@ -183,7 +184,7 @@ class PersonTest extends TestCase
         $this->assertFalse($visiblePeople->contains('title', 'Hidden Person'));
     }
 
-    /** @test */
+    #[Test]
     public function it_orders_by_photo_count_descending()
     {
         $person1 = Person::create([
@@ -217,7 +218,7 @@ class PersonTest extends TestCase
         $this->assertEquals($person1->id, $orderedPeople[2]->id);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_photo_count_from_metadata()
     {
         $person = Person::create([
@@ -231,7 +232,7 @@ class PersonTest extends TestCase
         $this->assertEquals(42, $person->photo_count);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_zero_photo_count_when_not_set()
     {
         $person = Person::create([
@@ -244,7 +245,7 @@ class PersonTest extends TestCase
         $this->assertEquals(0, $person->photo_count);
     }
 
-    /** @test */
+    #[Test]
     public function it_uses_event_object_class_for_relationships_from()
     {
         $person = Person::create([
@@ -274,7 +275,7 @@ class PersonTest extends TestCase
         $this->assertCount(1, $person->relationshipsFrom);
     }
 
-    /** @test */
+    #[Test]
     public function it_uses_event_object_class_for_relationships_to()
     {
         $person = Person::create([

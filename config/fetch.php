@@ -57,4 +57,62 @@ return [
         'max_content_length' => env('FETCH_PAYWALL_MAX_CONTENT_LENGTH', 600),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | List Page Detection
+    |--------------------------------------------------------------------------
+    |
+    | Pages (and newsletter emails) that are really lists of articles are
+    | detected with deterministic link clustering plus a batch of typed Jev
+    | questions. Thresholds are per question and tuned for the pinned Jev model
+    | in services.jev.model; re-tune them when the model changes. In shadow
+    | mode assessments are recorded on the bookmark but never acted on.
+    |
+    */
+
+    'list_detection' => [
+        'enabled' => env('FETCH_LIST_DETECTION_ENABLED', false),
+        'shadow' => env('FETCH_LIST_DETECTION_SHADOW', true),
+        'min_cluster_items' => env('FETCH_LIST_MIN_CLUSTER_ITEMS', 5),
+        'max_clusters' => 6,
+        'max_links' => 60,
+        'max_newsletter_links' => 40,
+        'budget_seconds' => 3.0,
+        'reassess_days' => 7,
+        'negative_memo_days' => 14,
+        'thresholds' => [
+            'page_kind_list' => 0.6,
+            'page_kind_single_article_max' => 0.3,
+            'has_article_list' => 0.6,
+            'cluster_is_primary' => 0.6,
+            'link_is_article' => 0.6,
+            'newsletter_link_digest' => 0.6,
+            'newsletter_link_is_article' => 0.6,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | List Expansion
+    |--------------------------------------------------------------------------
+    |
+    | How newly found list items become bookmarks. The first scan of a list
+    | records every item as seen and only fetches the top "initial_backfill".
+    | Later scans fetch at most "max_new_per_run" genuinely new items; the rest
+    | stay eligible for the next run. "tracking_params" are stripped when
+    | computing a URL's dedupe identity (never from the URL that is fetched).
+    |
+    */
+
+    'list_expansion' => [
+        'initial_backfill' => env('FETCH_LIST_INITIAL_BACKFILL', 5),
+        'max_new_per_run' => env('FETCH_LIST_MAX_NEW_PER_RUN', 20),
+        'stagger_seconds' => 20,
+        'dispatch_guard_minutes' => 30,
+        'tracking_params' => [
+            'utm_*', 'fbclid', 'gclid', 'dclid', 'msclkid', 'mc_cid', 'mc_eid', '_hsenc', '_hsmi',
+            'mkt_tok', 'ref_src', 'igshid', 'vero_id', 'oly_enc_id', 'oly_anon_id', '__s',
+        ],
+    ],
+
 ];

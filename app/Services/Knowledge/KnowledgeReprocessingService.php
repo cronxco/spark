@@ -71,6 +71,7 @@ class KnowledgeReprocessingService
     public function missingTldrEvents(?string $service = null, ?int $limit = null): Collection
     {
         $query = Event::query()
+            ->withoutInternal()
             ->where('domain', 'knowledge')
             ->whereIn('service', ['fetch', 'newsletter'])
             ->whereHas('integration')
@@ -89,6 +90,8 @@ class KnowledgeReprocessingService
             $query
                 ->where(function (Builder $query): void {
                     $query->where('service', 'fetch')
+                        // List expansions record found articles, not an article to summarise
+                        ->where('action', '!=', 'expanded')
                         ->whereDoesntHave('blocks', function (Builder $query): void {
                             $this->whereUsableTldrBlock($query, 'fetch_tldr');
                         });
@@ -111,6 +114,7 @@ class KnowledgeReprocessingService
     private function findUserEvent(User $user, string $eventId): ?Event
     {
         return Event::query()
+            ->withoutInternal()
             ->where('id', $eventId)
             ->whereHas('integration', fn (Builder $query) => $query->where('user_id', $user->id))
             ->with(['integration', 'target', 'blocks'])
@@ -160,7 +164,7 @@ class KnowledgeReprocessingService
             throw new InvalidArgumentException('Newsletter event does not have a publication target.');
         }
 
-        if ($mode === self::MODE_SUMMARY_ONLY && empty($publication->content)) {
+        if ($mode === self::MODE_SUMMARY_ONLY && empty($event->issueContent() ?? $publication->content)) {
             throw new InvalidArgumentException('Newsletter event has no extracted content to summarize.');
         }
 

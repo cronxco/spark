@@ -9,15 +9,14 @@ use App\Models\Place;
 use App\Models\User;
 use App\Services\TaskPipeline\TaskDefinition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class TaskPipelineInheritanceTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function task_definition_supports_model_inheritance(): void
     {
         $user = User::factory()->create();
@@ -55,9 +54,7 @@ class TaskPipelineInheritanceTest extends TestCase
         $this->assertTrue($task->isApplicableTo($place));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function task_definition_rejects_non_applicable_models(): void
     {
         $user = User::factory()->create();
@@ -85,9 +82,7 @@ class TaskPipelineInheritanceTest extends TestCase
         $this->assertFalse($task->isApplicableTo($place));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function task_definition_handles_place_with_conditions(): void
     {
         $user = User::factory()->create();

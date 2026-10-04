@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class KarakeepBookmarkDataTest extends TestCase
@@ -52,9 +53,7 @@ class KarakeepBookmarkDataTest extends TestCase
         ];
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function processes_bookmark_creates_objects_and_events(): void
     {
         $bookmark = [
@@ -94,9 +93,7 @@ class KarakeepBookmarkDataTest extends TestCase
         $this->assertEquals($bookmarkObject->id, $event->target_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function processes_bookmark_with_tags(): void
     {
         $bookmark = [
@@ -127,9 +124,7 @@ class KarakeepBookmarkDataTest extends TestCase
         $this->assertTrue($tags->pluck('name')->contains('php'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function processes_bookmark_with_list_memberships(): void
     {
         $bookmark = [
@@ -175,9 +170,7 @@ class KarakeepBookmarkDataTest extends TestCase
         $this->assertEquals($listObject->id, $listEvent->target_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function processes_bookmark_with_highlights(): void
     {
         $bookmark = [
@@ -220,9 +213,7 @@ class KarakeepBookmarkDataTest extends TestCase
         $this->assertEquals('Remember this', $highlightBlock->metadata['note']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function creates_summary_and_metadata_blocks(): void
     {
         $bookmark = [
@@ -258,9 +249,7 @@ class KarakeepBookmarkDataTest extends TestCase
         $this->assertEquals('https://example.com/image.jpg', $metadataBlock->media_url);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function skips_duplicate_events(): void
     {
         $bookmark = [
@@ -291,9 +280,7 @@ class KarakeepBookmarkDataTest extends TestCase
         $this->assertEquals(1, $eventCountAfter);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function truncates_content_to_150_words(): void
     {
         $longContent = str_repeat('word ', 200); // 200 words

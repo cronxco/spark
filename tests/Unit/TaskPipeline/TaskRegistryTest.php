@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Services\TaskPipeline\Exceptions\CircularDependencyException;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class TaskRegistryTest extends TestCase
@@ -17,9 +18,7 @@ class TaskRegistryTest extends TestCase
         TaskRegistry::clear();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_register_task(): void
     {
         $task = new TaskDefinition(
@@ -36,9 +35,7 @@ class TaskRegistryTest extends TestCase
         $this->assertEquals('test_task', TaskRegistry::getTask('test_task')->key);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_get_all_tasks(): void
     {
         $task1 = new TaskDefinition(
@@ -67,9 +64,7 @@ class TaskRegistryTest extends TestCase
         $this->assertArrayHasKey('task2', $all);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_get_tasks_for_model(): void
     {
         $task1 = new TaskDefinition(
@@ -100,9 +95,7 @@ class TaskRegistryTest extends TestCase
         $this->assertEquals('event_task', $tasks->first()->key);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function filters_tasks_by_trigger(): void
     {
         $task = new TaskDefinition(
@@ -126,9 +119,7 @@ class TaskRegistryTest extends TestCase
         $this->assertCount(1, $updateTasks);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function resolves_execution_order_with_dependencies(): void
     {
         $task1 = new TaskDefinition(
@@ -169,9 +160,7 @@ class TaskRegistryTest extends TestCase
         $this->assertEquals(['task1', 'task2', 'task3'], $keys);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function detects_circular_dependencies(): void
     {
         $task1 = new TaskDefinition(
@@ -198,9 +187,7 @@ class TaskRegistryTest extends TestCase
         TaskRegistry::resolveExecutionOrder($tasks);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function clears_registry(): void
     {
         $task = new TaskDefinition(

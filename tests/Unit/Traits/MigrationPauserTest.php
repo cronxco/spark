@@ -6,13 +6,14 @@ use App\Models\Integration;
 use App\Models\User;
 use App\Traits\MigrationPauser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MigrationPauserTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function it_can_pause_an_integration_during_migration(): void
     {
         $user = User::factory()->create();
@@ -36,7 +37,7 @@ class MigrationPauserTest extends TestCase
         $this->assertEquals(true, $integration->configuration['paused']);
     }
 
-    /** @test */
+    #[Test]
     public function it_can_unpause_an_integration_after_migration(): void
     {
         $user = User::factory()->create();
@@ -59,7 +60,7 @@ class MigrationPauserTest extends TestCase
         $this->assertEquals(false, $integration->configuration['paused']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_integrations_without_existing_configuration(): void
     {
         $user = User::factory()->create();

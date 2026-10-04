@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\RecentlyViewedService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use PHPUnit\Framework\Attributes\Test;
 use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
@@ -33,7 +34,7 @@ class RecentlyViewedTest extends TestCase
     // TracksViews Trait Tests
     // ===========================================
 
-    /** @test */
+    #[Test]
     public function it_logs_view_for_event(): void
     {
         $this->actingAs($this->user);
@@ -50,7 +51,7 @@ class RecentlyViewedTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_logs_view_for_event_object(): void
     {
         $this->actingAs($this->user);
@@ -67,7 +68,7 @@ class RecentlyViewedTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_logs_view_for_block(): void
     {
         $this->actingAs($this->user);
@@ -85,7 +86,7 @@ class RecentlyViewedTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_does_not_log_view_without_authenticated_user(): void
     {
         $event = Event::factory()->create(['integration_id' => $this->integration->id]);
@@ -98,7 +99,7 @@ class RecentlyViewedTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_recently_viewed_item(): void
     {
         $this->actingAs($this->user);
@@ -112,7 +113,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertTrue($event->wasRecentlyViewed());
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_views_within_time_window(): void
     {
         $this->actingAs($this->user);
@@ -138,7 +139,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertTrue($event->wasRecentlyViewed(15));
     }
 
-    /** @test */
+    #[Test]
     public function it_logs_view_only_if_not_recent(): void
     {
         $this->actingAs($this->user);
@@ -158,7 +159,7 @@ class RecentlyViewedTest extends TestCase
     // RecentlyViewedService Tests
     // ===========================================
 
-    /** @test */
+    #[Test]
     public function service_returns_recently_viewed_items(): void
     {
         $this->actingAs($this->user);
@@ -175,7 +176,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals(2, $recentlyViewed->count());
     }
 
-    /** @test */
+    #[Test]
     public function service_orders_by_most_recent_first(): void
     {
         $this->actingAs($this->user);
@@ -198,7 +199,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals($event1->id, $recentlyViewed->last()->model->id);
     }
 
-    /** @test */
+    #[Test]
     public function service_filters_by_type(): void
     {
         $this->actingAs($this->user);
@@ -222,7 +223,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals(EventObject::class, $objects->first()->type);
     }
 
-    /** @test */
+    #[Test]
     public function service_deduplicates_multiple_views_of_same_item(): void
     {
         $this->actingAs($this->user);
@@ -259,7 +260,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals(1, $recentlyViewed->count());
     }
 
-    /** @test */
+    #[Test]
     public function service_respects_limit(): void
     {
         $this->actingAs($this->user);
@@ -277,7 +278,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals(3, $limited->count());
     }
 
-    /** @test */
+    #[Test]
     public function service_returns_typed_helper_methods(): void
     {
         $this->actingAs($this->user);
@@ -306,7 +307,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertInstanceOf(Block::class, $blocks->first());
     }
 
-    /** @test */
+    #[Test]
     public function service_returns_correct_count(): void
     {
         $this->actingAs($this->user);
@@ -328,7 +329,7 @@ class RecentlyViewedTest extends TestCase
     // Purge Old Views Tests
     // ===========================================
 
-    /** @test */
+    #[Test]
     public function it_purges_views_beyond_retention_limit(): void
     {
         $this->actingAs($this->user);
@@ -362,7 +363,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals(20, Activity::where('event', 'viewed')->count());
     }
 
-    /** @test */
+    #[Test]
     public function it_keeps_most_recent_views_when_purging(): void
     {
         $this->actingAs($this->user);
@@ -412,7 +413,7 @@ class RecentlyViewedTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_purges_old_views_automatically_on_log_view(): void
     {
         $this->actingAs($this->user);
@@ -442,7 +443,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals(20, Activity::where('event', 'viewed')->count());
     }
 
-    /** @test */
+    #[Test]
     public function it_purges_views_for_all_users(): void
     {
         $user2 = User::factory()->create();
@@ -495,7 +496,7 @@ class RecentlyViewedTest extends TestCase
     // Recently Viewed Item Structure Tests
     // ===========================================
 
-    /** @test */
+    #[Test]
     public function recently_viewed_item_has_correct_structure(): void
     {
         $this->actingAs($this->user);
@@ -520,7 +521,7 @@ class RecentlyViewedTest extends TestCase
         $this->assertEquals($event->id, $item->id);
     }
 
-    /** @test */
+    #[Test]
     public function recently_viewed_handles_deleted_models_gracefully(): void
     {
         $this->actingAs($this->user);
@@ -545,7 +546,7 @@ class RecentlyViewedTest extends TestCase
     // User Isolation Tests
     // ===========================================
 
-    /** @test */
+    #[Test]
     public function recently_viewed_is_isolated_per_user(): void
     {
         $user2 = User::factory()->create();

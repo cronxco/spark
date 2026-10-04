@@ -7,6 +7,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -46,9 +47,7 @@ class KarakeepBookmarksPullTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation(): void
     {
         $job = new KarakeepBookmarksPull($this->integration);
@@ -59,9 +58,7 @@ class KarakeepBookmarksPullTest extends TestCase
         $this->assertEquals([60, 300, 600], $job->backoff);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unique_id_generation(): void
     {
         $job = new KarakeepBookmarksPull($this->integration);
@@ -71,9 +68,7 @@ class KarakeepBookmarksPullTest extends TestCase
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_integration_correctly(): void
     {
         $job = new KarakeepBookmarksPull($this->integration);
@@ -84,9 +79,7 @@ class KarakeepBookmarksPullTest extends TestCase
         $this->assertEquals('bookmarks', $this->integration->instance_type);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function configuration_inheritance(): void
     {
         $this->assertEquals(30, $this->integration->configuration['update_frequency_minutes']);
@@ -97,9 +90,7 @@ class KarakeepBookmarksPullTest extends TestCase
         $this->assertInstanceOf(KarakeepBookmarksPull::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_with_different_configurations(): void
     {
         // Test with highlights disabled
@@ -135,9 +126,7 @@ class KarakeepBookmarksPullTest extends TestCase
         $this->assertEquals(100, $integrationCustomLimit->configuration['fetch_limit']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_has_correct_service_and_type(): void
     {
         $job = new KarakeepBookmarksPull($this->integration);

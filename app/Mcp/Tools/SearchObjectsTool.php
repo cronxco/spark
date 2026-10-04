@@ -3,8 +3,9 @@
 namespace App\Mcp\Tools;
 
 use App\Http\Resources\EventObjectResource;
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\EventObject;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use Exception;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -17,6 +18,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 #[IsReadOnly]
 class SearchObjectsTool extends Tool
 {
+    use RequiresSparkAbility;
     /**
      * The tool's description.
      */
@@ -27,7 +29,7 @@ class SearchObjectsTool extends Tool
     MARKDOWN;
 
     public function __construct(
-        protected EmbeddingService $embeddingService
+        protected EmbeddingClient $embeddingService
     ) {}
 
     /**
@@ -35,6 +37,9 @@ class SearchObjectsTool extends Tool
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'data:read')) {
+            return $error;
+        }
         $user = $request->user();
 
         if (! $user) {

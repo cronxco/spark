@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 class ContentExtractorTest extends TestCase
 {
-    /** @test */
+    #[Test]
     public function it_extracts_content_from_valid_html()
     {
         $html = '
@@ -37,7 +37,7 @@ class ContentExtractorTest extends TestCase
         $this->assertNotEmpty($result['data']['text_content']);
     }
 
-    /** @test */
+    #[Test]
     public function it_fails_on_missing_title()
     {
         $html = '
@@ -55,7 +55,7 @@ class ContentExtractorTest extends TestCase
         $this->assertStringContainsString('title', strtolower($result['reason']));
     }
 
-    /** @test */
+    #[Test]
     public function it_fails_on_insufficient_content()
     {
         $html = '
@@ -74,7 +74,7 @@ class ContentExtractorTest extends TestCase
         $this->assertStringContainsString('content', strtolower($result['reason']));
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_robot_check_in_title()
     {
         $html = '
@@ -93,7 +93,7 @@ class ContentExtractorTest extends TestCase
         $this->assertStringContainsString('robot', strtolower($result['reason']));
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_paywall()
     {
         $html = '
@@ -114,7 +114,30 @@ class ContentExtractorTest extends TestCase
         $this->assertStringContainsString('paywall', strtolower($result['reason']));
     }
 
-    /** @test */
+    #[Test]
+    public function it_can_skip_access_barrier_detection_for_authenticated_browser_captures(): void
+    {
+        $body = str_repeat('This is the full article content from an authenticated browser session. ', 10);
+        $html = <<<HTML
+            <!doctype html>
+            <html>
+                <head><title>Authenticated Article Capture</title></head>
+                <body>
+                    <article><p>{$body}</p></article>
+                    <div class="paywall">Already a subscriber? Sign in to read.</div>
+                </body>
+            </html>
+            HTML;
+
+        $normalFetch = ContentExtractor::extract($html, 'https://example.com/private');
+        $browserCapture = ContentExtractor::extractCaptured($html, 'https://example.com/private');
+
+        $this->assertFalse($normalFetch['success']);
+        $this->assertTrue($browserCapture['success']);
+        $this->assertStringContainsString('full article content', $browserCapture['data']['text_content']);
+    }
+
+    #[Test]
     public function it_generates_consistent_content_hash()
     {
         $content1 = 'This is test content for hashing';
@@ -130,7 +153,7 @@ class ContentExtractorTest extends TestCase
         $this->assertEquals(64, strlen($hash1)); // SHA256 produces 64 char hex string
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_paywall_from_common_indicators()
     {
         $paywallIndicators = [
@@ -204,7 +227,7 @@ class ContentExtractorTest extends TestCase
         $this->assertFalse($detected, 'Ignored domains must never be flagged as paywalled');
     }
 
-    /** @test */
+    #[Test]
     public function it_extracts_author_information()
     {
         $html = '
@@ -229,7 +252,7 @@ class ContentExtractorTest extends TestCase
         $this->assertArrayHasKey('author', $result['data']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_malformed_html_gracefully()
     {
         $html = '<html><body><p>Unclosed paragraph and broken HTML structure';
@@ -241,7 +264,7 @@ class ContentExtractorTest extends TestCase
         $this->assertArrayHasKey('reason', $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_allows_pages_with_recaptcha_library_but_substantial_content()
     {
         // Simulate NYTimes-like page: has reCAPTCHA library loaded (for comments)
@@ -282,7 +305,7 @@ class ContentExtractorTest extends TestCase
         $this->assertGreaterThan(500, strlen($result['data']['text_content']));
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_actual_recaptcha_challenge_page()
     {
         // This simulates an actual CAPTCHA challenge page with minimal content
@@ -305,5 +328,42 @@ class ContentExtractorTest extends TestCase
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('robot', strtolower($result['reason']));
+    }
+
+    #[Test]
+    public function it_parses_without_validating(): void
+    {
+        $html = '<html><head><title>Hi</title></head><body><article><p>Short.</p></article></body></html>';
+
+        $parsed = ContentExtractor::parse($html, 'https://example.com/a');
+
+        $this->assertTrue($parsed['success']);
+        $this->assertSame('Hi', $parsed['data']['title']);
+
+        $validated = ContentExtractor::validateParsed($parsed, $html, 'https://example.com/a');
+
+        $this->assertFalse($validated['success']);
+        $this->assertSame('Title too short: Hi', $validated['reason']);
+    }
+
+    #[Test]
+    public function it_validates_a_parsed_article_like_extract_does(): void
+    {
+        $html = '<html><head><title>A proper article title</title></head><body><article>'
+            . str_repeat('<p>Plenty of genuine article text so that validation accepts the extracted content.</p>', 5)
+            . '</article></body></html>';
+
+        $validated = ContentExtractor::validateParsed(ContentExtractor::parse($html, 'https://example.com/a'), $html, 'https://example.com/a');
+
+        $this->assertTrue($validated['success']);
+        $this->assertEquals(ContentExtractor::extract($html, 'https://example.com/a'), $validated);
+    }
+
+    #[Test]
+    public function it_passes_parse_failures_through_validation(): void
+    {
+        $failure = ['success' => false, 'reason' => 'Parse error: nope', 'data' => null];
+
+        $this->assertSame($failure, ContentExtractor::validateParsed($failure, '', 'https://example.com/a'));
     }
 }
