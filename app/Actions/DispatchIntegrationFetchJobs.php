@@ -45,6 +45,7 @@ use App\Jobs\Outline\OutlinePullRecentDayNotes;
 use App\Jobs\Outline\OutlinePullRecentDocuments;
 use App\Jobs\RunIntegrationTask;
 use App\Models\Integration;
+use App\Services\IntegrationRuns\IntegrationRunService;
 
 class DispatchIntegrationFetchJobs
 {
@@ -59,6 +60,9 @@ class DispatchIntegrationFetchJobs
      * Dispatch the appropriate fetch jobs for the given integration.
      *
      * Returns the number of jobs dispatched. Zero means nothing was queued.
+     * The fetch jobs are queued as one run (see IntegrationRunService), so
+     * the integration only reads as up to date once their processing jobs
+     * have finished too.
      */
     public function dispatch(Integration $integration): int
     {
@@ -71,9 +75,14 @@ class DispatchIntegrationFetchJobs
 
         $fetchJobs = $this->getFetchJobsForIntegration($integration);
 
-        foreach ($fetchJobs as $jobClass) {
-            $jobClass::dispatch($integration);
+        if ($fetchJobs === []) {
+            return 0;
         }
+
+        app(IntegrationRunService::class)->start(
+            $integration,
+            array_map(static fn (string $jobClass): object => new $jobClass($integration), $fetchJobs),
+        );
 
         return count($fetchJobs);
     }

@@ -181,7 +181,7 @@ new class extends Component
             'sweep' => $this->describeSweep($pluginClass, $instances),
             'counts' => $counts,
             'attention' => collect($rows)
-                ->filter(fn (array $row) => $row['status'] === 'needs_update' || ($row['migration']['failed'] ?? false))
+                ->filter(fn (array $row) => $row['status'] === 'needs_update' || $row['run_failed'] !== null || ($row['migration']['failed'] ?? false))
                 ->count(),
             'instances' => $instanceRows,
             'connections' => $this->describeConnections($instanceRows),
@@ -218,13 +218,17 @@ new class extends Component
     private function describeInstance(Integration $integration, bool $receivesPushedData, string $serviceType, string $pluginName, ?ActionProgress $progress): array
     {
         $lastEventTime = $integration->last_event_time ? Carbon::parse($integration->last_event_time) : null;
+        $status = $integration->statusKey($lastEventTime);
 
         return [
             'id' => $integration->id,
             'name' => $integration->name ?: $pluginName,
             'connection_id' => $integration->integration_group_id ?? 'none',
             'connection_label' => $this->connectionLabel($integration),
-            'status' => $integration->statusKey($lastEventTime),
+            'status' => $status,
+            'run_failed' => in_array($status, ['up_to_date', 'needs_update', 'stale'], true)
+                ? $this->describeRunFailure($integration)
+                : null,
             'receives_pushed_data' => $receivesPushedData,
             'is_manual' => $serviceType === 'manual',
             'can_trigger' => ! $receivesPushedData,
@@ -233,6 +237,17 @@ new class extends Component
             'cadence' => $receivesPushedData ? null : $this->describeCadence($integration),
             'migration' => $this->describeMigration($integration, $progress),
         ];
+    }
+
+    /**
+     * `partial` or `failed` when the latest update run did not process
+     * everything, so a fetched-but-unprocessed run never reads as up to date.
+     */
+    private function describeRunFailure(Integration $integration): ?string
+    {
+        $runStatus = $integration->lastRun()['status'] ?? null;
+
+        return in_array($runStatus, ['partial', 'failed'], true) ? $runStatus : null;
     }
 
     private function connectionLabel(Integration $integration): ?string
@@ -535,6 +550,11 @@ new class extends Component
                                                 </span>
                                             @elseif ($instance['status'] === 'paused')
                                                 <x-badge :value="__('Paused')" class="badge-neutral badge-sm" />
+                                            @endif
+                                            @if ($instance['run_failed'] === 'partial')
+                                                <x-badge :value="__('Partly updated')" class="badge-warning badge-sm" />
+                                            @elseif ($instance['run_failed'] === 'failed')
+                                                <x-badge :value="__('Last update failed')" class="badge-error badge-sm" />
                                             @endif
                                             @if ($instance['migration']['failed'] ?? false)
                                                 <x-badge :value="__('Migration failed')" class="badge-error badge-sm" />

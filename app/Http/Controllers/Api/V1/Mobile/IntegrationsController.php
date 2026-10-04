@@ -230,10 +230,16 @@ class IntegrationsController extends Controller
      */
     private function statusMessage(Integration $integration): ?string
     {
-        return match ($integration->statusKey($integration->last_event_time ? Carbon::parse($integration->last_event_time) : null)) {
-            'paused' => 'Paused — Spark won\'t fetch until you resume it.',
-            'stale' => 'No new data recently. Nothing to fix unless you expected some.',
-            'needs_update' => 'Overdue for an update.',
+        $status = $integration->statusKey($integration->last_event_time ? Carbon::parse($integration->last_event_time) : null);
+        $runStatus = $integration->lastRun()['status'] ?? null;
+
+        return match (true) {
+            $status === 'paused' => 'Paused — Spark won\'t fetch until you resume it.',
+            $status === 'processing' => null,
+            $runStatus === 'failed' => 'The last update failed.',
+            $runStatus === 'partial' => 'Some of the last update couldn\'t be processed.',
+            $status === 'stale' => 'No new data recently. Nothing to fix unless you expected some.',
+            $status === 'needs_update' => 'Overdue for an update.',
             default => null,
         };
     }

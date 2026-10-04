@@ -10,6 +10,7 @@ use App\Services\GeocodingService;
 use App\Services\Media\MediaDownloadHelper;
 use App\Services\PlaceDetectionService;
 use Exception;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -29,7 +30,7 @@ use Throwable;
 
 abstract class BaseProcessingJob implements ShouldQueue
 {
-    use Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 300; // 5 minutes for processing
 
