@@ -296,6 +296,14 @@ paths:
           }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /relationship-types:
+    get:
+      operationId: listRelationshipTypes
+      tags: [data]
+      summary: Relationship types the server accepts
+      responses:
+        "200": { description: OK }
+
   /{kind}/{id}/relationships:
     get:
       operationId: listRelationships
@@ -346,7 +354,7 @@ paths:
               type: object
               required: [to_kind, to_id, type]
               properties:
-                to_kind: { type: string }
+                to_kind: { type: string, enum: [event, object, block] }
                 to_id: { type: string, format: uuid }
                 type: { type: string }
                 value: { type: [number, "null"] }

@@ -2,8 +2,8 @@
 
 namespace App\Spotlight\Queries\Scoped;
 
-use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
+use App\Spotlight\Support\OwnedRecords;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -20,7 +20,7 @@ class MetricAnomaliesQuery
                 return collect();
             }
 
-            $metric = MetricStatistic::find($metricId);
+            $metric = OwnedRecords::metrics()->find($metricId);
             if (! $metric) {
                 return collect();
             }

@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Services\Media\MediaDeduplicationService;
 use Carbon\CarbonImmutable;
 use Exception;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -20,7 +21,7 @@ use Illuminate\Support\Str;
 
 class ProcessFetchedContent implements ShouldQueue
 {
-    use Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 1;
 

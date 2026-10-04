@@ -84,6 +84,7 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/updates', 'updates.index')->name('updates.index');
     Volt::route('/events/{event}', 'events.show')->name('events.show');
     Volt::route('/objects/{object}', 'objects.show')->name('objects.show');
+    Volt::route('/people/{person}', 'people.show')->name('people.show');
     Volt::route('/blocks/{block}', 'blocks.show')->name('blocks.show');
     Volt::route('/tags', 'tags.index')->name('tags.index');
     Volt::route('/tags/{type}/{slug}/{id}', 'tags.show')->name('tags.show');
@@ -115,19 +116,23 @@ Route::middleware(['auth'])->group(function () {
     // Plugin and integration instance detail routes
     Route::get('plugins/{service}', function (string $service) {
         $pluginClass = PluginRegistry::getPlugin($service);
-        if (! $pluginClass) {
+        if (! $pluginClass || ! PluginRegistry::isAvailableTo($pluginClass, Auth::user())) {
             abort(404);
         }
 
-        // Get the integration group for this service if exists
-        $group = IntegrationGroup::where('service', $service)
+        // Every credential group the user has for this service: a second
+        // Monzo or GitHub account is its own group, and loading only the
+        // first() hid the other accounts' instances.
+        $groups = IntegrationGroup::where('service', $service)
             ->where('user_id', Auth::id())
-            ->first();
+            ->with('integrations')
+            ->oldest()
+            ->get();
 
         return view('plugins.show', [
             'service' => $service,
             'pluginClass' => $pluginClass,
-            'group' => $group,
+            'groups' => $groups,
         ]);
     })->name('plugins.show');
 

@@ -20,6 +20,7 @@ use App\Services\Notifications\NotificationIncidentResolver;
 use App\Services\PlaywrightHealthMetrics;
 use Exception;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -30,7 +31,7 @@ use Throwable;
 
 class FetchSingleUrl implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 3;
 

@@ -12,6 +12,15 @@ class TaskPlugin extends ManualPlugin
         return [];
     }
 
+    /**
+     * Task runs Artisan commands and whitelisted jobs on the server, so it is
+     * an internal tool for admins.
+     */
+    public static function isAdminOnly(): bool
+    {
+        return true;
+    }
+
     public static function getIdentifier(): string
     {
         return 'task';

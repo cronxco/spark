@@ -4,6 +4,7 @@ namespace App\Spotlight\Queries\Scoped;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
+use App\Spotlight\Support\OwnedRecords;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -20,7 +21,7 @@ class EventBlocksQuery
                 return collect();
             }
 
-            $event = Event::with('blocks')->find($eventId);
+            $event = OwnedRecords::events()->with('blocks')->find($eventId);
             if (! $event || $event->blocks->isEmpty()) {
                 return collect();
             }
