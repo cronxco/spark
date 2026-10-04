@@ -59,6 +59,8 @@ class SkillRegistry
     /** @var array<string, SkillDefinition>|null */
     private ?array $skills = null;
 
+    public function __construct(private ?string $skillsDirectory = null) {}
+
     /**
      * @return array<string, SkillDefinition>
      */
@@ -94,9 +96,9 @@ class SkillRegistry
         return isset($this->all()[$name]);
     }
 
-    private function directory(): string
+    public function directory(): string
     {
-        return resource_path('ai/skills');
+        return $this->skillsDirectory ?? resource_path('ai/skills');
     }
 
     private function parse(string $path): SkillDefinition

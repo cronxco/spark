@@ -8,9 +8,9 @@ use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Sentry\SentrySdk;
 use Sentry\Tracing\TransactionContext;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class EmbeddingClientTest extends TestCase
+class EmbeddingClientTest extends FrameworkTestCase
 {
     protected function setUp(): void
     {
@@ -35,7 +35,7 @@ class EmbeddingClientTest extends TestCase
             ]),
         ]);
 
-        $result = (new EmbeddingClient)->embed('searchable text', useCache: false);
+        $result = (new EmbeddingClient(retryDelayMilliseconds: 0))->embed('searchable text', useCache: false);
 
         $this->assertCount(1536, $result);
         $this->assertSame(0.25, $result[0]);
@@ -51,8 +51,9 @@ class EmbeddingClientTest extends TestCase
 
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('provider unavailable');
+        $this->beforeApplicationDestroyed(fn () => Http::assertSentCount(3));
 
-        (new EmbeddingClient)->embed('searchable text', useCache: false);
+        (new EmbeddingClient(retryDelayMilliseconds: 0))->embed('searchable text', useCache: false);
     }
 
     #[Test]
@@ -69,7 +70,7 @@ class EmbeddingClientTest extends TestCase
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('zero vector');
 
-        (new EmbeddingClient)->embed('searchable text', useCache: false);
+        (new EmbeddingClient(retryDelayMilliseconds: 0))->embed('searchable text', useCache: false);
     }
 
     #[Test]
@@ -89,7 +90,7 @@ class EmbeddingClientTest extends TestCase
         $transaction = \Sentry\startTransaction($context);
         SentrySdk::getCurrentHub()->setSpan($transaction);
 
-        (new EmbeddingClient)->embed('some text', useCache: false);
+        (new EmbeddingClient(retryDelayMilliseconds: 0))->embed('some text', useCache: false);
 
         $spans = $transaction->getSpanRecorder()?->getSpans() ?? [];
         $genAiSpans = array_values(array_filter(
@@ -115,9 +116,9 @@ class EmbeddingClientTest extends TestCase
         ]);
 
         config(['services.openai.models.embedding' => 'text-embedding-3-small']);
-        (new EmbeddingClient)->embed('same text');
+        (new EmbeddingClient(retryDelayMilliseconds: 0))->embed('same text');
         config(['services.openai.models.embedding' => 'text-embedding-3-large']);
-        (new EmbeddingClient)->embed('same text');
+        (new EmbeddingClient(retryDelayMilliseconds: 0))->embed('same text');
 
         Http::assertSentCount(2);
         Http::assertSent(fn ($request) => $request['model'] === 'text-embedding-3-small');

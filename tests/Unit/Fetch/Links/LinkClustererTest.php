@@ -8,9 +8,9 @@ use App\Services\Fetch\Links\LinkClusterer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Fixtures\FetchPages;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class LinkClustererTest extends TestCase
+class LinkClustererTest extends FrameworkTestCase
 {
     /**
      * @return array<string, array{string, string}>
