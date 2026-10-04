@@ -106,10 +106,18 @@ class LiveActivitiesController extends Controller
         return response()->json($this->resource($token));
     }
 
+    /**
+     * Resolve the activity by its ActivityKit id, the public identifier.
+     *
+     * The row id is accepted as well: shipped iOS builds sent the create
+     * response's `id` in follow-up paths, which matched nothing here, so every
+     * token rotation, update and end answered 404. Both are UUIDs scoped to
+     * the caller, so accepting either cannot reach another user's activity.
+     */
     protected function findOrFail(Request $request, string $id): LiveActivityToken
     {
         $token = LiveActivityToken::where('user_id', $request->user()->id)
-            ->where('activity_id', $id)
+            ->where(fn ($query) => $query->where('activity_id', $id)->orWhere('id', $id))
             ->first();
 
         abort_if($token === null, 404, 'Activity not found.');

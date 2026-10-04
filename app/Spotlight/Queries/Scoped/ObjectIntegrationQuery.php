@@ -4,7 +4,7 @@ namespace App\Spotlight\Queries\Scoped;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
-use App\Models\EventObject;
+use App\Spotlight\Support\OwnedRecords;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -22,7 +22,7 @@ class ObjectIntegrationQuery
                 return collect();
             }
 
-            $object = EventObject::find($objectId);
+            $object = OwnedRecords::objects()->find($objectId);
             if (! $object) {
                 return collect();
             }
@@ -34,7 +34,7 @@ class ObjectIntegrationQuery
             }
 
             // Try to find the integration from the object's first event
-            $integration = Event::where(function ($q) use ($objectId) {
+            $integration = OwnedRecords::events()->where(function ($q) use ($objectId) {
                 $q->where('actor_id', $objectId)
                     ->orWhere('target_id', $objectId);
             })

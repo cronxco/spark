@@ -113,3 +113,8 @@ DB::transaction(function () use ($event) {
 - Referential integrity maintained
 - Audit trail of deleted records
 - Safe operations reducing accidental data loss
+
+The mobile API exposes soft delete and restore for events and objects
+(`DELETE /api/v1/mobile/{events|objects}/{id}` and `POST .../{id}/restore`),
+which the iOS app uses for delete with Undo. A soft-deleted object keeps its
+media; the media is removed only when the object is force deleted.

@@ -93,7 +93,7 @@ class FindReceiptForTransactionJob implements ShouldQueue
 
             // Try to match each receipt
             foreach ($unmatchedReceipts as $receipt) {
-                $confidence = $this->calculateReverseMatchConfidence($receipt, $this->transactionEvent);
+                $confidence = $matcher->calculateReverseMatchConfidence($receipt, $this->transactionEvent);
 
                 if ($confidence >= $autoMatchThreshold) {
                     $matcher->createReceiptRelationship(
@@ -126,32 +126,5 @@ class FindReceiptForTransactionJob implements ShouldQueue
     public function uniqueId(): string
     {
         return 'find_receipt_for_transaction_' . $this->transactionEvent->id;
-    }
-
-    /**
-     * Calculate match confidence for reverse matching
-     * (Similar to ReceiptTransactionMatcher but simplified)
-     */
-    private function calculateReverseMatchConfidence(Event $receipt, Event $transaction): float
-    {
-        $score = 0.0;
-
-        // Amount match (40%)
-        $amountDiff = abs($receipt->value - $transaction->value);
-        $amountScore = 1 - min(1, $amountDiff / max(1, $receipt->value));
-        $score += $amountScore * 0.4;
-
-        // Time proximity (30%)
-        $timeDiff = abs($receipt->time->diffInMinutes($transaction->time));
-        $timeScore = max(0, 1 - ($timeDiff / 240)); // 4-hour window
-        $score += $timeScore * 0.3;
-
-        // Merchant name fuzzy match (30%)
-        $receiptMerchant = strtolower($receipt->target->title ?? '');
-        $txnMerchant = strtolower($transaction->target->title ?? '');
-        similar_text($receiptMerchant, $txnMerchant, $percent);
-        $score += ($percent / 100) * 0.3;
-
-        return $score;
     }
 }

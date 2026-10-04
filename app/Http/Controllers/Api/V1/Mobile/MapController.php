@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 use App\Http\Controllers\Controller;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\User;
+use App\Services\EffectiveTimezoneResolver;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,7 +16,11 @@ class MapController extends Controller
     public const CLUSTER_THRESHOLD = 500;
 
     /**
-     * GET /api/v1/mobile/map/data?bbox=swLat,swLng,neLat,neLng
+     * GET /api/v1/mobile/map/data?bbox=swLat,swLng,neLat,neLng[&date=YYYY-MM-DD]
+     *
+     * With `date`, events are limited to that local day in the user's
+     * effective timezone before the cluster limit is applied. Place markers
+     * are a catalogue, not activity, so they are not date-filtered.
      *
      * Returns geo-located events + place objects within the bounding box. When
      * the total exceeds CLUSTER_THRESHOLD the server collapses into coarse
@@ -33,6 +40,14 @@ class MapController extends Controller
         [$swLat, $swLng, $neLat, $neLng] = $bbox;
 
         $user = $request->user();
+
+        $day = null;
+        if ($request->filled('date')) {
+            $day = $this->dayBounds($user, (string) $request->query('date'));
+            if ($day === null) {
+                return response()->json(['message' => 'date must be a calendar date in YYYY-MM-DD format.'], 422);
+            }
+        }
         $integrationIds = $user->integrations()->pluck('id')->all();
 
         $events = collect();
@@ -50,6 +65,9 @@ class MapController extends Controller
                                 ->withinBounds($neLat, $swLat, $neLng, $swLng);
                         });
                 })
+                ->when($day, fn ($query) => $query
+                    ->where('time', '>=', $day['from'])
+                    ->where('time', '<', $day['to']))
                 ->with(['actor', 'target'])
                 ->orderBy('time', 'desc')
                 ->limit(self::CLUSTER_THRESHOLD + 1)
@@ -64,15 +82,23 @@ class MapController extends Controller
             ->get();
 
         $total = $events->count() + $places->count();
+        $meta = $day ? ['meta' => [
+            'date' => $day['date'],
+            'timezone' => $day['timezone'],
+            'from' => $day['from']->toIso8601String(),
+            'to' => $day['to']->toIso8601String(),
+        ]] : [];
 
         if ($total > self::CLUSTER_THRESHOLD) {
             return response()->json([
                 'clusters' => $this->cluster($events, $places),
                 'markers' => [],
+                ...$meta,
             ]);
         }
 
         return response()->json([
+            ...$meta,
             'clusters' => [],
             'markers' => [
                 'events' => $events
@@ -87,6 +113,34 @@ class MapController extends Controller
                     ->all(),
             ],
         ]);
+    }
+
+    /**
+     * UTC bounds of a local calendar day. The end is the next local midnight,
+     * so a 23- or 25-hour DST day keeps its real length.
+     *
+     * @return array{date: string, timezone: string, from: CarbonImmutable, to: CarbonImmutable}|null
+     */
+    protected function dayBounds(User $user, string $date): ?array
+    {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return null;
+        }
+
+        [$year, $month, $dayOfMonth] = array_map('intval', explode('-', $date));
+        if (! checkdate($month, $dayOfMonth, $year)) {
+            return null;
+        }
+
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneForDate($user, $date);
+        $start = CarbonImmutable::create($year, $month, $dayOfMonth, 0, 0, 0, $timezone);
+
+        return [
+            'date' => $date,
+            'timezone' => $timezone,
+            'from' => $start->utc(),
+            'to' => $start->addDay()->startOfDay()->utc(),
+        ];
     }
 
     /**
