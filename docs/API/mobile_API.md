@@ -193,6 +193,7 @@ Day-scoped payloads also **render** in that zone: every timestamp inside `GET /b
 | `GET`  | `/feed`                         | Cursor-paginated reverse-chronological event feed                               |
 | `GET`  | `/notifications`                | Cursor-paginated notifications inbox                                            |
 | `GET`  | `/events/{id}`                  | Single event                                                                    |
+| `GET`  | `/events/{id}/route`            | GPS route of a workout event (only when `has_route` is true)                    |
 | `GET`  | `/objects/{id}`                 | Single object with optional recent events                                       |
 | `GET`  | `/blocks/{id}`                  | Single block                                                                    |
 | `GET`  | `/metrics`                      | All available metric identifiers and metadata                                   |
@@ -619,6 +620,35 @@ Returns a single event by UUID. The response includes the full embedded `blocks`
 **Response `200`** — [CompactEvent](#compactevent)
 
 **Response `404`** — Event not found or belongs to another user.
+
+An event that carries a usable GPS route (Apple Health workouts) also has
+`"has_route": true`; the key is absent otherwise.
+
+---
+
+### `GET /events/{id}/route`
+
+Read-only GPS route for an owned event with `has_route`. Points without real
+coordinates are dropped, and routes longer than 1,000 points are thinned
+evenly, keeping the first and last point. Accepts `ios:read` or `data:read`.
+
+**Response `200`**
+
+```json
+{
+    "points": [{ "lat": 51.5, "lng": -0.12 }, { "lat": 51.51, "lng": -0.13 }],
+    "total_points": 2,
+    "distance": 5.02,
+    "distance_unit": "km",
+    "duration_seconds": 1500
+}
+```
+
+`total_points` counts the usable points before thinning. `distance`,
+`distance_unit` and `duration_seconds` are `null` when the source did not
+record them.
+
+**Response `404`** — No route, or the event is not found or not owned.
 
 ---
 

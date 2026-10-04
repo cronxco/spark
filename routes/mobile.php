@@ -87,6 +87,9 @@ Route::get('notifications/feed/{id}', [NotificationsController::class, 'show'])
     ->name('notifications.show');
 
 Route::get('events/{id}', [EventsController::class, 'show'])->name('events.show');
+Route::get('events/{id}/route', [EventsController::class, 'route'])
+    ->middleware('ability:ios:read,data:read')
+    ->name('events.route');
 Route::patch('{kind}/{id}/location', [LocationsController::class, 'set'])->whereIn('kind', ['events', 'objects'])->middleware(['ability:ios:write', 'if-match:entity'])->name('locations.set');
 Route::delete('{kind}/{id}/location', [LocationsController::class, 'clear'])->whereIn('kind', ['events', 'objects'])->middleware(['ability:ios:write', 'if-match:entity'])->name('locations.clear');
 Route::post('{kind}/{id}/location/geocode', [LocationsController::class, 'geocode'])->whereIn('kind', ['events', 'objects'])->middleware(['ability:ios:write', 'if-match:entity'])->name('locations.geocode');

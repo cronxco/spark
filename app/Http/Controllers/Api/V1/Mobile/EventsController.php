@@ -7,6 +7,7 @@ use App\Http\Resources\Compact\CompactEventResource;
 use App\Services\Api\ResourceVersion;
 use App\Services\EventNoteService;
 use App\Services\Mobile\EventLookup;
+use App\Services\Mobile\EventRoute;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,6 +17,7 @@ class EventsController extends Controller
         protected EventLookup $lookup,
         protected EventNoteService $notes,
         protected ResourceVersion $versions,
+        protected EventRoute $routes,
     ) {}
 
     /**
@@ -32,6 +34,31 @@ class EventsController extends Controller
         $response = response()->json(
             (new CompactEventResource($event))->resolve($request),
         );
+
+        if ($event->updated_at) {
+            $response->header('Last-Modified', $event->updated_at->toRfc7231String());
+        }
+        $response->header('ETag', $this->versions->etag($event));
+
+        return $response;
+    }
+
+    /**
+     * GET /api/v1/mobile/events/{id}/route
+     *
+     * Read-only GPS route for an event that carries one (workouts), thinned to
+     * at most EventRoute::MAX_POINTS. 404 when the event has no route.
+     */
+    public function route(Request $request, string $id): JsonResponse
+    {
+        $event = $this->lookup->find($request->user(), $id);
+        $route = $event ? $this->routes->forEvent($event) : null;
+
+        if (! $route) {
+            return response()->json(['message' => 'Route not found.'], 404);
+        }
+
+        $response = response()->json($route);
 
         if ($event->updated_at) {
             $response->header('Last-Modified', $event->updated_at->toRfc7231String());

@@ -337,6 +337,50 @@ paths:
         "428": { $ref: "#/components/responses/PreconditionRequired" }
         "412": { $ref: "#/components/responses/PreconditionFailed" }
 
+  /events/{id}/route:
+    get:
+      operationId: getEventRoute
+      tags: [entities]
+      summary: Read-only GPS route of a workout event, thinned to at most 1000 points
+      parameters: [{ $ref: "#/components/parameters/EntityId" }]
+      responses:
+        "200":
+          {
+            description: OK,
+            content:
+              {
+                application/json:
+                  {
+                    schema:
+                      {
+                        type: object,
+                        required: [points, total_points],
+                        properties:
+                          {
+                            points:
+                              {
+                                type: array,
+                                items:
+                                  {
+                                    type: object,
+                                    properties:
+                                      {
+                                        lat: { type: number },
+                                        lng: { type: number },
+                                      },
+                                  },
+                              },
+                            total_points: { type: integer },
+                            distance: { type: [number, "null"] },
+                            distance_unit: { type: [string, "null"] },
+                            duration_seconds: { type: [number, "null"] },
+                          },
+                      },
+                  },
+              },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /events/{id}/restore:
     post:
       operationId: restoreEvent
@@ -2424,6 +2468,11 @@ components:
             description: "Money events only (domain=money, value set) — resolved server-side so the client never infers direction from the action-name suffix.",
           }
         url: { type: string }
+        has_route:
+          {
+            type: boolean,
+            description: "Present (true) only when GET /events/{id}/route has a route.",
+          }
         actor: { type: object }
         target: { type: object }
         tags: { type: array, items: { type: object } }
