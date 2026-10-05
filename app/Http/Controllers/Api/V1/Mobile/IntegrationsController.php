@@ -12,9 +12,11 @@ use App\Integrations\PluginRegistry;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Services\Api\ResourceVersion;
+use App\Services\GoCardlessAccounts;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Throwable;
 
 class IntegrationsController extends Controller
@@ -133,9 +135,13 @@ class IntegrationsController extends Controller
             return response()->json(['message' => 'Integration not found.'], 404);
         }
 
-        $configuration = $integration->configuration ?? [];
-        $configuration['paused'] = $request->boolean('paused');
-        $integration->update(['configuration' => $configuration]);
+        if ($integration->service === 'gocardless') {
+            app(GoCardlessAccounts::class)->setPaused($integration, $request->boolean('paused'));
+        } else {
+            $configuration = $integration->configuration ?? [];
+            $configuration['paused'] = $request->boolean('paused');
+            $integration->update(['configuration' => $configuration]);
+        }
 
         $integration = $integration->fresh();
 
@@ -207,12 +213,19 @@ class IntegrationsController extends Controller
         $metadata = $group->auth_metadata ?? [];
         $metadata['mobile_reauth_origin'] = true;
         $metadata['mobile_reauth_started_at'] = now()->toISOString();
+        $metadata['mobile_reauth_attempt_id'] = (string) Str::uuid();
         $group->auth_metadata = $metadata;
         $group->save();
 
         try {
             $url = $plugin->getOAuthUrl($group);
         } catch (Throwable $e) {
+            $currentMetadata = $group->fresh()->auth_metadata ?? [];
+            if (($currentMetadata['mobile_reauth_attempt_id'] ?? null) === $metadata['mobile_reauth_attempt_id']) {
+                unset($currentMetadata['mobile_reauth_origin'], $currentMetadata['mobile_reauth_started_at'], $currentMetadata['mobile_reauth_attempt_id']);
+                $group->update(['auth_metadata' => $currentMetadata]);
+            }
+
             return response()->json(['message' => 'Could not start re-authentication.'], 422);
         }
 
@@ -220,7 +233,7 @@ class IntegrationsController extends Controller
             return response()->json(['message' => 'Could not start re-authentication.'], 422);
         }
 
-        return response()->json(['url' => $url]);
+        return response()->json(['url' => $url, 'attempt_id' => $metadata['mobile_reauth_attempt_id']]);
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Services\GeocodingService;
+use App\Services\GoCardlessAccounts;
 use App\Services\Media\MediaDownloadHelper;
 use App\Services\PlaceDetectionService;
 use Exception;
@@ -44,6 +45,8 @@ abstract class BaseProcessingJob implements ShouldQueue
 
     protected string $serviceName;
 
+    protected ?array $goCardlessSnapshot = null;
+
     /**
      * Create a new job instance.
      */
@@ -52,6 +55,10 @@ abstract class BaseProcessingJob implements ShouldQueue
         $this->integration = $integration;
         $this->rawData = $rawData;
         $this->serviceName = $this->getServiceName();
+        if ($integration->service === 'gocardless') {
+            $this->goCardlessSnapshot = $rawData['_gocardless_snapshot'] ?? GoCardlessAccounts::snapshot($integration);
+            unset($this->rawData['_gocardless_snapshot']);
+        }
     }
 
     /**
@@ -82,7 +89,16 @@ abstract class BaseProcessingJob implements ShouldQueue
             Log::info("Starting {$this->getJobType()} processing for integration {$this->integration->id} ({$this->serviceName})");
 
             $span = $transaction->startChild((new SpanContext)->setOp('integration.process')->setDescription($this->serviceName));
-            $this->process();
+            if ($this->serviceName === 'gocardless') {
+                app(GoCardlessAccounts::class)->locked($this->integration->user_id, function () {
+                    if (GoCardlessAccounts::isCurrent($this->integration, $this->goCardlessSnapshot)) {
+                        $this->integration->refresh();
+                        $this->process();
+                    }
+                });
+            } else {
+                $this->process();
+            }
             $span->finish();
 
             // Mark as successfully processed

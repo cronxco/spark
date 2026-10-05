@@ -12,6 +12,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Services\Api\ResourceVersion;
+use App\Services\GoCardlessAccounts;
 use App\Support\CollectionCursorPage;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -112,7 +113,7 @@ class MoneyAccountsController extends Controller
             'cursor' => ['nullable', 'string'],
         ]);
 
-        $paginator = Event::where('actor_id', $account->id)
+        $paginator = Event::whereIn('actor_id', app(GoCardlessAccounts::class)->memberIds($account))
             ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->orderByDesc('time')
@@ -311,10 +312,16 @@ class MoneyAccountsController extends Controller
      */
     private function resolveAccount(string $id, string $userId): ?EventObject
     {
-        return EventObject::where('id', $id)
+        $account = EventObject::withTrashed()->where('id', $id)
             ->where('user_id', $userId)
             ->where('concept', 'account')
             ->first();
+
+        if (! $account || ($account->trashed() && empty($account->metadata['merged_into']))) {
+            return null;
+        }
+
+        return app(GoCardlessAccounts::class)->canonical($account);
     }
 
     /**

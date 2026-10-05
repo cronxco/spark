@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\GoCardlessAccounts;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -302,7 +303,14 @@ class FinancialPlugin extends ManualPlugin
             ->get()
             ->filter(function ($account) {
                 // Exclude accounts marked as deleted/archived
-                return ! ($account->metadata['deleted'] ?? false);
+                if ($account->metadata['deleted'] ?? false) {
+                    return false;
+                }
+                if ($account->type === 'bank_account') {
+                    return app(GoCardlessAccounts::class)->canonical($account)?->id === $account->id;
+                }
+
+                return true;
             })
             ->values();
     }
@@ -364,7 +372,7 @@ class FinancialPlugin extends ManualPlugin
      */
     public function getBalanceEventsQuery(EventObject $accountObject): Builder
     {
-        return Event::where('actor_id', $accountObject->id)
+        return Event::whereIn('actor_id', app(GoCardlessAccounts::class)->memberIds($accountObject))
             ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance');
     }
@@ -374,7 +382,7 @@ class FinancialPlugin extends ManualPlugin
      */
     public function getLatestBalance(EventObject $accountObject): ?Event
     {
-        return Event::where('actor_id', $accountObject->id)
+        return Event::whereIn('actor_id', app(GoCardlessAccounts::class)->memberIds($accountObject))
             ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->latest('time')
@@ -390,7 +398,13 @@ class FinancialPlugin extends ManualPlugin
      */
     public function getLatestBalancesForAccounts($accounts): Collection
     {
-        $accountIds = $accounts->pluck('id')->toArray();
+        $canonicalIds = [];
+        foreach ($accounts as $account) {
+            foreach (app(GoCardlessAccounts::class)->memberIds($account) as $id) {
+                $canonicalIds[$id] = $account->id;
+            }
+        }
+        $accountIds = array_keys($canonicalIds);
 
         if (empty($accountIds)) {
             return collect();
@@ -414,6 +428,8 @@ class FinancialPlugin extends ManualPlugin
             ORDER BY actor_id, time DESC, id DESC
         ) as {$table}", $accountIds)->get();
 
-        return $results->keyBy('actor_id');
+        return $results->sort(function ($a, $b) {
+            return $b->time <=> $a->time ?: strcmp($b->id, $a->id);
+        })->groupBy(fn ($event) => $canonicalIds[$event->actor_id])->map->first();
     }
 }

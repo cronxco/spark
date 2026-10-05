@@ -8,6 +8,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\GoCardlessAccounts;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Livewire\Component;
 use Mary\Traits\Toast;
@@ -127,11 +128,13 @@ class IntegrationDetails extends Component
 
     public function toggleIntegrationPause(): void
     {
-        // Toggle the paused state
-        $config = $this->integration->configuration ?? [];
-        $config['paused'] = ! ($config['paused'] ?? false);
-        $this->integration->configuration = $config;
-        $this->integration->save();
+        if ($this->integration->service === 'gocardless') {
+            app(GoCardlessAccounts::class)->setPaused($this->integration, ! $this->integration->isPaused());
+        } else {
+            $config = $this->integration->configuration ?? [];
+            $config['paused'] = ! ($config['paused'] ?? false);
+            $this->integration->update(['configuration' => $config]);
+        }
 
         $this->dispatch('integration-pause-toggled');
     }
