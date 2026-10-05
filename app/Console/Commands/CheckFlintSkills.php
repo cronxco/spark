@@ -58,7 +58,7 @@ class CheckFlintSkills extends Command
                 continue;
             }
 
-            $ours = resource_path("ai/skills/{$skill->name}/SKILL.md");
+            $ours = $registry->directory() . "/{$skill->name}/SKILL.md";
             if ($this->normalise(File::get($theirs)) !== $this->normalise(File::get($ours))) {
                 $drifted[] = "{$skill->name}: complete skill file differs";
             }

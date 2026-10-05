@@ -5,9 +5,9 @@ namespace Tests\Unit\Fetch\Links;
 use App\Services\Fetch\Links\UrlCanonicalizer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class UrlCanonicalizerTest extends TestCase
+class UrlCanonicalizerTest extends FrameworkTestCase
 {
     /**
      * @return array<string, array{string, string}>

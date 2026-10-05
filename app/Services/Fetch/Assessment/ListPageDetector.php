@@ -125,12 +125,9 @@ class ListPageDetector
             $clusters = array_slice(array_merge([$structured], $clusters), 0, max(1, (int) config('fetch.list_detection.max_clusters', 6)));
         }
 
-        if (($memo['kind'] ?? null) === 'list'
-            && $assessedAt?->gt(now()->subDays((int) config('fetch.list_detection.reassess_days', 7)))
-            && ($reused = $this->assessor->reuse($clusters, (array) ($memo['signatures'] ?? [])))) {
-            return self::isShadow() ? null : $reused;
-        }
-
+        // A structural signature says where links live, not whether today's
+        // links are articles. Reclassify each scan so new sponsored cards and
+        // links rejected on earlier scans cannot inherit a group verdict.
         $textLength = $parsed['success'] ? mb_strlen((string) ($parsed['data']['text_content'] ?? '')) : null;
 
         if ($mode !== self::MODE_FORCE && ! $clusterer->looksListLike($page, $clusters, $validation['success'] ? $textLength : null)) {

@@ -78,7 +78,6 @@ return [
         'max_links' => 60,
         'max_newsletter_links' => 40,
         'budget_seconds' => 3.0,
-        'reassess_days' => 7,
         'negative_memo_days' => 14,
         'thresholds' => [
             'page_kind_list' => 0.6,

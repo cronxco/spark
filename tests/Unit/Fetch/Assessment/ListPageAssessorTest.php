@@ -44,7 +44,7 @@ class ListPageAssessorTest extends TestCase
             'has_article_list' => 0.95,
             'cluster_c0_is_primary' => 0.9,
             "link_{$sponsoredId}_is_article" => 0.05,
-            'link_l*_is_article' => 0.9,
+            'link_l*_is_article' => 0.9, 'link_*_role' => 'article',
         ]);
 
         $assessment = $this->assess();
@@ -147,24 +147,33 @@ class ListPageAssessorTest extends TestCase
     }
 
     #[Test]
-    public function it_reuses_memoised_groups_without_asking_jev(): void
+    public function it_never_accepts_links_without_an_individual_verdict(): void
     {
-        Http::fake();
+        config(['fetch.list_detection.max_links' => 1]);
+        FakeJev::fake(['page_kind' => 'article_list', 'has_article_list' => 0.95,
+            'cluster_c0_is_primary' => 0.9, 'link_*_is_article' => 0.9, 'link_*_role' => 'article']);
 
-        $assessment = app(ListPageAssessor::class)->reuse($this->clusters, [$this->clusters[0]->signature]);
+        $assessment = $this->assess();
 
-        $this->assertNotNull($assessment);
         $this->assertTrue($assessment->isList);
-        $this->assertSame(ListAssessment::STATUS_MEMO, $assessment->status);
-        $this->assertCount(9, $assessment->acceptedItems);
-        $this->assertNull(app(ListPageAssessor::class)->reuse($this->clusters, ['unknown-signature']));
-        Http::assertNothingSent();
+        $this->assertCount(1, $assessment->acceptedItems);
+        $this->assertCount(8, $assessment->rejectedItemIds);
+    }
+
+    #[Test]
+    public function a_sponsored_role_overrides_a_positive_article_probability(): void
+    {
+        FakeJev::fake(['page_kind' => 'article_list', 'has_article_list' => 0.95,
+            'cluster_c0_is_primary' => 0.9, 'link_*_is_article' => 0.9,
+            "link_{$this->sponsoredItem()->id}_role" => 'sponsored', 'link_*_role' => 'article']);
+
+        $this->assertCount(8, $this->assess()->acceptedItems);
     }
 
     #[Test]
     public function it_records_an_audit_trail(): void
     {
-        FakeJev::fake(['page_kind' => 'article_list', 'has_article_list' => 0.9, 'cluster_c0_is_primary' => 0.9, 'link_l*_is_article' => 0.9]);
+        FakeJev::fake(['page_kind' => 'article_list', 'has_article_list' => 0.9, 'cluster_c0_is_primary' => 0.9, 'link_l*_is_article' => 0.9, 'link_*_role' => 'article']);
 
         $audit = $this->assess()->toArray();
 
