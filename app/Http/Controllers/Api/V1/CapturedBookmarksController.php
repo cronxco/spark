@@ -49,7 +49,6 @@ class CapturedBookmarksController extends Controller
                 'url' => $bookmark->url,
                 'title' => $bookmark->title,
             ],
-            ...(isset($result['items_found']) ? ['items_found' => $result['items_found']] : []),
         ], $result['created'] ? 201 : 200);
     }
 }

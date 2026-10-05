@@ -44,13 +44,6 @@ class FetchScheduledUrls extends BaseFetchJob
                 OR metadata->>'fetch_mode' <> 'once'
                 OR COALESCE((metadata->>'fetch_count')::int, 0) = 0
             )")
-            // A one-time bookmark whose fetch was just dispatched elsewhere (e.g. a
-            // staggered list expansion) is left alone until that fetch has had time to run.
-            ->whereRaw("(
-                metadata->>'fetch_mode' IS DISTINCT FROM 'once'
-                OR metadata->>'fetch_dispatched_at' IS NULL
-                OR (metadata->>'fetch_dispatched_at')::timestamptz < ?
-            )", [now()->subMinutes((int) config('fetch.list_expansion.dispatch_guard_minutes', 30))->toIso8601String()])
             ->get();
 
         Log::info('Fetch: Found URLs to fetch', [

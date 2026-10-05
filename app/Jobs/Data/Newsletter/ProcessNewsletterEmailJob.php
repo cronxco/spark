@@ -149,8 +149,6 @@ class ProcessNewsletterEmailJob implements ShouldQueue
                 $fromName = trim($fromName, " \t\n\r\0\x0B\"'");
             }
 
-            $listUnsubscribe = $this->listUnsubscribeUrls((string) ($message->getHeaderValue('list-unsubscribe') ?: ''));
-
             // Extract content
             $textPlain = $message->getTextContent() ?: '';
             $textHtml = $message->getHtmlContent() ?: '';
@@ -172,7 +170,6 @@ class ProcessNewsletterEmailJob implements ShouldQueue
                 'message_id' => $messageId,
                 'text_plain' => $textPlain,
                 'text_html' => $textHtml,
-                'list_unsubscribe' => $listUnsubscribe,
             ];
         } catch (Exception $e) {
             Log::error('Newsletter: Email parsing failed', [
@@ -181,19 +178,6 @@ class ProcessNewsletterEmailJob implements ShouldQueue
 
             throw new Exception('Failed to parse email: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Web URLs from a List-Unsubscribe header (`<https://…>, <mailto:…>`).
-     * Link expansion must never request these.
-     *
-     * @return list<string>
-     */
-    private function listUnsubscribeUrls(string $header): array
-    {
-        preg_match_all('/<\s*(https?:\/\/[^>\s]+)\s*>/i', $header, $matches);
-
-        return array_values(array_unique($matches[1]));
     }
 
     /**
@@ -311,7 +295,6 @@ class ProcessNewsletterEmailJob implements ShouldQueue
                 'email_message_id' => $parsedEmail['message_id'],
                 's3_object_key' => $this->s3ObjectKey,
                 'raw_html' => $parsedEmail['text_html'] ?: $parsedEmail['text_plain'],
-                'list_unsubscribe' => $parsedEmail['list_unsubscribe'] ?? [],
             ],
         ];
 

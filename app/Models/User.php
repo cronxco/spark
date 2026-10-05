@@ -524,25 +524,6 @@ class User extends Authenticatable
     }
 
     /**
-     * Whether articles found on list pages and in newsletter digests are
-     * bookmarked and fetched straight away. Defaults to true; when off they
-     * are bookmarked disabled, for review in the Discovery tab.
-     */
-    public function getFetchListExpansionAutoFetchEnabled(): bool
-    {
-        $settings = $this->settings ?? [];
-
-        return $settings['fetch_list_expansion_auto_fetch'] ?? true;
-    }
-
-    public function setFetchListExpansionAutoFetchEnabled(bool $enabled): void
-    {
-        $settings = $this->settings ?? [];
-        $settings['fetch_list_expansion_auto_fetch'] = $enabled;
-        $this->update(['settings' => $settings]);
-    }
-
-    /**
      * Get excluded domains for Fetch Discovery
      * These domains will be filtered out during URL discovery
      */
