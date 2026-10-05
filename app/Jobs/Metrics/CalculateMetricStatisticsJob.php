@@ -8,6 +8,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -18,7 +19,7 @@ use Sentry\SentrySdk;
 use Sentry\Tracing\SpanStatus;
 use Sentry\Tracing\TransactionContext;
 
-class CalculateMetricStatisticsJob implements ShouldQueue
+class CalculateMetricStatisticsJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -27,6 +28,21 @@ class CalculateMetricStatisticsJob implements ShouldQueue
     public $tries = 2;
 
     public $backoff = [120, 300];
+
+    /**
+     * @param  string|null  $userId  Limit the run to one user. A user-triggered
+     *                               run must pass this; null is the all-tenant run.
+     */
+    public function __construct(public ?string $userId = null) {}
+
+    /**
+     * One pending run per user (or one all-tenant run) at a time, so repeated
+     * clicks don't stack recalculation work on the queue.
+     */
+    public function uniqueId(): string
+    {
+        return $this->userId ?? 'all';
+    }
 
     /**
      * Execute the job.
@@ -88,6 +104,10 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             ->select('integrations.user_id as user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit', $eventsTable . '.domain')
             ->whereNull($eventsTable . '.deleted_at')
             ->whereNull('integrations.deleted_at')
+            ->when($this->userId, fn ($query) => $query->where('integrations.user_id', $this->userId))
+            ->where(fn ($query) => $query
+                ->whereNull($eventsTable . '.event_metadata->internal')
+                ->orWhere($eventsTable . '.event_metadata->internal', false))
             ->whereNotNull($eventsTable . '.value')
             ->whereNotNull($eventsTable . '.value_unit')
             ->groupBy('integrations.user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit', $eventsTable . '.domain')
@@ -168,6 +188,9 @@ class CalculateMetricStatisticsJob implements ShouldQueue
             ->where('e.value_unit', $valueUnit)
             ->whereNotNull('e.value')
             ->whereNull('e.deleted_at')
+            ->where(fn ($query) => $query
+                ->whereNull('e.event_metadata->internal')
+                ->orWhere('e.event_metadata->internal', false))
             ->where('e.time', '>=', now()->subDays($windowDays))
             ->selectRaw(<<<SQL
                 COUNT(*) AS total_count,

@@ -5,13 +5,14 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactEventResource;
 use App\Http\Resources\Compact\CompactObjectResource;
+use App\Services\Api\ResourceVersion;
 use App\Services\Mobile\ObjectLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ObjectsController extends Controller
 {
-    public function __construct(protected ObjectLookup $lookup) {}
+    public function __construct(protected ObjectLookup $lookup, protected ResourceVersion $versions) {}
 
     /**
      * GET /api/v1/mobile/objects/{id}
@@ -47,7 +48,53 @@ class ObjectsController extends Controller
         if ($lastModified) {
             $response->header('Last-Modified', $lastModified->toRfc7231String());
         }
+        $response->header('ETag', $this->versions->etag($object));
 
         return $response;
+    }
+
+    /**
+     * DELETE /api/v1/mobile/objects/{id}
+     *
+     * Soft-deletes an owned object. Its events are kept. The row stays
+     * recoverable through `POST /objects/{id}/restore`.
+     */
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $object = $this->lookup->find($request->user(), $id);
+
+        if (! $object) {
+            return response()->json(['message' => 'Object not found.'], 404);
+        }
+
+        $object->delete();
+
+        return response()->json([
+            'id' => $object->id,
+            'deleted_at' => $object->deleted_at?->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/mobile/objects/{id}/restore
+     *
+     * Restores a soft-deleted owned object and returns it without recent
+     * events. An object that is not deleted is returned unchanged.
+     */
+    public function restore(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $trashed = $this->lookup->findTrashed($user, $id);
+        $trashed?->restore();
+
+        $object = $this->lookup->find($user, $id);
+
+        if (! $object) {
+            return response()->json(['message' => 'Object not found.'], 404);
+        }
+
+        return response()->json(
+            (new CompactObjectResource($object))->resolve($request),
+        )->header('ETag', $this->versions->etag($object));
     }
 }

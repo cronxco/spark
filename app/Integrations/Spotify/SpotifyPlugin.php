@@ -153,8 +153,8 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'icon' => 'fas.music',
                 'action' => 'dispatch_event',
                 'actionParams' => [
-                    'name' => 'trigger-spotify-sync',
-                    'data' => ['type' => 'recent'],
+                    'name' => 'trigger-all-integrations',
+                    'data' => ['service' => 'spotify'],
                     'close' => true,
                 ],
                 'priority' => 7,

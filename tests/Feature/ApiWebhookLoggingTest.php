@@ -14,10 +14,13 @@ use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Support\IsolatesLogs;
 use Tests\TestCase;
 
 class ApiWebhookLoggingTest extends TestCase
 {
+    use IsolatesLogs;
+
     use RefreshDatabase;
 
     private User $user;

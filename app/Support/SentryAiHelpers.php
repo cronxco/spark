@@ -29,17 +29,9 @@ if (! function_exists('start_ai_request_span')) {
             'gen_ai.system' => explode('/', $model)[0] ?? 'openai', // Extract provider from model name
         ]);
 
-        // Add message history (serialize as JSON strings per Sentry requirements)
-        $serializedMessages = array_map(function ($msg) {
-            return json_encode([
-                'role' => $msg['role'] ?? 'user',
-                'content' => $msg['content'] ?? '',
-            ]);
-        }, $messages);
-
-        $childSpan->setData([
-            'gen_ai.request.messages' => $serializedMessages,
-        ]);
+        // Prompts and request bodies may contain private user data and are not
+        // observability metadata. Record only their count.
+        $childSpan->setData(['gen_ai.request.message_count' => count($messages)]);
 
         // Add configuration parameters
         if (isset($config['temperature'])) {
@@ -64,7 +56,7 @@ if (! function_exists('finish_ai_request_span')) {
      * @param  array  $usage  Token usage data (input_tokens, output_tokens, total_tokens)
      * @param  string|null  $finishReason  The finish reason (stop, length, content_filter, etc.)
      */
-    function finish_ai_request_span(?Span $span, array $usage = [], ?string $finishReason = null): void
+    function finish_ai_request_span(?Span $span, array $usage = [], ?string $finishReason = null, bool $successful = true): void
     {
         if (! $span) {
             return;
@@ -102,6 +94,8 @@ if (! function_exists('finish_ai_request_span')) {
             $span->setData(['gen_ai.response.finish_reason' => $finishReason]);
         }
 
+        $span->setData(['gen_ai.response.success' => $successful]);
+
         $span->finish();
     }
 }
@@ -128,18 +122,7 @@ if (! function_exists('start_ai_agent_span')) {
             'gen_ai.agent.name' => $agentName,
         ]);
 
-        // Add input context (sanitized)
-        if (! empty($input)) {
-            $sanitizedInput = array_map(function ($value) {
-                if (is_string($value) && strlen($value) > 200) {
-                    return substr($value, 0, 200) . '... [truncated]';
-                }
-
-                return $value;
-            }, $input);
-
-            $childSpan->setData(['gen_ai.agent.input' => json_encode($sanitizedInput)]);
-        }
+        $childSpan->setData(['gen_ai.agent.context_keys' => array_values(array_keys($input))]);
 
         return $childSpan;
     }
@@ -152,7 +135,7 @@ if (! function_exists('finish_ai_agent_span')) {
      * @param  Span|null  $span  The span to finish
      * @param  array  $output  Output or results from the agent
      */
-    function finish_ai_agent_span(?Span $span, array $output = []): void
+    function finish_ai_agent_span(?Span $span, array $output = [], bool $successful = true): void
     {
         if (! $span) {
             return;
@@ -176,17 +159,10 @@ if (! function_exists('finish_ai_agent_span')) {
                 $outputSummary['blocks_created'] = $output['blocks_created'];
             }
 
-            // Fallback: serialize output (truncated)
-            if (empty($outputSummary)) {
-                $serialized = json_encode($output);
-                if (strlen($serialized) > 500) {
-                    $serialized = substr($serialized, 0, 500) . '... [truncated]';
-                }
-                $outputSummary['output'] = $serialized;
-            }
-
             $span->setData(['gen_ai.agent.output' => json_encode($outputSummary)]);
         }
+
+        $span->setData(['gen_ai.agent.success' => $successful]);
 
         $span->finish();
     }
@@ -214,19 +190,6 @@ if (! function_exists('start_ai_tool_span')) {
             'gen_ai.tool.name' => $toolName,
         ]);
 
-        // Add parameters (sanitized)
-        if (! empty($parameters)) {
-            $sanitizedParams = array_map(function ($value) {
-                if (is_string($value) && strlen($value) > 100) {
-                    return substr($value, 0, 100) . '... [truncated]';
-                }
-
-                return $value;
-            }, $parameters);
-
-            $childSpan->setData(['gen_ai.tool.parameters' => json_encode($sanitizedParams)]);
-        }
-
         return $childSpan;
     }
 }
@@ -238,25 +201,13 @@ if (! function_exists('finish_ai_tool_span')) {
      * @param  Span|null  $span  The span to finish
      * @param  mixed  $result  The result from the tool execution
      */
-    function finish_ai_tool_span(?Span $span, $result = null): void
+    function finish_ai_tool_span(?Span $span, bool $successful = true): void
     {
         if (! $span) {
             return;
         }
 
-        // Track tool result (sanitized)
-        if ($result !== null) {
-            $resultData = is_object($result) && method_exists($result, 'toArray')
-                ? $result->toArray()
-                : (is_array($result) ? $result : ['result' => $result]);
-
-            $serialized = json_encode($resultData);
-            if (strlen($serialized) > 200) {
-                $serialized = substr($serialized, 0, 200) . '... [truncated]';
-            }
-
-            $span->setData(['gen_ai.tool.result' => $serialized]);
-        }
+        $span->setData(['gen_ai.tool.success' => $successful]);
 
         $span->finish();
     }

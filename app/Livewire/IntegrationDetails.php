@@ -116,7 +116,11 @@ class IntegrationDetails extends Component
             return;
         }
 
-        (new DispatchIntegrationFetchJobs)->dispatch($this->integration);
+        if ((new DispatchIntegrationFetchJobs)->dispatch($this->integration) === 0) {
+            $this->error(DispatchIntegrationFetchJobs::NOTHING_TO_DISPATCH);
+
+            return;
+        }
 
         $this->success('Update triggered successfully!');
     }

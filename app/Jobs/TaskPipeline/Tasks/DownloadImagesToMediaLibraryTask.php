@@ -2,6 +2,7 @@
 
 namespace App\Jobs\TaskPipeline\Tasks;
 
+use App\Exceptions\TaskOutcomeException;
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Models\Block;
 use App\Models\Event;
@@ -12,6 +13,16 @@ use Illuminate\Support\Facades\Log;
 
 class DownloadImagesToMediaLibraryTask extends BaseTaskJob
 {
+    /**
+     * Blocks and objects that had an image URL but no stored image.
+     */
+    private int $needed = 0;
+
+    /**
+     * Of those, the ones still without an image after this run.
+     */
+    private int $missing = 0;
+
     /**
      * Execute the task to download external images to Media Library.
      *
@@ -49,6 +60,36 @@ class DownloadImagesToMediaLibraryTask extends BaseTaskJob
                 'downloaded_count' => $downloadedCount,
             ]);
         }
+
+        $counts = ['needed' => $this->needed, 'downloaded' => $downloadedCount, 'missing' => $this->missing];
+
+        if ($this->needed === 0) {
+            $this->recordOutcome('not_applicable');
+
+            return;
+        }
+
+        if ($this->missing === $this->needed) {
+            throw new TaskOutcomeException(
+                "None of the {$this->needed} images could be downloaded.",
+                'failed',
+                $counts,
+            );
+        }
+
+        $this->recordOutcome($this->missing > 0 ? 'succeeded_with_warnings' : 'succeeded', $counts);
+    }
+
+    /**
+     * Count one block or object that wanted an image, and whether it got one.
+     */
+    private function tally(int $downloaded): void
+    {
+        $this->needed++;
+
+        if ($downloaded === 0) {
+            $this->missing++;
+        }
     }
 
     /**
@@ -57,6 +98,8 @@ class DownloadImagesToMediaLibraryTask extends BaseTaskJob
     private function downloadBlockImages(Block $block, MediaDownloadHelper $mediaHelper): int
     {
         $count = 0;
+        $metadataImage = ($block->metadata ?? [])['image'] ?? ($block->metadata ?? [])['image_url'] ?? null;
+        $wantsImage = ($block->media_url || $metadataImage) && ! $block->hasMedia('downloaded_images');
 
         // Download from media_url if exists and not already in Media Library
         if ($block->media_url && ! $block->hasMedia('downloaded_images')) {
@@ -117,6 +160,10 @@ class DownloadImagesToMediaLibraryTask extends BaseTaskJob
             }
         }
 
+        if ($wantsImage) {
+            $this->tally($count);
+        }
+
         return $count;
     }
 
@@ -151,6 +198,8 @@ class DownloadImagesToMediaLibraryTask extends BaseTaskJob
                     'error' => $e->getMessage(),
                 ]);
             }
+
+            $this->tally($count);
         }
 
         return $count;

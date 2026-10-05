@@ -6,7 +6,7 @@ use App\Jobs\Data\HomeAssistant\HomeAssistantMediaEnrichmentData;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
-use App\Services\AssistantPromptingService;
+use App\Services\Ai\ChatClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -23,7 +23,7 @@ class HomeAssistantMediaEnrichmentDataTest extends TestCase
     #[Test]
     public function applies_a_single_candidate_without_calling_the_llm(): void
     {
-        $this->mock(AssistantPromptingService::class)->shouldNotReceive('generateResponse');
+        $this->mock(ChatClient::class)->shouldNotReceive('text');
 
         [$integration, $event] = $this->makeWatchEvent('Loki');
 
@@ -61,8 +61,8 @@ class HomeAssistantMediaEnrichmentDataTest extends TestCase
     #[Test]
     public function asks_the_llm_to_disambiguate_multiple_candidates_and_applies_its_choice(): void
     {
-        $this->mock(AssistantPromptingService::class)
-            ->shouldReceive('generateResponse')
+        $this->mock(ChatClient::class)
+            ->shouldReceive('text')
             ->once()
             ->andReturn('{"tmdb_id": 2}');
 
@@ -138,8 +138,8 @@ class HomeAssistantMediaEnrichmentDataTest extends TestCase
     #[Test]
     public function leaves_the_event_unchanged_when_the_llm_rejects_all_candidates(): void
     {
-        $this->mock(AssistantPromptingService::class)
-            ->shouldReceive('generateResponse')
+        $this->mock(ChatClient::class)
+            ->shouldReceive('text')
             ->once()
             ->andReturn('{"tmdb_id": null}');
 
@@ -164,8 +164,8 @@ class HomeAssistantMediaEnrichmentDataTest extends TestCase
     #[Test]
     public function leaves_the_event_unchanged_when_the_llm_call_throws(): void
     {
-        $this->mock(AssistantPromptingService::class)
-            ->shouldReceive('generateResponse')
+        $this->mock(ChatClient::class)
+            ->shouldReceive('text')
             ->once()
             ->andThrow(new RuntimeException('rate limited'));
 
@@ -189,7 +189,7 @@ class HomeAssistantMediaEnrichmentDataTest extends TestCase
     #[Test]
     public function does_nothing_when_the_related_event_no_longer_exists(): void
     {
-        $this->mock(AssistantPromptingService::class)->shouldNotReceive('generateResponse');
+        $this->mock(ChatClient::class)->shouldNotReceive('text');
 
         $integration = Integration::factory()->create(['service' => 'home_assistant']);
 

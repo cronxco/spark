@@ -2,8 +2,9 @@
 
 use Livewire\Volt\Component;
 use Livewire\Attributes\On;
+use App\Support\OwnedTagQuery;
 use Spatie\Tags\Tag;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Symfony\Component\Emoji\EmojiTransliterator;
 
@@ -62,33 +63,29 @@ new class extends Component {
 
     private function loadTags(): void
     {
-        // Get the table prefix for use in raw SQL
-        $prefix = DB::getTablePrefix();
-        $tagsTable = $prefix . 'tags';
-        $taggablesTable = $prefix . 'taggables';
+        $user = Auth::user();
 
-        $query = DB::table('tags')
-            ->select([
-                'tags.id',
-                DB::raw("{$tagsTable}.name->>'en' as name"),
-                DB::raw("{$tagsTable}.slug->>'en' as slug"),
-                'tags.type',
-                DB::raw("COUNT(DISTINCT CASE WHEN {$taggablesTable}.taggable_type = 'App\\Models\\Event' THEN {$taggablesTable}.taggable_id END) as events_count"),
-                DB::raw("COUNT(DISTINCT CASE WHEN {$taggablesTable}.taggable_type = 'App\\Models\\EventObject' THEN {$taggablesTable}.taggable_id END) as objects_count"),
-                DB::raw("COUNT(DISTINCT {$taggablesTable}.taggable_id) as total_count")
-            ])
-            ->leftJoin('taggables', 'tags.id', '=', 'taggables.tag_id')
-            ->groupBy('tags.id', DB::raw("{$tagsTable}.name->>'en'"), DB::raw("{$tagsTable}.slug->>'en'"), 'tags.type');
+        if (! $user) {
+            $this->tagsByType = [];
 
-        if ($this->searchQuery !== '') {
-            $searchTerm = '%' . $this->searchQuery . '%';
-            $query->where(function ($q) use ($searchTerm, $tagsTable) {
-                $q->whereRaw("LOWER({$tagsTable}.name->>'en') LIKE ?", [strtolower($searchTerm)])
-                    ->orWhereRaw("LOWER({$tagsTable}.type) LIKE ?", [strtolower($searchTerm)]);
-            });
+            return;
         }
 
-        $tags = $query->get();
+        // The previous implementation joined tags to taggables with no user
+        // predicate, so it listed every tag in the installation and aggregated
+        // usage counts across all tenants. OwnedTagQuery derives ownership from
+        // the user's own events and objects.
+        $tags = OwnedTagQuery::for($user, $this->searchQuery)
+            ->get()
+            ->map(fn (Tag $tag) => (object) [
+                'id' => $tag->id,
+                'name' => $tag->name,
+                'slug' => $tag->slug,
+                'type' => $tag->type,
+                'events_count' => (int) ($tag->events_count ?? 0),
+                'objects_count' => (int) ($tag->objects_count ?? 0),
+                'total_count' => (int) ($tag->events_count ?? 0) + (int) ($tag->objects_count ?? 0),
+            ]);
 
         // Process tags to generate slugs for emojis using Symfony Emoji
         $emojiTransliterator = EmojiTransliterator::create('en');

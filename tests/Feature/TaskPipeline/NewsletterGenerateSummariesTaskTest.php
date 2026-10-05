@@ -44,6 +44,27 @@ class NewsletterGenerateSummariesTaskTest extends TestCase
     }
 
     #[Test]
+    public function it_summarises_the_issue_it_belongs_to_rather_than_the_latest_one(): void
+    {
+        $fake = OpenAI::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
+        [$event] = $this->newsletterEvent(content: 'A later issue of the same publication');
+        $event->createBlock([
+            'title' => 'Issue Content',
+            'block_type' => 'newsletter_content',
+            'time' => $event->time,
+            'metadata' => ['content' => 'This issue only'],
+        ]);
+
+        (new NewsletterGenerateSummariesTask($event, $this->task()))->handle();
+
+        $fake->assertSent(Chat::class, function (string $method, array $parameters): bool {
+            $prompt = json_encode($parameters['messages']);
+
+            return str_contains($prompt, 'This issue only') && ! str_contains($prompt, 'A later issue');
+        });
+    }
+
+    #[Test]
     public function should_run_guard_skips_when_tldr_already_exists(): void
     {
         [$event] = $this->newsletterEvent(content: 'Clean article text');

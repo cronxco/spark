@@ -3,8 +3,7 @@
 namespace App\Spotlight\Queries\Scoped;
 
 use App\Integrations\PluginRegistry;
-use App\Models\Event;
-use App\Models\MetricStatistic;
+use App\Spotlight\Support\OwnedRecords;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -21,13 +20,13 @@ class MetricEventsQuery
                 return collect();
             }
 
-            $metric = MetricStatistic::find($metricId);
+            $metric = OwnedRecords::metrics()->find($metricId);
             if (! $metric) {
                 return collect();
             }
 
             // Find events matching this metric's service and action
-            $events = Event::with(['integration', 'actor', 'target'])
+            $events = OwnedRecords::events()->with(['integration', 'actor', 'target'])
                 ->where('service', $metric->service)
                 ->where('action', $metric->action)
                 ->when(! blank($query), function ($q) use ($query) {

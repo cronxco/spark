@@ -32,6 +32,17 @@ class EventObject extends Model implements HasMedia
      */
     protected static $recordEvents = ['updated'];
 
+    /**
+     * A 1536-dim pgvector column; keep it out of JSON/array serialisation.
+     */
+    /**
+     * Fields that come from the integration that produced the object. A lock
+     * freezes them against every writer, including integration refreshes.
+     *
+     * @var array<int, string>
+     */
+    public const SOURCE_FIELDS = ['title', 'concept', 'type', 'content', 'url'];
+
     public $incrementing = false;
 
     protected $table = 'objects';
@@ -54,9 +65,6 @@ class EventObject extends Model implements HasMedia
         'location_source',
     ];
 
-    /**
-     * A 1536-dim pgvector column; keep it out of JSON/array serialisation.
-     */
     protected $hidden = [
         'embeddings',
     ];
@@ -89,25 +97,24 @@ class EventObject extends Model implements HasMedia
         });
 
         static::updating(function ($model) {
-            // Prevent title and content updates on locked objects
             if ($model->isLocked()) {
-                $original = $model->getOriginal();
-
-                // Check if title or content are being changed
-                if ($model->isDirty('title') && $model->title !== $original['title']) {
-                    // Revert title to original value
-                    $model->title = $original['title'];
-                }
-
-                if ($model->isDirty('content') && $model->content !== $original['content']) {
-                    // Revert content to original value
-                    $model->content = $original['content'];
+                foreach (self::SOURCE_FIELDS as $field) {
+                    if ($model->isDirty($field)) {
+                        $model->{$field} = $model->getOriginal($field);
+                    }
                 }
             }
         });
 
         static::deleting(function ($model): void {
-            // Handle media deletion with deduplication logic
+            /*
+             * A soft delete is recoverable (the apps offer Undo), so the
+             * object's media stays until the object is force deleted.
+             */
+            if (! $model->isForceDeleting()) {
+                return;
+            }
+
             $deduplicationService = app(MediaDeduplicationService::class);
 
             foreach ($model->media as $media) {
@@ -132,6 +139,14 @@ class EventObject extends Model implements HasMedia
 
     public function getActivitylogOptions(): LogOptions
     {
+        if ($this->concept === 'document' && $this->type === 'flint_note') {
+            return LogOptions::defaults()
+                ->useLogName('changelog')
+                ->logOnly(['concept', 'type'])
+                ->logOnlyDirty()
+                ->dontSubmitEmptyLogs();
+        }
+
         return LogOptions::defaults()
             ->useLogName('changelog')
             ->logFillable()
@@ -210,6 +225,12 @@ class EventObject extends Model implements HasMedia
     public function targetEvents()
     {
         return $this->hasMany(Event::class, 'target_id')->withTrashed();
+    }
+
+    /** Most recent non-deleted event that enriched or referenced this object. */
+    public function latestTargetEvent()
+    {
+        return $this->hasOne(Event::class, 'target_id')->latestOfMany('time');
     }
 
     public function events()
@@ -466,7 +487,7 @@ class EventObject extends Model implements HasMedia
     }
 
     /**
-     * Check if this object is locked (prevents title/content updates)
+     * Check if this object is locked (freezes its source fields)
      */
     public function isLocked(): bool
     {
@@ -474,7 +495,7 @@ class EventObject extends Model implements HasMedia
     }
 
     /**
-     * Lock this object to prevent title and content updates
+     * Lock this object so nothing, including a source refresh, changes its source fields
      */
     public function lock(): void
     {
@@ -491,7 +512,7 @@ class EventObject extends Model implements HasMedia
     }
 
     /**
-     * Unlock this object to allow title and content updates
+     * Unlock this object so its source fields follow the source again
      */
     public function unlock(): void
     {

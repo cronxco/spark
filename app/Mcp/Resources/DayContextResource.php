@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Resources;
 
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Models\Integration;
 use App\Services\AssistantContextService;
 use Carbon\Carbon;
@@ -14,6 +15,8 @@ use Laravel\Mcp\Support\UriTemplate;
 
 class DayContextResource extends Resource implements HasUriTemplate
 {
+    use RequiresSparkAbility;
+
     /**
      * The resource's description.
      */
@@ -44,6 +47,10 @@ class DayContextResource extends Resource implements HasUriTemplate
      */
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'insights:read')) {
+            return $error;
+        }
+
         $user = $request->user();
 
         if (! $user) {

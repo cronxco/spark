@@ -7,6 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -53,7 +54,7 @@ class EventsControllerTest extends TestCase
     public function returns_compact_event_shape(): void
     {
         $event = $this->createEvent();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/events/{$event->id}")
             ->assertOk()
@@ -67,7 +68,7 @@ class EventsControllerTest extends TestCase
     #[Test]
     public function returns_404_for_nonexistent_event(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/events/00000000-0000-0000-0000-000000000000')
             ->assertStatus(404);
@@ -76,7 +77,7 @@ class EventsControllerTest extends TestCase
     #[Test]
     public function returns_404_for_malformed_id(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/events/not-a-uuid')->assertStatus(404);
     }
@@ -86,7 +87,7 @@ class EventsControllerTest extends TestCase
     {
         $event = $this->createEvent();
         $otherUser = User::factory()->create();
-        Sanctum::actingAs($otherUser, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($otherUser, SparkAbility::MOBILE_SESSION);
 
         $this->getJson("/api/v1/mobile/events/{$event->id}")->assertStatus(404);
     }
@@ -95,7 +96,7 @@ class EventsControllerTest extends TestCase
     public function etag_returns_304_on_match(): void
     {
         $event = $this->createEvent();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $first = $this->getJson("/api/v1/mobile/events/{$event->id}")->assertOk();
         $etag = $first->headers->get('ETag');
@@ -108,9 +109,9 @@ class EventsControllerTest extends TestCase
     public function update_note_sets_a_note_and_returns_it(): void
     {
         $event = $this->createEvent();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Remember this one'])
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Remember this one'], $this->ifMatch($event))
             ->assertOk()
             ->assertJsonPath('id', $event->id)
             ->assertJsonPath('note', 'Remember this one');
@@ -132,10 +133,10 @@ class EventsControllerTest extends TestCase
     public function update_note_is_idempotent_and_updates_existing_note(): void
     {
         $event = $this->createEvent();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'First'])->assertOk();
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Second'])
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'First'], $this->ifMatch($event))->assertOk();
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Second'], $this->ifMatch($event))
             ->assertOk()
             ->assertJsonPath('note', 'Second');
 
@@ -146,10 +147,10 @@ class EventsControllerTest extends TestCase
     public function update_note_with_null_clears_the_note(): void
     {
         $event = $this->createEvent();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Temp'])->assertOk();
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => null])
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'Temp'], $this->ifMatch($event))->assertOk();
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => null], $this->ifMatch($event))
             ->assertOk()
             ->assertJsonMissingPath('note');
 
@@ -161,7 +162,7 @@ class EventsControllerTest extends TestCase
     public function update_note_requires_write_ability(): void
     {
         $event = $this->createEvent();
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'nope'])
             ->assertStatus(403);
@@ -172,7 +173,7 @@ class EventsControllerTest extends TestCase
     {
         $event = $this->createEvent();
         $otherUser = User::factory()->create();
-        Sanctum::actingAs($otherUser, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($otherUser, SparkAbility::MOBILE_SESSION);
 
         $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => 'hi'])
             ->assertStatus(404);
@@ -182,9 +183,9 @@ class EventsControllerTest extends TestCase
     public function update_note_rejects_overlong_note(): void
     {
         $event = $this->createEvent();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
-        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => str_repeat('a', 10001)])
+        $this->patchJson("/api/v1/mobile/events/{$event->id}/note", ['note' => str_repeat('a', 10001)], $this->ifMatch($event))
             ->assertStatus(422);
     }
 
@@ -205,5 +206,11 @@ class EventsControllerTest extends TestCase
             'actor_id' => $actor->id,
             'target_id' => $target->id,
         ]);
+    }
+
+    /** @return array{If-Match: string} */
+    protected function ifMatch(Event $event): array
+    {
+        return ['If-Match' => $this->getJson("/api/v1/mobile/events/{$event->id}")->headers->get('ETag')];
     }
 }

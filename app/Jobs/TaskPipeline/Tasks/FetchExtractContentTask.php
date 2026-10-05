@@ -3,11 +3,12 @@
 namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
-use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Event;
+use App\Models\EventObject;
+use App\Services\Ai\Knowledge\ContentExtractor;
 use Exception;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use OpenAI\Laravel\Facades\OpenAI;
 
 class FetchExtractContentTask extends BaseTaskJob
 {
@@ -32,13 +33,18 @@ class FetchExtractContentTask extends BaseTaskJob
         try {
             $articleText = $this->extractArticleText($extracted['title'], $extracted['text_content']);
 
-            $webpage->update(['content' => $articleText]);
+            $contentBlock = $event->blocks->firstWhere('block_type', 'fetch_content');
+            $contentBlock->update([
+                'metadata' => array_merge($contentBlock->metadata ?? [], [
+                    'article_text' => $articleText,
+                    'article_text_hash' => $event->event_metadata['content_hash'] ?? null,
+                    'extracted_at' => now()->toIso8601String(),
+                ]),
+            ]);
 
-            ProcessTaskPipelineJob::dispatch(
-                model: $event->fresh(['target', 'integration', 'blocks']),
-                trigger: 'manual',
-                taskFilter: ['fetch_generate_summaries'],
-            );
+            $this->withLatestRevision($event, function (EventObject $webpage) use ($articleText): void {
+                $webpage->update(['content' => $articleText]);
+            });
 
             Log::info('Fetch: Article text extracted via TaskPipeline', [
                 'event_id' => $event->id,
@@ -46,10 +52,12 @@ class FetchExtractContentTask extends BaseTaskJob
                 'word_count' => str_word_count($articleText),
             ]);
         } catch (Exception $e) {
-            $metadata = $webpage->metadata ?? [];
-            $metadata['last_extraction_error'] = $e->getMessage();
-            $metadata['last_extraction_error_at'] = now()->toIso8601String();
-            $webpage->update(['metadata' => $metadata]);
+            $this->withLatestRevision($event, function (EventObject $webpage) use ($e): void {
+                $metadata = $webpage->metadata ?? [];
+                $metadata['last_extraction_error'] = $e->getMessage();
+                $metadata['last_extraction_error_at'] = now()->toIso8601String();
+                $webpage->update(['metadata' => $metadata]);
+            });
 
             throw $e;
         }
@@ -66,7 +74,7 @@ class FetchExtractContentTask extends BaseTaskJob
         $webpageMetadata = $webpage?->metadata ?? [];
 
         return [
-            'title' => $webpage?->title ?: ($event->event_metadata['title'] ?? 'Untitled'),
+            'title' => $event->target_metadata['title'] ?? $webpage?->title ?? $event->event_metadata['title'] ?? 'Untitled',
             'content' => (string) ($blockMetadata['html'] ?? $webpage?->content ?? ''),
             'text_content' => (string) ($blockMetadata['text'] ?? ''),
             'excerpt' => (string) ($blockMetadata['excerpt'] ?? $webpage?->content ?? ''),
@@ -78,68 +86,27 @@ class FetchExtractContentTask extends BaseTaskJob
 
     private function extractArticleText(string $title, string $content): string
     {
-        $contentLength = strlen($content);
-        $maxContentLength = 150000;
-        $wasTruncated = $contentLength > $maxContentLength;
-        $contentToSend = mb_substr($content, 0, $maxContentLength);
+        return app(ContentExtractor::class)->extract(
+            'knowledge/extract-article',
+            'title',
+            $title,
+            $content,
+            ['event_id' => $this->model->id],
+        );
+    }
 
-        if ($wasTruncated) {
-            Log::warning('Fetch: Content truncated for AI processing', [
-                'event_id' => $this->model->id,
-                'original_length' => $contentLength,
-                'truncated_to' => strlen($contentToSend),
-            ]);
-        }
+    private function withLatestRevision(Event $event, callable $callback): bool
+    {
+        return DB::transaction(function () use ($callback, $event): bool {
+            $webpage = EventObject::query()->lockForUpdate()->find($event->target_id);
 
-        $systemPrompt = <<<'PROMPT'
-You are an intelligent content extractor. Given an article title and raw content, extract and return the clean article text formatted in Markdown.
+            if (! $webpage || ($webpage->metadata['latest_event_id'] ?? null) !== $event->id) {
+                return false;
+            }
 
-**IMPORTANT**: Your output MUST be formatted in Markdown with appropriate formatting (headings, bold, italic, links, lists, quotes, code blocks, etc.) to enhance readability.
+            $callback($webpage);
 
-Requirements:
-1. Remove navigation, ads, footers, cookie notices, and other non-article content
-2. Preserve the complete article text including all paragraphs
-3. Format the content using proper Markdown syntax:
-   - Use # ## ### for headings
-   - Use **bold** and *italic* for emphasis
-   - Use > for blockquotes
-   - Use - or * for unordered lists, 1. 2. 3. for ordered lists
-   - Use [text](url) for links
-   - Use `code` for inline code, ``` for code blocks
-4. Keep all important content intact
-5. Return only the clean article text as Markdown (not JSON)
-
-The output should be the full, clean article text in Markdown format that a reader would want to read.
-PROMPT;
-
-        $model = 'gpt-5-nano';
-        $messages = [
-            ['role' => 'system', 'content' => $systemPrompt],
-            [
-                'role' => 'user',
-                'content' => json_encode([
-                    'title' => $title,
-                    'content' => $contentToSend,
-                ]),
-            ],
-        ];
-        $aiSpan = start_ai_request_span($model, $messages, []);
-
-        $result = OpenAI::chat()->create([
-            'model' => $model,
-            'messages' => $messages,
-        ]);
-
-        $usage = $result->usage ? $result->usage->toArray() : [];
-        $finishReason = $result->choices[0]->finishReason ?? null;
-        finish_ai_request_span($aiSpan, $usage, $finishReason);
-
-        $articleText = trim($result->choices[0]->message->content);
-
-        if (empty($articleText)) {
-            throw new Exception('Empty article text returned from AI');
-        }
-
-        return $articleText;
+            return true;
+        });
     }
 }

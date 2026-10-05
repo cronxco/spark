@@ -127,7 +127,7 @@ Available variables: `$value` (after value_multiplier), `$unit`
 - [Integration Plugins](docs/Architecture/INTEGRATION_PLUGINS.md) - Plugin system and implementation
 - [Jobs](docs/Architecture/JOBS.md) - Fetch and processing job architecture
 - [Scheduled Updates](docs/Architecture/SCHEDULED_INTEGRATION_UPDATES.md) - Automatic update system
-- [REST API](docs/Architecture/API.md) - External programmatic access
+- [REST API, Mobile API, and MCP](docs/API/README.md) - External programmatic access
 
 ### Advanced Features
 
@@ -297,7 +297,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - laravel/mcp (MCP) - v0
 - laravel/pint (PINT) - v1
 - laravel/sail (SAIL) - v1
-- phpunit/phpunit (PHPUNIT) - v11
+- phpunit/phpunit (PHPUNIT) - v13
 - prettier (PRETTIER) - v3
 - tailwindcss (TAILWINDCSS) - v4
 
@@ -681,6 +681,20 @@ $edit = fn(Product $product) => $this->editing = $product->id;$delete = fn(Produ
 
 - This application uses PHPUnit for testing. All tests must be written as PHPUnit classes. Use `vendor/bin/sail artisan make:test --phpunit {name}` to create a new test.
 - If you see a test using "Pest", convert it to PHPUnit.
+
+### Marking Test Methods (Critically Important)
+
+- PHPUnit 13 **removed support for the `/** @test *\/` docblock annotation**. Mark every test method with the `#[Test]` attribute instead:
+
+```php
+use PHPUnit\Framework\Attributes\Test;
+
+#[Test]
+public function it_does_the_thing(): void { ... }
+```
+
+- A method marked only with `@test` and not prefixed `test` is **silently not discovered** — it does not fail, it simply never runs, and `artisan test` reports "No tests found" for that file. Treat "No tests found" as a bug in the test file, never as a passing result.
+- Every test in the repo now uses `#[Test]` (the old `@test` files were converted in October 2026). CI fails on a zero-test run and on any non-zero PHPUnit exit, so a crash or bootstrap error no longer reads as green.
 - Every time a test has been updated, run that singular test.
 - When the tests relating to your feature are passing, ask the user if they would like to also run the entire test suite to make sure everything is still passing.
 - Tests should test all of the happy paths, failure paths, and weird paths.

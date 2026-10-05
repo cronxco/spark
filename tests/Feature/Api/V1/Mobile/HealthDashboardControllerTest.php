@@ -9,10 +9,12 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class HealthDashboardControllerTest extends TestCase
@@ -48,17 +50,17 @@ class HealthDashboardControllerTest extends TestCase
     {
         $this->getJson('/api/v1/mobile/health/dashboard')->assertStatus(401);
 
-        Sanctum::actingAs($this->user, ['ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_WRITE);
         $this->getJson('/api/v1/mobile/health/dashboard')->assertStatus(403);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
         $this->getJson('/api/v1/mobile/health/dashboard')->assertOk();
     }
 
     #[Test]
     public function validates_date_and_range_like_briefing(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date[]=2026-05-18')->assertStatus(422);
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-5-18')->assertStatus(422);
@@ -67,9 +69,34 @@ class HealthDashboardControllerTest extends TestCase
     }
 
     #[Test]
+    public function day_is_resolved_and_bounded_in_the_users_timezone(): void
+    {
+        // 19:30 UTC on 18 May is already 04:30 on 19 May in Tokyo.
+        $this->user->update(['settings' => ['timezone' => 'Asia/Tokyo']]);
+        $tokyoMorning = $this->event('apple_health', 'did_workout', 100, 'kcal', '2026-05-18 22:00:00', [
+            'duration_seconds' => 900,
+        ], targetTitle: 'Run');
+        $this->event('apple_health', 'did_workout', 90, 'kcal', '2026-05-18 14:30:00', [
+            'duration_seconds' => 600,
+        ], targetTitle: 'Walk');
+
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
+
+        $this->getJson('/api/v1/mobile/health/dashboard')
+            ->assertOk()
+            ->assertJsonPath('date', '2026-05-19');
+
+        // 22:00 UTC on 18 May is 07:00 on 19 May in Tokyo; 14:30 UTC is 23:30 on 18 May.
+        $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-19')
+            ->assertOk()
+            ->assertJsonCount(1, 'fitness.workouts')
+            ->assertJsonPath('fitness.workouts.0.event_id', $tokyoMorning->id);
+    }
+
+    #[Test]
     public function empty_data_returns_stable_shape(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -101,7 +128,7 @@ class HealthDashboardControllerTest extends TestCase
         ]);
         $this->event('oura', 'had_sleep_score', 78, 'percent', '2026-05-18 07:00:00');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -129,7 +156,7 @@ class HealthDashboardControllerTest extends TestCase
         $this->block($workout, 'energy', 135.695, 'kcal');
         $this->block($workout, 'intensity', 9.498, 'kcal/hr·kg');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -158,7 +185,7 @@ class HealthDashboardControllerTest extends TestCase
             'value_unit' => 'kg',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -181,7 +208,7 @@ class HealthDashboardControllerTest extends TestCase
             'end_datetime' => '2026-05-18T10:22:40+00:00',
         ], targetTitle: 'Run');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
@@ -196,7 +223,7 @@ class HealthDashboardControllerTest extends TestCase
         $this->stat('apple_health', 'had_step_count', 'steps', mean: 8000, lower: 6000, upper: 10000);
         $this->event('apple_health', 'had_step_count', 7411, 'steps', '2026-05-18 18:00:00');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18&range=7d')
             ->assertOk()
@@ -220,13 +247,39 @@ class HealthDashboardControllerTest extends TestCase
             ]);
         }
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
             ->assertOk()
             ->assertJsonCount(3, 'insights')
             ->assertJsonPath('insights.0.title', 'Insight 1')
             ->assertJsonPath('insights.0.content', 'Health insight 1');
+    }
+
+    #[Test]
+    public function insights_are_returned_chronologically_regardless_of_insert_order(): void
+    {
+        $flint = $this->event('flint', 'had_summary', null, null, '2026-05-18 12:00:00');
+
+        // Inserted newest first, so row order and chronological order differ.
+        foreach ([4, 3, 2, 1] as $i) {
+            Block::factory()->create([
+                'event_id' => $flint->id,
+                'block_type' => 'flint_health_insight',
+                'title' => "Insight {$i}",
+                'metadata' => ['content' => "Health insight {$i}"],
+                'time' => Carbon::parse("2026-05-18 12:0{$i}:00"),
+            ]);
+        }
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
+            ->assertOk()
+            ->assertJsonCount(3, 'insights')
+            ->assertJsonPath('insights.0.title', 'Insight 1')
+            ->assertJsonPath('insights.1.title', 'Insight 2')
+            ->assertJsonPath('insights.2.title', 'Insight 3');
     }
 
     private function integration(string $service): Integration

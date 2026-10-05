@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -43,9 +44,7 @@ class GitHubActivityPullTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation()
     {
         $job = new GitHubActivityPull($this->integration);
@@ -56,9 +55,7 @@ class GitHubActivityPullTest extends TestCase
         $this->assertEquals([60, 300, 600], $job->backoff);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unique_id_generation()
     {
         $job = new GitHubActivityPull($this->integration);
@@ -68,9 +65,7 @@ class GitHubActivityPullTest extends TestCase
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_integration_correctly()
     {
         $job = new GitHubActivityPull($this->integration);
@@ -82,9 +77,7 @@ class GitHubActivityPullTest extends TestCase
         $this->assertEquals('activity', $this->integration->instance_type);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function configuration_inheritance()
     {
         $this->assertEquals(['owner/repo1', 'owner/repo2'], $this->integration->configuration['repositories']);
@@ -95,9 +88,7 @@ class GitHubActivityPullTest extends TestCase
         $this->assertInstanceOf(GitHubActivityPull::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function normalize_repositories()
     {
         $plugin = new GitHubPlugin;
@@ -115,9 +106,7 @@ class GitHubActivityPullTest extends TestCase
         $this->assertEquals([], $result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function normalize_events()
     {
         $plugin = new GitHubPlugin;
@@ -139,9 +128,7 @@ class GitHubActivityPullTest extends TestCase
         $this->assertEquals(['push', 'pull_request'], $result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_with_different_configurations()
     {
         // Test with JSON string repositories

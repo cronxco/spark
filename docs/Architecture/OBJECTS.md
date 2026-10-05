@@ -86,6 +86,7 @@ EventObjects are soft-deletable and support tags, media, activity logging, and v
 - **Warning — unsupported relationship:** `integration()` is a legacy model method with no `integration_id` column backing it. EventObjects are user-scoped and this is not a supported Integration relationship or contract.
 - `actorEvents()` - HasMany Event (where this is `actor_id`)
 - `targetEvents()` - HasMany Event (where this is `target_id`)
+- `latestTargetEvent()` - Most recent non-deleted target Event by event time
 - `events()` - Union of actorEvents and targetEvents
 - `relationshipsFrom()` - MorphMany Relationship
 - `relationshipsTo()` - MorphMany Relationship
@@ -187,62 +188,28 @@ See [MEDIA.md](MEDIA.md) for detailed media documentation.
 
 ## Locking System
 
-EventObjects can be locked to prevent accidental updates to `title` and `content` fields.
+EventObjects can be locked to freeze their **source fields**: `title`, `concept`, `type`, `content` and `url` (`EventObject::SOURCE_FIELDS`). Notes, tags, location and metadata are not covered by the lock.
 
 **`isLocked(): bool`**
 
 Checks if the object is locked via `metadata['locked']`.
 
-```php
-if ($object->isLocked()) {
-    // Object is locked
-}
-```
+**`lock(): void`** / **`unlock(): void`**
 
-**`lock(): void`**
-
-Sets `metadata['locked']` to true.
-
-```php
-$object->lock();
-```
-
-**`unlock(): void`**
-
-Sets `metadata['locked']` to false.
-
-```php
-$object->unlock();
-```
+Set `metadata['locked']` to true or false.
 
 **Automatic protection:**
 
-The `updating` lifecycle hook automatically reverts changes to `title` and `content` if the object is locked:
+The `updating` lifecycle hook reverts any change to a source field while the object is locked, whoever makes it. A source refresh (a processing job's `update`/`updateOrCreate`) therefore never overwrites a locked field.
 
-```php
-protected static function booted()
-{
-    static::updating(function ($model) {
-        if ($model->isLocked()) {
-            $original = $model->getOriginal();
+### No overrides of source fields
 
-            // Revert title and content to original values
-            if ($model->isDirty('title')) {
-                $model->title = $original['title'];
-            }
-            if ($model->isDirty('content')) {
-                $model->content = $original['content'];
-            }
-        }
-    });
-}
-```
+Source fields belong to the integration that produced an item, and users cannot override them (no per-user overrides or aliases; at most a note). `App\Services\SourceFieldGuard` is the single check used by the web editors (`EditObject`, `EditBlock`), the v1 and mobile `PATCH` endpoints and the MCP `update-entity` tool:
 
-**Use cases:**
-
-- Prevent automated jobs from overwriting user-edited titles
-- Protect important objects from accidental updates
-- Lock objects that have been manually curated
+- An object is integration-sourced when any event from a non user-authored service names it as actor or target. Services whose items the user authors in Spark (`SourceFieldGuard::USER_AUTHORED_SERVICES`, e.g. `flint`, `task`, `manual_account`) stay editable.
+- A block's source fields are `title`, `block_type` and `url` (`Block::SOURCE_FIELDS`); every block of an integration event is sourced except the user's `note` block.
+- A rejected edit returns a 422 validation error per field with a plain message. Resubmitting the current value is not an edit.
+- A locked object rejects source-field edits whatever its origin.
 
 ## Location Support
 
