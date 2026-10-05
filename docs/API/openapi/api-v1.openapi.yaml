@@ -570,8 +570,14 @@ paths:
                 title: { type: [string, "null"], maxLength: 1000 }
                 html: { type: string, maxLength: 5242880 }
       responses:
-        "201": { description: Captured as a new bookmark }
-        "200": { description: Existing bookmark recaptured }
+        "201":
+          {
+            description: "Captured as a new bookmark (state captured), or as a new list page whose articles are being bookmarked (state list_expanded, with items_found)",
+          }
+        "200":
+          {
+            description: "Existing bookmark recaptured (state recaptured or list_expanded)",
+          }
         "403": { description: Token lacks bookmark:write }
         "422": { $ref: "#/components/responses/ValidationError" }
 
