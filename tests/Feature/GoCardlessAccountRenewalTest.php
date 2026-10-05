@@ -334,7 +334,7 @@ class GoCardlessAccountRenewalTest extends TestCase
         $canonical->update(['created_at' => now()->subDay()]);
         $duplicate = $this->account('Duplicate');
         $event = Event::create(['integration_id' => $this->integration->id, 'source_id' => 'old-alias-balance',
-            'actor_id' => $duplicate->id, 'service' => 'gocardless', 'domain' => 'money',
+            'actor_id' => $duplicate->id, 'target_id' => $canonical->id, 'service' => 'gocardless', 'domain' => 'money',
             'action' => 'had_balance', 'time' => now(), 'value' => 5000,
             'value_multiplier' => 100, 'value_unit' => 'GBP']);
         $this->stage();
