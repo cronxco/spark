@@ -88,7 +88,7 @@ class NewsletterLinkAssessor
 
         foreach ($links as $link) {
             $isArticle = $answers->noul("link_{$link->id}_is_article") >= $thresholds['newsletter_link_is_article']
-                && $answers->choice("link_{$link->id}_role") !== 'sponsor_ad';
+                && $answers->choice("link_{$link->id}_role") === 'article_or_story';
 
             if ($isArticle) {
                 $accepted[] = $link;

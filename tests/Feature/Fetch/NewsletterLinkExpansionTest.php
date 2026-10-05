@@ -23,6 +23,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Sleep;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Fixtures\FakeJev;
 use Tests\Fixtures\FetchPages;
@@ -65,6 +66,13 @@ class NewsletterLinkExpansionTest extends TestCase
         ]);
     }
 
+    public static function nonArticleRoles(): array
+    {
+        return array_map(fn (string $role): array => [$role], [
+            'newsletter_housekeeping', 'product', 'job_or_event', 'social_or_share', 'other',
+        ]);
+    }
+
     #[Test]
     public function the_assessor_accepts_story_links_and_rejects_the_sponsor(): void
     {
@@ -81,6 +89,19 @@ class NewsletterLinkExpansionTest extends TestCase
                 && count($request['state']['links']) === 7
                 && ! str_contains(json_encode($request['state']), 'nsubscribe');
         });
+    }
+
+    #[Test]
+    #[DataProvider('nonArticleRoles')]
+    public function a_non_article_role_overrides_positive_newsletter_article_probability(string $role): void
+    {
+        FakeJev::fake(['newsletter_kind' => 'link_digest', 'link_l1_role' => $role,
+            'link_l7_role' => 'sponsor_ad', 'link_*_role' => 'article_or_story', 'link_*_is_article' => 0.9]);
+
+        $assessment = app(NewsletterLinkAssessor::class)->assess(FetchPages::digestNewsletter(), 'Digest', 'News');
+
+        $this->assertCount(5, $assessment->acceptedItems);
+        $this->assertContains('l1', $assessment->rejectedItemIds);
     }
 
     #[Test]
