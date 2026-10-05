@@ -7,9 +7,9 @@ use Sentry\Breadcrumb;
 use Sentry\Event;
 use Sentry\Options;
 use Sentry\Serializer\PayloadSerializer;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class RedactSensitiveUrlsTest extends TestCase
+class RedactSensitiveUrlsTest extends FrameworkTestCase
 {
     private const URL = 'https://mcp.example.test:8443/tok_abc123secret/sse';
 

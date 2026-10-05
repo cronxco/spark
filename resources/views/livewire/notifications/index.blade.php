@@ -61,11 +61,13 @@ new class extends Component
 
         $this->previousCursors[] = $this->cursor;
         $this->cursor = $this->feed['next_cursor'];
+        unset($this->feed);
     }
 
     public function previousPage(): void
     {
         $this->cursor = array_pop($this->previousCursors);
+        unset($this->feed);
     }
 
     public function markAsRead(string $notificationId): void
@@ -97,6 +99,7 @@ new class extends Component
     {
         $this->cursor = null;
         $this->previousCursors = [];
+        unset($this->feed);
     }
 }; ?>
 

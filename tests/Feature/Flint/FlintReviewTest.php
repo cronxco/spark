@@ -46,6 +46,11 @@ class FlintReviewTest extends TestCase
         $item = collect(app(FlintReviewService::class)->items($this->user))->firstWhere('kind', 'receipt_suggestion');
         $this->assertSame((string) $receipt->id, $item['id']);
         $this->assertSame((string) $transaction->id, $item['candidates'][0]['id']);
+        $this->assertSame('Coffee House receipt', $item['subject']['title']);
+        $this->assertSame(4.5, $item['subject']['amount']);
+        $this->assertSame('GBP', $item['subject']['unit']);
+        $this->assertNotNull($item['subject']['time']);
+        $this->assertSame('Coffee House', $item['candidates'][0]['title']);
 
         app(FlintReviewService::class)->act($this->user, 'receipt_suggestion', $receipt->id, 'confirm', ['transaction_id' => $transaction->id]);
 
@@ -104,10 +109,28 @@ class FlintReviewTest extends TestCase
         $this->assertSame(0.62, $items['link_suggestion']['confidence']);
         $this->assertSame(['confirm', 'dismiss'], $items['link_suggestion']['actions']);
         $this->assertSame((string) $auto->id, $items['auto_link']['id']);
-        $this->assertSame(['keep', 'undo'], $items['auto_link']['actions']);
+        $this->assertSame(['undo'], $items['auto_link']['actions']);
 
         app(FlintReviewService::class)->act($this->user, 'link_suggestion', $pending->id, 'confirm');
         $this->assertFalse($pending->fresh()->isPending());
+        $this->assertNotNull($pending->fresh()->metadata['reviewed_at']);
+        $this->assertNotContains((string) $pending->id, collect(app(FlintReviewService::class)->items($this->user))->pluck('id'));
+    }
+
+    #[Test]
+    public function older_suggestions_appear_ahead_of_newer_automatic_links(): void
+    {
+        $transaction = $this->transaction('Coffee House');
+        $receipt = $this->receipt('Coffee House', ['needs_review' => true, 'candidate_matches' => [
+            ['transaction_id' => $transaction->id, 'confidence' => 0.7],
+        ]]);
+        $receipt->update(['time' => now()->subMonths(5)]);
+        $auto = $this->link(['auto_linked' => true, 'confidence' => 91.0]);
+
+        $items = app(FlintReviewService::class)->items($this->user);
+
+        $this->assertSame(['receipt_suggestion', 'auto_link'], array_column($items, 'kind'));
+        $this->assertSame((string) $auto->id, $items[1]['id']);
     }
 
     #[Test]
@@ -131,11 +154,37 @@ class FlintReviewTest extends TestCase
         $this->actingAs($this->user);
         Volt::test('flint.review')
             ->assertSee('Link suggestion')
-            ->assertSee('62% confident')
+            ->assertSee('Needs your decision')
+            ->assertSee('62% match score')
+            ->assertSee('Pot')
+            ->assertSee('Savings')
             ->call('act', 'link_suggestion', (string) $link->id, 'dismiss')
             ->assertSee('Nothing to review.');
 
         $this->assertSoftDeleted($link);
+    }
+
+    #[Test]
+    public function the_web_review_tab_shows_receipt_and_candidate_context_before_confirming(): void
+    {
+        $transaction = $this->transaction('Coffee House');
+        $receipt = $this->receipt('Coffee House', ['needs_review' => true, 'candidate_matches' => [
+            ['transaction_id' => $transaction->id, 'confidence' => 0.7],
+        ]]);
+
+        $this->actingAs($this->user);
+        Volt::test('flint.review')
+            ->assertSee('Needs your decision')
+            ->assertSee('Choose a transaction')
+            ->assertSee('Coffee House receipt')
+            ->assertSee('Coffee House')
+            ->assertSee('£4.50')
+            ->assertSee('70% match score')
+            ->set("chosen.{$receipt->id}", $transaction->id)
+            ->call('act', 'receipt_suggestion', (string) $receipt->id, 'confirm')
+            ->assertSee('Nothing to review.');
+
+        $this->assertTrue(Relationship::where('from_id', $receipt->id)->where('to_id', $transaction->id)->exists());
     }
 
     #[Test]

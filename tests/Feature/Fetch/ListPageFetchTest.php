@@ -13,6 +13,7 @@ use App\Services\Fetch\BookmarkCreator;
 use App\Services\Fetch\Links\LinkCandidateExtractor;
 use App\Services\Fetch\Links\LinkClusterer;
 use App\Services\Fetch\UrlSafetyValidator;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -90,19 +91,23 @@ class ListPageFetchTest extends TestCase
     }
 
     #[Test]
-    public function a_recurring_list_stays_enabled_and_reuses_its_groups_next_time(): void
+    public function a_recurring_list_stays_enabled_and_reassesses_links_next_time(): void
     {
-        $this->worker(FetchPages::blogIndex());
+        $this->worker(FetchPages::blogIndex(withSponsoredCard: true));
         $this->jevSaysList();
         $bookmark = $this->bookmark(['fetch_mode' => 'recurring', 'subscription_source' => 'subscribed']);
 
         $this->fetch($bookmark);
+        // Queue::fake leaves the unique lock held; a completed expansion
+        // releases it before the next scheduled scan.
+        app(UniqueLock::class)->release(Queue::pushed(ExpandLinkListJob::class)->sole());
         $this->fetch($bookmark);
 
         $this->assertTrue($bookmark->fresh()->metadata['enabled']);
         $this->assertSame(2, $bookmark->fresh()->metadata['fetch_count']);
         Queue::assertPushed(ExpandLinkListJob::class, 2);
-        Http::assertSentCount(5); // health + fetch twice, Jev once
+        Queue::assertPushed(ExpandLinkListJob::class, fn (ExpandLinkListJob $job): bool => count($job->items) === 8 && ! collect($job->items)->contains(fn (array $item): bool => str_contains($item['url'], 'partner-content')));
+        Http::assertSentCount(6); // health + fetch + Jev on both scans
     }
 
     #[Test]
@@ -209,7 +214,7 @@ class ListPageFetchTest extends TestCase
             'has_article_list' => 0.95,
             'cluster_c0_is_primary' => 0.9,
             "link_{$this->sponsoredLinkId()}_is_article" => 0.05,
-            'link_*_is_article' => 0.9,
+            'link_*_is_article' => 0.9, 'link_*_role' => 'article',
         ]);
     }
 

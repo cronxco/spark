@@ -68,39 +68,6 @@ class ListPageAssessor
     }
 
     /**
-     * Reuse the groups chosen on an earlier fetch when they are still on the
-     * page, without asking Jev again.
-     *
-     * @param  list<LinkCluster>  $clusters
-     * @param  list<string>  $signatures
-     */
-    public function reuse(array $clusters, array $signatures, int $minItems = 3): ?ListAssessment
-    {
-        if ($signatures === []) {
-            return null;
-        }
-
-        $selected = array_values(array_filter(
-            $clusters,
-            fn (LinkCluster $cluster): bool => in_array($cluster->signature, $signatures, true) && $cluster->count() >= $minItems,
-        ));
-
-        if ($selected === []) {
-            return null;
-        }
-
-        return new ListAssessment(
-            status: ListAssessment::STATUS_MEMO,
-            isList: true,
-            reason: 'Reused previously selected link groups',
-            clusters: $selected,
-            selectedClusterIds: array_map(fn (LinkCluster $cluster): string => $cluster->id, $selected),
-            acceptedItems: $this->dedupe(array_merge(...array_map(fn (LinkCluster $cluster): array => $cluster->items, $selected))),
-            thresholds: $this->thresholds(),
-        );
-    }
-
-    /**
      * @param  list<LinkCluster>  $clusters
      * @param  array<string, list<LinkCandidate>>  $links  Keyed by cluster id
      */
@@ -134,7 +101,9 @@ class ListPageAssessor
             foreach ($cluster->items as $item) {
                 $id = "link_{$item->id}_is_article";
 
-                if ($answers->has($id) && $answers->noul($id) < $thresholds['link_is_article']) {
+                if (! $answers->has($id)
+                    || $answers->noul($id) < $thresholds['link_is_article']
+                    || $answers->choice("link_{$item->id}_role") !== 'article') {
                     $rejected[] = $item->id;
 
                     continue;
@@ -161,8 +130,8 @@ class ListPageAssessor
 
     /**
      * Links to ask about individually, shared across groups so the batch
-     * stays small. Links beyond the budget are accepted on their group's
-     * verdict alone.
+     * stays small. Links beyond the budget are left unaccepted until they
+     * receive an individual verdict.
      *
      * @param  list<LinkCluster>  $clusters
      * @return array<string, list<LinkCandidate>>
