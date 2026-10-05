@@ -6,15 +6,21 @@ use App\Services\Ai\SkillRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class CheckFlintSkillsTest extends TestCase
+class CheckFlintSkillsTest extends FrameworkTestCase
 {
+    private string $skillsDirectory;
+
     private string $repo;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->skillsDirectory = sys_get_temp_dir() . '/spark-skills-' . bin2hex(random_bytes(12));
+        File::copyDirectory(resource_path('ai/skills'), $this->skillsDirectory);
+        $this->app->instance(SkillRegistry::class, new SkillRegistry($this->skillsDirectory));
 
         $this->repo = storage_path('framework/testing/claude-' . uniqid());
         File::ensureDirectoryExists($this->repo . '/.claude/skills');
@@ -23,6 +29,7 @@ class CheckFlintSkillsTest extends TestCase
     protected function tearDown(): void
     {
         File::deleteDirectory($this->repo);
+        File::deleteDirectory($this->skillsDirectory);
 
         parent::tearDown();
     }
@@ -89,7 +96,7 @@ class CheckFlintSkillsTest extends TestCase
     #[Test]
     public function it_fails_when_a_skill_calls_a_tool_with_an_argument_it_does_not_accept(): void
     {
-        $vendored = resource_path('ai/skills/flint-topics/SKILL.md');
+        $vendored = $this->skillsDirectory . '/flint-topics/SKILL.md';
         $original = File::get($vendored);
 
         File::put($vendored, str_replace(
@@ -112,7 +119,7 @@ class CheckFlintSkillsTest extends TestCase
     #[Test]
     public function the_tool_check_can_be_skipped(): void
     {
-        $vendored = resource_path('ai/skills/flint-topics/SKILL.md');
+        $vendored = $this->skillsDirectory . '/flint-topics/SKILL.md';
         $original = File::get($vendored);
 
         File::put($vendored, str_replace('from_date: "<local_date - 6d>"', 'domain: "knowledge"', $original));
@@ -132,7 +139,7 @@ class CheckFlintSkillsTest extends TestCase
             $target = "{$this->repo}/.claude/skills/{$skill->name}";
             File::ensureDirectoryExists($target);
             File::copy(
-                resource_path("ai/skills/{$skill->name}/SKILL.md"),
+                $this->skillsDirectory . "/{$skill->name}/SKILL.md",
                 "{$target}/SKILL.md",
             );
         }

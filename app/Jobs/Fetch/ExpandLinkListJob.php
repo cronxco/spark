@@ -4,6 +4,7 @@ namespace App\Jobs\Fetch;
 
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\Fetch\Assessment\ListPageDetector;
 use App\Services\Fetch\Expansion\LinkListExpander;
 use App\Services\Fetch\Expansion\ListItem;
 use App\Services\Fetch\FetchMetadata;
@@ -15,6 +16,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -61,9 +63,14 @@ class ExpandLinkListJob implements ShouldBeUnique, ShouldQueue
     {
         $list = EventObject::find($this->listBookmarkId);
 
-        if (! $list) {
+        if (! $list || (string) $list->user_id !== (string) $this->integration->user_id) {
             Log::warning('Fetch: List bookmark vanished before expansion', ['webpage_id' => $this->listBookmarkId]);
 
+            return;
+        }
+
+        if (! ListPageDetector::isEnabled() || ListPageDetector::isShadow()
+            || ! ListPageDetector::isEligibleForListExpansion($list)) {
             return;
         }
 
@@ -73,6 +80,10 @@ class ExpandLinkListJob implements ShouldBeUnique, ShouldQueue
             array_map(fn (array $item): ListItem => ListItem::fromArray($item), $this->items),
             $this->assessment,
         );
+
+        if ($result->countWithStatus(LinkListExpander::STATUS_RETRYABLE_FAILED) > 0) {
+            throw new RuntimeException('Some list articles could not be bookmarked; retrying unresolved items.');
+        }
 
         FetchMetadata::mutate($list, function (array $metadata) use ($result): array {
             $metadata['list_detection'] = array_merge($metadata['list_detection'] ?? [], array_filter([
@@ -99,7 +110,7 @@ class ExpandLinkListJob implements ShouldBeUnique, ShouldQueue
     {
         $list = EventObject::find($this->listBookmarkId);
 
-        if (! $list) {
+        if (! $list || (string) $list->user_id !== (string) $this->integration->user_id) {
             return;
         }
 

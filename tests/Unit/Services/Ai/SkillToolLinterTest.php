@@ -7,9 +7,9 @@ use App\Services\Ai\SkillDefinition;
 use App\Services\Ai\SkillRegistry;
 use App\Services\Ai\SkillToolLinter;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class SkillToolLinterTest extends TestCase
+class SkillToolLinterTest extends FrameworkTestCase
 {
     #[Test]
     public function it_accepts_a_call_that_matches_the_tools_real_signature(): void

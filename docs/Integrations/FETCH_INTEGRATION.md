@@ -271,8 +271,10 @@ pinned `JEV_MODEL`).
 Only pages the user chose are judged (API, mobile, MCP, browser capture,
 Spotlight, manual and legacy subscriptions). Pages found by discovery or by an
 earlier expansion never expand, so expansion cannot chain into a crawl.
-Recurring lists reuse their chosen groups for 7 days without asking Jev again;
-pages judged to be articles are not re-asked for 14 days.
+Recurring lists reclassify their current links on every scan, so rejected or
+new sponsored cards cannot inherit an earlier group verdict. Links beyond the
+classification budget are not expanded. Pages judged to be articles are not
+re-asked for 14 days.
 
 Per bookmark, the URLs tab offers **Treat as list of articles** (skip the
 structural check), **Always treat as one article** and **Detect lists
