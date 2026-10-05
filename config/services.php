@@ -155,6 +155,18 @@ return [
         'archive_bypass_excluded_domains' => env('FETCH_ARCHIVE_BYPASS_EXCLUDED_DOMAINS', ''),
     ],
 
+    'jev' => [
+        // TypeSafe's Jev (System One) classifier, used for narrow typed
+        // judgments such as "is this page a list of articles?". Pin an exact
+        // model version: the thresholds in config/fetch.php are tuned per
+        // version and must be re-checked when this changes.
+        'enabled' => env('JEV_ENABLED', false),
+        'api_key' => env('TYPESAFE_API_KEY'),
+        'base_url' => env('JEV_BASE_URL', 'https://api.typesafe.ai'),
+        'model' => env('JEV_MODEL', 'jev-1.13.0'),
+        'timeout' => (float) env('JEV_TIMEOUT', 10),
+    ],
+
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'organization' => env('OPENAI_ORGANIZATION'),

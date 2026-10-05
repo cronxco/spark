@@ -2215,6 +2215,9 @@ the iOS session's `data:write` capability.
 
 **Response `201`/`200`**:
 `{"state": "captured|recaptured", "bookmark": {"id": "uuid", "url": "...", "title": "..."}}`.
+With list detection enabled, a page that is a list of articles returns
+`"state": "list_expanded"` plus `items_found`; its articles are bookmarked
+individually in the background.
 
 **Response `422`** — URL fails the safety validator or readable content cannot
 be extracted.
