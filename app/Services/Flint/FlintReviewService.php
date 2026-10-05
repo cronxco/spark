@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Receipt\ReceiptMatchState;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -185,27 +186,30 @@ class FlintReviewService
 
     private function actOnReceiptSuggestion(User $user, string $id, string $action, ?string $transactionId): void
     {
-        $receipt = $this->receipts($user)
-            ->where('event_metadata->receipt_matching->status', 'suggestions')
-            ->whereNotIn('id', ReceiptMatchState::links()->select('from_id'))
-            ->findOrFail($id);
+        DB::transaction(function () use ($user, $id, $action, $transactionId): void {
+            $receipt = $this->receipts($user)
+                ->where('event_metadata->receipt_matching->status', 'suggestions')
+                ->whereNotIn('id', ReceiptMatchState::links()->select('from_id'))
+                ->lockForUpdate()
+                ->findOrFail($id);
 
-        if ($action === 'confirm') {
-            $candidate = collect(ReceiptMatchState::candidates($receipt))->firstWhere('transaction_id', $transactionId);
-            if ($candidate === null) {
-                throw new InvalidArgumentException('Choose one of the suggested transactions.');
+            if ($action === 'confirm') {
+                $candidate = collect(ReceiptMatchState::candidates($receipt))->firstWhere('transaction_id', $transactionId);
+                if ($candidate === null) {
+                    throw new InvalidArgumentException('Choose one of the suggested transactions.');
+                }
+                $transaction = Event::forUser($user->id)->findOrFail($transactionId);
+                app(ReceiptTransactionMatcher::class)->createReceiptRelationship($receipt, $transaction, (float) $candidate['confidence'], 'manual');
+            } elseif ($action === 'dismiss') {
+                ReceiptMatchState::update($receipt, [
+                    'status' => 'dismissed',
+                    'candidates' => [],
+                    'dismissed_at' => now()->toIso8601String(),
+                ]);
+            } else {
+                throw new InvalidArgumentException('A receipt suggestion can be confirmed or dismissed.');
             }
-            $transaction = Event::forUser($user->id)->findOrFail($transactionId);
-            app(ReceiptTransactionMatcher::class)->createReceiptRelationship($receipt, $transaction, (float) $candidate['confidence'], 'manual');
-        } elseif ($action === 'dismiss') {
-            ReceiptMatchState::update($receipt, [
-                'status' => 'dismissed',
-                'candidates' => [],
-                'dismissed_at' => now()->toIso8601String(),
-            ]);
-        } else {
-            throw new InvalidArgumentException('A receipt suggestion can be confirmed or dismissed.');
-        }
+        });
     }
 
     private function actOnAutoDecision(User $user, string $kind, string $id, string $action): void
