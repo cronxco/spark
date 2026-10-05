@@ -8,6 +8,7 @@ use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GeocodingServiceTest extends TestCase
@@ -23,9 +24,7 @@ class GeocodingServiceTest extends TestCase
         Cache::flush();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function geocode_returns_cached_result_when_available(): void
     {
         // Create cached geocode
@@ -53,9 +52,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertEquals('123 Main St, London, UK', $result['formatted_address']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function geocode_increments_cache_hit_count(): void
     {
         $address = '123 Main St, London';
@@ -78,9 +75,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertEquals(2, $cache->hit_count);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function geocode_calls_geoapify_when_not_cached(): void
     {
         config(['services.geoapify.api_key' => 'test_api_key']);
@@ -114,9 +109,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertEquals(-0.1278, $result['longitude']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function geocode_caches_api_result(): void
     {
         config(['services.geoapify.api_key' => 'test_api_key']);
@@ -148,9 +141,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertEquals('GB', $cached->country_code);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function geocode_returns_null_when_no_results(): void
     {
         Http::fake([
@@ -164,9 +155,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function geocode_returns_null_when_api_fails(): void
     {
         Http::fake([
@@ -178,9 +167,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_make_request_returns_true_when_under_limit(): void
     {
         Cache::put('geoapify_requests_' . now()->format('Y-m-d'), 100, now()->endOfDay());
@@ -188,9 +175,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertTrue($this->service->canMakeRequest());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function can_make_request_returns_false_when_at_limit(): void
     {
         Cache::put('geoapify_requests_' . now()->format('Y-m-d'), 3000, now()->endOfDay());
@@ -198,9 +183,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertFalse($this->service->canMakeRequest());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function increment_request_count(): void
     {
         $this->service->incrementRequestCount();
@@ -213,9 +196,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertEquals(2, $count);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function get_rate_limit_status(): void
     {
         Cache::put('geoapify_requests_' . now()->format('Y-m-d'), 150, now()->endOfDay());
@@ -227,9 +208,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertEquals(2850, $status['remaining']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function geocode_respects_rate_limit(): void
     {
         // Set cache to limit
@@ -244,9 +223,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function reverse_geocode_returns_cached_result_when_nearby(): void
     {
         // Create cached result
@@ -271,9 +248,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertNotNull($result['formatted_address']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function reverse_geocode_calls_api_when_no_cache(): void
     {
         config(['services.geoapify.api_key' => 'test_api_key']);
@@ -312,9 +287,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertEquals('Starbucks', $result['address_components']['name']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function reverse_geocode_caches_result(): void
     {
         config(['services.geoapify.api_key' => 'test_api_key']);
@@ -346,9 +319,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertEquals('Starbucks, 123 Main St, London, UK', $cache->formatted_address);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function reverse_geocode_respects_rate_limit(): void
     {
         Cache::put('geoapify_requests_' . now()->format('Y-m-d'), 3000, now()->endOfDay());
@@ -361,9 +332,7 @@ class GeocodingServiceTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function reverse_geocode_returns_null_when_no_results(): void
     {
         Http::fake([

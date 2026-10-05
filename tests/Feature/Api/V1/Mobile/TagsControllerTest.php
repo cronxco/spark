@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Tags\Tag;
@@ -51,7 +54,7 @@ class TagsControllerTest extends TestCase
         $otherObject = EventObject::factory()->create(['user_id' => $other->id]);
         $otherObject->attachTags([$hidden]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/tags')
             ->assertOk()
@@ -70,7 +73,7 @@ class TagsControllerTest extends TestCase
         $tagged->attachTags([$tag]);
         $this->createEvent('Coffee appears in text but is not tagged');
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson("/api/v1/mobile/tags/{$tag->id}")
             ->assertOk()
@@ -81,6 +84,31 @@ class TagsControllerTest extends TestCase
     }
 
     #[Test]
+    public function a_block_only_tag_is_visible_in_the_catalogue_and_detail_route(): void
+    {
+        $tag = Tag::findOrCreate('block-only', 'spark');
+        $block = Block::factory()->create(['event_id' => $this->createEvent('Parent')->id]);
+
+        DB::table('taggables')->insert([
+            'tag_id' => $tag->id,
+            'taggable_id' => $block->id,
+            'taggable_type' => Block::class,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/tags')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', (string) $tag->id);
+
+        $this->getJson("/api/v1/mobile/tags/{$tag->id}")
+            ->assertOk()
+            ->assertJsonPath('tag.id', (string) $tag->id)
+            ->assertJsonPath('data.0.kind', 'block')
+            ->assertJsonPath('data.0.id', (string) $block->id);
+    }
+
+    #[Test]
     public function suggest_prioritises_an_exact_existing_tag(): void
     {
         $exact = Tag::findOrCreate('coffee', 'spark');
@@ -88,7 +116,7 @@ class TagsControllerTest extends TestCase
         $event = $this->createEvent('Tagged');
         $event->attachTags([$exact, $prefix]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/tags/suggest?q=coffee')
             ->assertOk()
@@ -99,11 +127,11 @@ class TagsControllerTest extends TestCase
     public function write_endpoints_create_attach_remove_and_log_tags(): void
     {
         $event = $this->createEvent('Tagged');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $created = $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'name' => 'new tag',
-        ])->assertCreated()
+        ], $this->ifMatchEvent($event))->assertCreated()
             ->assertJsonPath('tag.name', 'new tag')
             ->assertJsonPath('tag.type', 'spark');
 
@@ -119,7 +147,7 @@ class TagsControllerTest extends TestCase
             'event' => 'tag_added',
         ]);
 
-        $this->deleteJson("/api/v1/mobile/events/{$event->id}/tags/{$tagId}")
+        $this->deleteJson("/api/v1/mobile/events/{$event->id}/tags/{$tagId}", [], $this->ifMatchEvent($event))
             ->assertOk()
             ->assertJsonCount(0, 'tags');
 
@@ -136,11 +164,11 @@ class TagsControllerTest extends TestCase
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
         $tag = Tag::findOrCreate('person', 'spark');
         $this->createEvent('Tagged')->attachTags([$tag]);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/objects/{$object->id}/tags", [
             'tag_id' => (string) $tag->id,
-        ])->assertCreated()
+        ], $this->ifMatchObject($object))->assertCreated()
             ->assertJsonPath('tags.0.id', (string) $tag->id);
 
         $this->getJson("/api/v1/mobile/objects/{$object->id}")
@@ -156,18 +184,18 @@ class TagsControllerTest extends TestCase
         $otherObject = EventObject::factory()->create(['user_id' => User::factory()->create()->id]);
         $otherObject->attachTags([$hidden]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'tag_id' => $hidden->id,
-        ])->assertNotFound();
+        ], $this->ifMatchEvent($event))->assertNotFound();
     }
 
     #[Test]
     public function writes_require_the_write_ability(): void
     {
         $event = $this->createEvent('Tagged');
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'name' => 'nope',
@@ -189,11 +217,23 @@ class TagsControllerTest extends TestCase
         ]);
         $event = Event::factory()->create(['integration_id' => $integration->id]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson("/api/v1/mobile/events/{$event->id}/tags", [
             'name' => 'nope',
         ])->assertNotFound();
+    }
+
+    /** @return array{If-Match: string} */
+    private function ifMatchEvent(Event $event): array
+    {
+        return ['If-Match' => $this->getJson("/api/v1/mobile/events/{$event->id}")->headers->get('ETag')];
+    }
+
+    /** @return array{If-Match: string} */
+    private function ifMatchObject(EventObject $object): array
+    {
+        return ['If-Match' => $this->getJson("/api/v1/mobile/objects/{$object->id}")->headers->get('ETag')];
     }
 
     private function createEvent(string $title): Event

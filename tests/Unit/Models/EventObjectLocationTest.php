@@ -6,6 +6,7 @@ use App\Models\EventObject;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class EventObjectLocationTest extends TestCase
@@ -20,9 +21,7 @@ class EventObjectLocationTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function set_location_stores_coordinates(): void
     {
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -38,9 +37,7 @@ class EventObjectLocationTest extends TestCase
         $this->assertNotNull($object->location_geocoded_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function latitude_accessor(): void
     {
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -51,9 +48,7 @@ class EventObjectLocationTest extends TestCase
         $this->assertEquals(51.5074, $object->latitude);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function longitude_accessor(): void
     {
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -64,9 +59,7 @@ class EventObjectLocationTest extends TestCase
         $this->assertEquals(-0.1278, $object->longitude);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function has_location_scope(): void
     {
         $objectWithLocation = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -81,9 +74,7 @@ class EventObjectLocationTest extends TestCase
         $this->assertFalse($results->contains($objectWithoutLocation));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function within_radius_scope(): void
     {
         $londonObject = EventObject::factory()->create(['user_id' => $this->user->id]);
@@ -100,9 +91,7 @@ class EventObjectLocationTest extends TestCase
         $this->assertFalse($results->contains($manchesterObject));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function within_bounds_scope(): void
     {
         $londonObject = EventObject::factory()->create(['user_id' => $this->user->id]);

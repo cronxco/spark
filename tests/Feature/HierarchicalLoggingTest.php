@@ -8,10 +8,14 @@ use App\Models\User;
 use App\Services\LoggingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\IsolatesLogs;
 use Tests\TestCase;
 
 class HierarchicalLoggingTest extends TestCase
 {
+    use IsolatesLogs;
+
     use RefreshDatabase;
 
     private User $user;
@@ -39,21 +43,7 @@ class HierarchicalLoggingTest extends TestCase
         ]);
     }
 
-    protected function tearDown(): void
-    {
-        // Clean up any log files created during tests
-        $logsPath = storage_path('logs');
-        if (File::exists($logsPath)) {
-            $files = File::glob($logsPath . '/*_{' . now()->format('Y-m-d') . '}.log');
-            foreach ($files as $file) {
-                File::delete($file);
-            }
-        }
-
-        parent::tearDown();
-    }
-
-    /** @test */
+    #[Test]
     public function debug_logs_only_go_to_integration_instance_file(): void
     {
         LoggingService::logHierarchical($this->integration, 'debug', 'Debug test message');
@@ -79,7 +69,7 @@ class HierarchicalLoggingTest extends TestCase
         }
     }
 
-    /** @test */
+    #[Test]
     public function info_logs_cascade_from_integration_to_group_to_user(): void
     {
         LoggingService::logHierarchical($this->integration, 'info', 'Info cascade test');
@@ -99,7 +89,7 @@ class HierarchicalLoggingTest extends TestCase
         $this->assertStringContainsString('Info cascade test', file_get_contents($userPath));
     }
 
-    /** @test */
+    #[Test]
     public function warning_logs_cascade_from_integration_to_group_to_user(): void
     {
         LoggingService::logHierarchical($this->integration, 'warning', 'Warning cascade test');
@@ -119,7 +109,7 @@ class HierarchicalLoggingTest extends TestCase
         $this->assertStringContainsString('Warning cascade test', file_get_contents($userPath));
     }
 
-    /** @test */
+    #[Test]
     public function error_logs_cascade_from_integration_to_group_to_user(): void
     {
         LoggingService::logHierarchical($this->integration, 'error', 'Error cascade test');
@@ -139,7 +129,7 @@ class HierarchicalLoggingTest extends TestCase
         $this->assertStringContainsString('Error cascade test', file_get_contents($userPath));
     }
 
-    /** @test */
+    #[Test]
     public function logs_are_written_to_correct_daily_files(): void
     {
         $date = now()->format('Y-m-d');
@@ -161,7 +151,7 @@ class HierarchicalLoggingTest extends TestCase
         $this->assertFileExists($integrationPath);
     }
 
-    /** @test */
+    #[Test]
     public function user_with_debug_disabled_doesnt_get_debug_logs_in_integration_file(): void
     {
         $this->user->disableDebugLogging();
@@ -176,7 +166,7 @@ class HierarchicalLoggingTest extends TestCase
         $this->assertFileDoesNotExist($integrationPath, 'Debug log file should not be created when debug logging is disabled');
     }
 
-    /** @test */
+    #[Test]
     public function integration_without_group_still_logs_to_user(): void
     {
         $integrationWithoutGroup = Integration::factory()->create([
@@ -199,7 +189,7 @@ class HierarchicalLoggingTest extends TestCase
         $this->assertStringContainsString('No group test', file_get_contents($userPath));
     }
 
-    /** @test */
+    #[Test]
     public function log_files_use_correct_uuid_block_naming(): void
     {
         LoggingService::logToUser($this->user, 'info', 'Test');
@@ -225,7 +215,7 @@ class HierarchicalLoggingTest extends TestCase
         $this->assertFileExists($integrationPath);
     }
 
-    /** @test */
+    #[Test]
     public function multiple_integrations_create_separate_log_files(): void
     {
         $integration2 = Integration::factory()->create([
@@ -256,7 +246,7 @@ class HierarchicalLoggingTest extends TestCase
         $this->assertStringNotContainsString('Integration 1 message', file_get_contents($path2));
     }
 
-    /** @test */
+    #[Test]
     public function log_context_is_preserved_in_files(): void
     {
         $context = [
@@ -278,7 +268,7 @@ class HierarchicalLoggingTest extends TestCase
         $this->assertStringContainsString((string) $this->integration->id, $content);
     }
 
-    /** @test */
+    #[Test]
     public function critical_logs_cascade_to_all_levels(): void
     {
         LoggingService::logHierarchical($this->integration, 'critical', 'Critical issue');

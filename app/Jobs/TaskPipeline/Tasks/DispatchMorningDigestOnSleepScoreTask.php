@@ -5,6 +5,8 @@ namespace App\Jobs\TaskPipeline\Tasks;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Services\EffectiveTimezoneResolver;
+use App\Services\Flint\FlintScheduleService;
+use App\Services\Flint\FlintScheduleSettings;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -30,7 +32,7 @@ class DispatchMorningDigestOnSleepScoreTask extends BaseTaskJob
         }
 
         $settings = $user->settings['flint'] ?? [];
-        if (! ($settings['digests_enabled'] ?? false)) {
+        if (! FlintScheduleSettings::enabled($settings, 'morning_digest_enabled')) {
             return;
         }
 
@@ -46,10 +48,7 @@ class DispatchMorningDigestOnSleepScoreTask extends BaseTaskJob
             return;
         }
 
-        $isWeekend = $now->isWeekend();
-        $morningTime = $isWeekend
-            ? ($settings['morning_time_weekend'] ?? config('services.flint_routine.morning_time_weekend'))
-            : ($settings['morning_time_weekday'] ?? config('services.flint_routine.morning_time_weekday'));
+        $morningTime = app(FlintScheduleService::class)->slot($user, 'morning_digest', $now);
 
         // Before the morning slot: let the dispatcher fire it at the slot instead.
         if ($now->lt(Carbon::parse($morningTime, $tz))) {

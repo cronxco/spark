@@ -6,6 +6,7 @@ use App\Services\WeatherService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class WeatherServiceTest extends TestCase
@@ -24,7 +25,7 @@ class WeatherServiceTest extends TestCase
         $this->service = new WeatherService;
     }
 
-    /** @test */
+    #[Test]
     public function returns_null_when_api_key_not_configured()
     {
         config(['services.metoffice.api_key' => '']);
@@ -35,7 +36,7 @@ class WeatherServiceTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[Test]
     public function fetches_weather_forecast_successfully()
     {
         Http::fake([
@@ -76,7 +77,7 @@ class WeatherServiceTest extends TestCase
         $this->assertEquals('Partly cloudy (day)', $result['forecasts'][0]['weather_type']);
     }
 
-    /** @test */
+    #[Test]
     public function caches_forecast_for_one_hour()
     {
         Cache::shouldReceive('remember')
@@ -93,7 +94,7 @@ class WeatherServiceTest extends TestCase
         $this->assertEquals(['cached' => true], $result);
     }
 
-    /** @test */
+    #[Test]
     public function detects_notable_weather_with_high_precipitation()
     {
         $forecast = [
@@ -106,7 +107,7 @@ class WeatherServiceTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[Test]
     public function detects_notable_weather_with_heavy_conditions()
     {
         $forecast = [
@@ -119,7 +120,7 @@ class WeatherServiceTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[Test]
     public function detects_notable_weather_with_temperature_extremes()
     {
         $forecast = [
@@ -133,7 +134,7 @@ class WeatherServiceTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[Test]
     public function does_not_flag_normal_weather_as_notable()
     {
         $forecast = [
@@ -149,7 +150,7 @@ class WeatherServiceTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[Test]
     public function generates_notable_weather_summary()
     {
         $forecasts = [
@@ -177,7 +178,7 @@ class WeatherServiceTest extends TestCase
         $this->assertStringContainsString('Heavy rain', $result['summary']);
     }
 
-    /** @test */
+    #[Test]
     public function returns_null_for_unremarkable_weather()
     {
         $forecasts = [

@@ -8,6 +8,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GoCardlessTransactionPullTest extends TestCase
@@ -45,9 +46,7 @@ class GoCardlessTransactionPullTest extends TestCase
         Cache::forget('gocardless_transaction_calls');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation()
     {
         $job = new GoCardlessTransactionPull($this->integration);
@@ -58,9 +57,7 @@ class GoCardlessTransactionPullTest extends TestCase
         $this->assertEquals([60, 300, 600], $job->backoff);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unique_id_generation()
     {
         $job = new GoCardlessTransactionPull($this->integration);
@@ -70,9 +67,7 @@ class GoCardlessTransactionPullTest extends TestCase
         $this->assertStringContainsString(date('Y-m-d'), $uniqueId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function missing_account_id_in_configuration()
     {
         $integrationWithoutAccountId = Integration::factory()->create([
@@ -93,9 +88,7 @@ class GoCardlessTransactionPullTest extends TestCase
         $this->assertInstanceOf(GoCardlessTransactionPull::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function rate_limit_cache_key_format()
     {
         // Test that our rate limiting cache keys are properly formatted
@@ -119,9 +112,7 @@ class GoCardlessTransactionPullTest extends TestCase
         $this->assertEquals($today, $cachedCalls[0]['date']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_handles_integration_correctly()
     {
         // Test that the job can be created with different integration types
@@ -142,9 +133,7 @@ class GoCardlessTransactionPullTest extends TestCase
         $this->assertNotEquals($job1->uniqueId(), $job2->uniqueId());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function configuration_inheritance()
     {
         // Test that configuration from the integration is accessible and includes account_id
@@ -172,9 +161,7 @@ class GoCardlessTransactionPullTest extends TestCase
         $this->assertInstanceOf(GoCardlessTransactionPull::class, $job);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function uses_account_id_from_integration_configuration()
     {
         // Create an integration with a specific account_id in configuration

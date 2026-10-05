@@ -3,6 +3,7 @@
 namespace Tests\Unit\Integrations\Oyster;
 
 use App\Integrations\Oyster\OysterTransportModeDetector;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OysterTransportModeDetectorTest extends TestCase
@@ -15,7 +16,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->detector = new OysterTransportModeDetector;
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_elizabeth_line()
     {
         $mode = $this->detector->detectMode('Paddington [Elizabeth line] to Canary Wharf [Elizabeth line]');
@@ -25,7 +26,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_ELIZABETH, $mode);
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_london_overground()
     {
         $mode = $this->detector->detectMode('West Croydon [London Overground/National Rail] to London City Airport DLR');
@@ -35,7 +36,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_OVERGROUND, $mode);
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_national_rail()
     {
         $mode = $this->detector->detectMode('Victoria (platforms 9-19) [National Rail] to East Croydon [National Rail]');
@@ -45,7 +46,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_NATIONAL_RAIL, $mode);
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_dlr()
     {
         $mode = $this->detector->detectMode('Greenwich [DLR/National Rail] to East Croydon [National Rail]');
@@ -55,7 +56,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_DLR, $mode);
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_tram()
     {
         $mode = $this->detector->detectMode('Entered Wandle Park tram stop');
@@ -68,7 +69,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_TRAM, $mode);
     }
 
-    /** @test */
+    #[Test]
     public function it_detects_london_underground_as_default()
     {
         // Without mode annotations, station-to-station journeys default to tube
@@ -82,7 +83,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_TUBE, $mode);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_tram_entry()
     {
         $result = $this->detector->parseStations('Entered East Croydon tram stop');
@@ -92,7 +93,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_TRAM, $result['mode']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_national_rail_journey()
     {
         $result = $this->detector->parseStations('Victoria (platforms 9-19) [National Rail] to East Croydon [National Rail]');
@@ -102,7 +103,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_NATIONAL_RAIL, $result['mode']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_tube_journey()
     {
         $result = $this->detector->parseStations('Westminster to Mansion House');
@@ -112,7 +113,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_TUBE, $result['mode']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_mixed_mode_journey()
     {
         $result = $this->detector->parseStations('Farringdon to East Croydon [National Rail]');
@@ -122,7 +123,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertEquals(OysterTransportModeDetector::MODE_NATIONAL_RAIL, $result['mode']);
     }
 
-    /** @test */
+    #[Test]
     public function it_identifies_non_journey_entries()
     {
         $this->assertTrue($this->detector->isNonJourney('Topped-up on touch in, Victoria (platforms 9-19) [National Rail]'));
@@ -133,7 +134,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertFalse($this->detector->isNonJourney('Entered Wandle Park tram stop'));
     }
 
-    /** @test */
+    #[Test]
     public function it_identifies_non_journey_types()
     {
         $this->assertEquals('topped_up_balance', $this->detector->getNonJourneyType('Topped-up on touch in, Victoria'));
@@ -141,7 +142,7 @@ class OysterTransportModeDetectorTest extends TestCase
         $this->assertNull($this->detector->getNonJourneyType('Victoria to East Croydon'));
     }
 
-    /** @test */
+    #[Test]
     public function it_provides_display_names_for_modes()
     {
         $this->assertEquals('London Underground', OysterTransportModeDetector::getDisplayName(OysterTransportModeDetector::MODE_TUBE));

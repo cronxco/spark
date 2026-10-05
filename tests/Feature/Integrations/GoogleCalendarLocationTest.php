@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\GeocodingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GoogleCalendarLocationTest extends TestCase
@@ -46,9 +47,7 @@ class GoogleCalendarLocationTest extends TestCase
         $this->plugin = new GoogleCalendarPlugin;
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function physical_location_is_geocoded(): void
     {
         // Mock geocoding service
@@ -100,9 +99,7 @@ class GoogleCalendarLocationTest extends TestCase
         $this->assertEquals('geoapify', $event->location_source);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function virtual_location_with_zoom_is_skipped(): void
     {
         $rawData = [
@@ -135,9 +132,7 @@ class GoogleCalendarLocationTest extends TestCase
         $this->assertNull($event->location_address);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function virtual_location_with_google_meet_is_skipped(): void
     {
         $rawData = [
@@ -168,9 +163,7 @@ class GoogleCalendarLocationTest extends TestCase
         $this->assertNull($event->location);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function event_without_location_is_handled(): void
     {
         $rawData = [

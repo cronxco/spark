@@ -5,7 +5,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Relationship;
 use App\Services\RelationshipTypeRegistry;
-use Illuminate\Support\Facades\Auth;
+use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
@@ -90,16 +90,19 @@ new class extends Component
         }
 
         try {
-            DB::transaction(function () {
-                Relationship::whereIn('id', $this->selectedRelationships)->delete();
+            $count = DB::transaction(function () {
+                // $selectedRelationships is a public Livewire property; re-resolve
+                // it through the same ownership predicate the listing uses.
+                return Relationship::where('user_id', AdminTenant::id())
+                    ->whereIn('id', $this->selectedRelationships)
+                    ->delete();
             });
 
-            $count = count($this->selectedRelationships);
             $this->success("Successfully deleted {$count} relationship(s).");
 
             $this->selectedRelationships = [];
             $this->resetPage();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Failed to delete relationships: ' . $e->getMessage());
         }
     }
@@ -107,7 +110,7 @@ new class extends Component
     public function getRelationships()
     {
         $query = Relationship::with(['from', 'to'])
-            ->where('user_id', Auth::id());
+            ->where('user_id', AdminTenant::id());
 
         // Apply search filter
         if ($this->search) {
@@ -163,7 +166,7 @@ new class extends Component
     {
         return collect(RelationshipTypeRegistry::getTypes())
             ->sortBy('display_name')
-            ->map(fn($config, $key) => [
+            ->map(fn ($config, $key) => [
                 'key' => $key,
                 'display_name' => $config['display_name'],
             ]);
@@ -171,22 +174,22 @@ new class extends Component
 
     public function getUniqueFromTypes()
     {
-        return Relationship::where('user_id', Auth::id())
+        return Relationship::where('user_id', AdminTenant::id())
             ->distinct()
             ->pluck('from_type')
             ->filter()
-            ->map(fn($type) => $this->formatModelType($type))
+            ->map(fn ($type) => $this->formatModelType($type))
             ->sort()
             ->values();
     }
 
     public function getUniqueToTypes()
     {
-        return Relationship::where('user_id', Auth::id())
+        return Relationship::where('user_id', AdminTenant::id())
             ->distinct()
             ->pluck('to_type')
             ->filter()
-            ->map(fn($type) => $this->formatModelType($type))
+            ->map(fn ($type) => $this->formatModelType($type))
             ->sort()
             ->values();
     }
@@ -258,7 +261,6 @@ new class extends Component
 
         return Str::limit($title, 30);
     }
-
 
     public function getTypeDisplayName(string $type): string
     {

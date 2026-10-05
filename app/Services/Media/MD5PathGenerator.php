@@ -60,26 +60,21 @@ class MD5PathGenerator implements PathGenerator
     /**
      * Get the MD5 hash for the media file.
      *
-     * If the custom property 'md5_hash' exists, use it.
-     * Otherwise, generate it from the file (fallback for edge cases).
+     * Uses the stored 'md5_hash' custom property. Without one, falls back to
+     * a hash of the media ID: that path is unique and won't deduplicate.
+     *
+     * The fallback must not call `$media->getPath()`. That method asks this
+     * generator for the path, which came back here, recursing until PHP ran
+     * out of memory on any page that showed an unhashed file.
      */
     protected function getFileHash(Media $media): string
     {
-        // Check if MD5 hash was stored as a custom property
         $storedHash = $media->getCustomProperty('md5_hash');
 
         if ($storedHash) {
             return $storedHash;
         }
 
-        // Fallback: calculate hash from file (should rarely happen)
-        $path = $media->getPath();
-
-        if (file_exists($path)) {
-            return md5_file($path);
-        }
-
-        // Last resort: use media ID (this prevents errors but won't deduplicate)
         return md5((string) $media->id);
     }
 }

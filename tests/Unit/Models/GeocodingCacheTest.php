@@ -5,15 +5,14 @@ namespace Tests\Unit\Models;
 use App\Models\GeocodingCache;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GeocodingCacheTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function hash_address_normalizes_consistently(): void
     {
         $address1 = '123 Main St, London';
@@ -29,9 +28,7 @@ class GeocodingCacheTest extends TestCase
         $this->assertEquals(64, strlen($hash1)); // SHA-256 produces 64 char hex string
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function hash_address_different_for_different_addresses(): void
     {
         $hash1 = GeocodingCache::hashAddress('123 Main St, London');
@@ -40,9 +37,7 @@ class GeocodingCacheTest extends TestCase
         $this->assertNotEquals($hash1, $hash2);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function record_hit_increments_count(): void
     {
         $cache = GeocodingCache::create([
@@ -66,9 +61,7 @@ class GeocodingCacheTest extends TestCase
         $this->assertTrue($cache->last_used_at->isAfter($initialTime));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function location_cast_to_point(): void
     {
         $cache = GeocodingCache::create([

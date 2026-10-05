@@ -76,6 +76,14 @@ class ApnsLiveActivityService
                     'status' => $response->status(),
                     'reason' => $reason,
                 ]);
+
+                // APNs will never accept this device token again, so the
+                // activity can no longer be updated: end it rather than leave it
+                // looking live. ExpiredProviderToken is our signing JWT, not the
+                // device's token, so it is logged but leaves the activity alone.
+                if ($reason !== 'ExpiredProviderToken') {
+                    $token->forceFill(['ends_at' => $token->ends_at ?? now()])->save();
+                }
             }
         }
 

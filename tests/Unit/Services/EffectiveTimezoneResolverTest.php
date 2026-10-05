@@ -145,6 +145,44 @@ class EffectiveTimezoneResolverTest extends TestCase
         $this->assertSame('UTC', app(EffectiveTimezoneResolver::class)->timezoneForAt(null, Carbon::now()));
     }
 
+    #[Test]
+    public function date_resolution_uses_the_timezone_in_effect_on_a_past_date(): void
+    {
+        Carbon::setTestNow('2026-09-25 12:00:00 UTC');
+        $user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
+        $this->makeTimezoneEvent($user, 'America/Vancouver', '2026-09-20T10:00:00.000000Z');
+        $resolver = app(EffectiveTimezoneResolver::class);
+
+        $this->assertSame('Europe/London', $resolver->timezoneForDate($user, '2026-09-10'));
+        $this->assertSame('America/Vancouver', $resolver->timezoneForDate($user, '2026-09-22'));
+
+        Carbon::setTestNow();
+    }
+
+    #[Test]
+    public function date_resolution_uses_the_live_timezone_for_today_and_future_dates(): void
+    {
+        Carbon::setTestNow('2026-09-25 12:00:00 UTC');
+        $user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
+        $this->makeTimezoneEvent($user, 'America/Vancouver', '2026-09-25T10:00:00.000000Z');
+        $resolver = app(EffectiveTimezoneResolver::class);
+
+        $this->assertSame('America/Vancouver', $resolver->timezoneForDate($user, '2026-09-25'));
+        $this->assertSame('America/Vancouver', $resolver->timezoneForDate($user, '2026-10-01'));
+
+        Carbon::setTestNow();
+    }
+
+    #[Test]
+    public function date_resolution_handles_missing_users_and_unparseable_dates(): void
+    {
+        $user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
+        $resolver = app(EffectiveTimezoneResolver::class);
+
+        $this->assertSame('UTC', $resolver->timezoneForDate(null, '2026-09-25'));
+        $this->assertSame('Europe/London', $resolver->timezoneForDate($user, '1999-02-31x'));
+    }
+
     private function makeTimezoneEvent(User $user, string $timezone, string $acknowledgedAt): Event
     {
         $integration = Integration::factory()->create([

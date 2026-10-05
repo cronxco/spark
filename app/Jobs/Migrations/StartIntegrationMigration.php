@@ -114,7 +114,7 @@ class StartIntegrationMigration implements ShouldQueue
                 return;
             }
 
-            $this->updateProgress('failed', 'Unsupported service', 0, [
+            $this->markFailed('Unsupported service', [
                 'service' => $service,
                 'integration_id' => $this->integration->id,
             ]);

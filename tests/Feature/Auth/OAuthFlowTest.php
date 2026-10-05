@@ -7,6 +7,7 @@ use App\Models\OAuthAuthorizationCode;
 use App\Models\OAuthRefreshToken;
 use App\Models\User;
 use App\Support\Pkce;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\PersonalAccessToken;
 use PHPUnit\Framework\Attributes\Test;
@@ -207,14 +208,15 @@ class OAuthFlowTest extends TestCase
         $this->assertSame(hash('sha256', $body['refresh_token']), $stored->token_hash);
         $this->assertNull($stored->revoked_at);
 
-        // Access token holds the concrete read/write abilities (Sanctum does
-        // exact-match ability checks, so `ios:*` scope expands to the pair).
+        // The `ios:*` scope the app asks for maps onto the action-scoped
+        // session capabilities, not the retired ios:read/ios:write pair.
         $tokenId = (int) explode('|', $body['access_token'])[0];
         $personalToken = PersonalAccessToken::query()->find($tokenId);
         $this->assertNotNull($personalToken);
         $this->assertSame((string) $user->getKey(), (string) $personalToken->tokenable_id);
-        $this->assertContains('ios:read', $personalToken->abilities);
-        $this->assertContains('ios:write', $personalToken->abilities);
+        $this->assertEqualsCanonicalizing(SparkAbility::MOBILE_SESSION, $personalToken->abilities);
+        $this->assertNotContains('ios:read', $personalToken->abilities);
+        $this->assertNotContains('tokens:manage', $personalToken->abilities);
     }
 
     #[Test]
@@ -320,6 +322,38 @@ class OAuthFlowTest extends TestCase
         // Old access token is gone.
         $oldAccessId = (int) explode('|', $first['access_token'])[0];
         $this->assertNull(PersonalAccessToken::query()->find($oldAccessId));
+    }
+
+    #[Test]
+    public function a_pre_cutover_session_is_upgraded_by_its_next_refresh(): void
+    {
+        config(['ios.mobile_api_enabled' => true]);
+        $user = User::factory()->create();
+        [$code, $verifier] = $this->performAuthorize($user);
+
+        $first = $this->postJson('/api/oauth/token', [
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'code_verifier' => $verifier,
+            'client_id' => 'ios',
+            'redirect_uri' => 'spark://auth/callback',
+        ])->json();
+        PersonalAccessToken::query()->whereKey((int) explode('|', $first['access_token'])[0])
+            ->update(['abilities' => json_encode(['ios:read', 'ios:write'])]);
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($first['access_token'])->getJson('/api/v1/mobile/feed')
+            ->assertStatus(401)
+            ->assertJsonPath('reason', 'session_upgrade_required');
+
+        $refreshed = $this->postJson('/api/oauth/refresh', [
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $first['refresh_token'],
+            'client_id' => 'ios',
+        ])->assertOk()->json();
+
+        $this->app['auth']->forgetGuards();
+        $this->withToken($refreshed['access_token'])->getJson('/api/v1/mobile/notifications')->assertOk();
     }
 
     #[Test]
