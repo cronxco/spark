@@ -47,8 +47,7 @@ final readonly class ListAssessment
     }
 
     /**
-     * Signatures of the groups chosen as the primary list, for reuse on the
-     * next fetch without asking Jev again.
+     * Signatures of the groups chosen as the primary list, for the audit trail.
      *
      * @return list<string>
      */

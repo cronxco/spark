@@ -3,13 +3,14 @@
 namespace App\Jobs\Data\Receipt;
 
 use App\Integrations\Receipt\ReceiptExtractor;
+use App\Integrations\Receipt\ReceiptTimeResolver;
 use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Services\Ai\AiUsageContext;
 use App\Services\CurrencyConversionService;
-use Carbon\Carbon;
+use App\Services\EffectiveTimezoneResolver;
 use Exception;
 use Html2Text\Html2Text;
 use Illuminate\Bus\Queueable;
@@ -338,10 +339,25 @@ class ProcessReceiptEmailJob implements ShouldQueue
             ]
         );
 
-        // Parse transaction date
-        $transactionTime = isset($receiptData['transaction_metadata']['transaction_date'])
-            ? Carbon::parse($receiptData['transaction_metadata']['transaction_date'])
-            : Carbon::parse($parsedEmail['date']);
+        $transaction = $receiptData['transaction_metadata'] ?? [];
+        $printedDate = $transaction['transaction_date'] ?? null;
+        $fallbackTimezone = app(EffectiveTimezoneResolver::class)->timezoneForDate(
+            $this->integration->user,
+            is_string($printedDate) ? substr($printedDate, 0, 10) : now()->toDateString(),
+        );
+        $resolvedTime = app(ReceiptTimeResolver::class)->resolve(
+            $transaction,
+            $parsedEmail['date'],
+            $fallbackTimezone,
+            now(),
+        );
+        $transactionTime = $resolvedTime['time'];
+        // Matching windows must use the same normalized instant as the event/blocks.
+        $matchingHints = $receiptData['matching_hints'] ?? [];
+        $matchingHints['suggested_date_range'] = [
+            'start' => $transactionTime->copy()->subHours(2)->toIso8601String(),
+            'end' => $transactionTime->copy()->addHours(2)->toIso8601String(),
+        ];
 
         // Create receipt event
         $event = Event::create([
@@ -360,7 +376,8 @@ class ProcessReceiptEmailJob implements ShouldQueue
                 'receipt_metadata' => $receiptData['receipt_metadata'],
                 'transaction_metadata' => $receiptData['transaction_metadata'],
                 'transaction_summary' => $receiptData['transaction_summary'],
-                'matching_hints' => $receiptData['matching_hints'],
+                'matching_hints' => $matchingHints,
+                'time_resolution' => $resolvedTime['metadata'],
                 'raw_extraction' => $receiptData, // Store full extraction for debugging
                 'email_message_id' => $parsedEmail['message_id'],
                 'raw_email_s3_key' => $this->s3ObjectKey,

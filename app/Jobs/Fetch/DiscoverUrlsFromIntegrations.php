@@ -9,6 +9,7 @@ use App\Models\Relationship;
 use App\Services\Fetch\Assessment\ListPageDetector;
 use App\Services\Fetch\BookmarkCreator;
 use App\Services\Fetch\Links\LinkCandidateExtractor;
+use App\Services\Fetch\Links\NewsletterLinkFilter;
 use App\Services\Fetch\Links\UrlCanonicalizer;
 use App\Services\Fetch\UrlSafetyValidator;
 use Exception;
@@ -400,9 +401,37 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
             return $metadata;
         }
 
-        unset($metadata['list_unsubscribe']);
+        $unsubscribe = (array) ($metadata['list_unsubscribe'] ?? []);
+        unset($metadata['list_unsubscribe'], $metadata['link_assessment']);
 
-        if ($newsletterExpandsLinks) {
+        if ($event->service === 'newsletter') {
+            $filter = app(NewsletterLinkFilter::class);
+            $html = $metadata['raw_html'] ?? null;
+            $denied = $unsubscribe;
+
+            if (is_string($html)) {
+                $page = app(LinkCandidateExtractor::class)->fromHtml($html, 'https://newsletter.invalid/');
+                $links = $filter->filter($page->candidates, $unsubscribe);
+                $allowed = array_fill_keys(array_map(fn ($link): string => UrlCanonicalizer::canonicalize($link->url), $links), true);
+                foreach ($page->candidates as $candidate) {
+                    if (! isset($allowed[UrlCanonicalizer::canonicalize($candidate->url)])) {
+                        $denied[] = $candidate->url;
+                    }
+                }
+                // Never regex-scan raw newsletter HTML. Its approved anchors
+                // are sufficient; image sources and housekeeping stay out.
+                $metadata['raw_html'] = array_map(fn ($link): string => $link->url, $links);
+            }
+
+            // The same endpoint may also appear in raw text or nested fields.
+            array_walk_recursive($metadata, function (&$value) use ($filter, $denied): void {
+                if (is_string($value)) {
+                    $value = preg_replace_callback('/https?:\/\/[^\s<>"\']+/i', fn (array $match): string => $filter->isDeniedUrl($match[0], $denied) ? '' : $match[0], $value);
+                }
+            });
+        }
+
+        if ($newsletterExpandsLinks && ! ListPageDetector::isShadow()) {
             unset($metadata['raw_html']);
         }
 

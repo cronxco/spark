@@ -8,6 +8,8 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Notifications\IntegrationCompleted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -83,7 +85,7 @@ class NotificationsCentreTest extends TestCase
     {
         // Create notifications at different times
         $this->user->notify(new IntegrationCompleted($this->integration));
-        sleep(1);
+        $this->travel(1)->seconds();
 
         $secondIntegration = Integration::factory()->create([
             'user_id' => $this->user->id,
@@ -316,16 +318,27 @@ class NotificationsCentreTest extends TestCase
     #[Test]
     public function pagination_works_correctly(): void
     {
-        // Create more than 25 notifications
-        for ($i = 0; $i < 30; $i++) {
-            $this->user->notify(new IntegrationCompleted($this->integration));
+        // Persist distinct feed entries; sending the same notification repeatedly
+        // exercises grouping rather than pagination and invokes unrelated channels.
+        for ($i = 0; $i < 26; $i++) {
+            $this->user->notifications()->create([
+                'id' => (string) Str::uuid(),
+                'type' => IntegrationCompleted::class,
+                'data' => ['title' => "Page item {$i}"],
+                'created_at' => now()->subSeconds($i),
+                'updated_at' => now()->subSeconds($i),
+            ]);
         }
 
-        $response = $this->actingAs($this->user)->get(route('notifications.index'));
+        $component = Volt::actingAs($this->user)->test('notifications.index');
+        $component->assertSee('Page item 0')->assertDontSee('Page item 25');
+        $this->assertCount(25, $component->instance()->feed['data']);
 
-        $response->assertOk();
-        // At least some notifications should be visible
-        $response->assertSee('Integration Completed');
+        $component->call('nextPage')->assertSee('Page item 25')->assertDontSee('Page item 0');
+        $this->assertCount(1, $component->instance()->feed['data']);
+
+        $component->call('previousPage')->assertSee('Page item 0')->assertDontSee('Page item 25');
+        $this->assertCount(25, $component->instance()->feed['data']);
     }
 
     #[Test]
