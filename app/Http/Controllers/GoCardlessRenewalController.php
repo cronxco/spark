@@ -42,6 +42,8 @@ class GoCardlessRenewalController extends Controller
         $oldAccounts = $group->integrations()->get()->pluck('configuration.account_id')->filter()->unique()
             ->mapWithKeys(fn ($id) => [$id => app(GoCardlessAccounts::class)->find($group->user_id, $id)?->title ?? 'Previously linked account']);
 
-        return view('integrations.gocardless-renewal', compact('group', 'pending', 'oldAccounts'));
+        return view('integrations.gocardless-renewal', [
+            'group' => $group, 'pending' => $pending, 'oldAccounts' => $oldAccounts,
+        ]);
     }
 }
