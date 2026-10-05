@@ -20,7 +20,7 @@ class EmbeddingClient
 
     private int $dimensions = 1536;
 
-    public function __construct()
+    public function __construct(private int $retryDelayMilliseconds = 1000)
     {
         $this->apiKey = config('services.openai.api_key');
         $this->organization = config('services.openai.organization');
@@ -215,7 +215,7 @@ class EmbeddingClient
 
             $response = Http::withHeaders($headers)
                 ->timeout(30)
-                ->retry(3, 1000)
+                ->retry(3, $this->retryDelayMilliseconds)
                 ->post($this->apiUrl, [
                     'input' => array_values($truncatedTexts),
                     'model' => $this->model,

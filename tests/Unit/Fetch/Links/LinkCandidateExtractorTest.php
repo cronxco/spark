@@ -6,9 +6,9 @@ use App\Services\Fetch\Links\LinkCandidate;
 use App\Services\Fetch\Links\LinkCandidateExtractor;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Fixtures\FetchPages;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class LinkCandidateExtractorTest extends TestCase
+class LinkCandidateExtractorTest extends FrameworkTestCase
 {
     #[Test]
     public function it_extracts_page_signals_and_feeds(): void

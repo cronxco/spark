@@ -8,10 +8,13 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\IsolatesLogs;
 use Tests\TestCase;
 
 class LoggingHelpersTest extends TestCase
 {
+    use IsolatesLogs;
+
     use RefreshDatabase;
 
     private User $user;

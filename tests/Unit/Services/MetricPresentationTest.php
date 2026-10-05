@@ -6,9 +6,9 @@ use App\Models\EventObject;
 use App\Models\MetricStatistic;
 use App\Services\MetricPresentation;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class MetricPresentationTest extends TestCase
+class MetricPresentationTest extends FrameworkTestCase
 {
     private MetricPresentation $presentation;
 

@@ -5,9 +5,9 @@ namespace Tests\Unit\Integrations;
 use App\Integrations\Fetch\ArticleImageExtractor;
 use App\Services\Fetch\UrlSafetyValidator;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class ArticleImageExtractorTest extends TestCase
+class ArticleImageExtractorTest extends FrameworkTestCase
 {
     protected function setUp(): void
     {

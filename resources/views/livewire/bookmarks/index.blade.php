@@ -12,7 +12,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Services\Fetch\Assessment\ListPageDetector;
 use App\Services\Fetch\FetchMetadata;
-use App\Services\Fetch\Links\UrlCanonicalizer;
+use App\Services\Fetch\BookmarkCreator;
 use App\Services\Fetch\UrlSafetyValidator;
 use App\Services\PlaywrightHealthMetrics;
 use Illuminate\Support\Facades\Auth;
@@ -953,47 +953,40 @@ new class extends Component
             return;
         }
 
-        // Check if URL already exists as a subscription (allow if it's only discovered)
-        $existing = EventObject::where('user_id', Auth::id())
-            ->where('concept', 'bookmark')
-            ->where('type', 'fetch_webpage')
-            ->where('url', $this->newUrl)
-            ->where(function ($q) {
-                $q->whereRaw("metadata->>'subscription_source' = 'subscribed'")
-                    ->orWhereNull('metadata->subscription_source'); // Legacy URLs
-            })
-            ->exists();
-
-        if ($existing) {
-            $this->error('This URL is already subscribed.');
-
-            return;
-        }
-
         try {
-            $domain = parse_url($this->newUrl, PHP_URL_HOST);
-
-            EventObject::create([
-                'user_id' => Auth::id(),
-                'concept' => 'bookmark',
-                'type' => 'fetch_webpage',
-                'title' => $this->newUrl, // Will be updated on first fetch
-                'url' => $this->newUrl,
-                'time' => now(),
-                'metadata' => [
-                    'domain' => $domain,
-                    'fetch_integration_id' => $this->integration->id,
-                    'subscription_source' => 'subscribed',
-                    'canonical_url' => UrlCanonicalizer::canonicalize($this->newUrl),
-                    'fetch_mode' => 'recurring', // Subscribed URLs are fetched repeatedly
-                    'subscribed_at' => now()->toIso8601String(),
-                    'enabled' => true,
-                    'last_checked_at' => null,
-                    'last_changed_at' => null,
-                    'content_hash' => null,
-                    'fetch_count' => 0,
-                ],
+            $values = [
+                'domain' => parse_url($this->newUrl, PHP_URL_HOST),
+                'fetch_integration_id' => $this->integration->id,
+                'subscription_source' => 'subscribed',
+                'fetch_mode' => 'recurring',
+                'subscribed_at' => now()->toIso8601String(),
+                'enabled' => true,
+                'is_discovered_url' => false,
+            ];
+            $result = app(BookmarkCreator::class)->firstOrCreate(Auth::id(), $this->newUrl, [], $values + [
+                'last_checked_at' => null,
+                'last_changed_at' => null,
+                'content_hash' => null,
+                'fetch_count' => 0,
             ]);
+
+            if (! $result['created']) {
+                $bookmark = $result['bookmark'];
+                if (($bookmark->metadata['subscription_source'] ?? 'subscribed') === 'subscribed') {
+                    $this->error('This URL is already subscribed.');
+
+                    return;
+                }
+
+                FetchMetadata::mutate($bookmark, function (array $metadata) use ($values): array {
+                    // Subscribing is an explicit user choice. Keep discovery
+                    // provenance/history but remove the automatic crawl guard.
+                    $metadata['discovery_origin'] ??= array_intersect_key($metadata, array_flip(['via', 'found_in', 'list_expansion_depth']));
+                    unset($metadata['via'], $metadata['found_in'], $metadata['list_expansion_depth']);
+
+                    return array_merge($metadata, $values);
+                });
+            }
 
             $this->success('URL subscribed successfully!');
             $this->newUrl = '';

@@ -9,6 +9,7 @@ use App\Models\Integration;
 use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Fetch\BookmarkCreator;
+use App\Services\Fetch\FetchMetadata;
 use App\Services\Fetch\Links\UrlCanonicalizer;
 use App\Services\Fetch\UrlSafetyValidator;
 use Carbon\CarbonImmutable;
@@ -107,6 +108,7 @@ class LinkListExpander
             seen: [],
             selfIdentity: null,
             coldStart: false,
+            newItemLimit: count($items),
         );
 
         $entries = $this->createChildren($fetchIntegration, $entries, [
@@ -138,7 +140,7 @@ class LinkListExpander
      * @param  array<string, string>  $seen  canonical URL => status
      * @return list<array{url: string, canonical_url: string, title: ?string, status: string, child_id: ?string}>
      */
-    private function classify(User $user, array $items, array $seen, ?string $selfIdentity, bool $coldStart): array
+    private function classify(User $user, array $items, array $seen, ?string $selfIdentity, bool $coldStart, ?int $newItemLimit = null): array
     {
         $candidates = [];
         foreach ($items as $item) {
@@ -153,7 +155,7 @@ class LinkListExpander
 
         $existing = $this->bookmarks->findMany($user->id, array_map(fn (ListItem $item): string => $item->url, array_values($candidates)));
         $backfill = max(0, (int) config('fetch.list_expansion.initial_backfill', 5));
-        $cap = max(0, (int) config('fetch.list_expansion.max_new_per_run', 20));
+        $cap = $newItemLimit ?? max(0, (int) config('fetch.list_expansion.max_new_per_run', 20));
         $newSlots = $coldStart ? $backfill : $cap;
 
         $entries = [];
@@ -226,8 +228,8 @@ class LinkListExpander
                 continue;
             }
 
-            if ($entry['status'] === self::STATUS_QUEUED) {
-                try {
+            try {
+                if ($entry['status'] === self::STATUS_QUEUED) {
                     // The URL is a unique placeholder title until the first fetch
                     // (objects are unique per user and title); the list's title for
                     // the item is kept in metadata.
@@ -254,22 +256,27 @@ class LinkListExpander
                         'fetch_count' => 0,
                         'is_discovered_url' => true,
                         'is_linkable' => false,
-                        'fetch_dispatched_at' => $autoFetch ? $now->toIso8601String() : null,
+                        'fetch_dispatched_at' => null,
                     ], $discoveredFrom));
-                } catch (Throwable $e) {
-                    Log::warning('Fetch: Failed to create list item bookmark', [
-                        'url' => $entry['url'],
-                        'error' => $e->getMessage(),
-                    ]);
-                    $entries[$index]['status'] = self::STATUS_RETRYABLE_FAILED;
-
-                    continue;
+                } else {
+                    $result = [
+                        'bookmark' => EventObject::findOrFail($entry['child_id']),
+                        'created' => false,
+                    ];
                 }
 
                 $child = $result['bookmark'];
                 $entries[$index]['child_id'] = (string) $child->id;
 
-                if (! $result['created']) {
+                $childMetadata = $child->metadata ?? [];
+                $recoverDispatch = ! $result['created']
+                    && ($childMetadata['via'] ?? null) === 'list_expansion'
+                    && (string) ($childMetadata[$source instanceof EventObject ? 'discovered_from_object_id' : 'discovered_from_event_id'] ?? '') === (string) $source->id
+                    && empty($childMetadata['fetch_dispatched_at'])
+                    && (int) ($childMetadata['fetch_count'] ?? 0) === 0
+                    && ($childMetadata['enabled'] ?? false);
+
+                if (! $result['created'] && ! $recoverDispatch) {
                     $entries[$index]['status'] = self::STATUS_EXISTING;
                 } elseif (! $autoFetch) {
                     $entries[$index]['status'] = self::STATUS_DISABLED;
@@ -280,10 +287,18 @@ class LinkListExpander
 
                     FetchSingleUrl::dispatch($fetchIntegration, (string) $child->id, $child->url)
                         ->delay($now->addSeconds($delay));
+                    FetchMetadata::merge($child, ['fetch_dispatched_at' => $now->toIso8601String()]);
+                    $entries[$index]['status'] = self::STATUS_QUEUED;
                 }
-            }
 
-            $this->link($fetchIntegration, $source, $entries[$index]);
+                $this->link($fetchIntegration, $source, $entries[$index]);
+            } catch (Throwable $e) {
+                Log::warning('Fetch: Failed to prepare list item', [
+                    'url' => $entry['url'],
+                    'error' => $e->getMessage(),
+                ]);
+                $entries[$index]['status'] = self::STATUS_RETRYABLE_FAILED;
+            }
         }
 
         return $entries;
