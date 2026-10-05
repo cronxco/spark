@@ -5,6 +5,7 @@ namespace App\Services\Receipt;
 use App\Models\Event;
 use App\Models\Relationship;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 /** Product state belongs to the receipt event; the link remains authoritative. */
 class ReceiptMatchState
@@ -48,10 +49,29 @@ class ReceiptMatchState
 
     public static function update(Event $receipt, array $changes): void
     {
-        $receipt->refresh();
-        $metadata = $receipt->event_metadata ?? [];
-        $metadata['receipt_matching'] = array_replace($metadata['receipt_matching'] ?? [], $changes);
-        $receipt->withoutEvents(fn () => $receipt->update(['event_metadata' => $metadata]));
+        DB::transaction(function () use ($receipt, $changes): void {
+            $locked = Event::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+            $metadata = $locked->event_metadata ?? [];
+            $metadata['receipt_matching'] = array_replace($metadata['receipt_matching'] ?? [], $changes);
+            $locked->withoutEvents(fn () => $locked->update(['event_metadata' => $metadata]));
+            $receipt->refresh();
+        });
+    }
+
+    public static function failIfPending(Event $receipt): void
+    {
+        DB::transaction(function () use ($receipt): void {
+            $locked = Event::query()->whereKey($receipt->id)->lockForUpdate()->first();
+            if (! $locked || self::isMatched($locked)
+                || in_array(self::status($locked), ['no_match', 'dismissed', 'suggestions'], true)) {
+                return;
+            }
+            self::update($locked, [
+                'status' => 'failed',
+                'reason' => 'matching_failed',
+                'attempted_at' => now()->toIso8601String(),
+            ]);
+        });
     }
 
     public static function clear(Event $receipt, string $status = 'unmatched'): void

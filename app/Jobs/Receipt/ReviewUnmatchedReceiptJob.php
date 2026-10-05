@@ -27,7 +27,8 @@ class ReviewUnmatchedReceiptJob implements ShouldQueue
     public function handle(ReceiptTransactionMatcher $matcher): void
     {
         $receipt = Event::query()->with(['integration', 'target'])->find($this->receiptId);
-        if (! $receipt || $receipt->service !== 'receipt' || ReceiptMatchState::isMatched($receipt)) {
+        if (! $receipt || $receipt->service !== 'receipt' || ReceiptMatchState::isMatched($receipt)
+            || in_array(ReceiptMatchState::status($receipt), ['no_match', 'dismissed'], true)) {
             return;
         }
 
@@ -46,12 +47,8 @@ class ReviewUnmatchedReceiptJob implements ShouldQueue
     public function failed(Throwable $error): void
     {
         $receipt = Event::find($this->receiptId);
-        if ($receipt && ! ReceiptMatchState::isMatched($receipt)) {
-            ReceiptMatchState::update($receipt, [
-                'status' => 'failed',
-                'reason' => 'matching_failed',
-                'attempted_at' => now()->toIso8601String(),
-            ]);
+        if ($receipt) {
+            ReceiptMatchState::failIfPending($receipt);
         }
         Log::error('Receipt matching sweep failed', [
             'receipt_id' => $this->receiptId,

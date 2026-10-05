@@ -237,15 +237,30 @@ class ReceiptTransactionMatcher
     /** Run the same receipt decision path for intake, a late transaction, or a retry. */
     public function matchReceipt(Event $receipt, ?Event $incomingTransaction = null, bool $allowAutomatic = true): string
     {
+        return DB::transaction(function () use ($receipt, $incomingTransaction, $allowAutomatic): string {
+            $locked = Event::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+
+            return $this->matchLockedReceipt($locked, $incomingTransaction, $allowAutomatic);
+        });
+    }
+
+    private function matchLockedReceipt(Event $receipt, ?Event $incomingTransaction, bool $allowAutomatic): string
+    {
         if (ReceiptMatchState::isMatched($receipt)) {
             return 'already_matched';
         }
-        if ($incomingTransaction && in_array(ReceiptMatchState::status($receipt), ['dismissed', 'no_match'], true)) {
+        $userRejected = in_array(ReceiptMatchState::status($receipt), ['dismissed', 'no_match'], true);
+        if ($userRejected && ! $incomingTransaction) {
+            return ReceiptMatchState::status($receipt);
+        }
+        if ($userRejected) {
             $allowAutomatic = false;
         }
 
-        $candidates = $this->findCandidateMatches($receipt);
-        if ($incomingTransaction
+        $candidates = $userRejected ? collect() : $this->findCandidateMatches($receipt);
+        if ($incomingTransaction && $receipt->time && $incomingTransaction->time
+            && in_array($incomingTransaction->service, ['monzo', 'gocardless'], true)
+            && $incomingTransaction->domain === 'money'
             && $incomingTransaction->integration?->user_id === $receipt->integration?->user_id
             && in_array($incomingTransaction->action, self::TRANSACTION_ACTIONS, true)) {
             $score = $this->calculateReverseMatchConfidence($receipt, $incomingTransaction);
@@ -259,6 +274,9 @@ class ReceiptTransactionMatcher
             }
         }
         $candidates = $candidates->sortByDesc('confidence')->values();
+        if ($userRejected && $candidates->isEmpty()) {
+            return ReceiptMatchState::status($receipt);
+        }
 
         if ($candidates->isEmpty()) {
             $hasAmount = is_numeric($receipt->value) && $receipt->value > 0;

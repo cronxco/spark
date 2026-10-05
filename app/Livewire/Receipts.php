@@ -142,7 +142,13 @@ class Receipts extends Component
     {
         $receipt = $this->findOwnedEvent($receiptId);
         abort_unless($receipt?->service === 'receipt', 404);
-        app(ReceiptMatchingActions::class)->markNoMatch($receipt);
+        try {
+            app(ReceiptMatchingActions::class)->markNoMatch($receipt);
+        } catch (InvalidArgumentException $exception) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => $exception->getMessage()]);
+
+            return;
+        }
     }
 
     public function deleteReceipt(string $receiptId): void

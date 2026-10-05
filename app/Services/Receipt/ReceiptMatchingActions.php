@@ -63,7 +63,7 @@ class ReceiptMatchingActions
                     $query->orWhereDate('time', $term);
                 }
             });
-        } else {
+        } elseif ($receipt->time) {
             $query->whereBetween('time', [$receipt->time->copy()->subDays(30), $receipt->time->copy()->addDays(30)]);
         }
 
@@ -86,14 +86,17 @@ class ReceiptMatchingActions
 
     public function markNoMatch(Event $receipt): void
     {
-        if (ReceiptMatchState::isMatched($receipt)) {
-            throw new InvalidArgumentException('Unlink this receipt before marking it unmatched.');
-        }
-        ReceiptMatchState::update($receipt, [
-            'status' => 'no_match',
-            'reason' => 'confirmed_by_user',
-            'candidates' => [],
-            'dismissed_at' => now()->toIso8601String(),
-        ]);
+        DB::transaction(function () use ($receipt): void {
+            $locked = Event::query()->whereKey($receipt->id)->lockForUpdate()->firstOrFail();
+            if (ReceiptMatchState::isMatched($locked)) {
+                throw new InvalidArgumentException('Unlink this receipt before marking it unmatched.');
+            }
+            ReceiptMatchState::update($locked, [
+                'status' => 'no_match',
+                'reason' => 'confirmed_by_user',
+                'candidates' => [],
+                'dismissed_at' => now()->toIso8601String(),
+            ]);
+        });
     }
 }

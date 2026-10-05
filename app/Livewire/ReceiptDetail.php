@@ -108,7 +108,13 @@ class ReceiptDetail extends Component
     public function markNoMatch(): void
     {
         $this->authorizeReceipt();
-        app(ReceiptMatchingActions::class)->markNoMatch($this->receipt);
+        try {
+            app(ReceiptMatchingActions::class)->markNoMatch($this->receipt);
+        } catch (InvalidArgumentException $exception) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => $exception->getMessage()]);
+
+            return;
+        }
         $this->receipt->refresh();
     }
 

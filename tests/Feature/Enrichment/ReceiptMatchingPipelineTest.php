@@ -13,6 +13,7 @@ use App\Models\Relationship;
 use App\Models\TaskExecution;
 use App\Models\User;
 use App\Services\Receipt\ReceiptMatchState;
+use App\Services\Receipt\ReceiptMatchingActions;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskRegistry;
 use DateTimeInterface;
@@ -178,6 +179,68 @@ class ReceiptMatchingPipelineTest extends TestCase
 
         $this->assertSame('suggestions', ReceiptMatchState::status($receipt->fresh()));
         $this->assertFalse(ReceiptMatchState::isMatched($receipt));
+    }
+
+    #[Test]
+    public function queued_matching_and_failure_callbacks_preserve_user_decisions(): void
+    {
+        $at = now()->subHour();
+        $receipt = $this->receiptFor($this->alice, 1250, $at, 'Coffee Shop');
+        $this->transactionFor($this->alice, 1250, $at, 'card_payment_to', 'Coffee Shop');
+        $job = new ReviewUnmatchedReceiptJob($receipt->id, 'queued-before-decision');
+        $task = new MatchReceiptToTransactionTask($receipt, $this->definition('match_receipt_to_transaction', MatchReceiptToTransactionTask::class));
+
+        foreach (['no_match', 'dismissed'] as $status) {
+            ReceiptMatchState::update($receipt, ['status' => $status, 'candidates' => []]);
+            $before = ReceiptMatchState::state($receipt->fresh());
+            $job->handle(app(ReceiptTransactionMatcher::class));
+            $this->assertSame($status, app(ReceiptTransactionMatcher::class)->matchReceipt($receipt));
+            $job->failed(new \RuntimeException('Late failure'));
+            $task->failed(new \RuntimeException('Late task failure'));
+            $this->assertSame($before, ReceiptMatchState::state($receipt->fresh()));
+            $this->assertFalse(ReceiptMatchState::isMatched($receipt));
+        }
+    }
+
+    #[Test]
+    public function rejected_receipts_reopen_only_for_the_qualifying_incoming_transaction(): void
+    {
+        $at = now()->subHour();
+        $receipt = $this->receiptFor($this->alice, 1250, $at, 'Coffee Shop');
+        $old = $this->transactionFor($this->alice, 1250, $at, 'card_payment_to', 'Coffee Shop');
+        $weak = $this->transactionFor($this->alice, 1250, $at->copy()->addHours(4), 'card_payment_to', 'ZZZZ');
+        $new = $this->transactionFor($this->alice, 1250, $at, 'card_payment_to', 'Coffee Shop');
+        $matcher = app(ReceiptTransactionMatcher::class);
+
+        foreach (['no_match', 'dismissed'] as $status) {
+            ReceiptMatchState::update($receipt, ['status' => $status, 'candidates' => []]);
+            $this->assertSame($status, $matcher->matchReceipt($receipt, $weak));
+            $this->assertSame($status, ReceiptMatchState::status($receipt->fresh()));
+            $this->assertSame('review_required', $matcher->matchReceipt($receipt, $new));
+            $this->assertSame([$new->id], array_column(ReceiptMatchState::candidates($receipt->fresh()), 'transaction_id'));
+            $this->assertNotContains($old->id, array_column(ReceiptMatchState::candidates($receipt), 'transaction_id'));
+            $this->assertFalse(ReceiptMatchState::isMatched($receipt));
+        }
+    }
+
+    #[Test]
+    public function explicit_no_match_refuses_a_link_and_retry_clears_the_decision(): void
+    {
+        Queue::fake();
+        $receipt = $this->receiptFor($this->alice, 1250, now(), 'Coffee Shop');
+        $transaction = $this->transactionFor($this->alice, 1250, now(), 'card_payment_to', 'Coffee Shop');
+        $actions = app(ReceiptMatchingActions::class);
+        $actions->markNoMatch($receipt);
+        $actions->retry($receipt);
+        $this->assertSame('searching', ReceiptMatchState::status($receipt->fresh()));
+        $actions->link($receipt, $transaction);
+        try {
+            $actions->markNoMatch($receipt);
+            $this->fail('A linked receipt must reject no-match.');
+        } catch (InvalidArgumentException) {
+            $this->assertSame('matched', ReceiptMatchState::status($receipt->fresh()));
+            $this->assertSame('matched', ReceiptMatchState::state($receipt)['status']);
+        }
     }
 
     private function outcome(Event $event, string $taskKey): ?string
