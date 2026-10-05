@@ -271,16 +271,13 @@ class ContentExtractor
         return hash('sha256', $normalized);
     }
 
-    /**
-     * Parse HTML with Readability without judging whether the result is usable.
-     *
-     * Callers that need to inspect a page before deciding how to treat it (for
-     * example list-page detection) parse first and validate afterwards.
-     *
-     * @return array{success: bool, reason: ?string, data: ?array{title: ?string, content: ?string, text_content: string, excerpt: ?string, author: ?string, image: ?string, direction: ?string}}
-     */
-    public static function parse(string $html, string $url): array
-    {
+    private static function extractDocument(
+        string $html,
+        string $url,
+        ?string $userId,
+        bool $detectAccessBarriers,
+    ): array {
+        // Create Readability configuration
         $config = new Configuration([
             'FixRelativeURLs' => true,
             'SubstituteEntities' => true,
@@ -291,18 +288,45 @@ class ContentExtractor
             $readability = new Readability($config);
             $readability->parse($html, $url);
 
+            // Extract data
+            $extracted = [
+                'title' => $readability->getTitle(),
+                'content' => $readability->getContent(), // HTML
+                'text_content' => strip_tags($readability->getContent(), '<br>'),
+                'excerpt' => $readability->getExcerpt(),
+                'author' => $readability->getAuthor(),
+                'image' => $readability->getImage(),
+                'direction' => $readability->getDirection(), // ltr/rtl
+            ];
+
+            // Validate extracted content
+            $validation = self::validate($extracted, $html, $url, $detectAccessBarriers);
+
+            // Write debug file with extracted content
+            self::writeDebugExtraction($url, $extracted, $validation, $userId);
+
+            if (! $validation['success']) {
+                Log::warning('Fetch: Content extraction validation failed', [
+                    'url' => $url,
+                    'reason' => $validation['reason'],
+                    'title' => $extracted['title'],
+                    'content_length' => strlen($extracted['text_content'] ?? ''),
+                ]);
+
+                return $validation;
+            }
+
+            Log::debug('Fetch: Content extracted successfully', [
+                'url' => $url,
+                'title' => $extracted['title'],
+                'author' => $extracted['author'],
+                'content_length' => strlen($extracted['text_content']),
+            ]);
+
             return [
                 'success' => true,
                 'reason' => null,
-                'data' => [
-                    'title' => $readability->getTitle(),
-                    'content' => $readability->getContent(), // HTML
-                    'text_content' => strip_tags((string) $readability->getContent(), '<br>'),
-                    'excerpt' => $readability->getExcerpt(),
-                    'author' => $readability->getAuthor(),
-                    'image' => $readability->getImage(),
-                    'direction' => $readability->getDirection(), // ltr/rtl
-                ],
+                'data' => $extracted,
             ];
         } catch (ParseException $e) {
             Log::error('Fetch: Readability parse error', [
@@ -327,76 +351,6 @@ class ContentExtractor
                 'data' => null,
             ];
         }
-    }
-
-    /**
-     * Apply the usual acceptance checks to a result from parse().
-     *
-     * @param  array{success: bool, reason: ?string, data: ?array}  $parsed
-     * @return array ['success' => bool, 'reason' => string|null, 'data' => array|null]
-     */
-    public static function validateParsed(
-        array $parsed,
-        string $html,
-        string $url,
-        ?string $userId = null,
-        bool $detectAccessBarriers = true,
-    ): array {
-        if (! $parsed['success'] || $parsed['data'] === null) {
-            return $parsed;
-        }
-
-        $extracted = $parsed['data'];
-
-        try {
-            $validation = self::validate($extracted, $html, $url, $detectAccessBarriers);
-        } catch (Exception $e) {
-            Log::error('Fetch: Extraction error', [
-                'url' => $url,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [
-                'success' => false,
-                'reason' => 'Extraction error: ' . $e->getMessage(),
-                'data' => null,
-            ];
-        }
-
-        self::writeDebugExtraction($url, $extracted, $validation, $userId);
-
-        if (! $validation['success']) {
-            Log::warning('Fetch: Content extraction validation failed', [
-                'url' => $url,
-                'reason' => $validation['reason'],
-                'title' => $extracted['title'],
-                'content_length' => strlen($extracted['text_content'] ?? ''),
-            ]);
-
-            return $validation;
-        }
-
-        Log::debug('Fetch: Content extracted successfully', [
-            'url' => $url,
-            'title' => $extracted['title'],
-            'author' => $extracted['author'],
-            'content_length' => strlen($extracted['text_content']),
-        ]);
-
-        return [
-            'success' => true,
-            'reason' => null,
-            'data' => $extracted,
-        ];
-    }
-
-    private static function extractDocument(
-        string $html,
-        string $url,
-        ?string $userId,
-        bool $detectAccessBarriers,
-    ): array {
-        return self::validateParsed(self::parse($html, $url), $html, $url, $userId, $detectAccessBarriers);
     }
 
     /**

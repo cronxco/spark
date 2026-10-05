@@ -4,7 +4,7 @@ namespace Tests\Unit\Integrations;
 
 use App\Integrations\ManualLog\VivinoSearchParser;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
 /**
  * Tests the parsing/normalization logic against a constructed fixture that
@@ -15,7 +15,7 @@ use Tests\TestCase;
  * correctly extracts and normalizes data from HTML of that assumed shape,
  * so the logic is right even if the real selectors need adjustment later.
  */
-class VivinoSearchParserTest extends TestCase
+class VivinoSearchParserTest extends FrameworkTestCase
 {
     private const FIXTURE_HTML = <<<'HTML'
         <html><body>

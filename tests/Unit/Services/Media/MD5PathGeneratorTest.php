@@ -5,9 +5,9 @@ namespace Tests\Unit\Services\Media;
 use App\Services\Media\MD5PathGenerator;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class MD5PathGeneratorTest extends TestCase
+class MD5PathGeneratorTest extends FrameworkTestCase
 {
     protected MD5PathGenerator $pathGenerator;
 

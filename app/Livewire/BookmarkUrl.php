@@ -4,9 +4,8 @@ namespace App\Livewire;
 
 use App\Exceptions\UnsafeUrlException;
 use App\Jobs\Fetch\FetchSingleUrl;
-use App\Services\Fetch\BookmarkCreator;
+use App\Models\EventObject;
 use App\Services\Fetch\FetchIntegrationResolver;
-use App\Services\Fetch\FetchMetadata;
 use App\Services\Fetch\UrlSafetyValidator;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -59,26 +58,47 @@ class BookmarkUrl extends Component
         // Get domain for title
         $domain = $this->getDomainFromUrl($normalizedUrl);
 
-        $result = app(BookmarkCreator::class)->firstOrCreate(Auth::id(), $normalizedUrl, ['title' => $domain], [
-            'fetch_integration_id' => $fetchIntegration->id,
-            'fetch_mode' => $this->fetchMode,
-            'enabled' => $this->enabled,
-            'fetch_count' => 0,
-            'added_via' => 'spotlight',
-        ]);
+        // Check if URL already exists
+        $existingWebpage = EventObject::where('user_id', Auth::id())
+            ->where('concept', 'bookmark')
+            ->where('type', 'fetch_webpage')
+            ->where('url', $normalizedUrl)
+            ->first();
 
-        if (! $result['created']) {
-            FetchMetadata::merge($result['bookmark'], [
-                'fetch_integration_id' => $fetchIntegration->id,
-                'fetch_mode' => $this->fetchMode,
-                'enabled' => $this->enabled,
+        if ($existingWebpage) {
+            // Update existing webpage
+            $metadata = $existingWebpage->metadata ?? [];
+            $metadata['fetch_integration_id'] = $fetchIntegration->id;
+            $metadata['fetch_mode'] = $this->fetchMode;
+            $metadata['enabled'] = $this->enabled;
+
+            $existingWebpage->metadata = $metadata;
+            $existingWebpage->save();
+
+            $webpageId = $existingWebpage->id;
+        } else {
+            // Create new webpage EventObject
+            $webpage = EventObject::create([
+                'user_id' => Auth::id(),
+                'concept' => 'bookmark',
+                'type' => 'fetch_webpage',
+                'title' => $domain,
+                'url' => $normalizedUrl,
+                'time' => now(),
+                'metadata' => [
+                    'fetch_integration_id' => $fetchIntegration->id,
+                    'fetch_mode' => $this->fetchMode,
+                    'enabled' => $this->enabled,
+                    'fetch_count' => 0,
+                    'added_via' => 'spotlight',
+                ],
             ]);
+
+            $webpageId = $webpage->id;
         }
 
-        $webpage = $result['bookmark'];
-
         // Dispatch fetch job immediately
-        FetchSingleUrl::dispatch($fetchIntegration, $webpage->id, $webpage->url);
+        FetchSingleUrl::dispatch($fetchIntegration, $webpageId, $normalizedUrl);
 
         // Close modal and notify
         $this->showModal = false;

@@ -57,10 +57,9 @@
         }
     }
 
-    // Check if there's a linked_to relationship (URL discovered from this event's
-    // target, or an article found in this newsletter issue)
-    $hasLinkedUrl = $event->relationshipsFrom()->where('type', 'linked_to')->exists();
-    if (! $hasLinkedUrl && $event->target) {
+    // Check if there's a linked_to relationship (URL discovered from this event's target)
+    $hasLinkedUrl = false;
+    if ($event->target) {
         $hasLinkedUrl = $event->target->relationshipsFrom()
         ->where('type', 'linked_to')
         ->exists();
