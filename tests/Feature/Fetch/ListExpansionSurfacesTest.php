@@ -10,6 +10,9 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Services\Fetch\Assessment\ListPageDetector;
+use App\Services\Fetch\BookmarkCreator;
+use App\Services\Fetch\UrlSafetyValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Sleep;
@@ -139,6 +142,28 @@ class ListExpansionSurfacesTest extends TestCase
 
         Volt::test('bookmarks.index')->call('setListDetectionMode', (string) $bookmark->id, 'bogus');
         $this->assertSame('force', $bookmark->fresh()->metadata['list_detection']['mode']);
+    }
+
+    #[Test]
+    public function subscribing_to_a_discovered_tracking_variant_promotes_the_same_bookmark(): void
+    {
+        $this->mock(UrlSafetyValidator::class, fn ($mock) => $mock->shouldReceive('isSafe')->andReturnTrue());
+        $bookmark = app(BookmarkCreator::class)->firstOrCreate($this->user->id,
+            'https://example.com/post', [], ['subscription_source' => 'discovered',
+                'fetch_count' => 3, 'enabled' => false, 'via' => 'list_expansion',
+                'found_in' => 'list_expansion', 'list_expansion_depth' => 1])['bookmark'];
+        $this->actingAs($this->user);
+
+        Volt::test('bookmarks.index')->set('newUrl', $bookmark->url . '?utm_source=share')->call('subscribeToUrl')->assertHasNoErrors();
+
+        $bookmark->refresh();
+        $this->assertSame(1, EventObject::where('type', 'fetch_webpage')->count());
+        $this->assertSame('subscribed', $bookmark->metadata['subscription_source']);
+        $this->assertSame('recurring', $bookmark->metadata['fetch_mode']);
+        $this->assertTrue($bookmark->metadata['enabled']);
+        $this->assertSame(3, $bookmark->metadata['fetch_count']);
+        $this->assertTrue(ListPageDetector::isEligibleForListExpansion($bookmark));
+        $this->assertSame(1, $bookmark->metadata['discovery_origin']['list_expansion_depth']);
     }
 
     #[Test]
