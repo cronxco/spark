@@ -76,11 +76,15 @@ class GoCardlessAccountRenewalTest extends TestCase
     #[Test]
     public function identical_names_do_not_merge_different_accounts(): void
     {
-        $first = $this->plugin->upsertAccountObject($this->integration, $this->details());
+        $first = $this->plugin->upsertAccountObject($this->integration, $this->details())->refresh();
         $other = $this->plugin->createInstance($this->group, 'accounts', ['account_id' => 'other-account']);
-        $second = $this->plugin->upsertAccountObject($other, $this->details('other-account', 'other-resource'));
+        $second = $this->plugin->upsertAccountObject($other, $this->details('other-account', 'other-resource'))->refresh();
         $this->assertNotSame($first->id, $second->id);
-        $this->assertSame($first->title, $second->title);
+        $this->assertNotSame($first->title, $second->title);
+        $this->assertSame($first->metadata['name'], $second->metadata['name']);
+        $again = $this->plugin->upsertAccountObject($other, $this->details('other-account', 'other-resource'));
+        $this->assertSame($second->id, $again->id);
+        $this->assertSame($second->title, $again->title);
     }
 
     #[Test]
@@ -271,7 +275,7 @@ class GoCardlessAccountRenewalTest extends TestCase
         $event = Event::create(['integration_id' => $this->integration->id, 'source_id' => 'balance-one',
             'actor_id' => $duplicate->id, 'target_id' => $canonical->id, 'service' => 'gocardless',
             'domain' => 'money', 'action' => 'had_balance', 'time' => now(), 'value' => 12345,
-            'value_multiplier' => 100, 'value_unit' => 'GBP']);
+            'value_multiplier' => 100, 'value_unit' => 'GBP'])->refresh();
         $relationship = Relationship::create(['user_id' => $this->owner->id, 'from_type' => EventObject::class,
             'from_id' => $duplicate->id, 'to_type' => EventObject::class, 'to_id' => $canonical->id, 'type' => 'related_to']);
         $otherOwner = User::factory()->create();
@@ -303,7 +307,7 @@ class GoCardlessAccountRenewalTest extends TestCase
         $event = Event::create(['integration_id' => $this->integration->id, 'source_id' => 'old-alias-balance',
             'actor_id' => $duplicate->id, 'target_id' => $canonical->id, 'service' => 'gocardless', 'domain' => 'money',
             'action' => 'had_balance', 'time' => now(), 'value' => 5000,
-            'value_multiplier' => 100, 'value_unit' => 'GBP']);
+            'value_multiplier' => 100, 'value_unit' => 'GBP'])->refresh();
         $this->stage();
         $this->provider($this->details('new-account'));
         $this->assertTrue($this->plugin->completeRenewal($this->group, 'pending-reference'));
@@ -367,10 +371,25 @@ class GoCardlessAccountRenewalTest extends TestCase
             'id' => 'old-account', 'iban' => 'GB82WEST12345698765432', 'currency' => 'GBP',
         ]);
         $this->assertNotNull($object);
+        $object->refresh();
         $this->assertSame('old-account', $object->metadata['account_id']);
         $this->assertSame('GB82WEST12345698765432', $object->metadata['raw']['iban']);
         $this->assertSame($object->id, $this->plugin->upsertAccountObject($this->integration, ['id' => 'old-account'])->id);
         $this->assertSame($object->id, $this->integration->fresh()->configuration['account_object_id']);
+    }
+
+    #[Test]
+    public function provider_name_changes_cannot_collide_with_another_account_title(): void
+    {
+        $first = $this->plugin->upsertAccountObject($this->integration, $this->details())->refresh();
+        $other = $this->plugin->createInstance($this->group, 'accounts', ['account_id' => 'other-account']);
+        $details = $this->details('other-account', 'other-resource');
+        $details['details'] = 'Another supplied name';
+        $second = $this->plugin->upsertAccountObject($other, $details)->refresh();
+        $updated = $this->plugin->upsertAccountObject($other, $this->details('other-account', 'other-resource'));
+        $this->assertSame($second->id, $updated->id);
+        $this->assertNotSame($first->title, $updated->title);
+        $this->assertSame($first->metadata['name'], $updated->metadata['name']);
     }
 
     private function details(string $id = 'old-account', string $resource = 'bank-resource'): array
@@ -385,7 +404,7 @@ class GoCardlessAccountRenewalTest extends TestCase
             'type' => 'bank_account', 'title' => $title, 'metadata' => $metadata ?? [
                 'account_id' => 'old-account', 'name' => $title, 'is_pinned' => true,
                 'is_negative_balance' => true, 'raw' => $this->details(),
-            ]]);
+            ]])->refresh();
     }
 
     private function stage(): void

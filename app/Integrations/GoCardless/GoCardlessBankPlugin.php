@@ -1166,7 +1166,9 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
                     }
                 }
                 $existing->update([
-                    'title' => $existing->title === $this->generateAccountName($raw) ? $metadata['name'] : $existing->title,
+                    'title' => $this->availableAccountTitle($integration->user_id,
+                        $existing->title === $this->generateAccountName($raw) ? $metadata['name'] : $existing->title,
+                        $accountId, (string) $existing->id),
                     'content' => json_encode($account), 'metadata' => $metadata,
                 ]);
 
@@ -1175,7 +1177,8 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
             return EventObject::create([
                 'user_id' => $integration->user_id, 'concept' => 'account', 'type' => 'bank_account',
-                'title' => $name, 'content' => json_encode($account), 'metadata' => $metadata,
+                'title' => $this->availableAccountTitle($integration->user_id, $name, $accountId),
+                'content' => json_encode($account), 'metadata' => $metadata,
             ]);
         });
     }
@@ -3000,4 +3003,19 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         return $response->json();
     }
+
+    private function availableAccountTitle(string $userId, string $name, string $accountId, ?string $exceptId = null): string
+    {
+        $title = $name;
+        $suffix = 1;
+        while (EventObject::where('user_id', $userId)->where('concept', 'account')
+            ->where('type', 'bank_account')->where('title', $title)
+            ->when($exceptId, fn ($query) => $query->where('id', '!=', $exceptId))->exists()) {
+            $title = $name . ' [' . $accountId . ']' . ($suffix === 1 ? '' : ' (' . $suffix . ')');
+            $suffix++;
+        }
+
+        return $title;
+    }
+
 }
