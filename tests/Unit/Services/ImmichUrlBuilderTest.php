@@ -4,9 +4,9 @@ namespace Tests\Unit\Services;
 
 use App\Services\ImmichUrlBuilder;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class ImmichUrlBuilderTest extends TestCase
+class ImmichUrlBuilderTest extends FrameworkTestCase
 {
     protected ImmichUrlBuilder $builder;
 

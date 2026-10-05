@@ -6,10 +6,6 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Relationship;
-use App\Services\Fetch\Assessment\ListPageDetector;
-use App\Services\Fetch\BookmarkCreator;
-use App\Services\Fetch\Links\LinkCandidateExtractor;
-use App\Services\Fetch\Links\UrlCanonicalizer;
 use App\Services\Fetch\UrlSafetyValidator;
 use Exception;
 use Illuminate\Bus\Batchable;
@@ -136,16 +132,8 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
         // integration scopes to the user; chunk to avoid loading all events.
         $events = Event::whereIn('integration_id', $monitoredIntegrationIds)
             ->lazyById(500);
-        $newsletterExpansion = Integration::whereIn('id', $monitoredIntegrationIds)
-            ->where('service', 'newsletter')
-            ->get()
-            ->mapWithKeys(fn (Integration $integration): array => [
-                (string) $integration->id => ListPageDetector::isEnabled() && (bool) ($integration->configuration['expand_links'] ?? true),
-            ]);
 
         foreach ($events as $event) {
-            $event->event_metadata = $this->scannableMetadata($event, $newsletterExpansion->get((string) $event->integration_id, false));
-
             // Check if event has a url field (EventObjects have url, but Events might in event_metadata)
             // We'll check event_metadata for a 'url' key at the top level
             if ($event->event_metadata && is_array($event->event_metadata) && isset($event->event_metadata['url'])) {
@@ -193,7 +181,9 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
         ]);
 
         // Filter out image and static asset URLs by file extension
-        $excludedExtensions = LinkCandidateExtractor::EXCLUDED_EXTENSIONS;
+        $imageExtensions = ['ico', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'tiff', 'avif'];
+        $assetExtensions = ['css', 'js', 'woff', 'woff2', 'ttf', 'eot', 'map'];
+        $excludedExtensions = array_merge($imageExtensions, $assetExtensions);
 
         $beforeExtensionFilter = $discoveredUrls->count();
         $discoveredUrls = $discoveredUrls->reject(function ($urlData) use ($excludedExtensions) {
@@ -244,15 +234,12 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
 
         // Filter out URLs that are already subscribed
         // Query for fetch_webpage objects belonging to this user
-        $existingIdentities = EventObject::where('user_id', $this->integration->user_id)
+        $existingUrls = EventObject::where('user_id', $this->integration->user_id)
             ->where('type', 'fetch_webpage')
-            ->get(['url', 'metadata'])
-            ->map(fn (EventObject $bookmark): string => $bookmark->metadata['canonical_url'] ?? UrlCanonicalizer::canonicalize((string) $bookmark->url))
-            ->flip();
+            ->pluck('url')
+            ->toArray();
 
-        $newUrls = $discoveredUrls
-            ->reject(fn (array $urlData): bool => $existingIdentities->has(UrlCanonicalizer::canonicalize($urlData['url'])))
-            ->unique(fn (array $urlData): string => UrlCanonicalizer::canonicalize($urlData['url']));
+        $newUrls = $discoveredUrls->whereNotIn('url', $existingUrls);
 
         Log::info('DiscoverUrlsFromIntegrations: New URLs to subscribe', [
             'count' => $newUrls->count(),
@@ -280,35 +267,35 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
                     continue;
                 }
 
-                $created = app(BookmarkCreator::class)->firstOrCreate($this->integration->user_id, $urlData['url'], [
+                $webpage = EventObject::create([
+                    'user_id' => $this->integration->user_id,
+                    'concept' => 'bookmark',
+                    'type' => 'fetch_webpage',
                     'title' => $urlData['url'], // Will be updated on first fetch
-                ], [
-                    'domain' => $domain,
-                    'fetch_integration_id' => $this->integration->id, // Store which Fetch integration manages this
-                    'subscription_source' => 'discovered',
-                    'fetch_mode' => 'once', // Auto-discovered URLs are fetched once
-                    'discovered_from_integration_id' => $urlData['source_integration_id'],
-                    'discovered_from_object_id' => $urlData['source_object_id'] ?? null,
-                    'discovered_from_event_id' => $urlData['source_event_id'] ?? null,
-                    'discovered_at' => now()->toIso8601String(),
-                    'found_in' => $urlData['found_in'],
-                    'enabled' => $autoFetchEnabled, // Respect user's auto-fetch setting
-                    'discovery_status' => 'pending',
-                    'discovery_ignored' => false,
-                    'last_checked_at' => null,
-                    'last_changed_at' => null,
-                    'content_hash' => null,
-                    'fetch_count' => 0,
-                    'is_discovered_url' => true, // Flag for discovered URLs
-                    'is_linkable' => $urlData['is_linkable'] ?? false, // Whether to link to source
-                    'source_is_object' => isset($urlData['source_object_id']), // URL from object vs event
+                    'url' => $urlData['url'],
+                    'time' => now(),
+                    'metadata' => [
+                        'domain' => $domain,
+                        'fetch_integration_id' => $this->integration->id, // Store which Fetch integration manages this
+                        'subscription_source' => 'discovered',
+                        'fetch_mode' => 'once', // Auto-discovered URLs are fetched once
+                        'discovered_from_integration_id' => $urlData['source_integration_id'],
+                        'discovered_from_object_id' => $urlData['source_object_id'] ?? null,
+                        'discovered_from_event_id' => $urlData['source_event_id'] ?? null,
+                        'discovered_at' => now()->toIso8601String(),
+                        'found_in' => $urlData['found_in'],
+                        'enabled' => $autoFetchEnabled, // Respect user's auto-fetch setting
+                        'discovery_status' => 'pending',
+                        'discovery_ignored' => false,
+                        'last_checked_at' => null,
+                        'last_changed_at' => null,
+                        'content_hash' => null,
+                        'fetch_count' => 0,
+                        'is_discovered_url' => true, // Flag for discovered URLs
+                        'is_linkable' => $urlData['is_linkable'] ?? false, // Whether to link to source
+                        'source_is_object' => isset($urlData['source_object_id']), // URL from object vs event
+                    ],
                 ]);
-
-                if (! $created['created']) {
-                    continue;
-                }
-
-                $webpage = $created['bookmark'];
 
                 $createdCount++;
 
@@ -383,30 +370,6 @@ class DiscoverUrlsFromIntegrations implements ShouldQueue
             'created' => $createdCount,
             'monitored_integrations' => count($monitoredIntegrationIds),
         ]);
-    }
-
-    /**
-     * Event metadata with keys discovery must not scan: unsubscribe URLs are
-     * never fetched, and a newsletter's HTML is handled by digest link
-     * expansion when that is on.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function scannableMetadata(Event $event, bool $newsletterExpandsLinks): ?array
-    {
-        $metadata = $event->event_metadata;
-
-        if (! is_array($metadata)) {
-            return $metadata;
-        }
-
-        unset($metadata['list_unsubscribe']);
-
-        if ($newsletterExpandsLinks) {
-            unset($metadata['raw_html']);
-        }
-
-        return $metadata;
     }
 
     /**

@@ -58,7 +58,9 @@ class SenseCheckTenancyTest extends TestCase
 
         $this->assertSame(1, $health['events']['total']);
         $this->assertSame(1, $health['blocks']['total']);
-        $this->assertSame(1, $health['objects']['total']);
+        // The owned event's actor and target now correctly belong to the admin,
+        // alongside the explicit object above. The victim owns seven objects.
+        $this->assertSame(3, $health['objects']['total']);
     }
 
     #[Test]
