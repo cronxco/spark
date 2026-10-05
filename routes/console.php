@@ -45,6 +45,14 @@ Schedule::job(new DispatchRetrospectiveAnomalyTasksJob)
     ->onOneServer()
     ->sentryMonitor();
 
+// Sweep a small recent receipt batch for review-only proposals. This never
+// creates automatic historical links and leaves explicit user dismissals alone.
+Schedule::command('receipt-matching:backfill --dispatch --limit=25 --recent-days=60 --retry-after-days=7')
+    ->dailyAt('04:20')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->sentryMonitor();
+
 // Schedule Horizon snapshots only if Horizon is installed
 if (class_exists(Horizon::class) && class_exists(SnapshotCommand::class)) {
     Schedule::command('horizon:snapshot')

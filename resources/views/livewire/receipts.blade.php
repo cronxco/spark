@@ -24,7 +24,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                     <x-icon name="fas.receipt" class="w-8 h-8" />
                 </div>
                 <div class="stat-title">Total Receipts</div>
-                <div class="stat-value text-primary">{{ $receipts->total() }}</div>
+                <div class="stat-value text-primary">{{ $stats['total'] }}</div>
             </div>
         </div>
 
@@ -35,9 +35,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                 </div>
                 <div class="stat-title">Matched</div>
                 <div class="stat-value text-success">
-                    {{ \App\Models\Event::where('service', 'receipt')
-                        ->whereHas('target', fn($q) => $q->whereJsonContains('metadata->is_matched', true))
-                        ->count() }}
+                    {{ $stats['matched'] }}
                 </div>
             </div>
         </div>
@@ -49,9 +47,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                 </div>
                 <div class="stat-title">Needs Review</div>
                 <div class="stat-value text-warning">
-                    {{ \App\Models\Event::where('service', 'receipt')
-                        ->whereHas('target', fn($q) => $q->whereJsonContains('metadata->needs_review', true))
-                        ->count() }}
+                    {{ $stats['review'] }}
                 </div>
             </div>
         </div>
@@ -63,17 +59,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                 </div>
                 <div class="stat-title">Unmatched</div>
                 <div class="stat-value text-info">
-                    {{ \App\Models\Event::where('service', 'receipt')
-                        ->whereHas('target', function($q) {
-                            $q->where(function($sub) {
-                                $sub->whereJsonContains('metadata->is_matched', false)
-                                    ->orWhereNull('metadata->is_matched');
-                            })->where(function($sub) {
-                                $sub->whereJsonContains('metadata->needs_review', false)
-                                    ->orWhereNull('metadata->needs_review');
-                            });
-                        })
-                        ->count() }}
+                    {{ $stats['total'] - $stats['matched'] - $stats['review'] }}
                 </div>
             </div>
         </div>
@@ -128,9 +114,9 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                             @php
                                 $merchant = $receipt->target;
                                 $metadata = $merchant?->metadata ?? [];
-                                $isMatched = $metadata['is_matched'] ?? false;
-                                $needsReview = $metadata['needs_review'] ?? false;
-                                $extractedData = $metadata['extracted_data'] ?? [];
+                                $isMatched = \App\Services\Receipt\ReceiptMatchState::isMatched($receipt);
+                                $needsReview = !$isMatched && \App\Services\Receipt\ReceiptMatchState::status($receipt) === 'suggestions';
+                                $extractedData = $receipt->event_metadata['raw_extraction'] ?? [];
                                 $lineItems = $extractedData['line_items'] ?? [];
                             @endphp
                             <tr class="hover">
@@ -167,7 +153,7 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                     @else
                                         <div class="badge badge-info gap-1">
                                             <x-icon name="fas.clock" class="w-3 h-3" />
-                                            Unmatched
+                                            {{ match (\App\Services\Receipt\ReceiptMatchState::status($receipt)) { 'searching' => 'Searching', 'no_candidate' => 'No match found', 'needs_details' => 'Needs details', 'no_match' => 'No transaction', default => 'Unmatched' } }}
                                         </div>
                                     @endif
                                 </td>
@@ -191,6 +177,8 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                         @else
                                             <x-button icon="fas.link" wire:click="openMatchModal('{{ $receipt->id }}')"
                                                 class="btn-ghost btn-xs" tooltip="Manual Match" />
+                                            <x-button icon="fas.rotate" wire:click="retryMatch('{{ $receipt->id }}')"
+                                                class="btn-ghost btn-xs" tooltip="Find match again" />
                                         @endif
 
                                         <x-button icon="fas.trash" wire:click="deleteReceipt('{{ $receipt->id }}')"
@@ -224,14 +212,11 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
     </div>
 
     {{-- Manual Match Modal --}}
-    @if ($showMatchModal && $selectedReceiptId)
+    @if ($showMatchModal && $selectedReceipt)
         <x-modal wire:model="showMatchModal" title="Match Receipt to Transaction" class="backdrop-blur">
             <div class="space-y-4">
                 @php
-                    $selectedReceipt = \App\Models\Event::find($selectedReceiptId);
                     $merchant = $selectedReceipt?->target;
-                    $metadata = $merchant?->metadata ?? [];
-                    $candidates = $metadata['match_candidates'] ?? [];
                 @endphp
 
                 {{-- Receipt Summary --}}
@@ -258,16 +243,11 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                 </div>
 
                 {{-- Candidate Transactions --}}
-                @if (count($candidates) > 0)
+                @if ($candidateTransactions->isNotEmpty())
                     <div>
                         <h3 class="font-semibold mb-2">Suggested Matches</h3>
                         <div class="space-y-2">
-                            @foreach ($candidates as $candidate)
-                                @php
-                                    $transaction = \App\Models\Event::find($candidate['transaction_id']);
-                                    $confidence = $candidate['confidence'] ?? 0;
-                                @endphp
-                                @if ($transaction)
+                            @foreach ($candidateTransactions as $transaction)
                                     <div class="card bg-base-100 border border-base-300 hover:border-primary cursor-pointer"
                                         wire:click="createManualMatch('{{ $selectedReceiptId }}', '{{ $transaction->id }}')">
                                         <div class="card-body p-3">
@@ -282,14 +262,10 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                                                     <div class="font-mono font-semibold">
                                                         {{ $transaction->value_unit }} {{ number_format($transaction->value / ($transaction->value_multiplier ?: 1), 2) }}
                                                     </div>
-                                                    <div class="badge badge-sm {{ $confidence >= 0.8 ? 'badge-success' : 'badge-warning' }}">
-                                                        {{ round($confidence * 100) }}% match
-                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                @endif
                             @endforeach
                         </div>
                     </div>
@@ -304,8 +280,19 @@ state(['search' => '', 'statusFilter' => 'all', 'sortBy' => ['column' => 'time',
                 {{-- Manual Search --}}
                 <div>
                     <h3 class="font-semibold mb-2">Search Transactions</h3>
-                    <x-input placeholder="Search by merchant, amount, or date..." icon="fas.search" />
-                    <p class="text-xs text-base-content/60 mt-1">Feature coming soon</p>
+                    <x-input placeholder="Search merchant, amount or YYYY-MM-DD..." icon="fas.search" wire:model.live.debounce.300ms="transactionSearch" />
+                    <div class="max-h-72 overflow-y-auto space-y-2 mt-3">
+                        @forelse ($searchTransactions as $transaction)
+                            <button type="button" class="card bg-base-200 w-full text-left" wire:click="createManualMatch('{{ $selectedReceiptId }}', '{{ $transaction->id }}')">
+                                <span class="card-body p-3 flex-row justify-between gap-3">
+                                    <span><strong>{{ $transaction->target?->title ?? 'Transaction' }}</strong><br><small>{{ $transaction->time->format('j M Y H:i') }}</small></span>
+                                    <span>{{ $transaction->value_unit }} {{ number_format($transaction->formatted_value, 2) }}</span>
+                                </span>
+                            </button>
+                        @empty
+                            <p class="text-sm text-base-content/60">No transactions found.</p>
+                        @endforelse
+                    </div>
                 </div>
             </div>
 

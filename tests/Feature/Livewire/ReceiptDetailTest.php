@@ -54,7 +54,7 @@ class ReceiptDetailTest extends TestCase
     {
         Storage::fake('s3-receipts');
         $receipt = $this->receiptFor($this->user);
-        $receipt->target->update(['metadata' => ['s3_object_key' => 'receipts/expired.eml']]);
+        $receipt->update(['event_metadata' => ['raw_email_s3_key' => 'receipts/expired.eml']]);
 
         $this->actingAs($this->user);
 
@@ -69,7 +69,7 @@ class ReceiptDetailTest extends TestCase
         Storage::fake('s3-receipts');
         Storage::disk('s3-receipts')->put('receipts/kept.eml', 'From: shop@example.com');
         $receipt = $this->receiptFor($this->user);
-        $receipt->target->update(['metadata' => ['s3_object_key' => 'receipts/kept.eml']]);
+        $receipt->update(['event_metadata' => ['raw_email_s3_key' => 'receipts/kept.eml']]);
 
         $this->actingAs($this->user);
 

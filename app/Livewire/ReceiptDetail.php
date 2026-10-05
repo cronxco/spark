@@ -2,14 +2,15 @@
 
 namespace App\Livewire;
 
-use App\Integrations\Receipt\ReceiptTransactionMatcher;
 use App\Models\Event;
-use App\Models\Relationship;
+use App\Services\Receipt\ReceiptMatchingActions;
+use App\Services\Receipt\ReceiptMatchState;
 use App\Traits\AuthorizesOwnership;
 use Exception;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -20,6 +21,8 @@ class ReceiptDetail extends Component
     public Event $receipt;
 
     public bool $showMatchModal = false;
+
+    public string $transactionSearch = '';
 
     public function mount(string $id): void
     {
@@ -58,15 +61,13 @@ class ReceiptDetail extends Component
             return;
         }
 
-        $matcher = new ReceiptTransactionMatcher;
-        $confidence = $this->calculateMatchConfidence($this->receipt, $transaction);
+        try {
+            app(ReceiptMatchingActions::class)->link($this->receipt, $transaction);
+        } catch (InvalidArgumentException $exception) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => $exception->getMessage()]);
 
-        $matcher->createReceiptRelationship(
-            $this->receipt,
-            $transaction,
-            $confidence,
-            'manual'
-        );
+            return;
+        }
 
         $this->dispatch('notify', [
             'type' => 'success',
@@ -80,22 +81,7 @@ class ReceiptDetail extends Component
     public function removeMatch(): void
     {
         $this->authorizeReceipt();
-
-        // Find and delete the receipt_for relationship
-        Relationship::where('from_type', Event::class)
-            ->where('from_id', $this->receipt->id)
-            ->where('type', 'receipt_for')
-            ->delete();
-
-        // Update merchant metadata
-        $merchant = $this->receipt->target;
-        if ($merchant) {
-            $metadata = $merchant->metadata ?? [];
-            $metadata['is_matched'] = false;
-            $metadata['needs_review'] = false;
-            unset($metadata['matched_transaction_id'], $metadata['matched_at']);
-            $merchant->update(['metadata' => $metadata]);
-        }
+        app(ReceiptMatchingActions::class)->unlink($this->receipt);
 
         $this->dispatch('notify', [
             'type' => 'success',
@@ -105,12 +91,38 @@ class ReceiptDetail extends Component
         $this->mount($this->receipt->id); // Refresh data
     }
 
+    public function retryMatch(): void
+    {
+        $this->authorizeReceipt();
+        try {
+            app(ReceiptMatchingActions::class)->retry($this->receipt);
+        } catch (InvalidArgumentException $exception) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => $exception->getMessage()]);
+
+            return;
+        }
+        $this->receipt->refresh();
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Searching for a transaction']);
+    }
+
+    public function markNoMatch(): void
+    {
+        $this->authorizeReceipt();
+        try {
+            app(ReceiptMatchingActions::class)->markNoMatch($this->receipt);
+        } catch (InvalidArgumentException $exception) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => $exception->getMessage()]);
+
+            return;
+        }
+        $this->receipt->refresh();
+    }
+
     public function downloadOriginalEmail(): ?StreamedResponse
     {
         $this->authorizeReceipt();
 
-        $merchant = $this->receipt->target;
-        $s3Key = $merchant?->metadata['s3_object_key'] ?? null;
+        $s3Key = $this->receipt->event_metadata['raw_email_s3_key'] ?? null;
 
         if (! $s3Key) {
             $this->dispatch('notify', [
@@ -164,31 +176,31 @@ class ReceiptDetail extends Component
 
     public function getMatchedTransactionProperty(): ?Event
     {
-        $relationship = Relationship::where('from_type', Event::class)
-            ->where('from_id', $this->receipt->id)
-            ->where('type', 'receipt_for')
-            ->first();
+        $relationship = ReceiptMatchState::link($this->receipt);
 
         if (! $relationship) {
             return null;
         }
 
-        return Event::find($relationship->to_id);
+        return Event::forUser(Auth::id())->with('target')->find($relationship->to_id);
     }
 
     public function getCandidateMatchesProperty(): array
     {
-        $merchant = $this->receipt->target;
-        $metadata = $merchant?->metadata ?? [];
-
-        return $metadata['match_candidates'] ?? [];
+        return ReceiptMatchState::candidates($this->receipt);
     }
 
     public function render(): View
     {
         return view('livewire.receipt-detail', [
             'matchedTransaction' => $this->matchedTransaction,
+            'matchedRelationship' => ReceiptMatchState::link($this->receipt),
             'candidateMatches' => $this->candidateMatches,
+            'matchingStatus' => ReceiptMatchState::status($this->receipt),
+            'matchingState' => ReceiptMatchState::state($this->receipt),
+            'searchTransactions' => $this->showMatchModal
+                ? app(ReceiptMatchingActions::class)->search($this->receipt, $this->transactionSearch)
+                : collect(),
         ])->title('Receipt Details - ' . $this->receipt->target?->title ?? 'Receipt');
     }
 
@@ -200,22 +212,5 @@ class ReceiptDetail extends Component
     private function authorizeReceipt(): void
     {
         $this->authorizeOwner($this->receipt->integration?->user_id);
-    }
-
-    private function calculateMatchConfidence(Event $receipt, Event $transaction): float
-    {
-        $score = 0.5; // Base score for manual match
-
-        // Amount match
-        if ($receipt->value === $transaction->value) {
-            $score += 0.3;
-        }
-
-        // Time proximity (within same day)
-        if ($receipt->time->isSameDay($transaction->time)) {
-            $score += 0.2;
-        }
-
-        return min(1.0, $score);
     }
 }

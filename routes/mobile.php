@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\V1\Mobile\NotificationSettingsController;
 use App\Http\Controllers\Api\V1\Mobile\ObjectsController;
 use App\Http\Controllers\Api\V1\Mobile\PingController;
 use App\Http\Controllers\Api\V1\Mobile\PlacesController;
+use App\Http\Controllers\Api\V1\Mobile\ReceiptMatchingController;
 use App\Http\Controllers\Api\V1\Mobile\SearchController;
 use App\Http\Controllers\Api\V1\Mobile\SyncController;
 use App\Http\Controllers\Api\V1\Mobile\TagsController;
@@ -426,6 +427,13 @@ Route::post('flint/review/{kind}/{id}', [FlintReviewController::class, 'act'])
     ->whereIn('kind', ['receipt_suggestion', 'receipt_auto_match', 'link_suggestion', 'auto_link'])
     ->middleware('spark.ability:flint:write')
     ->name('flint.review.act');
+Route::get('flint/receipts/unmatched', [ReceiptMatchingController::class, 'unmatched'])->middleware('spark.ability:flint:read');
+Route::get('flint/receipts/{id}/match', [ReceiptMatchingController::class, 'show'])->middleware('spark.ability:flint:read');
+Route::get('flint/receipts/{id}/transactions', [ReceiptMatchingController::class, 'search'])->middleware('spark.ability:flint:read');
+Route::post('flint/receipts/{id}/retry', [ReceiptMatchingController::class, 'retry'])->middleware('spark.ability:flint:write');
+Route::post('flint/receipts/{id}/link', [ReceiptMatchingController::class, 'link'])->middleware('spark.ability:flint:write');
+Route::post('flint/receipts/{id}/no-match', [ReceiptMatchingController::class, 'noMatch'])->middleware('spark.ability:flint:write');
+Route::delete('flint/receipts/{id}/match', [ReceiptMatchingController::class, 'unlink'])->middleware('spark.ability:flint:write');
 
 /*
 |--------------------------------------------------------------------------
