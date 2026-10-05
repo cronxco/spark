@@ -329,4 +329,41 @@ class ContentExtractorTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('robot', strtolower($result['reason']));
     }
+
+    #[Test]
+    public function it_parses_without_validating(): void
+    {
+        $html = '<html><head><title>Hi</title></head><body><article><p>Short.</p></article></body></html>';
+
+        $parsed = ContentExtractor::parse($html, 'https://example.com/a');
+
+        $this->assertTrue($parsed['success']);
+        $this->assertSame('Hi', $parsed['data']['title']);
+
+        $validated = ContentExtractor::validateParsed($parsed, $html, 'https://example.com/a');
+
+        $this->assertFalse($validated['success']);
+        $this->assertSame('Title too short: Hi', $validated['reason']);
+    }
+
+    #[Test]
+    public function it_validates_a_parsed_article_like_extract_does(): void
+    {
+        $html = '<html><head><title>A proper article title</title></head><body><article>'
+            . str_repeat('<p>Plenty of genuine article text so that validation accepts the extracted content.</p>', 5)
+            . '</article></body></html>';
+
+        $validated = ContentExtractor::validateParsed(ContentExtractor::parse($html, 'https://example.com/a'), $html, 'https://example.com/a');
+
+        $this->assertTrue($validated['success']);
+        $this->assertEquals(ContentExtractor::extract($html, 'https://example.com/a'), $validated);
+    }
+
+    #[Test]
+    public function it_passes_parse_failures_through_validation(): void
+    {
+        $failure = ['success' => false, 'reason' => 'Parse error: nope', 'data' => null];
+
+        $this->assertSame($failure, ContentExtractor::validateParsed($failure, '', 'https://example.com/a'));
+    }
 }
