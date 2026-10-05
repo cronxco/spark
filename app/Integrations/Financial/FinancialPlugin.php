@@ -378,6 +378,7 @@ class FinancialPlugin extends ManualPlugin
             ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->latest('time')
+            ->orderByDesc('id')
             ->first();
     }
 
@@ -410,7 +411,7 @@ class FinancialPlugin extends ManualPlugin
             AND service IN ('manual_account', 'monzo', 'gocardless')
             AND action = 'had_balance'
             AND deleted_at IS NULL
-            ORDER BY actor_id, time DESC
+            ORDER BY actor_id, time DESC, id DESC
         ) as {$table}", $accountIds)->get();
 
         return $results->keyBy('actor_id');
