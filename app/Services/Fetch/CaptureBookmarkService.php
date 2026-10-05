@@ -129,17 +129,20 @@ class CaptureBookmarkService
         $titleAttributes = $title !== '' && $this->bookmarkCreator->titleIsAvailable($bookmark, $title) ? ['title' => $title] : [];
         $memo = $probe->metadata['list_detection'] ?? [];
 
-        FetchMetadata::mutate($bookmark, fn (array $metadata): array => array_merge($metadata, [
-            'subscription_source' => $source,
-            'last_capture_at' => now()->toISOString(),
-            'last_capture_method' => $captureMethod,
-            'last_checked_at' => now()->toIso8601String(),
-            'fetch_count' => max(1, (int) ($metadata['fetch_count'] ?? 0)),
-            'enabled' => false,
-            'last_error' => null,
-            'pipeline_status' => 'complete',
-            'list_detection' => array_merge($metadata['list_detection'] ?? [], $memo, ['expansion_status' => 'pending']),
-        ]), $titleAttributes);
+        FetchMetadata::mutate($bookmark, function (array $metadata) use ($source, $captureMethod, $memo, $result): array {
+            $once = ($metadata['fetch_mode'] ?? 'recurring') === 'once';
+
+            return array_merge($metadata, [
+                'subscription_source' => $result['created'] ? $source : ($metadata['subscription_source'] ?? $source),
+                'last_capture_at' => now()->toISOString(),
+                'last_capture_method' => $captureMethod,
+                'last_checked_at' => now()->toIso8601String(),
+                'fetch_count' => max(1, (int) ($metadata['fetch_count'] ?? 0)),
+                'last_error' => null,
+                'pipeline_status' => 'complete',
+                'list_detection' => array_merge($metadata['list_detection'] ?? [], $memo, ['expansion_status' => 'pending']),
+            ], $once ? ['enabled' => false] : []);
+        }, $titleAttributes);
 
         ExpandLinkListJob::dispatch(
             $this->integrationResolver->resolve($user),

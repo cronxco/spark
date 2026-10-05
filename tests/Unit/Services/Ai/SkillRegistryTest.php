@@ -7,14 +7,29 @@ use App\Services\Ai\SkillRegistry;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class SkillRegistryTest extends TestCase
+class SkillRegistryTest extends FrameworkTestCase
 {
+    private string $skillsDirectory;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->skillsDirectory = sys_get_temp_dir() . '/spark-skills-' . bin2hex(random_bytes(12));
+        File::copyDirectory(resource_path('ai/skills'), $this->skillsDirectory);
+    }
+
+    protected function tearDown(): void
+    {
+        File::deleteDirectory($this->skillsDirectory);
+        parent::tearDown();
+    }
+
     #[Test]
     public function it_loads_the_four_vendored_async_skills(): void
     {
-        $skills = (new SkillRegistry)->all();
+        $skills = (new SkillRegistry($this->skillsDirectory))->all();
 
         foreach (['spark-day-briefing-async', 'flint-topics', 'flint-reading-list', 'flint-news-roundup'] as $name) {
             $this->assertArrayHasKey($name, $skills);
@@ -28,7 +43,7 @@ class SkillRegistryTest extends TestCase
     public function the_conversational_briefing_skill_is_deliberately_not_vendored(): void
     {
         $this->assertFalse(
-            (new SkillRegistry)->has('spark-day-briefing'),
+            (new SkillRegistry($this->skillsDirectory))->has('spark-day-briefing'),
             'spark-day-briefing expects a back-and-forth check-in and cannot run unattended'
         );
     }
@@ -36,7 +51,7 @@ class SkillRegistryTest extends TestCase
     #[Test]
     public function no_vendored_skill_can_reach_an_infrastructure_namespace(): void
     {
-        foreach ((new SkillRegistry)->all() as $skill) {
+        foreach ((new SkillRegistry($this->skillsDirectory))->all() as $skill) {
             foreach ($skill->allowedTools as $tool) {
                 $namespace = strtok($tool, '__');
 
@@ -58,7 +73,7 @@ class SkillRegistryTest extends TestCase
             $this->expectException(RuntimeException::class);
             $this->expectExceptionMessage("declares the forbidden tool 'supabase__execute_sql'");
 
-            (new SkillRegistry)->all();
+            (new SkillRegistry($this->skillsDirectory))->all();
         } finally {
             File::deleteDirectory($path);
         }
@@ -73,7 +88,7 @@ class SkillRegistryTest extends TestCase
             $this->expectException(RuntimeException::class);
             $this->expectExceptionMessage('must declare at least one allowed tool');
 
-            (new SkillRegistry)->all();
+            (new SkillRegistry($this->skillsDirectory))->all();
         } finally {
             File::deleteDirectory($path);
         }
@@ -88,7 +103,7 @@ class SkillRegistryTest extends TestCase
             $this->expectException(RuntimeException::class);
             $this->expectExceptionMessage("declares the unapproved tool 'github__delete_repo'");
 
-            (new SkillRegistry)->all();
+            (new SkillRegistry($this->skillsDirectory))->all();
         } finally {
             File::deleteDirectory($path);
         }
@@ -100,12 +115,12 @@ class SkillRegistryTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Unknown Flint skill: not-a-skill');
 
-        (new SkillRegistry)->get('not-a-skill');
+        (new SkillRegistry($this->skillsDirectory))->get('not-a-skill');
     }
 
     private function writeSkill(string $name, string $frontmatter, string $body = 'Do the thing.'): string
     {
-        $dir = resource_path("ai/skills/{$name}");
+        $dir = $this->skillsDirectory . "/{$name}";
         File::ensureDirectoryExists($dir);
         File::put("{$dir}/SKILL.md", "---\n{$frontmatter}\n---\n\n{$body}\n");
 

@@ -3,11 +3,14 @@
 namespace Tests\Unit\Services;
 
 use App\Services\RelationshipTypeRegistry;
+use Illuminate\Foundation\Testing\WithCachedConfig;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class RelationshipTypeRegistryTest extends TestCase
+class RelationshipTypeRegistryTest extends FrameworkTestCase
 {
+    use WithCachedConfig;
+
     #[Test]
     public function it_returns_all_relationship_types(): void
     {
