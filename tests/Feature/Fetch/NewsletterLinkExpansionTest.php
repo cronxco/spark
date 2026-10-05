@@ -169,11 +169,38 @@ class NewsletterLinkExpansionTest extends TestCase
     #[Test]
     public function the_resolver_follows_tracking_redirects(): void
     {
-        Http::fake(['https://tracking.example-mail.com/*' => Http::response('', 200, [
-            'X-Guzzle-Redirect-History' => 'https://hop.example.net/r, https://news.example.org/story-1',
-        ])]);
+        Http::fake([
+            'https://tracking.example-mail.com/*' => Http::response('', 302, ['Location' => 'https://hop.example.net/r']),
+            'https://hop.example.net/r' => Http::response('', 302, ['Location' => 'https://news.example.org/story-1']),
+            'https://news.example.org/story-1' => Http::response('', 200),
+        ]);
 
         $this->assertSame('https://news.example.org/story-1', app(TrackingLinkResolver::class)->resolve('https://tracking.example-mail.com/c/1abc'));
+        Http::assertSentCount(3);
+    }
+
+    #[Test]
+    public function redirect_resolution_never_requests_unsubscribe_or_private_destinations(): void
+    {
+        $start = 'https://tracking.example-mail.com/c/abc';
+        $destination = 'https://news.example.org/x/opaque';
+        Http::fake([$start => Http::response('', 302, ['Location' => $destination])]);
+
+        $this->assertNull(app(TrackingLinkResolver::class)->resolve($start, [$destination]));
+        Http::assertSentCount(1);
+        Http::assertNotSent(fn (Request $request): bool => $request->url() === $destination);
+    }
+
+    #[Test]
+    public function redirect_resolution_checks_encoded_housekeeping_before_get_fallback(): void
+    {
+        $start = 'https://tracking.example-mail.com/c/abc';
+        $destination = 'https://news.example.org/%75nsubscribe?key=abc';
+        Http::fake([$start => Http::sequence()->push('', 405)->push('', 302, ['Location' => $destination])]);
+
+        $this->assertNull(app(TrackingLinkResolver::class)->resolve($start));
+        Http::assertSentCount(2);
+        Http::assertNotSent(fn (Request $request): bool => $request->url() === $destination);
     }
 
     #[Test]
@@ -209,6 +236,40 @@ class NewsletterLinkExpansionTest extends TestCase
         $urls = EventObject::where('type', 'fetch_webpage')->pluck('url');
         $this->assertTrue($urls->contains('https://tracking.example-mail.com/c/1abc'));
         $this->assertFalse($urls->contains(self::UNSUBSCRIBE), 'List-Unsubscribe URLs are never discovered');
+    }
+
+    #[Test]
+    public function legacy_discovery_never_fetches_opaque_unsubscribe_links_or_their_copies(): void
+    {
+        $this->newsletter->update(['configuration' => ['expand_links' => false]]);
+        $this->fetch->update(['configuration' => ['monitor_integrations' => [$this->newsletter->id]]]);
+        $opaque = 'https://tracking.example-mail.com/c/opaque';
+        $this->issue(['raw_html' => '<a href="' . $opaque . '">Unsubscribe</a>'
+            . '<a href="https://news.example.org/story">A story worth reading</a>',
+            'raw_text' => 'Unsubscribe ' . $opaque, 'list_unsubscribe' => [$opaque],
+            'nested' => ['url' => $opaque]]);
+
+        (new DiscoverUrlsFromIntegrations($this->fetch->fresh()))->handle();
+
+        $urls = EventObject::where('type', 'fetch_webpage')->pluck('url');
+        $this->assertFalse($urls->contains($opaque));
+        $this->assertTrue($urls->contains('https://news.example.org/story'));
+    }
+
+    #[Test]
+    public function a_queued_task_obeys_changed_newsletter_and_global_settings(): void
+    {
+        Http::fake();
+        $issue = $this->issue();
+        $this->newsletter->update(['configuration' => ['expand_links' => false]]);
+        $this->runTask($issue);
+        $this->newsletter->update(['configuration' => []]);
+        config(['fetch.list_detection.enabled' => false]);
+        $this->runTask($issue);
+
+        Http::assertNothingSent();
+        Queue::assertNotPushed(FetchSingleUrl::class);
+        $this->assertSame(0, EventObject::where('type', 'fetch_webpage')->count());
     }
 
     #[Test]

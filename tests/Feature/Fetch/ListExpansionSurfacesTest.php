@@ -52,7 +52,7 @@ class ListExpansionSurfacesTest extends TestCase
     #[Test]
     public function a_captured_list_page_is_expanded(): void
     {
-        FakeJev::fake(['page_kind' => 'article_list', 'has_article_list' => 0.9, 'cluster_c0_is_primary' => 0.9, 'link_*_is_article' => 0.9]);
+        FakeJev::fake(['page_kind' => 'article_list', 'has_article_list' => 0.9, 'cluster_c0_is_primary' => 0.9, 'link_*_is_article' => 0.9, 'link_*_role' => 'article']);
         Sanctum::actingAs($this->user, ['bookmark:write']);
 
         $this->postJson('/api/v1/bookmarks/capture', [
@@ -72,6 +72,24 @@ class ListExpansionSurfacesTest extends TestCase
         $this->assertSame('list', $bookmark->metadata['list_detection']['kind']);
         Queue::assertPushed(ExpandLinkListJob::class, fn (ExpandLinkListJob $job): bool => count($job->items) === 8);
         Queue::assertNotPushed(ProcessFetchedContent::class);
+    }
+
+    #[Test]
+    public function capturing_an_existing_recurring_list_preserves_its_subscription(): void
+    {
+        FakeJev::fake(['page_kind' => 'article_list', 'has_article_list' => 0.9,
+            'cluster_c0_is_primary' => 0.9, 'link_*_is_article' => 0.9, 'link_*_role' => 'article']);
+        $bookmark = $this->scheduledBookmark('https://example.com/', 'recurring', null,
+            ['subscription_source' => 'subscribed']);
+        Sanctum::actingAs($this->user, ['bookmark:write']);
+
+        $this->postJson('/api/v1/bookmarks/capture', ['url' => $bookmark->url,
+            'html' => FetchPages::blogIndex(), 'title' => 'Captured blog'])
+            ->assertOk()->assertJsonPath('state', 'list_expanded');
+
+        $this->assertTrue($bookmark->fresh()->metadata['enabled']);
+        $this->assertSame('subscribed', $bookmark->fresh()->metadata['subscription_source']);
+        $this->assertSame('recurring', $bookmark->fresh()->metadata['fetch_mode']);
     }
 
     #[Test]
