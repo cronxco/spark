@@ -1,12 +1,12 @@
 <?php
 
-use App\Http\Controllers\GoCardlessRenewalController;
 use App\Http\Controllers\AasaController;
 use App\Http\Controllers\Admin\BlockViewController;
 use App\Http\Controllers\Admin\GoCardlessAdminController;
 use App\Http\Controllers\Admin\MigrationsController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Auth\OAuthController;
+use App\Http\Controllers\GoCardlessRenewalController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;

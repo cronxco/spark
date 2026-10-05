@@ -24,6 +24,32 @@ class GoCardlessAccounts
         return $account;
     }
 
+    public static function snapshot(Integration $integration): array
+    {
+        return [
+            'account_id' => $integration->configuration['account_id'] ?? null,
+            'requisition_id' => $integration->group?->account_id,
+            'generation' => $integration->group?->auth_metadata['gocardless_generation'] ?? null,
+        ];
+    }
+
+    public static function isCurrent(Integration $integration, ?array $snapshot): bool
+    {
+        $current = Integration::with('group')->find($integration->id);
+        if (! $current || ($current->configuration['paused'] ?? false) ||
+            ($current->group?->auth_metadata['eua_expired'] ?? false)) {
+            return false;
+        }
+
+        // Jobs queued before this deployment have no snapshot. They may run
+        // only before the first renewal using the new generation contract.
+        if ($snapshot === null) {
+            return empty($current->group?->auth_metadata['gocardless_generation']);
+        }
+
+        return self::snapshot($current) === $snapshot;
+    }
+
     public function find(string $userId, string $accountId): ?EventObject
     {
         if ($accountId === '' || $accountId === 'unknown') {
@@ -134,31 +160,5 @@ class GoCardlessAccounts
             $config['gocardless_pause_reason'] = $paused ? 'user' : null;
             $integration->update(['configuration' => $config]);
         });
-    }
-
-    public static function snapshot(Integration $integration): array
-    {
-        return [
-            'account_id' => $integration->configuration['account_id'] ?? null,
-            'requisition_id' => $integration->group?->account_id,
-            'generation' => $integration->group?->auth_metadata['gocardless_generation'] ?? null,
-        ];
-    }
-
-    public static function isCurrent(Integration $integration, ?array $snapshot): bool
-    {
-        $current = Integration::with('group')->find($integration->id);
-        if (! $current || ($current->configuration['paused'] ?? false) ||
-            ($current->group?->auth_metadata['eua_expired'] ?? false)) {
-            return false;
-        }
-
-        // Jobs queued before this deployment have no snapshot. They may run
-        // only before the first renewal using the new generation contract.
-        if ($snapshot === null) {
-            return empty($current->group?->auth_metadata['gocardless_generation']);
-        }
-
-        return self::snapshot($current) === $snapshot;
     }
 }

@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
-use App\Jobs\GoCardless\HandleExpiredEuaJob;
 use App\Jobs\Data\GoCardless\GoCardlessAccountData;
+use App\Jobs\GoCardless\HandleExpiredEuaJob;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -57,40 +57,6 @@ class GoCardlessAccountRenewalTest extends TestCase
                 return 'test-token';
             }
         };
-    }
-
-    private function details(string $id = 'old-account', string $resource = 'bank-resource'): array
-    {
-        return ['id' => $id, 'details' => 'Bank supplied name', 'resourceId' => $resource,
-            'currency' => 'GBP', 'cashAccountType' => 'CARD'];
-    }
-
-    private function account(string $title = 'My card', ?array $metadata = null): EventObject
-    {
-        return EventObject::create(['user_id' => $this->owner->id, 'concept' => 'account',
-            'type' => 'bank_account', 'title' => $title, 'metadata' => $metadata ?? [
-                'account_id' => 'old-account', 'name' => $title, 'is_pinned' => true,
-                'is_negative_balance' => true, 'raw' => $this->details(),
-            ]]);
-    }
-
-    private function stage(): void
-    {
-        $meta = $this->group->auth_metadata;
-        $meta['gocardless_pending'] = ['id' => 'generation-two', 'reference' => 'pending-reference',
-            'requisition_id' => 'new-requisition', 'agreement_id' => 'new-agreement',
-            'institution_id' => 'test-bank', 'link' => 'https://example.test/consent',
-            'expires_at' => now()->addHour()->toISOString()];
-        $this->group->update(['auth_metadata' => $meta]);
-    }
-
-    private function provider(array $details, string $status = 'LN'): void
-    {
-        Http::fake([
-            '*/requisitions/new-requisition/' => Http::response(['status' => $status,
-                'reference' => 'pending-reference', 'institution_id' => 'test-bank', 'accounts' => [$details['id']]]),
-            '*/accounts/' . $details['id'] . '/details/' => Http::response(['account' => $details]),
-        ]);
     }
 
     #[Test]
@@ -393,7 +359,6 @@ class GoCardlessAccountRenewalTest extends TestCase
         Http::assertSent(fn ($request) => $request->method() === 'DELETE' && $request->url() === $url);
     }
 
-
     #[Test]
     public function sparse_bank_details_create_an_account_but_id_only_payloads_do_not(): void
     {
@@ -408,4 +373,37 @@ class GoCardlessAccountRenewalTest extends TestCase
         $this->assertSame($object->id, $this->integration->fresh()->configuration['account_object_id']);
     }
 
+    private function details(string $id = 'old-account', string $resource = 'bank-resource'): array
+    {
+        return ['id' => $id, 'details' => 'Bank supplied name', 'resourceId' => $resource,
+            'currency' => 'GBP', 'cashAccountType' => 'CARD'];
+    }
+
+    private function account(string $title = 'My card', ?array $metadata = null): EventObject
+    {
+        return EventObject::create(['user_id' => $this->owner->id, 'concept' => 'account',
+            'type' => 'bank_account', 'title' => $title, 'metadata' => $metadata ?? [
+                'account_id' => 'old-account', 'name' => $title, 'is_pinned' => true,
+                'is_negative_balance' => true, 'raw' => $this->details(),
+            ]]);
+    }
+
+    private function stage(): void
+    {
+        $meta = $this->group->auth_metadata;
+        $meta['gocardless_pending'] = ['id' => 'generation-two', 'reference' => 'pending-reference',
+            'requisition_id' => 'new-requisition', 'agreement_id' => 'new-agreement',
+            'institution_id' => 'test-bank', 'link' => 'https://example.test/consent',
+            'expires_at' => now()->addHour()->toISOString()];
+        $this->group->update(['auth_metadata' => $meta]);
+    }
+
+    private function provider(array $details, string $status = 'LN'): void
+    {
+        Http::fake([
+            '*/requisitions/new-requisition/' => Http::response(['status' => $status,
+                'reference' => 'pending-reference', 'institution_id' => 'test-bank', 'accounts' => [$details['id']]]),
+            '*/accounts/' . $details['id'] . '/details/' => Http::response(['account' => $details]),
+        ]);
+    }
 }

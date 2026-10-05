@@ -19,7 +19,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 // Http and Log already imported above
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
@@ -309,12 +308,9 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
      * Get OAuth URL for GoCardless Bank Account Data API
      */
 
-
     /**
      * Handle OAuth callback from GoCardless
      */
-
-
     public function fetchData(Integration $integration): void
     {
         $instanceType = $integration->instance_type ?: 'transactions';
@@ -504,7 +500,6 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
                         'account_id' => $accountId,
                         'account_name' => $accountDetails['details'] ?? $accountDetails['ownerName'] ?? 'Unknown',
                     ]);
-
 
                     $accountDetails['id'] = $accountId;
                     $accounts[] = $accountDetails;
@@ -1010,7 +1005,6 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
         $balanceReferenceDate = $balance['referenceDate'] ?? now()->toDateString();
         $balanceType = $balance['balanceType'] ?? 'unknown';
         $accountId = $integration->configuration['account_id'] ?? 'unknown';
-
 
         // Ensure account object exists by upserting with minimal data
         // This matches Monzo's approach of inline upsert to guarantee the object exists
@@ -1864,7 +1858,6 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
     /**
      * Create a new EUA and requisition for an existing integration group
      */
-
 
     /**
      * Delete the old requisition after successful reconfirmation

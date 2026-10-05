@@ -2,12 +2,12 @@
 
 namespace App\Console\Commands;
 
-use App\Models\User;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Relationship;
 use App\Models\TaskExecution;
+use App\Models\User;
 use App\Services\GoCardlessAccounts;
 use Illuminate\Console\Command;
 use RuntimeException;
@@ -40,6 +40,7 @@ class ReconcileGoCardlessAccounts extends Command
                             $object->update(['metadata' => $metadata]);
                         }
                     }
+
                     continue;
                 }
                 $canonical = $members->first();

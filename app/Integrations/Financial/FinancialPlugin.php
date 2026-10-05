@@ -2,12 +2,12 @@
 
 namespace App\Integrations\Financial;
 
-use App\Services\GoCardlessAccounts;
 use App\Integrations\Base\ManualPlugin;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\GoCardlessAccounts;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 

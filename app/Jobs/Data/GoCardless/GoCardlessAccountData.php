@@ -2,9 +2,9 @@
 
 namespace App\Jobs\Data\GoCardless;
 
-use App\Services\GoCardlessAccounts;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Jobs\Base\BaseProcessingJob;
+use App\Services\GoCardlessAccounts;
 use Illuminate\Support\Facades\Log;
 
 class GoCardlessAccountData extends BaseProcessingJob

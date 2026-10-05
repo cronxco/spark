@@ -2,14 +2,13 @@
 
 namespace App\Integrations\GoCardless;
 
-use Illuminate\Support\Facades\Cache;
-use App\Jobs\GoCardless\RetireRequisitionJob;
 use App\Jobs\GoCardless\RefreshRenewedConnectionJob;
-use App\Models\Integration;
+use App\Jobs\GoCardless\RetireRequisitionJob;
 use App\Models\IntegrationGroup;
 use App\Services\GoCardlessAccounts;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -131,6 +130,7 @@ trait GoCardlessRenewal
                 }
                 if ($selected === '__missing') {
                     $resolved[$oldId] = null;
+
                     continue;
                 }
                 if ($selected !== null) {
@@ -138,15 +138,16 @@ trait GoCardlessRenewal
                         throw new RuntimeException('The selected account is not part of this bank consent.');
                     }
                     $resolved[$oldId] = $selected;
+
                     continue;
                 }
                 if (isset($accounts[$oldId])) {
                     $resolved[$oldId] = $oldId;
+
                     continue;
                 }
                 $old = app(GoCardlessAccounts::class)->find($group->user_id, $oldId);
-                $matches = $old ? array_keys(array_filter($accounts, fn ($details) =>
-                    $this->sameBankAccount($old->metadata['raw'] ?? [], $details))) : [];
+                $matches = $old ? array_keys(array_filter($accounts, fn ($details) => $this->sameBankAccount($old->metadata['raw'] ?? [], $details))) : [];
                 $resolved[$oldId] = count($matches) === 1 ? $matches[0] : null;
             }
             $newIds = array_filter($resolved);

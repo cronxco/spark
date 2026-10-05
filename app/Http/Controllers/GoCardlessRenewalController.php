@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use RuntimeException;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Models\IntegrationGroup;
 use App\Services\GoCardlessAccounts;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
+use RuntimeException;
 
 class GoCardlessRenewalController extends Controller
 {

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1\Mobile;
 
-use App\Services\GoCardlessAccounts;
 use App\Http\Controllers\Api\V1\Mobile\Concerns\HandlesIdempotency;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\BalanceEntryResource;
@@ -13,6 +12,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Services\Api\ResourceVersion;
+use App\Services\GoCardlessAccounts;
 use App\Support\CollectionCursorPage;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;

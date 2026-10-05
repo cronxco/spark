@@ -2,10 +2,10 @@
 
 namespace App\Services\Mobile;
 
-use App\Services\GoCardlessAccounts;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
+use App\Services\GoCardlessAccounts;
 use Illuminate\Support\Collection;
 
 class ObjectLookup

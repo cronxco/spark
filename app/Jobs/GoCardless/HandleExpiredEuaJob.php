@@ -3,8 +3,8 @@
 namespace App\Jobs\GoCardless;
 
 use App\Models\IntegrationGroup;
-use App\Services\GoCardlessAccounts;
 use App\Notifications\IntegrationAuthenticationFailed;
+use App\Services\GoCardlessAccounts;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Exception;
@@ -38,99 +38,6 @@ class HandleExpiredEuaJob implements ShouldQueue
             return;
         }
         app(GoCardlessAccounts::class)->locked($group->user_id, fn () => $this->handleCurrentExpiry($store));
-    }
-
-    private function handleCurrentExpiry(TaskExecutionStore $store): void
-    {
-        $group = IntegrationGroup::find($this->groupId);
-
-        if (! $group) {
-            Log::warning('HandleExpiredEuaJob: Integration group not found', [
-                'group_id' => $this->groupId,
-            ]);
-
-            return;
-        }
-
-        $metadata = $group->auth_metadata ?? [];
-        if (($this->snapshot === null && ! empty($metadata['gocardless_generation'])) ||
-            ($this->snapshot !== null && (
-                ($this->snapshot['requisition_id'] ?? null) !== $group->account_id ||
-                ($this->snapshot['generation'] ?? null) !== ($metadata['gocardless_generation'] ?? null)
-            )) || ($this->euaId && ! empty($metadata['gocardless_agreement_id']) &&
-                $this->euaId !== $metadata['gocardless_agreement_id'])) {
-            return;
-        }
-
-        // Check if already marked as expired (prevent duplicate processing)
-        if ($group->auth_metadata['eua_expired'] ?? false) {
-            Log::info('HandleExpiredEuaJob: EUA already marked as expired, skipping', [
-                'group_id' => $this->groupId,
-            ]);
-
-            return;
-        }
-
-        $task = $this->taskDefinition();
-
-        $store->recordStatus($group, $task, 'pending', [
-            'eua_id' => $this->euaId,
-        ], $this);
-
-        try {
-            Log::info('HandleExpiredEuaJob: Processing expired EUA', [
-                'group_id' => $this->groupId,
-                'eua_id' => $this->euaId,
-            ]);
-
-            // Step 1: Mark Integration Group as requiring reconfirmation
-            $authMetadata = $group->auth_metadata ?? [];
-            $authMetadata['eua_expired'] = true;
-            $authMetadata['eua_expired_at'] = now()->toISOString();
-            $authMetadata['requires_reconfirmation'] = true;
-            $group->update(['auth_metadata' => $authMetadata]);
-
-            Log::info('HandleExpiredEuaJob: Marked group as requiring reconfirmation', [
-                'group_id' => $this->groupId,
-            ]);
-
-            // Step 2: Pause All Instances in Group
-            $pausedCount = 0;
-            $group->integrations()->each(function ($integration) use (&$pausedCount) {
-                $config = $integration->configuration ?? [];
-                if (! ($config['paused'] ?? false)) {
-                    $config['paused'] = true;
-                    $config['gocardless_pause_reason'] = 'eua_expired';
-                    $integration->update(['configuration' => $config]);
-                    $pausedCount++;
-                }
-            });
-
-            Log::info('HandleExpiredEuaJob: Paused integrations', [
-                'group_id' => $this->groupId,
-                'paused_count' => $pausedCount,
-            ]);
-
-            // Step 3: Delete Pending Jobs from the pull queue
-            $this->deletePendingJobs($group);
-
-            // Step 4: Send Single Notification
-            $this->sendNotification($group);
-
-            $store->recordStatus($group, $task, 'success', [
-                'paused_count' => $pausedCount,
-            ], $this);
-
-            Log::info('HandleExpiredEuaJob: Completed EUA expiry handling', [
-                'group_id' => $this->groupId,
-            ]);
-        } catch (Exception $e) {
-            $store->recordStatus($group, $task, 'failed', [
-                'error' => $e->getMessage(),
-            ], $this);
-
-            throw $e;
-        }
     }
 
     public function failed(Exception $exception): void
@@ -230,6 +137,99 @@ class HandleExpiredEuaJob implements ShouldQueue
                 'group_id' => $group->id,
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    private function handleCurrentExpiry(TaskExecutionStore $store): void
+    {
+        $group = IntegrationGroup::find($this->groupId);
+
+        if (! $group) {
+            Log::warning('HandleExpiredEuaJob: Integration group not found', [
+                'group_id' => $this->groupId,
+            ]);
+
+            return;
+        }
+
+        $metadata = $group->auth_metadata ?? [];
+        if (($this->snapshot === null && ! empty($metadata['gocardless_generation'])) ||
+            ($this->snapshot !== null && (
+                ($this->snapshot['requisition_id'] ?? null) !== $group->account_id ||
+                ($this->snapshot['generation'] ?? null) !== ($metadata['gocardless_generation'] ?? null)
+            )) || ($this->euaId && ! empty($metadata['gocardless_agreement_id']) &&
+                $this->euaId !== $metadata['gocardless_agreement_id'])) {
+            return;
+        }
+
+        // Check if already marked as expired (prevent duplicate processing)
+        if ($group->auth_metadata['eua_expired'] ?? false) {
+            Log::info('HandleExpiredEuaJob: EUA already marked as expired, skipping', [
+                'group_id' => $this->groupId,
+            ]);
+
+            return;
+        }
+
+        $task = $this->taskDefinition();
+
+        $store->recordStatus($group, $task, 'pending', [
+            'eua_id' => $this->euaId,
+        ], $this);
+
+        try {
+            Log::info('HandleExpiredEuaJob: Processing expired EUA', [
+                'group_id' => $this->groupId,
+                'eua_id' => $this->euaId,
+            ]);
+
+            // Step 1: Mark Integration Group as requiring reconfirmation
+            $authMetadata = $group->auth_metadata ?? [];
+            $authMetadata['eua_expired'] = true;
+            $authMetadata['eua_expired_at'] = now()->toISOString();
+            $authMetadata['requires_reconfirmation'] = true;
+            $group->update(['auth_metadata' => $authMetadata]);
+
+            Log::info('HandleExpiredEuaJob: Marked group as requiring reconfirmation', [
+                'group_id' => $this->groupId,
+            ]);
+
+            // Step 2: Pause All Instances in Group
+            $pausedCount = 0;
+            $group->integrations()->each(function ($integration) use (&$pausedCount) {
+                $config = $integration->configuration ?? [];
+                if (! ($config['paused'] ?? false)) {
+                    $config['paused'] = true;
+                    $config['gocardless_pause_reason'] = 'eua_expired';
+                    $integration->update(['configuration' => $config]);
+                    $pausedCount++;
+                }
+            });
+
+            Log::info('HandleExpiredEuaJob: Paused integrations', [
+                'group_id' => $this->groupId,
+                'paused_count' => $pausedCount,
+            ]);
+
+            // Step 3: Delete Pending Jobs from the pull queue
+            $this->deletePendingJobs($group);
+
+            // Step 4: Send Single Notification
+            $this->sendNotification($group);
+
+            $store->recordStatus($group, $task, 'success', [
+                'paused_count' => $pausedCount,
+            ], $this);
+
+            Log::info('HandleExpiredEuaJob: Completed EUA expiry handling', [
+                'group_id' => $this->groupId,
+            ]);
+        } catch (Exception $e) {
+            $store->recordStatus($group, $task, 'failed', [
+                'error' => $e->getMessage(),
+            ], $this);
+
+            throw $e;
         }
     }
 
