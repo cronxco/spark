@@ -195,7 +195,7 @@ class MoneyAccountsControllerTest extends TestCase
             $cursor = $response->json('next_cursor');
         } while ($response->json('has_more'));
 
-        $this->assertSame($events->pluck('id')->all(), $ids);
+        $this->assertSame($events->map(fn ($event) => (string) $event->id)->all(), $ids);
         $this->assertCount(60, array_unique($ids));
         $this->getJson("/api/v1/mobile/money/accounts/{$account->id}/balances?limit=100")
             ->assertOk()
