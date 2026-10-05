@@ -64,7 +64,7 @@ class NewsletterExpandLinksTask extends BaseTaskJob
         }
 
         // Settings may have changed while the job was queued.
-        $event = $this->model->fresh(['target', 'integration']);
+        $event = $this->model->refresh()->load(['target', 'integration']);
 
         if (! $event || ! self::isEnabledFor($event)) {
             return;

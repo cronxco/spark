@@ -13,6 +13,7 @@ use App\Services\Fetch\BookmarkCreator;
 use App\Services\Fetch\Links\LinkCandidateExtractor;
 use App\Services\Fetch\Links\LinkClusterer;
 use App\Services\Fetch\UrlSafetyValidator;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -97,6 +98,9 @@ class ListPageFetchTest extends TestCase
         $bookmark = $this->bookmark(['fetch_mode' => 'recurring', 'subscription_source' => 'subscribed']);
 
         $this->fetch($bookmark);
+        // Queue::fake leaves the unique lock held; a completed expansion
+        // releases it before the next scheduled scan.
+        app(UniqueLock::class)->release(Queue::pushed(ExpandLinkListJob::class)->sole());
         $this->fetch($bookmark);
 
         $this->assertTrue($bookmark->fresh()->metadata['enabled']);
