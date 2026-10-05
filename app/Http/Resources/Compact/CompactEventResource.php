@@ -4,6 +4,8 @@ namespace App\Http\Resources\Compact;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
+use App\Services\Mobile\EventRoute;
+use App\Support\MoneyDirection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -34,6 +36,11 @@ class CompactEventResource extends JsonResource
             'service' => $this->service,
             'domain' => $this->domain,
             'action' => $this->action,
+            // Consecutive events sharing this key are the same run (e.g.
+            // twenty Spotify plays back to back) — the client groups on it
+            // directly instead of implementing its own run-length rule that
+            // has to agree with the web app's by coincidence.
+            'group_key' => $this->groupKey(),
         ];
 
         if ($this->value !== null) {
@@ -45,10 +52,21 @@ class CompactEventResource extends JsonResource
                 $this->service,
                 $this->action,
             );
+
+            // Resolved server-side so the client never infers in/out/internal
+            // from the action-name suffix.
+            if ($this->domain === 'money') {
+                $data['direction'] = MoneyDirection::for($this->resource);
+            }
         }
 
         if ($this->url) {
             $data['url'] = $this->url;
+        }
+
+        // Only present when true. The points themselves come from GET /events/{id}/route.
+        if (app(EventRoute::class)->hasRoute($this->resource)) {
+            $data['has_route'] = true;
         }
 
         if ($this->relationLoaded('actor') && $this->actor) {
@@ -64,10 +82,10 @@ class CompactEventResource extends JsonResource
         if ($this->relationLoaded('target') && $this->target) {
             $data['target'] = [
                 'id' => $this->target->id,
-                'title' => $this->target->title,
+                'title' => $this->displayTargetTitle(),
                 'concept' => $this->target->concept,
                 'type' => $this->target->type,
-                'media_url' => $this->target->media_url,
+                'media_url' => $this->displayTargetMediaUrl(),
             ];
         }
 
@@ -143,6 +161,20 @@ class CompactEventResource extends JsonResource
         }
 
         return [];
+    }
+
+    /**
+     * The run a consecutive-events grouping should key on: same service,
+     * same action, same actor. Twenty Spotify plays by the same account
+     * share a key; a card payment on two different accounts doesn't.
+     */
+    private function groupKey(): string
+    {
+        return implode(':', [
+            $this->service ?? '',
+            $this->action ?? '',
+            $this->actor_id ?? '',
+        ]);
     }
 
     /**

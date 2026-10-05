@@ -272,7 +272,7 @@
                                 {!! json_encode($account->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
                             </script>
                             <script type="application/json" id="tag-suggestions-{{ $account->id }}">
-                                {!! json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
+                                {!! json_encode(\App\Support\OwnedTagQuery::suggestionsFor(auth()->guard('web')->user())) !!}
                             </script>
                     </div>
                 </x-card>

@@ -8,6 +8,7 @@ use App\Services\Media\MediaDownloadHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\Test;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\TestCase;
 
@@ -28,9 +29,7 @@ class MediaDownloadHelperTest extends TestCase
         config(['media-library.disk_name' => 'public']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function downloads_and_attaches_media_from_url(): void
     {
         $imageContent = $this->createTestImageContent();
@@ -55,9 +54,7 @@ class MediaDownloadHelperTest extends TestCase
         $this->assertEquals('https://example.com/image.jpg', $media->getCustomProperty('source_url'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function deduplicates_identical_images(): void
     {
         $imageContent = $this->createTestImageContent();
@@ -100,9 +97,7 @@ class MediaDownloadHelperTest extends TestCase
         $this->assertEquals(2, Media::where('custom_properties->md5_hash', $hash)->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function handles_failed_download_gracefully(): void
     {
         Http::fake([
@@ -122,9 +117,7 @@ class MediaDownloadHelperTest extends TestCase
         $this->assertEquals(0, $eventObject->media()->count());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function handles_empty_response_gracefully(): void
     {
         Http::fake([
@@ -143,9 +136,7 @@ class MediaDownloadHelperTest extends TestCase
         $this->assertNull($media);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function attaches_media_from_base64(): void
     {
         $imageContent = $this->createTestImageContent();
@@ -167,9 +158,7 @@ class MediaDownloadHelperTest extends TestCase
         $this->assertNotNull($media->getCustomProperty('md5_hash'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function deduplicates_base64_images(): void
     {
         $imageContent = $this->createTestImageContent();
@@ -189,9 +178,7 @@ class MediaDownloadHelperTest extends TestCase
         $this->assertEquals($hash, $media2->getCustomProperty('md5_hash'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function stores_custom_properties(): void
     {
         $imageContent = $this->createTestImageContent();

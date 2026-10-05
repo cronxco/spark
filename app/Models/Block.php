@@ -30,6 +30,16 @@ class Block extends Model implements HasMedia
      */
     protected static $recordEvents = ['updated'];
 
+    /**
+     * A 1536-dim pgvector column; keep it out of JSON/array serialisation.
+     */
+    /**
+     * Fields that come from the integration that produced the block.
+     *
+     * @var array<int, string>
+     */
+    public const SOURCE_FIELDS = ['title', 'block_type', 'url'];
+
     public $incrementing = false;
 
     protected $table = 'blocks';
@@ -51,9 +61,6 @@ class Block extends Model implements HasMedia
         'embeddings',
     ];
 
-    /**
-     * A 1536-dim pgvector column; keep it out of JSON/array serialisation.
-     */
     protected $hidden = [
         'embeddings',
     ];
@@ -421,7 +428,7 @@ class Block extends Model implements HasMedia
             return null;
         }
 
-        return Str::markdown($content);
+        return render_markdown($content);
     }
 
     /**

@@ -7,15 +7,14 @@ use App\Models\EventObject;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MapViewTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function map_route_is_accessible_when_authenticated(): void
     {
         $user = User::factory()->create();
@@ -26,9 +25,7 @@ class MapViewTest extends TestCase
         $response->assertSee('Map');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function map_route_requires_authentication(): void
     {
         $response = $this->get(route('map.index'));
@@ -36,9 +33,7 @@ class MapViewTest extends TestCase
         $response->assertRedirect(route('login'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function map_displays_events_with_location(): void
     {
         $user = User::factory()->create();
@@ -54,9 +49,7 @@ class MapViewTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function map_filters_by_date_range(): void
     {
         $user = User::factory()->create();
@@ -77,9 +70,7 @@ class MapViewTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function map_shows_event_objects_with_location(): void
     {
         $user = User::factory()->create();
@@ -94,9 +85,7 @@ class MapViewTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function map_data_includes_latitude_and_longitude(): void
     {
         $user = User::factory()->create();

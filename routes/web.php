@@ -23,6 +23,7 @@ use App\Livewire\ReceiptDetail;
 use App\Livewire\Receipts;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\AdminTenant;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -84,6 +85,7 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('/updates', 'updates.index')->name('updates.index');
     Volt::route('/events/{event}', 'events.show')->name('events.show');
     Volt::route('/objects/{object}', 'objects.show')->name('objects.show');
+    Volt::route('/people/{person}', 'people.show')->name('people.show');
     Volt::route('/blocks/{block}', 'blocks.show')->name('blocks.show');
     Volt::route('/tags', 'tags.index')->name('tags.index');
     Volt::route('/tags/{type}/{slug}/{id}', 'tags.show')->name('tags.show');
@@ -115,19 +117,23 @@ Route::middleware(['auth'])->group(function () {
     // Plugin and integration instance detail routes
     Route::get('plugins/{service}', function (string $service) {
         $pluginClass = PluginRegistry::getPlugin($service);
-        if (! $pluginClass) {
+        if (! $pluginClass || ! PluginRegistry::isAvailableTo($pluginClass, Auth::user())) {
             abort(404);
         }
 
-        // Get the integration group for this service if exists
-        $group = IntegrationGroup::where('service', $service)
+        // Every credential group the user has for this service: a second
+        // Monzo or GitHub account is its own group, and loading only the
+        // first() hid the other accounts' instances.
+        $groups = IntegrationGroup::where('service', $service)
             ->where('user_id', Auth::id())
-            ->first();
+            ->with('integrations')
+            ->oldest()
+            ->get();
 
         return view('plugins.show', [
             'service' => $service,
             'pluginClass' => $pluginClass,
-            'group' => $group,
+            'groups' => $groups,
         ]);
     })->name('plugins.show');
 
@@ -137,7 +143,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Money routes
     Route::get('money', FinancialAccounts::class)->name('money');
-    Route::get('money/{account}', FinancialAccountShow::class)->name('money.show');
+    Route::get('money/{account}', FinancialAccountShow::class)->whereUuid('account')->name('money.show');
 
     // Receipts routes
     Route::get('money/receipts', Receipts::class)->name('receipts.index');
@@ -313,7 +319,14 @@ Route::get('auth/authelia/callback', function () {
 });
 
 // Admin routes
-Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'verified', 'admin', 'admin.operator.audit'])->prefix('admin')->name('admin.')->group(function () {
+    Volt::route('operator', 'admin.operator')->middleware('password.confirm:password.confirm,900')->name('operator.index');
+    Route::post('operator/stop', function () {
+        AdminTenant::end();
+
+        return redirect()->route('admin.operator.index');
+    })->name('operator.stop');
+
     Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
     Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
     Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
@@ -334,7 +347,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
     Route::get('block-view', [BlockViewController::class, 'index'])->name('block-view.index');
     Route::post('bin/delete', function () {
-        DeleteBinItemsBatch::dispatch(Auth::id());
+        DeleteBinItemsBatch::dispatch(AdminTenant::id());
 
         return response()->json([
             'message' => 'Deletion process started. All items will be permanently deleted.',

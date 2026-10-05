@@ -126,7 +126,7 @@ class ReceiptDetail extends Component
             if (! $disk->exists($s3Key)) {
                 $this->dispatch('notify', [
                     'type' => 'error',
-                    'message' => 'Email file not found in storage',
+                    'message' => 'Original email no longer kept',
                 ]);
 
                 return null;

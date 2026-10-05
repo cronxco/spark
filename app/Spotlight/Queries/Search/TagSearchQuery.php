@@ -2,6 +2,8 @@
 
 namespace App\Spotlight\Queries\Search;
 
+use App\Support\OwnedTagQuery;
+use Illuminate\Support\Facades\Auth;
 use Spatie\Tags\Tag;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -14,23 +16,22 @@ class TagSearchQuery
     public static function make(): SpotlightQuery
     {
         return SpotlightQuery::forMode('tags', function (string $query) {
-            // Use a subquery to count taggables in a single query (avoid N+1)
-            $tagsQuery = Tag::query()
-                ->selectRaw('tags.*, (SELECT COUNT(*) FROM taggables WHERE taggables.tag_id = tags.id) as taggables_count');
+            $user = Auth::user();
 
-            if (! blank($query)) {
-                $tagsQuery->where(function ($q) use ($query) {
-                    $q->where('name->en', 'ilike', "%{$query}%")
-                        ->orWhere('slug->en', 'ilike', "%{$query}%")
-                        ->orWhere('type', 'ilike', "%{$query}%");
-                });
+            if (! $user) {
+                return collect();
             }
+
+            // Tags carry no user_id; ownership and usage counts are derived from
+            // the signed-in user's own tagged records. The previous subquery
+            // counted taggables across every tenant.
+            $tagsQuery = OwnedTagQuery::for($user, $query);
 
             return $tagsQuery
                 ->limit(5)
                 ->get()
                 ->map(function (Tag $tag) {
-                    $taggablesCount = $tag->taggables_count ?? 0;
+                    $taggablesCount = (int) ($tag->events_count ?? 0) + (int) ($tag->objects_count ?? 0);
 
                     $subtitle = ucfirst($tag->type ?? 'general');
                     if ($taggablesCount > 0) {

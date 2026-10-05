@@ -7,6 +7,7 @@ use App\Models\EventObject;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class EventLocationTest extends TestCase
@@ -21,9 +22,7 @@ class EventLocationTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function set_location_stores_coordinates(): void
     {
         $event = Event::factory()->create();
@@ -40,9 +39,7 @@ class EventLocationTest extends TestCase
         $this->assertNotNull($event->location_geocoded_at);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function latitude_accessor(): void
     {
         $event = Event::factory()->create();
@@ -54,9 +51,7 @@ class EventLocationTest extends TestCase
         $this->assertEquals(51.5074, $event->latitude);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function longitude_accessor(): void
     {
         $event = Event::factory()->create();
@@ -68,9 +63,7 @@ class EventLocationTest extends TestCase
         $this->assertEquals(-0.1278, $event->longitude);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function latitude_accessor_returns_null_when_no_location(): void
     {
         $event = Event::factory()->create();
@@ -79,9 +72,7 @@ class EventLocationTest extends TestCase
         $this->assertNull($event->latitude);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function inherit_location_from_target(): void
     {
         // Create target object with location
@@ -110,9 +101,7 @@ class EventLocationTest extends TestCase
         $this->assertEquals('inherited', $event->location_source);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function inherit_location_returns_false_when_no_target(): void
     {
         $event = Event::factory()->create();
@@ -126,9 +115,7 @@ class EventLocationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function inherit_location_returns_false_when_target_has_no_location(): void
     {
         $target = EventObject::factory()->create([
@@ -145,9 +132,7 @@ class EventLocationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function has_location_scope(): void
     {
         $eventWithLocation = Event::factory()->create();
@@ -164,9 +149,7 @@ class EventLocationTest extends TestCase
         $this->assertFalse($results->contains($eventWithoutLocation));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function within_radius_scope(): void
     {
         // London coordinates: 51.5074, -0.1278
@@ -192,9 +175,7 @@ class EventLocationTest extends TestCase
         $this->assertCount(2, $results);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function within_bounds_scope(): void
     {
         // London

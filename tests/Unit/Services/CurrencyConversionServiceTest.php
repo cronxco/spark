@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class CurrencyConversionServiceTest extends TestCase
@@ -31,7 +32,7 @@ class CurrencyConversionServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function it_converts_usd_to_gbp(): void
     {
         // Mock API response
@@ -49,7 +50,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEquals(790, $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_converts_eur_to_gbp(): void
     {
         Http::fake([
@@ -66,7 +67,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEquals(860, $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_returns_same_amount_for_same_currency(): void
     {
         $result = $this->service->convert(1000, 'GBP', 'GBP');
@@ -77,7 +78,7 @@ class CurrencyConversionServiceTest extends TestCase
         Http::assertNothingSent();
     }
 
-    /** @test */
+    #[Test]
     public function it_normalizes_currency_symbols(): void
     {
         $this->assertEquals('GBP', $this->service->normalizeCurrency('£'));
@@ -86,7 +87,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEquals('JPY', $this->service->normalizeCurrency('¥'));
     }
 
-    /** @test */
+    #[Test]
     public function it_normalizes_currency_codes(): void
     {
         $this->assertEquals('GBP', $this->service->normalizeCurrency('gbp'));
@@ -95,7 +96,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEquals('GBP', $this->service->normalizeCurrency('GBP'));
     }
 
-    /** @test */
+    #[Test]
     public function it_checks_if_conversion_is_needed(): void
     {
         $this->assertFalse($this->service->needsConversion('GBP', 'GBP'));
@@ -106,7 +107,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertTrue($this->service->needsConversion('EUR', 'GBP'));
     }
 
-    /** @test */
+    #[Test]
     public function it_caches_exchange_rates(): void
     {
         Http::fake([
@@ -127,7 +128,7 @@ class CurrencyConversionServiceTest extends TestCase
         Http::assertSentCount(1); // Still only 1 request
     }
 
-    /** @test */
+    #[Test]
     public function it_fetches_historical_rates(): void
     {
         $historicalDate = Carbon::parse('2025-01-15');
@@ -151,7 +152,7 @@ class CurrencyConversionServiceTest extends TestCase
         });
     }
 
-    /** @test */
+    #[Test]
     public function it_uses_fallback_rates_when_api_fails(): void
     {
         Http::fake([
@@ -164,7 +165,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEquals(0.79, $rate); // Fallback rate
     }
 
-    /** @test */
+    #[Test]
     public function it_uses_reverse_fallback_rates(): void
     {
         Http::fake([
@@ -178,7 +179,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEqualsWithDelta(1.27, $rate, 0.01);
     }
 
-    /** @test */
+    #[Test]
     public function it_throws_exception_when_api_fails_and_no_fallback(): void
     {
         config(['services.currency.fallback_enabled' => false]);
@@ -192,7 +193,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->service->getRate('USD', 'GBP');
     }
 
-    /** @test */
+    #[Test]
     public function it_throws_exception_when_api_key_not_configured(): void
     {
         config(['services.currency.api_key' => null]);
@@ -203,7 +204,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->service->getRate('USD', 'GBP');
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_api_error_responses(): void
     {
         Http::fake([
@@ -219,7 +220,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEquals(0.79, $rate);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_missing_currency_in_response(): void
     {
         Http::fake([
@@ -238,7 +239,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEquals(0.79, $rate);
     }
 
-    /** @test */
+    #[Test]
     public function it_rounds_converted_amounts_correctly(): void
     {
         Http::fake([
@@ -259,7 +260,7 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEquals(794, $result);
     }
 
-    /** @test */
+    #[Test]
     public function it_caches_historical_rates_indefinitely(): void
     {
         $historicalDate = Carbon::parse('2025-01-15');
@@ -284,14 +285,14 @@ class CurrencyConversionServiceTest extends TestCase
         $this->assertEquals(0.80, Cache::get($cacheKey));
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_whitespace_in_currency_codes(): void
     {
         $this->assertEquals('GBP', $this->service->normalizeCurrency('  gbp  '));
         $this->assertEquals('USD', $this->service->normalizeCurrency(' usd '));
     }
 
-    /** @test */
+    #[Test]
     public function it_defaults_to_gbp_for_unrecognized_currency(): void
     {
         $this->assertEquals('GBP', $this->service->normalizeCurrency('XXX'));

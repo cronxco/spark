@@ -4,7 +4,7 @@ namespace Tests\Feature\TaskPipeline;
 
 use App\Jobs\TaskPipeline\Tasks\GenerateEmbeddingTask;
 use App\Models\Event;
-use App\Services\EmbeddingService;
+use App\Services\Ai\EmbeddingClient;
 use App\Services\TaskPipeline\TaskDefinition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
@@ -26,14 +26,14 @@ class GenerateEmbeddingTaskTest extends TestCase
         ]);
 
         $embedding = $this->validEmbedding();
-        $embeddingService = Mockery::mock(EmbeddingService::class);
+        $embeddingService = Mockery::mock(EmbeddingClient::class);
         $embeddingService->shouldReceive('embed')->once()->andReturn($embedding);
         $embeddingService->shouldReceive('getEmbeddingMetadata')->once()->andReturn([
             'embedding_model' => 'text-embedding-3-small',
             'embedding_dimensions' => 1536,
             'embedding_generated_at' => now()->toIso8601String(),
         ]);
-        $this->instance(EmbeddingService::class, $embeddingService);
+        $this->instance(EmbeddingClient::class, $embeddingService);
 
         (new GenerateEmbeddingTask($event, $this->taskDefinition()))->handle();
 
@@ -50,10 +50,10 @@ class GenerateEmbeddingTaskTest extends TestCase
     {
         $event = Event::factory()->create();
 
-        $embeddingService = Mockery::mock(EmbeddingService::class);
+        $embeddingService = Mockery::mock(EmbeddingClient::class);
         $embeddingService->shouldReceive('embed')->once()->andThrow(new RuntimeException('provider unavailable'));
         $embeddingService->shouldReceive('getEmbeddingMetadata')->never();
-        $this->instance(EmbeddingService::class, $embeddingService);
+        $this->instance(EmbeddingClient::class, $embeddingService);
 
         try {
             (new GenerateEmbeddingTask($event, $this->taskDefinition()))->handle();
@@ -75,10 +75,10 @@ class GenerateEmbeddingTaskTest extends TestCase
     {
         $event = Event::factory()->create();
 
-        $embeddingService = Mockery::mock(EmbeddingService::class);
+        $embeddingService = Mockery::mock(EmbeddingClient::class);
         $embeddingService->shouldReceive('embed')->once()->andReturn(array_fill(0, 1536, 0.0));
         $embeddingService->shouldReceive('getEmbeddingMetadata')->never();
-        $this->instance(EmbeddingService::class, $embeddingService);
+        $this->instance(EmbeddingClient::class, $embeddingService);
 
         try {
             (new GenerateEmbeddingTask($event, $this->taskDefinition()))->handle();

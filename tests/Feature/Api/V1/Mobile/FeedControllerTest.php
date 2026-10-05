@@ -8,10 +8,12 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
 use Tests\TestCase;
 
 class FeedControllerTest extends TestCase
@@ -51,7 +53,7 @@ class FeedControllerTest extends TestCase
     public function returns_paginated_feed_in_reverse_chronological_order(): void
     {
         $this->seedEvents(3);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/feed?limit=2')
             ->assertOk()
@@ -70,7 +72,7 @@ class FeedControllerTest extends TestCase
     public function paginates_with_cursor(): void
     {
         $this->seedEvents(3);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $first = $this->getJson('/api/v1/mobile/feed?limit=2')->assertOk();
         $cursor = $first->json('next_cursor');
@@ -87,7 +89,7 @@ class FeedControllerTest extends TestCase
     public function etag_returns_304_on_match(): void
     {
         $this->seedEvents(1);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $first = $this->getJson('/api/v1/mobile/feed')->assertOk();
         $etag = $first->headers->get('ETag');
@@ -101,7 +103,7 @@ class FeedControllerTest extends TestCase
     {
         $this->seedEvents(2, domain: 'money');
         $this->seedEvents(1, domain: 'health');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/feed?domain=money')
             ->assertOk();
@@ -113,7 +115,7 @@ class FeedControllerTest extends TestCase
     #[Test]
     public function rejects_invalid_domain(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/feed?domain=bogus')
             ->assertStatus(422)
@@ -151,7 +153,7 @@ class FeedControllerTest extends TestCase
             'metadata' => ['content' => 'A longer paragraph summary.'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/feed?domain=knowledge')
             ->assertOk();
@@ -168,7 +170,7 @@ class FeedControllerTest extends TestCase
     public function feed_events_never_embed_blocks_array_only_count(): void
     {
         $this->seedEvents(1, domain: 'money');
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')
             ->assertOk()
@@ -199,7 +201,7 @@ class FeedControllerTest extends TestCase
             'metadata' => ['content' => 'You paid Pret £3.50.'],
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed?domain=money')
             ->assertOk()
@@ -213,7 +215,7 @@ class FeedControllerTest extends TestCase
     public function feed_events_include_actor_and_target_type(): void
     {
         $this->seedEvents(1);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
 
@@ -245,7 +247,7 @@ class FeedControllerTest extends TestCase
             'target_id' => $target->id,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
 
@@ -257,7 +259,7 @@ class FeedControllerTest extends TestCase
     public function feed_events_include_tags_as_objects(): void
     {
         $this->seedEvents(1);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
 
@@ -269,7 +271,7 @@ class FeedControllerTest extends TestCase
     public function feed_events_include_blocks_count(): void
     {
         $this->seedEvents(1);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
 
@@ -284,7 +286,7 @@ class FeedControllerTest extends TestCase
         $targetDate = Carbon::now()->subDays(3)->startOfDay();
         $this->seedEventsAtTime(2, $targetDate->copy()->addHours(10));
         $this->seedEvents(2);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/feed?date=' . $targetDate->format('Y-m-d'))->assertOk();
 
@@ -300,7 +302,7 @@ class FeedControllerTest extends TestCase
         $futureDate = Carbon::now()->addDays(2)->startOfDay();
         $this->seedEventsAtTime(1, $futureDate->copy()->addHours(9));
         $this->seedEvents(2);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/feed?date=' . $futureDate->format('Y-m-d'))->assertOk();
 
@@ -309,9 +311,32 @@ class FeedControllerTest extends TestCase
     }
 
     #[Test]
+    public function date_parameter_is_bounded_by_the_users_local_day(): void
+    {
+        Carbon::setTestNow('2026-07-03 12:00:00 UTC');
+        $this->user->update(['settings' => ['timezone' => 'Asia/Tokyo']]);
+
+        // 20:00 UTC on 1 July is 05:00 on 2 July in Tokyo.
+        $this->seedEventsAtTime(1, Carbon::parse('2026-07-01 20:00:00', 'UTC'));
+        // 14:30 UTC on 1 July is 23:30 on 1 July in Tokyo.
+        $this->seedEventsAtTime(1, Carbon::parse('2026-07-01 14:30:00', 'UTC'));
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'ios:write']));
+
+        $second = $this->getJson('/api/v1/mobile/feed?date=2026-07-02')->assertOk();
+        $this->assertCount(1, $second->json('data'));
+        $this->assertSame('2026-07-01 20:00', Carbon::parse($second->json('data.0.time'))->utc()->format('Y-m-d H:i'));
+
+        $first = $this->getJson('/api/v1/mobile/feed?date=2026-07-01')->assertOk();
+        $this->assertCount(1, $first->json('data'));
+        $this->assertSame('2026-07-01 14:30', Carbon::parse($first->json('data.0.time'))->utc()->format('Y-m-d H:i'));
+
+        Carbon::setTestNow();
+    }
+
+    #[Test]
     public function rejects_invalid_date_format(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/feed?date=not-a-date')
             ->assertStatus(422)
@@ -322,7 +347,7 @@ class FeedControllerTest extends TestCase
     public function events_include_display_name_and_hidden_flag(): void
     {
         $this->seedEvents(1);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
 
@@ -334,13 +359,64 @@ class FeedControllerTest extends TestCase
     public function events_with_value_include_display_value(): void
     {
         $this->seedEvents(1);
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
 
         $this->assertArrayHasKey('display_value', $item);
         $this->assertIsString($item['display_value']);
         $this->assertNotEmpty($item['display_value']);
+    }
+
+    #[Test]
+    public function events_include_a_shared_group_key_for_consecutive_runs(): void
+    {
+        $this->seedEvents(3);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $data = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data');
+
+        $this->assertCount(3, $data);
+        $this->assertSame($data[0]['group_key'], $data[1]['group_key']);
+        $this->assertSame($data[1]['group_key'], $data[2]['group_key']);
+        $this->assertNotEmpty($data[0]['group_key']);
+    }
+
+    #[Test]
+    public function money_events_include_a_resolved_direction(): void
+    {
+        $this->seedEvents(1);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertSame('out', $item['direction']);
+    }
+
+    #[Test]
+    public function pot_transfers_are_flagged_as_internal_direction(): void
+    {
+        $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account']);
+        $pot = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account']);
+
+        Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'pot_transfer_to',
+            'value' => 500,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'actor_id' => $account->id,
+            'target_id' => $pot->id,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
+
+        $this->assertSame('internal', $item['direction']);
     }
 
     #[Test]
@@ -360,7 +436,7 @@ class FeedControllerTest extends TestCase
             'actor_id' => $actor->id,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
 
@@ -385,7 +461,7 @@ class FeedControllerTest extends TestCase
             'actor_id' => $actor->id,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
 
@@ -421,7 +497,7 @@ class FeedControllerTest extends TestCase
             'actor_id' => $actor->id,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $item = $this->getJson('/api/v1/mobile/feed')->assertOk()->json('data.0');
 
@@ -434,7 +510,7 @@ class FeedControllerTest extends TestCase
     {
         $this->seedEvents(2);
         $this->seedEventsAtTime(1, Carbon::now()->addDay());
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $response = $this->getJson('/api/v1/mobile/feed')->assertOk();
 

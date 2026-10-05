@@ -49,6 +49,41 @@ class RunIntegrationUpdateTaskTest extends TestCase
     }
 
     #[Test]
+    public function dispatching_twice_for_the_same_integration_while_the_first_is_still_queued_only_enqueues_once(): void
+    {
+        // ShouldBeUnique releases its lock as soon as a dispatched job finishes
+        // an attempt (success or failure) - not after all retries are
+        // exhausted. Under the `sync` queue driver each dispatch runs to
+        // completion (and releases its lock) before the next dispatch call
+        // even happens, so the race this guards against - a second dispatch
+        // landing while the first is still sitting in the queue - can't be
+        // observed with `sync`. Use the `database` driver instead, so the
+        // first dispatch enqueues a row without executing it, and confirm
+        // the second dispatch for the same integration is silently dropped.
+        config(['queue.default' => 'database']);
+
+        $user = User::factory()->create();
+        $group = IntegrationGroup::create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'access_token' => 'test-token',
+        ]);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'github',
+            'integration_group_id' => $group->id,
+            'last_triggered_at' => null,
+        ]);
+
+        $task = TaskRegistry::getTask('run_integration_update');
+
+        RunIntegrationUpdateTask::dispatch($integration, $task);
+        RunIntegrationUpdateTask::dispatch($integration, $task);
+
+        $this->assertDatabaseCount('jobs', 1);
+    }
+
+    #[Test]
     public function task_is_not_applicable_when_integration_is_paused(): void
     {
         $integration = Integration::factory()->create([

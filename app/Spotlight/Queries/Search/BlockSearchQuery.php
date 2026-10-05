@@ -4,6 +4,8 @@ namespace App\Spotlight\Queries\Search;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Block;
+use App\Services\Search\RecencyRanking;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -20,15 +22,17 @@ class BlockSearchQuery
                 return collect();
             }
 
-            return Block::with(['event'])
+            $blocks = Block::with(['event'])
+                ->whereHas('event.integration', fn ($q) => $q->where('user_id', Auth::id()))
                 ->where(function ($q) use ($query) {
                     $q->where('title', 'ilike', "%{$query}%")
                         ->orWhere('block_type', 'ilike', "%{$query}%");
                 })
-                ->latest('time')
-                ->limit(5)
+                ->limit(5);
+
+            return app(RecencyRanking::class)->orderByText($blocks, $query, 'title')
                 ->get()
-                ->map(function (Block $block) {
+                ->map(function (Block $block, int $rank) {
                     $blockTitle = $block->title ?? ucfirst(str_replace('_', ' ', $block->block_type ?? 'Block'));
 
                     // Build subtitle parts
@@ -82,16 +86,13 @@ class BlockSearchQuery
 
                     $subtitle = implode(' • ', $subtitleParts);
 
-                    // Boost priority for recent blocks
-                    $priority = $block->time && $block->time->isAfter(now()->subWeek()) ? 1 : 2;
-
                     return SpotlightResult::make()
                         ->setTitle($blockTitle)
                         ->setSubtitle($subtitle)
                         ->setTypeahead('Block: ' . $blockTitle)
                         ->setIcon($blockIcon)
                         ->setGroup('blocks')
-                        ->setPriority($priority)
+                        ->setPriority($rank + 1)
                         ->setAction('jump_to', ['path' => route('blocks.show', $block)])
                         ->setTokens(['block' => $block]);
                 });

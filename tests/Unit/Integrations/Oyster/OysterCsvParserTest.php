@@ -4,6 +4,7 @@ namespace Tests\Unit\Integrations\Oyster;
 
 use App\Integrations\Oyster\OysterCsvParser;
 use App\Integrations\Oyster\OysterTransportModeDetector;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OysterCsvParserTest extends TestCase
@@ -16,7 +17,7 @@ class OysterCsvParserTest extends TestCase
         $this->parser = new OysterCsvParser;
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_basic_csv_with_journeys()
     {
         $csv = <<<'CSV'
@@ -32,7 +33,7 @@ CSV;
         $this->assertCount(0, $result['non_journeys']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_national_rail_journey_correctly()
     {
         $csv = <<<'CSV'
@@ -57,7 +58,7 @@ CSV;
         $this->assertEquals(8.41, $journey['balance']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_tram_entry_correctly()
     {
         $csv = <<<'CSV'
@@ -78,7 +79,7 @@ CSV;
         $this->assertEquals(OysterTransportModeDetector::MODE_TRAM, $journey['transport_mode']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_tube_journey_correctly()
     {
         $csv = <<<'CSV'
@@ -95,7 +96,7 @@ CSV;
         $this->assertEquals(OysterTransportModeDetector::MODE_TUBE, $journey['transport_mode']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_top_up_entries()
     {
         $csv = <<<'CSV'
@@ -117,7 +118,7 @@ CSV;
         $this->assertEquals('Victoria', $topUp['station']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_season_ticket_entries()
     {
         $csv = <<<'CSV'
@@ -137,7 +138,7 @@ CSV;
         $this->assertEquals('West Croydon', $seasonTicket['station']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_dlr_journeys()
     {
         $csv = <<<'CSV'
@@ -154,7 +155,7 @@ CSV;
         $this->assertEquals(OysterTransportModeDetector::MODE_DLR, $journey['transport_mode']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_elizabeth_line_journeys()
     {
         $csv = <<<'CSV'
@@ -173,7 +174,7 @@ CSV;
         $this->assertStringContainsString('zones not covered', $journey['note']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_overground_journeys()
     {
         $csv = <<<'CSV'
@@ -190,7 +191,7 @@ CSV;
         $this->assertEquals(OysterTransportModeDetector::MODE_OVERGROUND, $journey['transport_mode']);
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_zero_charges_for_season_ticket_journeys()
     {
         $csv = <<<'CSV'
@@ -206,7 +207,7 @@ CSV;
         $this->assertNull($journey['charge']);
     }
 
-    /** @test */
+    #[Test]
     public function it_creates_valid_datetime_objects()
     {
         $csv = <<<'CSV'
@@ -227,7 +228,7 @@ CSV;
         $this->assertEquals('18:14', $journey['end_datetime']->format('H:i'));
     }
 
-    /** @test */
+    #[Test]
     public function it_handles_empty_csv()
     {
         $csv = '';
@@ -238,7 +239,7 @@ CSV;
         $this->assertCount(0, $result['non_journeys']);
     }
 
-    /** @test */
+    #[Test]
     public function it_parses_multiple_journeys_in_correct_order()
     {
         $csv = <<<'CSV'
