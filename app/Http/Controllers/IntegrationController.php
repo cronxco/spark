@@ -138,7 +138,10 @@ class IntegrationController extends Controller
             $group = $ref ? IntegrationGroup::where('user_id', $user->id)->where('service', $service)
                 ->where(function ($query) use ($ref) {
                     $query->where('auth_metadata->gocardless_pending->reference', $ref)
-                        ->orWhere('auth_metadata->gocardless_completed_reference', $ref);
+                        ->orWhere(function ($completed) use ($ref) {
+                            $completed->where('auth_metadata->gocardless_completed_reference', $ref)
+                                ->whereNull('auth_metadata->gocardless_pending');
+                        });
                 })->first() : null;
             if (! $group) {
                 return redirect()->route('integrations.index')

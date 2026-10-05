@@ -83,7 +83,8 @@ trait GoCardlessRenewal
     {
         $group->refresh();
         $meta = $group->auth_metadata ?? [];
-        if ($reference !== '' && ($meta['gocardless_completed_reference'] ?? null) === $reference) {
+        if ($reference !== '' && empty($meta['gocardless_pending']) &&
+            ($meta['gocardless_completed_reference'] ?? null) === $reference) {
             return true;
         }
         $pending = $meta['gocardless_pending'] ?? null;
@@ -113,7 +114,8 @@ trait GoCardlessRenewal
         return app(GoCardlessAccounts::class)->locked($group->user_id, function () use ($group, $pending, $reference, $accounts, $mapping) {
             $group->refresh();
             $meta = $group->auth_metadata ?? [];
-            if (($meta['gocardless_completed_reference'] ?? null) === $reference) {
+            if (empty($meta['gocardless_pending']) &&
+                ($meta['gocardless_completed_reference'] ?? null) === $reference) {
                 return true;
             }
             if (($meta['gocardless_pending']['id'] ?? null) !== $pending['id']) {

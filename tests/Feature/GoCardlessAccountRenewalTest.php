@@ -326,4 +326,70 @@ class GoCardlessAccountRenewalTest extends TestCase
         $this->artisan('gocardless:reconcile-accounts', ['--user' => $this->owner->id, '--apply' => true])->assertSuccessful();
         $this->assertSame(1, Event::where('integration_id', $this->integration->id)->count());
     }
+
+    #[Test]
+    public function renewed_aliases_keep_duplicate_history_visible_and_repairable(): void
+    {
+        $canonical = $this->account();
+        $canonical->update(['created_at' => now()->subDay()]);
+        $duplicate = $this->account('Duplicate');
+        $event = Event::create(['integration_id' => $this->integration->id, 'source_id' => 'old-alias-balance',
+            'actor_id' => $duplicate->id, 'service' => 'gocardless', 'domain' => 'money',
+            'action' => 'had_balance', 'time' => now(), 'value' => 5000,
+            'value_multiplier' => 100, 'value_unit' => 'GBP']);
+        $this->stage();
+        $this->provider($this->details('new-account'));
+        $this->assertTrue($this->plugin->completeRenewal($this->group, 'pending-reference'));
+        $canonical->refresh();
+        $financial = new FinancialPlugin;
+        $this->assertSame([$canonical->id], $financial->getFinancialAccounts($this->owner)->modelKeys());
+        $this->assertSame($event->id, $financial->getLatestBalance($canonical)->id);
+        $this->assertSame($event->id, $financial->getLatestBalancesForAccounts(collect([$canonical]))->get($canonical->id)->id);
+        $this->assertContains($event->id, $financial->getBalanceEventsQuery($canonical)->pluck('id')->all());
+        $legacyIntegration = $this->plugin->createInstance($this->group, 'balances', ['account_id' => 'old-account']);
+        $this->artisan('gocardless:reconcile-accounts', ['--user' => $this->owner->id])->assertSuccessful();
+        $this->assertFalse($duplicate->fresh()->trashed());
+        $this->artisan('gocardless:reconcile-accounts', ['--user' => $this->owner->id, '--apply' => true])->assertSuccessful();
+        $this->assertTrue($duplicate->fresh()->trashed());
+        $this->assertSame($canonical->id, $event->fresh()->actor_id);
+        $this->assertSame($canonical->id, $legacyIntegration->fresh()->configuration['account_object_id']);
+    }
+
+    #[Test]
+    public function old_completed_callback_cannot_complete_a_new_mobile_attempt(): void
+    {
+        $this->stage();
+        $meta = $this->group->auth_metadata;
+        $meta['gocardless_completed_reference'] = 'previous-reference';
+        $meta['mobile_reauth_origin'] = true;
+        $meta['mobile_reauth_attempt_id'] = 'current-mobile-attempt';
+        $this->group->update(['auth_metadata' => $meta]);
+        $this->app->instance(GoCardlessBankPlugin::class, $this->plugin);
+        $this->actingAs($this->owner)->get(route('integrations.oauth.callback', [
+            'service' => 'gocardless', 'ref' => 'previous-reference',
+        ]))->assertRedirect(route('integrations.index'));
+        $this->assertSame('current-mobile-attempt', $this->group->fresh()->auth_metadata['mobile_reauth_attempt_id']);
+        $this->assertSame('old-requisition', $this->group->fresh()->account_id);
+        $this->assertSame('generation-two', $this->group->fresh()->auth_metadata['gocardless_pending']['id']);
+        $this->assertTrue($this->group->fresh()->auth_metadata['eua_expired']);
+        Http::assertNothingSent();
+    }
+
+    #[Test]
+    public function provider_cleanup_uses_the_exact_endpoint_and_retries_server_errors(): void
+    {
+        $url = 'https://bankaccountdata.gocardless.com/api/v2/requisitions/old-requisition/';
+        Http::fake([$url => Http::sequence()->push([], 500)->push([], 204)->push([], 404)]);
+        try {
+            $this->plugin->deleteOldRequisition('old-requisition');
+            $this->fail('A server failure must be retried.');
+        } catch (RuntimeException) {
+            // Retry the same operation, as the queued retirement job does.
+        }
+        $this->plugin->deleteOldRequisition('old-requisition');
+        $this->plugin->deleteOldRequisition('old-requisition');
+        Http::assertSentCount(3);
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE' && $request->url() === $url);
+    }
+
 }

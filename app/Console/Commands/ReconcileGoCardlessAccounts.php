@@ -27,10 +27,10 @@ class ReconcileGoCardlessAccounts extends Command
 
             return self::FAILURE;
         }
-        $run = function () use ($userId) {
+        $run = function () use ($userId, $accounts) {
             $objects = EventObject::where('user_id', $userId)->where('concept', 'account')
                 ->where('type', 'bank_account')->orderBy('created_at')->orderBy('id')->get();
-            foreach ($objects->groupBy(fn ($object) => $object->metadata['account_id'] ?? 'unknown') as $id => $members) {
+            foreach ($objects->groupBy(fn ($object) => $accounts->canonical($object)?->id ?? 'unknown') as $id => $members) {
                 if ($id === 'unknown' || $id === '') {
                     foreach ($members as $object) {
                         $this->line("Quarantine unidentified account {$object->id} ({$object->title}); keep all history.");
@@ -139,10 +139,10 @@ class ReconcileGoCardlessAccounts extends Command
         }
         $merged['is_pinned'] = ($merged['is_pinned'] ?? false) || ($metadata['is_pinned'] ?? false);
         $merged['gocardless_account_ids'] = array_values(array_unique(array_merge(
-            $merged['gocardless_account_ids'] ?? [], $metadata['gocardless_account_ids'] ?? [], [$merged['account_id']])));
+            $merged['gocardless_account_ids'] ?? [], $metadata['gocardless_account_ids'] ?? [], [$merged['account_id'], $metadata['account_id']])));
         $canonical->update(['metadata' => $merged]);
         Integration::where('user_id', $owner)->where('service', 'gocardless')
-            ->where('configuration->account_id', $merged['account_id'])->get()->each(function ($integration) use ($canonical) {
+            ->whereIn('configuration->account_id', $merged['gocardless_account_ids'])->get()->each(function ($integration) use ($canonical) {
                 $config = $integration->configuration ?? [];
                 $config['account_object_id'] = $canonical->id;
                 $integration->update(['configuration' => $config]);

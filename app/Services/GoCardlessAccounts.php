@@ -46,12 +46,17 @@ class GoCardlessAccounts
             return [$account->id];
         }
 
+        $ids = array_values(array_unique(array_merge(
+            $account->metadata['gocardless_account_ids'] ?? [], [$id])));
+
         return EventObject::where('user_id', $account->user_id)
             ->where('concept', 'account')->where('type', 'bank_account')
-            ->where(function ($query) use ($id, $account) {
-                $query->where('metadata->account_id', $id)
-                    ->orWhereJsonContains('metadata->gocardless_account_ids', $id)
+            ->where(function ($query) use ($ids, $account) {
+                $query->whereIn('metadata->account_id', $ids)
                     ->orWhere('metadata->merged_into', $account->id);
+                foreach ($ids as $id) {
+                    $query->orWhereJsonContains('metadata->gocardless_account_ids', $id);
+                }
             })->pluck('id')->all();
     }
 

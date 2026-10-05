@@ -7,21 +7,12 @@ use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Models\IntegrationGroup;
 use App\Services\GoCardlessAccounts;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 class GoCardlessRenewalController extends Controller
 {
-    public function show(Request $request, IntegrationGroup $group)
-    {
-        abort_unless($group->user_id === $request->user()->id && $group->service === 'gocardless', 404);
-        $pending = $group->auth_metadata['gocardless_pending'] ?? [];
-        abort_unless(! empty($pending['requires_mapping']), 404);
-        $oldAccounts = $group->integrations()->get()->pluck('configuration.account_id')->filter()->unique()
-            ->mapWithKeys(fn ($id) => [$id => app(GoCardlessAccounts::class)->find($group->user_id, $id)?->title ?? 'Previously linked account']);
-
-        return view('integrations.gocardless-renewal', compact('group', 'pending', 'oldAccounts'));
-    }
-
-    public function store(Request $request, IntegrationGroup $group, GoCardlessBankPlugin $plugin)
+    public function store(Request $request, IntegrationGroup $group, GoCardlessBankPlugin $plugin): RedirectResponse
     {
         abort_unless($group->user_id === $request->user()->id && $group->service === 'gocardless', 404);
         $validated = $request->validate(['reference' => ['required', 'string'],
@@ -41,5 +32,16 @@ class GoCardlessRenewalController extends Controller
         }
 
         return redirect()->route('integrations.index')->with('success', 'Bank connection renewed. Previously paused accounts remain paused.');
+    }
+
+    public function show(Request $request, IntegrationGroup $group): View
+    {
+        abort_unless($group->user_id === $request->user()->id && $group->service === 'gocardless', 404);
+        $pending = $group->auth_metadata['gocardless_pending'] ?? [];
+        abort_unless(! empty($pending['requires_mapping']), 404);
+        $oldAccounts = $group->integrations()->get()->pluck('configuration.account_id')->filter()->unique()
+            ->mapWithKeys(fn ($id) => [$id => app(GoCardlessAccounts::class)->find($group->user_id, $id)?->title ?? 'Previously linked account']);
+
+        return view('integrations.gocardless-renewal', compact('group', 'pending', 'oldAccounts'));
     }
 }

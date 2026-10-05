@@ -1878,16 +1878,16 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->getAccessToken(),
-        ])->delete($this->getBaseUrl() . "/api/v2/requisitions/{$requisitionId}/");
+        ])->delete($this->getBaseUrl() . "/requisitions/{$requisitionId}/");
 
         $this->logApiResponse('DELETE', "/api/v2/requisitions/{$requisitionId}/", $response->status(), $response->body(), $response->headers());
 
         if (! $response->successful() && $response->status() !== 404) {
-            throw new RuntimeException('Could not retire the old GoCardless requisition.');
             Log::warning('GoCardless: Failed to delete old requisition', [
                 'requisition_id' => $requisitionId,
                 'error' => $response->body(),
             ]);
+            throw new RuntimeException('Could not retire the old GoCardless requisition.');
         } else {
             Log::info('GoCardless: Old requisition deleted successfully', [
                 'requisition_id' => $requisitionId,
