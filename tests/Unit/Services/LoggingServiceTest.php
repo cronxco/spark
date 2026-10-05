@@ -8,10 +8,14 @@ use App\Models\User;
 use App\Services\LoggingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\IsolatesLogs;
 use Tests\TestCase;
 
 class LoggingServiceTest extends TestCase
 {
+    use IsolatesLogs;
+
     use RefreshDatabase;
 
     private User $user;
@@ -36,7 +40,7 @@ class LoggingServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function user_log_channel_has_correct_path_and_configuration(): void
     {
         $uuidBlock = $this->user->getUuidBlock();
@@ -48,7 +52,7 @@ class LoggingServiceTest extends TestCase
         $this->assertStringContainsString(storage_path('logs'), $path);
     }
 
-    /** @test */
+    #[Test]
     public function group_log_channel_has_correct_path(): void
     {
         $uuidBlock = $this->group->getUuidBlock();
@@ -60,7 +64,7 @@ class LoggingServiceTest extends TestCase
         $this->assertStringContainsString(storage_path('logs'), $path);
     }
 
-    /** @test */
+    #[Test]
     public function integration_log_channel_has_correct_path(): void
     {
         $uuidBlock = $this->integration->getUuidBlock();
@@ -72,7 +76,7 @@ class LoggingServiceTest extends TestCase
         $this->assertStringContainsString(storage_path('logs'), $path);
     }
 
-    /** @test */
+    #[Test]
     public function log_to_user_writes_to_user_log_file(): void
     {
         Log::spy();
@@ -84,7 +88,7 @@ class LoggingServiceTest extends TestCase
             ->with('info', 'Test message', ['foo' => 'bar']);
     }
 
-    /** @test */
+    #[Test]
     public function log_to_group_writes_to_group_log_file(): void
     {
         Log::spy();
@@ -96,7 +100,7 @@ class LoggingServiceTest extends TestCase
             ->with('warning', 'Group test', ['baz' => 'qux']);
     }
 
-    /** @test */
+    #[Test]
     public function log_to_integration_respects_debug_logging_disabled(): void
     {
         $this->user->disableDebugLogging();
@@ -107,7 +111,7 @@ class LoggingServiceTest extends TestCase
         Log::shouldNotHaveReceived('log');
     }
 
-    /** @test */
+    #[Test]
     public function log_to_integration_allows_debug_when_enabled(): void
     {
         $this->user->enableDebugLogging();
@@ -120,7 +124,7 @@ class LoggingServiceTest extends TestCase
             ->with('debug', 'Debug message', []);
     }
 
-    /** @test */
+    #[Test]
     public function log_to_integration_always_allows_info_and_above(): void
     {
         $this->user->disableDebugLogging();
@@ -133,7 +137,7 @@ class LoggingServiceTest extends TestCase
         Log::shouldHaveReceived('log')->times(3);
     }
 
-    /** @test */
+    #[Test]
     public function hierarchical_logging_cascades_info_levels(): void
     {
         Log::spy();
@@ -144,7 +148,7 @@ class LoggingServiceTest extends TestCase
         Log::shouldHaveReceived('log')->times(3);
     }
 
-    /** @test */
+    #[Test]
     public function hierarchical_logging_keeps_debug_at_integration_level(): void
     {
         $this->user->enableDebugLogging();
@@ -156,7 +160,7 @@ class LoggingServiceTest extends TestCase
         Log::shouldHaveReceived('log')->once();
     }
 
-    /** @test */
+    #[Test]
     public function hierarchical_logging_without_group_still_logs_to_user(): void
     {
         // Create integration without group
@@ -174,7 +178,7 @@ class LoggingServiceTest extends TestCase
         Log::shouldHaveReceived('log')->times(2);
     }
 
-    /** @test */
+    #[Test]
     public function get_user_log_files_returns_array(): void
     {
         $files = LoggingService::getUserLogFiles($this->user);
@@ -182,7 +186,7 @@ class LoggingServiceTest extends TestCase
         $this->assertIsArray($files);
     }
 
-    /** @test */
+    #[Test]
     public function get_group_log_files_returns_array(): void
     {
         $files = LoggingService::getGroupLogFiles($this->group);
@@ -190,7 +194,7 @@ class LoggingServiceTest extends TestCase
         $this->assertIsArray($files);
     }
 
-    /** @test */
+    #[Test]
     public function get_integration_log_files_returns_array(): void
     {
         $files = LoggingService::getIntegrationLogFiles($this->integration);
@@ -198,7 +202,7 @@ class LoggingServiceTest extends TestCase
         $this->assertIsArray($files);
     }
 
-    /** @test */
+    #[Test]
     public function log_paths_include_date_when_provided(): void
     {
         $date = '2025-01-15';
@@ -212,7 +216,7 @@ class LoggingServiceTest extends TestCase
         $this->assertStringContainsString($date, $integrationPath);
     }
 
-    /** @test */
+    #[Test]
     public function log_paths_use_current_date_when_not_provided(): void
     {
         $date = now()->format('Y-m-d');

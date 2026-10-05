@@ -4,6 +4,8 @@ namespace App\Spotlight\Queries\Search;
 
 use App\Integrations\PluginRegistry;
 use App\Models\EventObject;
+use App\Services\Search\RecencyRanking;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -20,11 +22,14 @@ class ObjectSearchQuery
                 return collect();
             }
 
-            return EventObject::query()
+            $objects = EventObject::query()
+                ->where('user_id', Auth::id())
                 ->where('title', 'ilike', "%{$query}%")
-                ->limit(5)
+                ->limit(5);
+
+            return app(RecencyRanking::class)->orderByText($objects, $query, 'title')
                 ->get()
-                ->map(function (EventObject $object) {
+                ->map(function (EventObject $object, int $rank) {
                     // Build subtitle parts
                     $subtitleParts = [];
                     $objectIcon = 'cube';
@@ -62,16 +67,13 @@ class ObjectSearchQuery
 
                     $subtitle = implode(' • ', $subtitleParts);
 
-                    // Boost priority for recent objects
-                    $priority = $object->time && $object->time->isAfter(now()->subWeek()) ? 1 : 2;
-
                     return SpotlightResult::make()
                         ->setTitle($object->title ?? 'Untitled')
                         ->setSubtitle($subtitle)
                         ->setTypeahead('Object: ' . ($object->title ?? 'Untitled'))
                         ->setIcon($objectIcon)
                         ->setGroup('objects')
-                        ->setPriority($priority)
+                        ->setPriority($rank + 1)
                         ->setAction('jump_to', ['path' => route('objects.show', $object)])
                         ->setTokens(['object' => $object]);
                 });

@@ -40,9 +40,107 @@ class NewsletterExtractContentTaskTest extends TestCase
     }
 
     #[Test]
+    public function it_keeps_each_issue_text_on_its_own_event(): void
+    {
+        Queue::fake([ProcessTaskPipelineJob::class]);
+        OpenAI::fake([$this->openAiResponse('# Monday issue'), $this->openAiResponse('# Tuesday issue')]);
+
+        [$monday, $publication] = $this->newsletterEvent(rawHtml: '<html>Monday</html>');
+        $monday->update(['time' => now()->subDay()]);
+        $tuesday = Event::factory()->create([
+            'time' => now(),
+            'integration_id' => $monday->integration_id,
+            'target_id' => $publication->id,
+            'service' => 'newsletter',
+            'domain' => 'knowledge',
+            'action' => 'received_post',
+            'event_metadata' => ['email_subject' => 'Tuesday', 'raw_html' => '<html>Tuesday</html>'],
+        ]);
+
+        (new NewsletterExtractContentTask($monday, $this->task()))->handle();
+        (new NewsletterExtractContentTask($tuesday, $this->task()))->handle();
+
+        $this->assertSame('# Monday issue', $monday->fresh()->issueContent());
+        $this->assertSame('# Monday issue', $monday->fresh()->displayTargetContent());
+        $this->assertSame('# Tuesday issue', $tuesday->fresh()->issueContent());
+        $this->assertSame('# Tuesday issue', $publication->refresh()->content);
+    }
+
+    #[Test]
+    public function re_extracting_an_older_issue_leaves_the_publications_latest_text_alone(): void
+    {
+        Queue::fake([ProcessTaskPipelineJob::class]);
+        OpenAI::fake([$this->openAiResponse('# Monday issue')]);
+
+        [$monday, $publication] = $this->newsletterEvent(rawHtml: '<html>Monday</html>');
+        $monday->update(['time' => now()->subDay()]);
+        $publication->update(['content' => '# Tuesday issue']);
+        Event::factory()->create([
+            'integration_id' => $monday->integration_id,
+            'target_id' => $publication->id,
+            'service' => 'newsletter',
+            'domain' => 'knowledge',
+            'action' => 'received_post',
+            'time' => now(),
+        ]);
+
+        (new NewsletterExtractContentTask($monday, $this->task()))->handle();
+
+        $this->assertSame('# Monday issue', $monday->fresh()->issueContent());
+        $this->assertSame('# Tuesday issue', $publication->refresh()->content);
+    }
+
+    #[Test]
+    public function a_soft_deleted_issue_block_is_neither_read_nor_counted_as_extracted(): void
+    {
+        [$event, $publication] = $this->newsletterEvent(rawHtml: '<html>Issue</html>');
+        $publication->update(['content' => '# Publication text']);
+        $event->createBlock([
+            'title' => 'Issue Content',
+            'block_type' => 'newsletter_content',
+            'time' => $event->time,
+            'metadata' => ['content' => '# Deleted text'],
+        ])->delete();
+
+        $definition = collect(NewsletterPlugin::getTaskDefinitions())
+            ->firstWhere('key', 'newsletter_extract_content');
+
+        $this->assertNull($event->fresh()->issueContent());
+        $this->assertNull($event->fresh()->load('blocks')->issueContent());
+        $this->assertTrue($definition->isApplicableTo($event->fresh()));
+    }
+
+    #[Test]
+    public function an_issue_extracted_before_per_issue_text_falls_back_to_the_publication(): void
+    {
+        [$event, $publication] = $this->newsletterEvent(rawHtml: '<html>Old</html>');
+        $publication->update(['content' => '# Latest issue']);
+
+        $this->assertNull($event->issueContent());
+        $this->assertSame('# Latest issue', $event->displayTargetContent());
+    }
+
+    #[Test]
+    public function a_new_issue_of_an_extracted_publication_is_still_extracted(): void
+    {
+        [$event] = $this->newsletterEvent(rawHtml: '<html>New issue</html>', extractedAt: now()->toIso8601String());
+
+        $definition = collect(NewsletterPlugin::getTaskDefinitions())
+            ->firstWhere('key', 'newsletter_extract_content');
+
+        $this->assertTrue($definition->isApplicableTo($event));
+    }
+
+    #[Test]
     public function should_run_guard_skips_when_already_extracted(): void
     {
-        [$event] = $this->newsletterEvent(rawHtml: '<html>Raw newsletter</html>', extractedAt: now()->toIso8601String());
+        [$event] = $this->newsletterEvent(rawHtml: '<html>Raw newsletter</html>');
+        $event->createBlock([
+            'title' => 'Issue Content',
+            'block_type' => 'newsletter_content',
+            'time' => $event->time,
+            'metadata' => ['content' => '# Already extracted'],
+        ]);
 
         $definition = collect(NewsletterPlugin::getTaskDefinitions())
             ->firstWhere('key', 'newsletter_extract_content');

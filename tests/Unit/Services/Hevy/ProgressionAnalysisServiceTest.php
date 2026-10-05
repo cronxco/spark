@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\User;
 use App\Services\Hevy\ProgressionAnalysisService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ProgressionAnalysisServiceTest extends TestCase
@@ -22,9 +23,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->service = app(ProgressionAnalysisService::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function parses_notes_target_format(): void
     {
         $notes = 'Previous workout notes. 15:kg@5';
@@ -36,9 +35,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertEquals(5.0, $result['increment_amount']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function parses_notes_target_with_reps_increment(): void
     {
         $notes = 'Keep pushing! 20:reps@2';
@@ -50,9 +47,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertEquals(2.0, $result['increment_amount']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function parses_notes_target_with_decimal_increment(): void
     {
         $notes = '12:kg@2.5';
@@ -64,9 +59,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertEquals(2.5, $result['increment_amount']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function returns_null_for_invalid_notes_format(): void
     {
         $notes = 'No target information here';
@@ -75,9 +68,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertNull($result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function formats_notes_with_increase_weight_action(): void
     {
         $recommendation = [
@@ -97,9 +88,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertStringContainsString('12:kg@', $notes);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function formats_notes_with_increase_reps_action(): void
     {
         $recommendation = [
@@ -117,9 +106,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertStringContainsString(':reps@2', $notes);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function formats_notes_with_deload_action(): void
     {
         $recommendation = [
@@ -135,9 +122,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertStringContainsString('⏪ Deloaded', $notes);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function formats_notes_with_maintain_action(): void
     {
         $recommendation = [
@@ -152,9 +137,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertStringContainsString('▶️ Maintain', $notes);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function rounds_weight_to_increment(): void
     {
         // Test rounding to nearest 5kg
@@ -171,9 +154,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertEquals(14.0, $this->service->roundToIncrement(13.8, 2.0));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function analyze_recommends_increase_weight(): void
     {
         $user = User::factory()->create();
@@ -273,9 +254,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertEquals('kg', $recommendation['current_unit']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function analyze_recommends_deload(): void
     {
         $user = User::factory()->create();
@@ -358,9 +337,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertEquals(65, $recommendation['new_weight']); // 70 * 0.9 = 63, rounded to 65 (nearest 5kg)
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function analyze_recommends_maintain(): void
     {
         $user = User::factory()->create();
@@ -425,9 +402,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertEquals('maintain', $recommendation['action']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function analyze_finds_heaviest_set_not_last_set(): void
     {
         $user = User::factory()->create();
@@ -525,9 +500,7 @@ class ProgressionAnalysisServiceTest extends TestCase
         $this->assertEquals(75, $recommendation['new_weight']); // 70 + 5
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function analyze_handles_missing_rpe(): void
     {
         $user = User::factory()->create();

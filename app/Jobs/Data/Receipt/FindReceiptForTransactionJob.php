@@ -40,7 +40,20 @@ class FindReceiptForTransactionJob implements ShouldQueue
             $startTime = $this->transactionEvent->time->copy()->subHours(4);
             $endTime = $this->transactionEvent->time->copy()->addHours(4);
 
-            $unmatchedReceipts = Event::where('service', 'receipt')
+            // Restrict candidates to the transaction's own owner. Without this a
+            // transaction can be matched to another tenant's receipt.
+            $ownerId = $this->transactionEvent->integration?->user_id;
+
+            if ($ownerId === null) {
+                Log::warning('Receipt: Cannot resolve owning user for transaction', [
+                    'transaction_id' => $this->transactionEvent->id,
+                ]);
+
+                return;
+            }
+
+            $unmatchedReceipts = Event::forUser($ownerId)
+                ->where('service', 'receipt')
                 ->where('domain', 'money')
                 ->where('action', 'had_receipt_from')
                 ->whereBetween('time', [$startTime, $endTime])
@@ -80,7 +93,7 @@ class FindReceiptForTransactionJob implements ShouldQueue
 
             // Try to match each receipt
             foreach ($unmatchedReceipts as $receipt) {
-                $confidence = $this->calculateReverseMatchConfidence($receipt, $this->transactionEvent);
+                $confidence = $matcher->calculateReverseMatchConfidence($receipt, $this->transactionEvent);
 
                 if ($confidence >= $autoMatchThreshold) {
                     $matcher->createReceiptRelationship(
@@ -113,32 +126,5 @@ class FindReceiptForTransactionJob implements ShouldQueue
     public function uniqueId(): string
     {
         return 'find_receipt_for_transaction_' . $this->transactionEvent->id;
-    }
-
-    /**
-     * Calculate match confidence for reverse matching
-     * (Similar to ReceiptTransactionMatcher but simplified)
-     */
-    private function calculateReverseMatchConfidence(Event $receipt, Event $transaction): float
-    {
-        $score = 0.0;
-
-        // Amount match (40%)
-        $amountDiff = abs($receipt->value - $transaction->value);
-        $amountScore = 1 - min(1, $amountDiff / max(1, $receipt->value));
-        $score += $amountScore * 0.4;
-
-        // Time proximity (30%)
-        $timeDiff = abs($receipt->time->diffInMinutes($transaction->time));
-        $timeScore = max(0, 1 - ($timeDiff / 240)); // 4-hour window
-        $score += $timeScore * 0.3;
-
-        // Merchant name fuzzy match (30%)
-        $receiptMerchant = strtolower($receipt->target->title ?? '');
-        $txnMerchant = strtolower($transaction->target->title ?? '');
-        similar_text($receiptMerchant, $txnMerchant, $percent);
-        $score += ($percent / 100) * 0.3;
-
-        return $score;
     }
 }

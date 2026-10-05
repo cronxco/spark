@@ -3,18 +3,19 @@
 use App\Jobs\CheckIntegrationUpdates;
 use App\Jobs\Fetch\CheckCookieExpiryJob;
 use App\Jobs\Fetch\RefreshExpiringCookies;
-use App\Jobs\Flint\RunPatternDetectionJob;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
+use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Jobs\TaskPipeline\DispatchRetrospectiveAnomalyTasksJob;
 use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\EffectiveTimezoneResolver;
+use App\Services\Flint\FlintScheduleService;
+use App\Services\Flint\FlintScheduleSettings;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 use Laravel\Horizon\Console\SnapshotCommand;
 use Laravel\Horizon\Horizon;
@@ -53,6 +54,26 @@ if (class_exists(Horizon::class) && class_exists(SnapshotCommand::class)) {
         ->sentryMonitor();
 }
 
+// Prune failed_jobs older than 30 days to prevent unbounded growth
+Schedule::command('queue:prune-failed --hours=720')
+    ->daily()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Keep the notification feed bounded while retaining 30 days of completed history.
+Schedule::command('notifications:maintain-history')
+    ->hourly()
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->sentryMonitor();
+
+// Daily Digest email: each user's digest goes out once their local digest time passes.
+Schedule::command('notifications:send-digests')
+    ->everyFifteenMinutes()
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->sentryMonitor();
+
 // Check cookie expiry daily at 6am
 Schedule::job(new CheckCookieExpiryJob)
     ->dailyAt('06:00')
@@ -67,10 +88,14 @@ Schedule::job(new RefreshExpiringCookies)
     ->withoutOverlapping()
     ->sentryMonitor();
 
-// Flint digest dispatcher (runs every 15 minutes to check for scheduled digests)
-// New flow: -15min = agents run + digest generation, 0min = send notification
+// Flint digest dispatcher (runs every 15 minutes to check for scheduled digest slots).
+// Spark only owns the timing: when a user's slot is due it fires an outbound webhook
+// (TriggerFlintDigestRoutineJob) asking the Claude Code Routine to run the digest
+// skill. The routine writes the digest back via the create-flint-digest MCP tool,
+// and NotifyOnDigestReadyTask sends the notification once that event lands.
 Schedule::call(function () {
     $resolver = app(EffectiveTimezoneResolver::class);
+    $flintSchedule = app(FlintScheduleService::class);
 
     // The id of the user's Oura sleep-score event for a local wake date, or null
     // if it hasn't been ingested yet. Used to gate the morning digest.
@@ -81,9 +106,11 @@ Schedule::call(function () {
         ->where('event_metadata->day', $localDate)
         ->value('id');
 
-    $users = User::whereNotNull('settings->flint->digests_enabled')
-        ->where('settings->flint->digests_enabled', '!=', false)
-        ->get();
+    $users = User::query()->where(function ($query) {
+        foreach (FlintScheduleSettings::ENABLED_KEYS as $key) {
+            $query->orWhereNotNull("settings->flint->{$key}");
+        }
+    })->get();
 
     foreach ($users as $user) {
         $settings = $user->settings['flint'] ?? [];
@@ -92,17 +119,14 @@ Schedule::call(function () {
         $tz = $resolver->timezoneFor($user);
         $now = $resolver->now($user);
         $today = $resolver->today($user)->toDateString();
-        $isWeekend = $now->isWeekend();
-
-        $morningTime = $isWeekend
-            ? ($settings['morning_time_weekend'] ?? config('services.flint_routine.morning_time_weekend'))
-            : ($settings['morning_time_weekday'] ?? config('services.flint_routine.morning_time_weekday'));
-        $eveningTime = $settings['evening_time'] ?? config('services.flint_routine.evening_time');
-        $fallbackTime = $settings['morning_fallback'] ?? config('services.flint_routine.morning_fallback');
+        $morningTime = $flintSchedule->slot($user, 'morning_digest', $now);
+        $eveningTime = $flintSchedule->slot($user, 'evening_digest', $now);
+        $fallbackTime = $flintSchedule->morningFallback($user);
 
         // Evening digest: pure time gate at the configured evening slot.
         $eveningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'evening');
-        if ($now->gte(Carbon::parse($eveningTime, $tz)) && ! Cache::has($eveningMarker)) {
+        if (FlintScheduleSettings::enabled($settings, 'evening_digest_enabled')
+            && $now->gte(Carbon::parse($eveningTime, $tz)) && ! Cache::has($eveningMarker)) {
             dispatch(new TriggerFlintDigestRoutineJob($user, 'evening', $today, $tz, 'scheduled'))
                 ->onQueue('flint');
         }
@@ -112,7 +136,8 @@ Schedule::call(function () {
         // (Low-latency firing when sleep lands after the slot is handled by
         // DispatchMorningDigestOnSleepScoreTask; this is the backstop.)
         $morningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'morning');
-        if ($now->gte(Carbon::parse($morningTime, $tz)) && ! Cache::has($morningMarker)) {
+        if (FlintScheduleSettings::enabled($settings, 'morning_digest_enabled')
+            && $now->gte(Carbon::parse($morningTime, $tz)) && ! Cache::has($morningMarker)) {
             $sleepEventId = $sleepScoreEventIdFor($user, $today);
 
             if ($sleepEventId !== null) {
@@ -131,25 +156,41 @@ Schedule::call(function () {
     ->withoutOverlapping()
     ->sentryMonitor();
 
-// Flint pattern detection (weekly on Sundays at 04:00)
+// The once-daily Flint routines that aren't the digest: topic review, reading
+// list, news roundup. Same shape as the digest dispatcher — Spark fires the
+// webhook at the user's configured local slot and the routine does the work.
+// A routine whose webhook URL is unset is a no-op (the job logs and returns).
 Schedule::call(function () {
-    $users = User::query()
-        ->whereHas('integrations', function ($query) {
-            $query->where('service', 'flint');
-        })
-        ->get();
+    $resolver = app(EffectiveTimezoneResolver::class);
+    $flintSchedule = app(FlintScheduleService::class);
 
-    Log::info('Dispatching pattern detection', [
-        'user_count' => $users->count(),
-    ]);
+    $users = User::query()->where(function ($query) {
+        foreach (FlintScheduleSettings::ENABLED_KEYS as $key) {
+            $query->orWhereNotNull("settings->flint->{$key}");
+        }
+    })->get();
 
     foreach ($users as $user) {
-        dispatch(new RunPatternDetectionJob($user))->onQueue('flint');
+        $settings = $user->settings['flint'] ?? [];
+        $tz = $resolver->timezoneFor($user);
+        $now = $resolver->now($user);
+        $today = $resolver->today($user)->toDateString();
+
+        foreach (['topics', 'reading_list', 'news_roundup'] as $routine) {
+            if (! FlintScheduleSettings::enabled($settings, "{$routine}_enabled")) {
+                continue;
+            }
+            $slot = $flintSchedule->slot($user, $routine, $now);
+            $marker = TriggerFlintRoutineJob::markerKey($user->id, $today, $routine);
+
+            if ($now->gte(Carbon::parse($slot, $tz)) && ! Cache::has($marker)) {
+                dispatch(new TriggerFlintRoutineJob($user, $routine, $today, $tz))->onQueue('flint');
+            }
+        }
     }
 })
-    ->weeklyOn(0, '04:00')
-    ->timezone('Europe/London')
-    ->name('flint-pattern-detection')
+    ->everyFifteenMinutes()
+    ->name('flint-routine-dispatcher')
     ->onOneServer()
     ->withoutOverlapping()
     ->sentryMonitor();

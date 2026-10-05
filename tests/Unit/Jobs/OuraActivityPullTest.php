@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OuraActivityPullTest extends TestCase
@@ -40,9 +41,7 @@ class OuraActivityPullTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function fetch_activity_success()
     {
         Queue::fake();
@@ -74,9 +73,7 @@ class OuraActivityPullTest extends TestCase
         $this->assertEquals($mockResponse['data'], $result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function dispatch_processing_jobs()
     {
         Queue::fake();
@@ -97,9 +94,7 @@ class OuraActivityPullTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_metadata()
     {
         $job = $this->createTestableJob();

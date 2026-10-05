@@ -1,19 +1,21 @@
 <?php
 
-use App\Models\Event;
 use App\Models\Block;
-use Illuminate\Support\Facades\Auth;
+use App\Models\Event;
+use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
-use Illuminate\Support\Str;
+
 use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
 
-new class extends Component {
-    use WithPagination, Toast;
+new class extends Component
+{
+    use Toast, WithPagination;
 
     public string $search = '';
     public string $serviceFilter = '';
@@ -82,24 +84,31 @@ new class extends Component {
     {
         if (empty($this->selectedEvents)) {
             $this->error('No events selected for deletion.');
+
             return;
         }
 
         try {
-            DB::transaction(function () {
+            $count = DB::transaction(function () {
+                // Re-resolve the client-supplied selection through the same
+                // ownership predicate the listing uses. $selectedEvents is a
+                // public Livewire property and cannot be trusted as an authority.
+                $ownedIds = Event::forUser(AdminTenant::id())
+                    ->whereIn('id', $this->selectedEvents)
+                    ->pluck('id');
+
                 // Delete blocks first (cascade)
-                Block::whereIn('event_id', $this->selectedEvents)->delete();
+                Block::whereIn('event_id', $ownedIds)->delete();
 
                 // Delete events
-                Event::whereIn('id', $this->selectedEvents)->delete();
+                return Event::whereIn('id', $ownedIds)->delete();
             });
 
-            $count = count($this->selectedEvents);
             $this->success("Successfully deleted {$count} event(s) and their associated blocks.");
 
             $this->selectedEvents = [];
             $this->resetPage();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Failed to delete events: ' . $e->getMessage());
         }
     }
@@ -108,7 +117,7 @@ new class extends Component {
     {
         $query = Event::with(['actor', 'target', 'integration', 'blocks'])
             ->whereHas('integration', function ($q) {
-                $q->where('user_id', Auth::id());
+                $q->where('user_id', AdminTenant::id());
             });
 
         // Apply search filter
@@ -152,21 +161,21 @@ new class extends Component {
     public function getUniqueServices()
     {
         return Event::whereHas('integration', function ($q) {
-            $q->where('user_id', Auth::id());
+            $q->where('user_id', AdminTenant::id());
         })->distinct()->pluck('service')->filter()->sort()->values();
     }
 
     public function getUniqueDomains()
     {
         return Event::whereHas('integration', function ($q) {
-            $q->where('user_id', Auth::id());
+            $q->where('user_id', AdminTenant::id());
         })->distinct()->pluck('domain')->filter()->sort()->values();
     }
 
     public function getUniqueActions()
     {
         return Event::whereHas('integration', function ($q) {
-            $q->where('user_id', Auth::id());
+            $q->where('user_id', AdminTenant::id());
         })->distinct()->pluck('action')->filter()->sort()->values();
     }
 

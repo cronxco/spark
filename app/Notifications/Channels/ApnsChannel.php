@@ -3,6 +3,10 @@
 namespace App\Notifications\Channels;
 
 use App\Models\PushSubscription;
+use App\Models\User;
+use App\Notifications\NotificationCatalogue;
+use App\Notifications\SparkNotification;
+use App\Services\Notifications\NotificationDeliveryRecorder;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Notification;
@@ -66,8 +70,9 @@ class ApnsChannel
         }
 
         $message = $notification->toApn($notifiable);
+        $notificationId = $this->storedNotificationId($notifiable, $notification);
 
-        $this->applySparkEnvelope($message, $notification);
+        $this->applySparkEnvelope($message, $notification, $notificationId);
 
         $tokens = $subscriptions->pluck('endpoint')->all();
 
@@ -77,34 +82,64 @@ class ApnsChannel
 
         $this->dispatchEvents($notifiable, $notification, $responses);
 
-        $this->sendSilentCompanion($client, $notifiable, $notification, $tokens);
+        $this->sendSilentCompanion($client, $notifiable, $notification, $tokens, $notificationId);
 
         return $responses;
     }
 
     /**
+     * The id of the in-app notification this push belongs to, which the app
+     * reports receipts against (decision N-8). A repeat folded into an earlier
+     * open notification carries that notification's id, not its own.
+     */
+    protected function storedNotificationId(mixed $notifiable, Notification $notification): ?string
+    {
+        if ($notifiable instanceof User && $notification instanceof SparkNotification) {
+            return app(NotificationDeliveryRecorder::class)->storedNotificationId($notifiable, $notification);
+        }
+
+        return $notification->id;
+    }
+
+    /**
      * Apply the Spark envelope defaults to an outgoing message.
      */
-    protected function applySparkEnvelope(ApnMessage $message, Notification $notification): void
+    protected function applySparkEnvelope(ApnMessage $message, Notification $notification, ?string $notificationId = null): void
     {
         $type = method_exists($notification, 'getNotificationType')
             ? $notification->getNotificationType()
             : null;
 
-        if ($message->category === null && $type !== null) {
-            $message->category($type);
+        // The category identifier selects which UNNotificationCategory — and so
+        // which action buttons — the client shows. It must be one the client
+        // registered, and matching is case-sensitive. Sending the raw snake_case
+        // notification type meant no category ever matched, leaving every
+        // action button inert. threadId is a grouping key only, so the raw type
+        // remains correct there.
+        $category = $type === null ? null : ($this->clientCategories()[$type] ?? null);
+
+        if ($message->category === null && $category !== null) {
+            $message->category($category);
         }
 
         if ($message->threadId === null && $type !== null) {
             $message->threadId($type);
         }
 
+        // Lets the Notification Service Extension run on receipt, so the app
+        // can report that the notification was shown (decision N-8).
+        if ($message->mutableContent === null) {
+            $message->mutableContent(1);
+        }
+
         $envelope = array_filter([
+            'contract_version' => 1,
+            'notification_id' => $notificationId ?? $notification->id,
             'type' => $type,
-            'entity_type' => $notification->sparkEntityType ?? null,
-            'entity_id' => $notification->sparkEntityId ?? null,
-            'deep_link' => $notification->sparkDeepLink ?? null,
-            'sync_cursor' => $notification->sparkSyncCursor ?? null,
+            'entity_type' => method_exists($notification, 'getEntityType') ? $notification->getEntityType() : null,
+            'entity_id' => method_exists($notification, 'getEntityId') ? $notification->getEntityId() : null,
+            'deep_link' => method_exists($notification, 'getDeepLink') ? $notification->getDeepLink() : null,
+            'sync_cursor' => method_exists($notification, 'getSyncCursor') ? $notification->getSyncCursor() : null,
         ], fn ($value) => $value !== null);
 
         if ($envelope === []) {
@@ -122,17 +157,21 @@ class ApnsChannel
     /**
      * Dispatch a silent content-available push so the client can sync.
      */
-    protected function sendSilentCompanion(Client $client, mixed $notifiable, Notification $notification, array $tokens): void
+    protected function sendSilentCompanion(Client $client, mixed $notifiable, Notification $notification, array $tokens, ?string $notificationId = null): void
     {
         $silent = (new ApnMessage)
             ->contentAvailable(1)
             ->pushType(ApnMessagePushType::Background)
             ->custom([
                 'spark' => array_filter([
+                    'contract_version' => 1,
+                    'notification_id' => $notificationId ?? $notification->id,
                     'type' => method_exists($notification, 'getNotificationType')
                         ? $notification->getNotificationType()
                         : null,
-                    'sync_cursor' => $notification->sparkSyncCursor ?? null,
+                    'sync_cursor' => method_exists($notification, 'getSyncCursor')
+                        ? $notification->getSyncCursor()
+                        : null,
                 ], fn ($value) => $value !== null),
             ]);
 
@@ -193,5 +232,22 @@ class ApnsChannel
                     ->delete();
             }
         }
+    }
+
+    /**
+     * Notification type -> UNNotificationCategory identifier registered by the
+     * iOS client.
+     *
+     * Derived from NotificationCatalogue so the server and the client cannot
+     * drift: the categories the client registers are exactly
+     * NotificationCatalogue::apnsCategoryIdentifiers(). A type absent from the
+     * catalogue is sent without a category, which is a plain notification with
+     * no action buttons — the honest outcome until it is added there.
+     *
+     * @return array<string, string>
+     */
+    private function clientCategories(): array
+    {
+        return NotificationCatalogue::apnsCategories();
     }
 }

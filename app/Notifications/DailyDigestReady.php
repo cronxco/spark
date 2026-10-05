@@ -3,92 +3,120 @@
 namespace App\Notifications;
 
 use App\Models\EventObject;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Models\User;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
-use NotificationChannels\WebPush\WebPushChannel;
-use NotificationChannels\WebPush\WebPushMessage;
+use Illuminate\Support\Str;
 
-class DailyDigestReady extends Notification implements ShouldQueue
+class DailyDigestReady extends SparkNotification
 {
-    use Queueable;
-
     public function __construct(
-        public EventObject $digestObject,
+        public ?EventObject $digestObject,
         public string $period,
-        public array $blocks
+        public ?string $title = null,
+        public ?string $summary = null,
+        public int $unansweredQuestionCount = 0,
     ) {}
 
-    public function via($notifiable): array
+    public function getNotificationType(): string
     {
-        $channels = ['database'];
+        return 'daily_digest';
+    }
 
-        if ($notifiable->hasEmailNotificationsEnabled('daily_digest')) {
-            $channels[] = 'mail';
-        }
+    public function getTitle(): string
+    {
+        return $this->title ?? $this->digestObject?->title ?? $this->getTimeBasedGreeting() . ' digest';
+    }
 
-        if ($notifiable->hasPushNotificationsEnabled() && $notifiable->pushSubscriptions()->validWebPush()->exists()) {
-            $channels[] = WebPushChannel::class;
-        }
+    public function getMessage(): string
+    {
+        return $this->headline() ?? 'Your daily digest is ready to review.';
+    }
 
-        return $channels;
+    public function getActionUrl(): ?string
+    {
+        return $this->digestUrl();
+    }
+
+    public function getEntityType(): ?string
+    {
+        return $this->digestObject === null ? null : 'object';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return $this->digestObject?->id === null ? null : (string) $this->digestObject->id;
+    }
+
+    public function getGroupKey(): ?string
+    {
+        return $this->digestObject === null
+            ? null
+            : "daily_digest:{$this->digestObject->id}";
     }
 
     public function toMail($notifiable): MailMessage
     {
-        $headline = $this->findBlockContent('flint_summarised_headline');
-        $keyPoints = $this->findBlockMetadata('flint_five_key_points', 'points') ?? [];
-
         $message = (new MailMessage)
-            ->subject('Your ' . ucfirst($this->period) . ' Digest is Ready')
+            ->subject($this->title ?? 'Your ' . ucfirst($this->period) . ' Digest is Ready')
             ->greeting('Hello!')
-            ->line($headline ?? 'Your daily digest is ready to review.');
+            ->line($this->summary ?? 'Your daily digest is ready to review.');
 
-        if (! empty($keyPoints)) {
-            $message->line('**Key Points:**');
-            foreach (array_slice($keyPoints, 0, 3) as $point) {
-                $message->line('• ' . $point);
-            }
+        if ($this->unansweredQuestionCount > 0) {
+            $message->line(sprintf(
+                '**%d question%s waiting for you.**',
+                $this->unansweredQuestionCount,
+                $this->unansweredQuestionCount === 1 ? '' : 's',
+            ));
         }
 
-        $message->action('View Full Digest', route('objects.show', $this->digestObject->id));
+        $message->action('View Full Digest', $this->digestUrl());
 
         return $message;
     }
 
-    public function toArray($notifiable): array
+    public function toArray(User $notifiable): array
     {
         return [
-            'digest_object_id' => $this->digestObject->id,
+            ...parent::toArray($notifiable),
+            'digest_object_id' => $this->digestObject?->id,
             'period' => $this->period,
-            'title' => $this->digestObject->title,
-            'headline' => $this->findBlockContent('flint_summarised_headline'),
+            'headline' => $this->headline(),
+            'unanswered_question_count' => $this->unansweredQuestionCount,
         ];
     }
 
-    public function toWebPush($notifiable, $notification): WebPushMessage
+    /**
+     * A one-line teaser: the opening sentence of the digest summary, short
+     * enough to survive a push notification.
+     */
+    private function headline(): ?string
     {
-        $headline = $this->findBlockContent('flint_summarised_headline');
-        $greeting = $this->getTimeBasedGreeting();
-        $body = $headline ? $this->toSentenceCase($headline) : 'Your daily digest is ready to review.';
+        if (blank($this->summary)) {
+            return null;
+        }
 
-        return (new WebPushMessage)
-            ->title($greeting)
-            ->icon('/icons/Spark-iOS-Default-60x60@3x.png')
-            ->body($body)
-            ->badge('/favicon.ico')
-            ->tag('daily-digest-' . $this->period)
-            ->data([
-                'url' => route('objects.show', $this->digestObject->id),
-                'type' => 'daily_digest',
-                'digest_object_id' => $this->digestObject->id,
-                'period' => $this->period,
-            ])
-            ->options([
-                'TTL' => 86400, // 24 hours
-                'urgency' => 'normal',
-            ]);
+        $firstLine = trim(Str::before(trim($this->summary), "\n"));
+
+        // `before('. ')` returns the whole line when there is no sentence break,
+        // so the result may already carry its own terminal punctuation.
+        $firstSentence = Str::of($firstLine)->before('. ')->trim()->toString();
+
+        if ($firstSentence === '') {
+            return Str::limit($firstLine, 160);
+        }
+
+        if (! Str::endsWith($firstSentence, ['.', '!', '?'])) {
+            $firstSentence .= '.';
+        }
+
+        return Str::limit($firstSentence, 160);
+    }
+
+    private function digestUrl(): string
+    {
+        return $this->digestObject
+            ? route('objects.show', $this->digestObject->id)
+            : route('flint.index');
     }
 
     private function getTimeBasedGreeting(): string
@@ -104,26 +132,5 @@ class DailyDigestReady extends Notification implements ShouldQueue
         }
 
         return 'Good Evening';
-    }
-
-    private function toSentenceCase(string $text): string
-    {
-        $text = mb_strtolower($text);
-
-        return mb_strtoupper(mb_substr($text, 0, 1)) . mb_substr($text, 1);
-    }
-
-    private function findBlockContent(string $blockType): ?string
-    {
-        $block = collect($this->blocks)->firstWhere('block_type', $blockType);
-
-        return $block?->metadata['content'] ?? null;
-    }
-
-    private function findBlockMetadata(string $blockType, string $key): mixed
-    {
-        $block = collect($this->blocks)->firstWhere('block_type', $blockType);
-
-        return $block?->metadata[$key] ?? null;
     }
 }

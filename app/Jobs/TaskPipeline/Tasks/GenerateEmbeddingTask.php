@@ -4,7 +4,8 @@ namespace App\Jobs\TaskPipeline\Tasks;
 
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Models\Event;
-use App\Services\EmbeddingService;
+use App\Services\Ai\AiUsageContext;
+use App\Services\Ai\EmbeddingClient;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -15,7 +16,7 @@ class GenerateEmbeddingTask extends BaseTaskJob
      */
     protected function execute(): void
     {
-        $embeddingService = app(EmbeddingService::class);
+        $embeddingService = app(EmbeddingClient::class);
 
         // Get searchable text from the model using its getSearchableText() method
         $searchableText = $this->model->getSearchableText();
@@ -26,13 +27,15 @@ class GenerateEmbeddingTask extends BaseTaskJob
                 'model_id' => $this->model->id,
             ]);
 
+            $this->recordOutcome('not_applicable');
+
             return;
         }
 
         // Generate embedding
-        $embedding = $embeddingService->embed($searchableText);
+        $embedding = $embeddingService->embed($searchableText, usageContext: AiUsageContext::forModel($this->model));
 
-        if (EmbeddingService::isZeroVector($embedding)) {
+        if (EmbeddingClient::isZeroVector($embedding)) {
             throw new RuntimeException('Embedding provider returned a zero vector');
         }
 
@@ -50,7 +53,7 @@ class GenerateEmbeddingTask extends BaseTaskJob
         // Use withoutEvents() to prevent observers from triggering on this internal update
         $this->model->withoutEvents(function () use ($embedding, $metadata, $metadataField) {
             $this->model->update([
-                'embeddings' => EmbeddingService::formatForPostgres($embedding),
+                'embeddings' => EmbeddingClient::formatForPostgres($embedding),
                 $metadataField => $metadata,
             ]);
         });

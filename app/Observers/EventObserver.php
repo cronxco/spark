@@ -33,7 +33,7 @@ class EventObserver
      */
     public function updated(Event $event): void
     {
-        if (! config('app.enable_task_pipeline', true)) {
+        if ($event->isInternal() || ! config('app.enable_task_pipeline', true)) {
             return;
         }
 

@@ -34,7 +34,8 @@ class EventFeed
         int $limit = self::LIMIT_DEFAULT,
     ): array {
         $limit = max(1, min($limit, self::LIMIT_MAX));
-        $integrationIds = $user->integrations()->pluck('id')->all();
+        $integrationIds = ($service === 'openai' ? $user->allIntegrations() : $user->integrations())
+            ->pluck('id')->all();
 
         if (empty($integrationIds)) {
             return [
@@ -50,6 +51,10 @@ class EventFeed
             ->whereIn('integration_id', $integrationIds)
             ->where('service', $service)
             ->with(['actor', 'target', 'blocks', 'tags']);
+
+        if ($service !== 'openai') {
+            $query->withoutInternal();
+        }
 
         if ($action) {
             $query->where('action', $action);
@@ -90,6 +95,7 @@ class EventFeed
         $eagerLoads = ['actor', 'target', 'integration', 'tags', 'blocks'];
 
         $query = Event::query()
+            ->withoutInternal()
             ->whereIn('integration_id', empty($integrationIds) ? [-1] : $integrationIds)
             ->withCount('blocks')
             ->with($eagerLoads);
@@ -99,7 +105,9 @@ class EventFeed
         }
 
         if ($date !== null) {
-            $query->whereBetween('time', [$date->copy()->startOfDay(), $date->copy()->endOfDay()]);
+            // `time` is stored in UTC, so the local day's bounds are converted
+            // before binding; `$date` carries the timezone the day belongs to.
+            $query->whereBetween('time', [$date->copy()->startOfDay()->utc(), $date->copy()->endOfDay()->utc()]);
         } else {
             $query->where('time', '<=', now());
         }

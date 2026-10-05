@@ -11,15 +11,14 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class KarakeepPluginTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_has_correct_metadata(): void
     {
         $this->assertEquals('karakeep', KarakeepPlugin::getIdentifier());
@@ -31,9 +30,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertTrue(KarakeepPlugin::supportsMigration());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_defines_required_action_types(): void
     {
         $actionTypes = KarakeepPlugin::getActionTypes();
@@ -45,9 +42,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertEquals('Added to List', $actionTypes['added_to_list']['display_name']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_defines_required_block_types(): void
     {
         $blockTypes = KarakeepPlugin::getBlockTypes();
@@ -59,9 +54,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertEquals('AI Summary', $blockTypes['bookmark_summary']['display_name']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_defines_required_object_types(): void
     {
         $objectTypes = KarakeepPlugin::getObjectTypes();
@@ -74,9 +67,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertTrue($objectTypes['karakeep_user']['hidden']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function initialize_group_creates_group_with_metadata(): void
     {
         $user = User::factory()->create();
@@ -91,9 +82,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertArrayHasKey('api_url', $group->auth_metadata);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function create_instance_stores_configuration(): void
     {
         $user = User::factory()->create();
@@ -117,9 +106,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertTrue($integration->configuration['sync_highlights']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function create_instance_with_migration_flag_starts_paused(): void
     {
         $user = User::factory()->create();
@@ -134,9 +121,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertTrue($integration->configuration['paused']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function pull_dispatches_processing_job(): void
     {
         Bus::fake();
@@ -195,9 +180,7 @@ class KarakeepPluginTest extends TestCase
         Bus::assertDispatched(KarakeepBookmarksData::class);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function instance_types_include_bookmarks(): void
     {
         $instanceTypes = KarakeepPlugin::getInstanceTypes();
@@ -207,9 +190,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertIsArray($instanceTypes['bookmarks']['schema']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function configuration_schema_includes_required_fields(): void
     {
         $schema = KarakeepPlugin::getConfigurationSchema();
@@ -221,9 +202,7 @@ class KarakeepPluginTest extends TestCase
         $this->assertEquals(50, $schema['fetch_limit']['default']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function group_configuration_schema_includes_api_credentials(): void
     {
         $schema = KarakeepPlugin::getGroupConfigurationSchema();

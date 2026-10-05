@@ -17,7 +17,7 @@ Clients use a named version and conditional reads. The current additive `ios:rea
 The current dual-ability convention and broad trusted-client access were rejected.
 
 ## Related repository paths
-`routes/api.php`, `routes/mobile.php`, `routes/channels.php`, `bootstrap/app.php`, `docs/mobile/MOBILE_API.md`.
+`routes/api.php`, `routes/mobile.php`, `routes/channels.php`, `bootstrap/app.php`, `docs/API/mobile_API.md`.
 
 ## Evidence gaps / open questions
 Define endpoint ability mapping, authorization tests, and compatibility/deprecation ownership.

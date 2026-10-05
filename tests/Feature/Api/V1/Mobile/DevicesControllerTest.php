@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 use App\Models\PushSubscription;
 use App\Models\User;
 use App\Notifications\TestPushNotification;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
@@ -33,7 +34,7 @@ class DevicesControllerTest extends TestCase
     #[Test]
     public function index_returns_ios_devices_for_authenticated_user(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->user->pushSubscriptions()->create([
             'endpoint' => str_repeat('a', 64),
@@ -63,7 +64,7 @@ class DevicesControllerTest extends TestCase
     #[Test]
     public function index_falls_back_to_a_default_name_when_device_name_is_missing(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         // device_name is nullable, but the iOS decoder requires a non-null name.
         $this->user->pushSubscriptions()->create([
@@ -85,7 +86,7 @@ class DevicesControllerTest extends TestCase
             'device_type' => PushSubscription::DEVICE_TYPE_IOS,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->getJson('/api/v1/mobile/devices')
             ->assertOk()
@@ -101,7 +102,7 @@ class DevicesControllerTest extends TestCase
     #[Test]
     public function register_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/devices', $this->payload())
             ->assertStatus(403);
@@ -110,7 +111,7 @@ class DevicesControllerTest extends TestCase
     #[Test]
     public function register_creates_ios_push_subscription(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $token = str_repeat('b', 64);
 
@@ -131,7 +132,7 @@ class DevicesControllerTest extends TestCase
     #[Test]
     public function register_upserts_on_duplicate_token(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $token = str_repeat('c', 64);
 
@@ -147,7 +148,7 @@ class DevicesControllerTest extends TestCase
     #[Test]
     public function register_rejects_invalid_environment(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/devices', array_merge($this->payload(), ['app_environment' => 'staging']))
             ->assertStatus(422);
@@ -156,7 +157,7 @@ class DevicesControllerTest extends TestCase
     #[Test]
     public function destroy_removes_subscription(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $subscription = $this->user->pushSubscriptions()->create([
             'endpoint' => str_repeat('d', 64),
@@ -181,7 +182,7 @@ class DevicesControllerTest extends TestCase
             'app_environment' => 'sandbox',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/devices', $this->payload($token))
             ->assertStatus(201);
@@ -202,27 +203,21 @@ class DevicesControllerTest extends TestCase
             'device_type' => 'ios',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->deleteJson("/api/v1/mobile/devices/{$subscription->id}")
             ->assertStatus(404);
     }
 
-    /**
-     * @test
-     */
     #[Test]
     public function push_requires_ios_subscription(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/devices/test')
             ->assertStatus(400);
     }
 
-    /**
-     * @test
-     */
     #[Test]
     public function push_sends_ios_notification(): void
     {
@@ -234,7 +229,7 @@ class DevicesControllerTest extends TestCase
             'app_environment' => 'sandbox',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/devices/test')
             ->assertStatus(204);

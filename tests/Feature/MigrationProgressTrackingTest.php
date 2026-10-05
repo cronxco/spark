@@ -9,15 +9,14 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MigrationProgressTrackingTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function start_integration_migration_creates_progress_record(): void
     {
         Bus::fake();
@@ -49,9 +48,7 @@ class MigrationProgressTrackingTest extends TestCase
         $this->assertTrue($progress->isInProgress());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_progress_updates_during_processing(): void
     {
         $user = User::factory()->create();
@@ -89,9 +86,7 @@ class MigrationProgressTrackingTest extends TestCase
         $this->assertEquals(['service' => 'oura', 'instance_type' => 'activity'], $progress->details);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_progress_can_be_marked_completed(): void
     {
         $user = User::factory()->create();
@@ -126,9 +121,7 @@ class MigrationProgressTrackingTest extends TestCase
         $this->assertEquals(['items_processed' => 100, 'duration' => '2m 30s'], $progress->details);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_progress_can_be_marked_failed(): void
     {
         $user = User::factory()->create();
@@ -162,5 +155,32 @@ class MigrationProgressTrackingTest extends TestCase
         $this->assertNotNull($progress->failed_at);
         $this->assertEquals('API rate limit exceeded', $progress->error_message);
         $this->assertEquals(['error_code' => 'RATE_LIMIT', 'retry_after' => 3600], $progress->details);
+    }
+
+    #[Test]
+    public function unsupported_service_migration_is_marked_failed_and_unpauses_the_integration(): void
+    {
+        Bus::fake();
+
+        $user = User::factory()->create();
+        $group = IntegrationGroup::factory()->create(['user_id' => $user->id]);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'not-a-migratable-service',
+            'instance_type' => 'default',
+        ]);
+
+        (new StartIntegrationMigration($integration))->handle();
+
+        $progress = ActionProgress::getLatestProgress(
+            $user->id,
+            'migration',
+            "integration_{$integration->id}"
+        );
+
+        $this->assertTrue($progress->isFailed());
+        $this->assertSame('Unsupported service', $progress->error_message);
+        $this->assertFalse($integration->fresh()->configuration['paused']);
     }
 }

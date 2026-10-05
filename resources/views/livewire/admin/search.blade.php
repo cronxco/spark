@@ -3,12 +3,12 @@
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\SearchLog;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Support\AdminTenant;
+use Illuminate\Support\Facades\Artisan;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
-use Illuminate\Support\Str;
+
 use function Livewire\Volt\layout;
 
 layout('components.layouts.app');
@@ -85,7 +85,7 @@ new class extends Component
 
     public function getSearchLogs()
     {
-        $query = SearchLog::query();
+        $query = SearchLog::where('user_id', AdminTenant::id());
 
         // Apply search filter
         if ($this->search) {
@@ -112,9 +112,9 @@ new class extends Component
 
     public function getStatsProperty(): array
     {
-        $totalSearches = SearchLog::where('created_at', '>=', now()->subDays(7))->count();
+        $totalSearches = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(7))->count();
 
-        $typeBreakdown = SearchLog::where('created_at', '>=', now()->subDays(7))
+        $typeBreakdown = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(7))
             ->selectRaw('type, COUNT(*) as count')
             ->groupBy('type')
             ->pluck('count', 'type')
@@ -127,7 +127,7 @@ new class extends Component
         $semanticPercent = $totalSearches > 0 ? round(($semanticCount / $totalSearches) * 100) : 0;
         $keywordPercent = $totalSearches > 0 ? round(($keywordCount / $totalSearches) * 100) : 0;
 
-        $avgSimilarity = SearchLog::where('created_at', '>=', now()->subDays(7))
+        $avgSimilarity = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(7))
             ->whereNotNull('avg_similarity')
             ->avg('avg_similarity');
 
@@ -146,12 +146,15 @@ new class extends Component
 
     public function getEmbeddingCoverageProperty(): array
     {
-        $eventsTotal = Event::count();
-        $eventsWithEmbeddings = Event::whereNotNull('embeddings')->count();
+        $userId = AdminTenant::id();
+        $ownedBlocks = fn () => Block::whereHas('event.integration', fn ($q) => $q->where('user_id', $userId));
+
+        $eventsTotal = Event::forUser($userId)->count();
+        $eventsWithEmbeddings = Event::forUser($userId)->whereNotNull('embeddings')->count();
         $eventsPercent = $eventsTotal > 0 ? round(($eventsWithEmbeddings / $eventsTotal) * 100) : 0;
 
-        $blocksTotal = Block::count();
-        $blocksWithEmbeddings = Block::whereNotNull('embeddings')->count();
+        $blocksTotal = $ownedBlocks()->count();
+        $blocksWithEmbeddings = $ownedBlocks()->whereNotNull('embeddings')->count();
         $blocksPercent = $blocksTotal > 0 ? round(($blocksWithEmbeddings / $blocksTotal) * 100) : 0;
 
         return [
@@ -168,17 +171,17 @@ new class extends Component
 
     public function getPopularQueriesProperty(): array
     {
-        return SearchLog::getPopularQueries(null, 10, 30)->toArray();
+        return SearchLog::getPopularQueries(AdminTenant::id(), 10, 30)->toArray();
     }
 
     public function getZeroResultQueriesProperty(): array
     {
-        return SearchLog::getZeroResultQueries(null, 10, 30)->toArray();
+        return SearchLog::getZeroResultQueries(AdminTenant::id(), 10, 30)->toArray();
     }
 
     public function getPerformanceMetricsProperty(): array
     {
-        $last30Days = SearchLog::where('created_at', '>=', now()->subDays(30))->get();
+        $last30Days = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(30))->get();
 
         $apiCalls = $last30Days->where('type', 'semantic')->count();
         $estimatedCost = ($apiCalls * 20 * 0.02) / 1000000; // Rough estimate: 20 tokens avg, $0.02 per 1M tokens
@@ -199,12 +202,12 @@ new class extends Component
 
     public function getQualityInsightsProperty(): array
     {
-        $lowSimilarity = SearchLog::where('created_at', '>=', now()->subDays(30))
+        $lowSimilarity = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(30))
             ->whereNotNull('avg_similarity')
             ->where('avg_similarity', '>', 0.4) // Low similarity = high distance
             ->count();
 
-        $noEmbeddings = SearchLog::where('created_at', '>=', now()->subDays(30))
+        $noEmbeddings = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(30))
             ->where('results_count', 0)
             ->whereNotNull('threshold')
             ->count();
@@ -217,7 +220,7 @@ new class extends Component
 
     public function formatType(string $type): string
     {
-        return match($type) {
+        return match ($type) {
             'semantic' => '🔍 Semantic',
             'keyword' => '🔎 Keyword',
             'hybrid' => '🔀 Hybrid',
@@ -227,7 +230,7 @@ new class extends Component
 
     public function formatSource(string $source): string
     {
-        return match($source) {
+        return match ($source) {
             'api' => 'API',
             'spotlight_auto' => 'Spotlight (Auto)',
             'spotlight_mode' => 'Spotlight (~)',
@@ -242,6 +245,7 @@ new class extends Component
         }
 
         $percent = round((1 - $similarity) * 100);
+
         return $percent . '%';
     }
 
@@ -264,16 +268,16 @@ new class extends Component
                 default => 500,
             };
 
-            Illuminate\Support\Facades\Artisan::call('embeddings:generate', [
+            Artisan::call('embeddings:generate', [
                 '--type' => $type,
                 '--batch' => 50,
                 '--limit' => $limit,
             ]);
 
-            $output = Illuminate\Support\Facades\Artisan::output();
+            $output = Artisan::output();
 
             $this->success("Started generating {$type} embeddings. Check queue for progress.");
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Failed to start embedding generation: ' . $e->getMessage());
         }
     }
