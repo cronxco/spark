@@ -116,11 +116,10 @@ class NetWorthController extends Controller
      */
     private function balanceAsOf(EventObject $account, Carbon $at): ?Event
     {
-        return Event::where('actor_id', $account->id)
-            ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
-            ->where('action', 'had_balance')
+        return $this->financial->getBalanceEventsQuery($account)
             ->where('time', '<=', $at)
             ->orderByDesc('time')
+            ->orderByDesc('id')
             ->first();
     }
 

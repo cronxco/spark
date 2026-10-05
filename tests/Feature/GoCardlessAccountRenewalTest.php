@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Support\SparkAbility;
 use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Jobs\Data\GoCardless\GoCardlessAccountData;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use InvalidArgumentException;
+use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
@@ -317,6 +319,17 @@ class GoCardlessAccountRenewalTest extends TestCase
         $this->assertSame($event->id, $financial->getLatestBalance($canonical)->id);
         $this->assertSame($event->id, $financial->getLatestBalancesForAccounts(collect([$canonical]))->get($canonical->id)->id);
         $this->assertContains($event->id, $financial->getBalanceEventsQuery($canonical)->pluck('id')->all());
+        $historical = $event->replicate();
+        $historical->source_id = 'old-alias-historical-balance';
+        $historical->time = now()->subDays(35);
+        $historical->value = 4000;
+        $historical->save();
+        Sanctum::actingAs($this->owner, SparkAbility::MOBILE_READ);
+        $this->getJson('/api/v1/mobile/money/net-worth?compare=1month')
+            ->assertOk()->assertJsonPath('data.total', -50)
+            ->assertJsonPath('data.comparison.then', -40)
+            ->assertJsonPath('data.comparison.change', -10)
+            ->assertJsonPath('data.excluded_accounts', 0);
         $legacyIntegration = $this->plugin->createInstance($this->group, 'balances', ['account_id' => 'old-account']);
         $this->artisan('gocardless:reconcile-accounts', ['--user' => $this->owner->id])->assertSuccessful();
         $this->assertFalse($duplicate->fresh()->trashed());
