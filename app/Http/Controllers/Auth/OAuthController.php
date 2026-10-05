@@ -7,6 +7,7 @@ use App\Models\OAuthAuthorizationCode;
 use App\Models\OAuthRefreshToken;
 use App\Models\User;
 use App\Support\Pkce;
+use App\Support\SparkAbility;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -213,6 +214,51 @@ class OAuthController extends Controller
     }
 
     /**
+     * POST /api/v1/mobile/logout
+     *
+     * Ends the calling session server-side: revokes the paired refresh token
+     * and deletes the access token presenting the request.
+     *
+     * Sign-out previously only deleted the client's device registration, so the
+     * access and refresh pair stayed valid until natural expiry — a stolen
+     * device kept working after the user had signed out. Deliberately scoped to
+     * the current credential only: other devices and independently created
+     * personal access tokens are untouched.
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $accessToken = $user->currentAccessToken();
+
+        if ($accessToken === null) {
+            return response()->json([], 204);
+        }
+
+        $accessTokenId = $accessToken->getKey();
+
+        DB::transaction(function () use ($user, $accessTokenId) {
+            $refresh = OAuthRefreshToken::query()
+                ->where('user_id', $user->getKey())
+                ->where('access_token_id', $accessTokenId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($refresh !== null && $refresh->revoked_at === null) {
+                $refresh->update(['revoked_at' => now()]);
+            } elseif ($refresh !== null) {
+                // Refresh rotation won the race after Sanctum authenticated the
+                // old access token. Revoke its device family so the successor
+                // access/refresh pair created by that rotation cannot survive.
+                $this->revokeDeviceTokens($refresh);
+            }
+
+            $user->tokens()->whereKey($accessTokenId)->delete();
+        });
+
+        return response()->json([], 204);
+    }
+
+    /**
      * Issue a Sanctum personal access token + paired refresh token.
      *
      * @return array{access_token:string,token_type:string,expires_in:int,refresh_token:string,scope:string}
@@ -279,24 +325,20 @@ class OAuthController extends Controller
     /**
      * Translate an OAuth scope string into Sanctum token abilities.
      *
-     * Sanctum ability checks are exact string matches (not glob patterns),
-     * so `ios:*` in a scope string expands to the explicit pair that the
-     * `ability:ios:read` / `ability:ios:write` middleware actually look for.
+     * The app still asks for `ios:*` (or nothing). That now maps onto the
+     * action-scoped capabilities the mobile routes check (decision D-API-3).
+     * A stored refresh scope is translated the same way, so an existing
+     * session moves to the new capabilities on its next refresh.
      *
      * @return array<int, string>
      */
     protected function scopeToAbilities(string $scope): array
     {
-        $allowed = ['ios:read', 'ios:write', 'ios:*'];
+        $requested = array_values(array_filter(explode(' ', trim($scope))));
+        $readOnly = in_array('ios:read', $requested, true)
+            && ! array_intersect($requested, ['ios:write', 'ios:*']);
 
-        $tokens = array_values(array_filter(explode(' ', trim($scope))));
-        $abilities = array_values(array_intersect($tokens, $allowed));
-
-        if ($abilities === [] || in_array('ios:*', $abilities, true)) {
-            return ['ios:read', 'ios:write'];
-        }
-
-        return $abilities;
+        return $readOnly ? SparkAbility::MOBILE_READ : SparkAbility::MOBILE_SESSION;
     }
 
     /**

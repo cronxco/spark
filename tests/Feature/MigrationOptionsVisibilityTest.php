@@ -6,15 +6,14 @@ use App\Integrations\PluginRegistry;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class MigrationOptionsVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_options_shown_for_supported_plugins(): void
     {
         /** @var User $user */
@@ -33,9 +32,7 @@ class MigrationOptionsVisibilityTest extends TestCase
         $response->assertSee('Historic import time limit');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function migration_options_hidden_for_unsupported_plugins(): void
     {
         /** @var User $user */
@@ -54,9 +51,7 @@ class MigrationOptionsVisibilityTest extends TestCase
         $response->assertDontSee('Historic import time limit');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function plugin_migration_support_methods(): void
     {
         // Test plugins that support migration
@@ -79,9 +74,7 @@ class MigrationOptionsVisibilityTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function all_migration_supported_plugins_have_migration_implementation(): void
     {
         $migrationSupportedPlugins = ['monzo', 'gocardless', 'oura', 'spotify', 'github', 'outline'];

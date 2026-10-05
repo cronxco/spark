@@ -4,6 +4,7 @@ namespace App\Spotlight\Queries\Integration;
 
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
+use Illuminate\Support\Facades\Auth;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -15,7 +16,9 @@ class IntegrationSearchQuery
     public static function make(): SpotlightQuery
     {
         return SpotlightQuery::forMode('integrations', function (string $query) {
-            $integrationsQuery = Integration::with('group');
+            $integrationsQuery = Integration::external()
+                ->where('user_id', Auth::id())
+                ->with('group');
 
             if (! blank($query)) {
                 $integrationsQuery->where(function ($q) use ($query) {

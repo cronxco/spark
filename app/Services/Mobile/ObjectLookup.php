@@ -30,6 +30,21 @@ class ObjectLookup
     }
 
     /**
+     * Find a soft-deleted EventObject owned by the user, for restoring it.
+     */
+    public function findTrashed(User $user, string $objectId): ?EventObject
+    {
+        if (! preg_match(EventLookup::UUID_REGEX, $objectId)) {
+            return null;
+        }
+
+        return EventObject::onlyTrashed()
+            ->where('user_id', $user->id)
+            ->where('id', $objectId)
+            ->first();
+    }
+
+    /**
      * Recent events where this object appears as actor or target, newest first.
      *
      * @return Collection<int, Event>

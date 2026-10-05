@@ -4,9 +4,11 @@ namespace Tests\Feature\Flint;
 
 use App\Jobs\Flint\SendDigestNotificationJob;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
+use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Jobs\TaskPipeline\Tasks\DispatchMorningDigestOnSleepScoreTask;
 use App\Jobs\TaskPipeline\Tasks\NotifyOnDigestReadyTask;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use App\Services\TaskPipeline\TaskRegistry;
@@ -136,6 +138,24 @@ class FlintDigestSchedulingTest extends TestCase
     }
 
     #[Test]
+    public function sleep_task_respects_only_the_morning_briefing_switch(): void
+    {
+        Bus::fake();
+        $user = $this->newYorkUser();
+        $settings = $user->settings;
+        $settings['flint']['morning_digest_enabled'] = false;
+        $settings['flint']['evening_digest_enabled'] = true;
+        $user->update(['settings' => $settings]);
+        $sleep = $this->seedSleepScore($user, '2026-06-15');
+        Carbon::setTestNow('2026-06-15 12:00:00');
+
+        $task = TaskRegistry::getTask('dispatch_morning_digest_on_sleep_score');
+        (new DispatchMorningDigestOnSleepScoreTask($sleep, $task))->handle();
+
+        Bus::assertNotDispatched(TriggerFlintDigestRoutineJob::class);
+    }
+
+    #[Test]
     public function sleep_task_ignores_historical_back_fill(): void
     {
         Bus::fake();
@@ -188,8 +208,27 @@ class FlintDigestSchedulingTest extends TestCase
             'service' => 'flint',
         ]);
 
+        // Explicit media_url: null - the default factory value is a fake
+        // image URL, which would make download_images_to_media_library
+        // applicable and attempt a real HTTP download, throwing and aborting
+        // the rest of the pipeline before notify_on_digest_ready runs.
+        $actor = EventObject::factory()->create(['user_id' => $user->id, 'media_url' => null]);
+        $target = EventObject::factory()->create(['user_id' => $user->id, 'media_url' => null]);
+
+        // Task pipeline dispatch is disabled by default in tests (phpunit.xml
+        // sets ENABLE_TASK_PIPELINE=false); enable it right before the action
+        // under test, matching TaskPipelineModelObserverTest's convention.
+        // Also disable the (demo) OpenAI key from .env.example so
+        // generate_embedding doesn't attempt a real HTTP call.
+        config([
+            'app.enable_task_pipeline' => true,
+            'services.openai.api_key' => null,
+        ]);
+
         Event::factory()->create([
             'integration_id' => $integration->id,
+            'actor_id' => $actor->id,
+            'target_id' => $target->id,
             'service' => 'flint',
             'domain' => 'knowledge',
             'action' => 'had_summary',
@@ -213,7 +252,7 @@ class FlintDigestSchedulingTest extends TestCase
         $user = User::factory()->create([
             'settings' => [
                 'timezone' => 'Europe/London',
-                'flint' => ['digests_enabled' => true],
+                'flint' => ['morning_digest_enabled' => true, 'evening_digest_enabled' => true],
             ],
         ]);
         $integration = Integration::factory()->create([
@@ -246,6 +285,61 @@ class FlintDigestSchedulingTest extends TestCase
         });
     }
 
+    #[Test]
+    public function the_legacy_all_routines_key_alone_schedules_nothing(): void
+    {
+        Bus::fake();
+        $user = $this->newYorkUser();
+        $user->update(['settings' => array_merge($user->settings, ['flint' => ['digests_enabled' => true]])]);
+        $this->seedSleepScore($user, '2026-06-15');
+        Carbon::setTestNow('2026-06-15 23:30:00');
+
+        $this->runDispatcher();
+        $this->runRoutineDispatcher();
+
+        Bus::assertNotDispatched(TriggerFlintDigestRoutineJob::class);
+        Bus::assertNotDispatched(TriggerFlintRoutineJob::class);
+    }
+
+    #[Test]
+    public function morning_and_evening_briefing_switches_are_independent(): void
+    {
+        Bus::fake();
+        $user = $this->newYorkUser();
+        $settings = $user->settings;
+        $settings['flint']['morning_digest_enabled'] = false;
+        $settings['flint']['evening_digest_enabled'] = true;
+        $user->update(['settings' => $settings]);
+        $this->seedSleepScore($user, '2026-06-15');
+        Carbon::setTestNow('2026-06-15 23:30:00');
+
+        $this->runDispatcher();
+
+        Bus::assertNotDispatched(TriggerFlintDigestRoutineJob::class, fn ($job) => $job->period === 'morning');
+        Bus::assertDispatched(TriggerFlintDigestRoutineJob::class, fn ($job) => $job->period === 'evening');
+    }
+
+    #[Test]
+    public function each_non_digest_scheduler_uses_its_own_switch(): void
+    {
+        Bus::fake();
+        $user = $this->newYorkUser();
+        $settings = $user->settings;
+        $settings['flint'] = array_merge($settings['flint'], [
+            'topics_enabled' => true,
+            'reading_list_enabled' => false,
+            'news_roundup_enabled' => false,
+        ]);
+        $user->update(['settings' => $settings]);
+        Carbon::setTestNow('2026-06-16 02:00:00'); // 22:00 on the 15th in New York
+
+        $this->runRoutineDispatcher();
+
+        Bus::assertDispatched(TriggerFlintRoutineJob::class, fn ($job) => $job->routine === 'topics');
+        Bus::assertNotDispatched(TriggerFlintRoutineJob::class, fn ($job) => $job->routine === 'reading_list');
+        Bus::assertNotDispatched(TriggerFlintRoutineJob::class, fn ($job) => $job->routine === 'news_roundup');
+    }
+
     /**
      * Create a user with digests enabled whose effective timezone is New York.
      */
@@ -254,7 +348,7 @@ class FlintDigestSchedulingTest extends TestCase
         $user = User::factory()->create([
             'settings' => [
                 'timezone' => 'Europe/London',
-                'flint' => ['digests_enabled' => true],
+                'flint' => ['morning_digest_enabled' => true, 'evening_digest_enabled' => true],
             ],
         ]);
 
@@ -298,6 +392,17 @@ class FlintDigestSchedulingTest extends TestCase
 
         $this->assertNotNull($event, 'flint-digest-dispatcher schedule not found');
 
+        $property = new ReflectionProperty($event, 'callback');
+        $property->setAccessible(true);
+        app()->call($property->getValue($event));
+    }
+
+    private function runRoutineDispatcher(): void
+    {
+        $event = collect(app(Schedule::class)->events())
+            ->first(fn ($event) => ($event->description ?? null) === 'flint-routine-dispatcher');
+
+        $this->assertNotNull($event, 'flint-routine-dispatcher schedule not found');
         $property = new ReflectionProperty($event, 'callback');
         $property->setAccessible(true);
         app()->call($property->getValue($event));

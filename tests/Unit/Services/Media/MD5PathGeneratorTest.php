@@ -3,10 +3,11 @@
 namespace Tests\Unit\Services\Media;
 
 use App\Services\Media\MD5PathGenerator;
+use PHPUnit\Framework\Attributes\Test;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class MD5PathGeneratorTest extends TestCase
+class MD5PathGeneratorTest extends FrameworkTestCase
 {
     protected MD5PathGenerator $pathGenerator;
 
@@ -16,9 +17,7 @@ class MD5PathGeneratorTest extends TestCase
         $this->pathGenerator = new MD5PathGenerator;
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function generates_path_with_md5_hash(): void
     {
         // Create a mock media object with MD5 hash in custom properties
@@ -30,9 +29,7 @@ class MD5PathGeneratorTest extends TestCase
         $this->assertEquals('ab/cd/abcdef1234567890abcdef1234567890/', $path);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function generates_conversions_path(): void
     {
         $media = $this->createMockMedia('abcdef1234567890abcdef1234567890');
@@ -42,9 +39,7 @@ class MD5PathGeneratorTest extends TestCase
         $this->assertEquals('ab/cd/abcdef1234567890abcdef1234567890/conversions/', $path);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function generates_responsive_images_path(): void
     {
         $media = $this->createMockMedia('abcdef1234567890abcdef1234567890');
@@ -54,9 +49,7 @@ class MD5PathGeneratorTest extends TestCase
         $this->assertEquals('ab/cd/abcdef1234567890abcdef1234567890/responsive/', $path);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function uses_different_paths_for_different_hashes(): void
     {
         $media1 = $this->createMockMedia('111111111111111111111111111111');
@@ -70,9 +63,7 @@ class MD5PathGeneratorTest extends TestCase
         $this->assertEquals('22/22/222222222222222222222222222222/', $path2);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function uses_same_path_for_same_hash(): void
     {
         $media1 = $this->createMockMedia('abcdef1234567890abcdef1234567890');
@@ -87,6 +78,18 @@ class MD5PathGeneratorTest extends TestCase
     /**
      * Create a mock Media object with a given MD5 hash.
      */
+    #[Test]
+    public function a_file_without_a_stored_hash_uses_its_id_and_does_not_recurse(): void
+    {
+        $media = new Media;
+        $media->id = 123;
+        $media->custom_properties = [];
+
+        $hash = md5('123');
+
+        $this->assertSame(substr($hash, 0, 2) . '/' . substr($hash, 2, 2) . '/' . $hash . '/', $this->pathGenerator->getPath($media));
+    }
+
     protected function createMockMedia(string $md5Hash): Media
     {
         $media = $this->getMockBuilder(Media::class)

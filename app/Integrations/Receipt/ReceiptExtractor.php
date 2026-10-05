@@ -2,16 +2,18 @@
 
 namespace App\Integrations\Receipt;
 
+use App\Services\Ai\AiModel;
+use App\Services\Ai\AiUsageContext;
+use App\Services\Ai\ChatClient;
 use Exception;
 use Illuminate\Support\Facades\Log;
-use OpenAI\Laravel\Facades\OpenAI;
 
 class ReceiptExtractor
 {
     /**
-     * Extract structured receipt data from raw text using GPT-5
+     * Extract structured receipt data from raw text
      */
-    public function extract(string $receiptText, string $emailSubject = '', string $emailFrom = ''): array
+    public function extract(string $receiptText, string $emailSubject = '', string $emailFrom = '', ?AiUsageContext $usageContext = null): array
     {
         $schemaExample = $this->getSchemaExample();
 
@@ -29,7 +31,13 @@ If it IS a valid receipt, extract the data with is_valid_receipt: true.
 
 CRITICAL REQUIREMENTS:
 1. ALL monetary amounts must be in smallest currency unit (pence for GBP, cents for USD, etc.)
-2. Parse dates as ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)
+2. Preserve the transaction date and clock time printed on the receipt as ISO 8601.
+   If a timezone/offset is explicitly printed, preserve it (Z only for explicit UTC).
+   Otherwise return YYYY-MM-DDTHH:mm:ss WITHOUT Z or an offset; do not convert to UTC.
+   Set transaction_timezone to an IANA timezone only when supported by the merchant's
+   physical location (e.g. Europe/London for a UK shop), otherwise null. Do not infer
+   it from currency alone. If only a date is printed, return YYYY-MM-DD; if absent,
+   return null. Use the purchase/payment date, not delivery, collection or due dates.
 3. If receipt is not in English, extract data AND translate all text to English
 4. confidence_score: 0.0-1.0 (only >0.8 if all key fields clearly visible)
 5. Infer merchant name even if partially visible or abbreviated
@@ -67,38 +75,22 @@ PROMPT;
         $userPrompt = "Email Subject: {$emailSubject}\nEmail From: {$emailFrom}\n\nReceipt Text:\n{$receiptText}";
 
         try {
-            Log::info('Receipt: Extracting receipt data with GPT-5', [
+            Log::info('Receipt: Extracting receipt data', [
                 'text_length' => strlen($receiptText),
                 'subject' => $emailSubject,
                 'from' => $emailFrom,
             ]);
 
-            // Start Sentry AI request span
-            $model = 'gpt-5-nano';
-            $messages = [
+            $extracted = app(ChatClient::class)->json(AiModel::Extraction, [
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user', 'content' => $userPrompt],
-            ];
-            $aiSpan = start_ai_request_span($model, $messages, [
+            ], array_filter([
                 'temperature' => 1,
-            ]);
-
-            $response = OpenAI::chat()->create([
-                'model' => $model,
-                'temperature' => 1,
-                'messages' => $messages,
-                'response_format' => ['type' => 'json_object'],
-            ]);
-
-            // Finish AI request span with token usage
-            $usage = $response->usage ? $response->usage->toArray() : [];
-            $finishReason = $response->choices[0]->finishReason ?? null;
-            finish_ai_request_span($aiSpan, $usage, $finishReason);
-
-            $extracted = json_decode($response->choices[0]->message->content, true);
+                'usage_context' => $usageContext,
+            ]));
 
             if (! $extracted) {
-                throw new Exception('Invalid response from GPT-5: could not parse JSON');
+                throw new Exception('Invalid response from the extraction model: could not parse JSON');
             }
 
             // Check if this was identified as not a valid receipt
@@ -114,7 +106,7 @@ PROMPT;
 
             // Validate required fields for valid receipts
             if (! isset($extracted['transaction_summary'])) {
-                throw new Exception('Invalid response from GPT-5: missing required fields');
+                throw new Exception('Invalid response from the extraction model: missing required fields');
             }
 
             // Ensure is_valid_receipt is set
@@ -130,7 +122,7 @@ PROMPT;
 
             return $extracted;
         } catch (Exception $e) {
-            Log::error('Receipt: GPT-5 extraction failed', [
+            Log::error('Receipt: extraction failed', [
                 'error' => $e->getMessage(),
                 'text_preview' => substr($receiptText, 0, 500),
             ]);
@@ -151,7 +143,7 @@ PROMPT;
                 'email_from' => 'string',
                 'email_received_at' => '2025-01-15T14:32:00Z',
                 'confidence_score' => 0.95,
-                'extraction_model' => 'gpt-5-nano',
+                'extraction_model' => AiModel::Extraction->model(),
                 'raw_text_preview' => 'string (first 200 chars)',
             ],
             'merchant' => [
@@ -171,7 +163,8 @@ PROMPT;
                 'tip_amount' => 0,
             ],
             'transaction_metadata' => [
-                'transaction_date' => '2025-01-15T14:30:00Z',
+                'transaction_date' => '2025-01-15T14:30:00',
+                'transaction_timezone' => 'Europe/London',
                 'receipt_number' => 'R-2025-0123456',
                 'terminal_id' => 'T-005 or null',
                 'payment_method' => 'card',

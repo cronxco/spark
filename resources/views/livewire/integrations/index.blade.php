@@ -27,7 +27,7 @@ new class extends Component {
 
     public function loadData(): void
     {
-        $this->plugins = PluginRegistry::getAllPlugins()->map(function ($pluginClass) {
+        $this->plugins = PluginRegistry::getPluginsAvailableTo(Auth::user())->map(function ($pluginClass) {
             return [
                 'identifier' => $pluginClass::getIdentifier(),
                 'name' => $pluginClass::getDisplayName(),

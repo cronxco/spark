@@ -11,6 +11,7 @@ use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class GoodreadsShelfDataTest extends TestCase
@@ -50,9 +51,7 @@ class GoodreadsShelfDataTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function processes_book_from_read_shelf_with_rating()
     {
         $rawData = [
@@ -111,9 +110,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertEquals(100, $book->metadata['current_progress']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function parses_series_information_correctly()
     {
         $rawData = [
@@ -158,9 +155,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertEquals(3, $relationship->metadata['series_order']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function processes_currently_reading_shelf()
     {
         $this->integration->update(['instance_type' => 'shelf_currently_reading']);
@@ -195,9 +190,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertEquals(0, $book->metadata['current_progress']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function processes_to_read_shelf()
     {
         $this->integration->update(['instance_type' => 'shelf_to_read']);
@@ -230,9 +223,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertEquals('to-read', $book->metadata['current_shelf']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function deduplicates_books_by_book_id()
     {
         // Create same book twice
@@ -280,9 +271,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertEquals(5, $book->metadata['user_rating']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function tags_events_with_author_names()
     {
         $rawData = [
@@ -311,9 +300,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertTrue($tags->contains('Test Author'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function uses_stored_reading_started_at_for_is_reading_events()
     {
         $this->integration->update(['instance_type' => 'shelf_currently_reading']);
@@ -358,9 +345,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertStringContainsString('2025-11-29', $event->time->toDateTimeString());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function falls_back_to_shelf_pub_date_if_no_stored_date()
     {
         $this->integration->update(['instance_type' => 'shelf_currently_reading']);
@@ -391,9 +376,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertStringContainsString('2025-12-01', $event->time->toDateTimeString());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function moves_reading_started_at_to_previously_started_at_when_book_moved_to_read_shelf()
     {
         // Create a book with reading_started_at
@@ -437,9 +420,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertEquals($startedAt, $book->metadata['previously_started_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function moves_reading_started_at_to_previously_started_at_when_book_moved_to_to_read_shelf()
     {
         $this->integration->update(['instance_type' => 'shelf_to_read']);
@@ -485,9 +466,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertEquals($startedAt, $book->metadata['previously_started_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function does_not_move_date_for_currently_reading_shelf()
     {
         $this->integration->update(['instance_type' => 'shelf_currently_reading']);
@@ -533,9 +512,7 @@ class GoodreadsShelfDataTest extends TestCase
         $this->assertEquals($startedAt, $book->metadata['reading_started_at']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function preserves_previously_started_at_when_book_already_has_one()
     {
         // Create a book with both reading_started_at and previously_started_at

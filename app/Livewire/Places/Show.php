@@ -153,7 +153,10 @@ class Show extends Component
     public function deletePlace(): void
     {
         $this->place->delete();
-        $this->redirect(route('places.index'));
+
+        // There is no routed places list (see the Explore plan, D2), so land
+        // on the map rather than an undefined route after the delete.
+        $this->redirect(route('map.index'));
     }
 
     #[Computed]

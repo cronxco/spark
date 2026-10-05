@@ -1,0 +1,259 @@
+<?php
+
+namespace Tests\Feature\Api\V1\Mobile;
+
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Models\User;
+use App\Services\FlintTopicService;
+use App\Support\SparkAbility;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+
+class FlintTopicsControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected User $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['ios.mobile_api_enabled' => true]);
+        $this->user = User::factory()->create();
+    }
+
+    #[Test]
+    public function lists_the_users_topics_newest_first(): void
+    {
+        // updated_at isn't fillable on EventObject, and save() re-stamps it
+        // regardless — forceFill + disabled timestamps is the only way to
+        // backdate it for the ordering assertion below.
+        $older = $this->topic('Edinburgh trip with Dan', kind: 'thematic', status: 'dormant');
+        $older->timestamps = false;
+        $older->forceFill(['updated_at' => now()->subDays(5)])->save();
+
+        $newer = $this->topic('US–Iran escalation', kind: 'strategic', status: 'active');
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/topics')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', (string) $newer->id)
+            ->assertJsonPath('data.0.title', 'US–Iran escalation')
+            ->assertJsonPath('data.0.kind', 'strategic')
+            ->assertJsonPath('data.0.status', 'active')
+            ->assertJsonPath('data.1.id', (string) $older->id)
+            ->assertJsonCount(2, 'data');
+    }
+
+    #[Test]
+    public function paginates_with_the_shared_cursor_envelope(): void
+    {
+        $this->topic('First');
+        $this->topic('Second');
+        $this->topic('Third');
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $first = $this->getJson('/api/v1/mobile/flint/topics?limit=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('has_more', true);
+
+        $cursor = $first->json('next_cursor');
+        $this->assertNotNull($cursor);
+
+        $this->getJson('/api/v1/mobile/flint/topics?limit=2&cursor=' . urlencode($cursor))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('has_more', false)
+            ->assertJsonPath('next_cursor', null);
+    }
+
+    #[Test]
+    public function filters_by_status(): void
+    {
+        $this->topic('Active thread', status: 'active');
+        $this->topic('Dormant thread', status: 'dormant');
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/topics?status=dormant')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Dormant thread');
+    }
+
+    #[Test]
+    public function only_returns_the_authenticated_users_topics(): void
+    {
+        $other = User::factory()->create();
+        EventObject::factory()->create([
+            'user_id' => $other->id,
+            'concept' => 'flint',
+            'type' => 'topic',
+            'title' => 'Someone else\'s thread',
+            'metadata' => ['kind' => 'thematic', 'status' => 'active'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/topics')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    #[Test]
+    public function detail_returns_versioned_owned_evidence(): void
+    {
+        $topic = $this->topic('Quarterly planning', kind: 'strategic');
+        $integration = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'flint']);
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'event_metadata' => ['title' => 'Morning Digest', 'local_date' => '2026-09-14', 'period' => 'morning'],
+        ]);
+        app(FlintTopicService::class)->update($this->user, $topic->id, ['related_event_id' => $event->id]);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', (string) $topic->id)
+            ->assertJsonPath('data.mentions.0.digest_id', (string) $event->id)
+            ->assertJsonPath('data.mentions.0.deep_link', 'spark://digest/' . $event->id)
+            ->assertJsonStructure(['data' => ['version']]);
+    }
+
+    #[Test]
+    public function detail_does_not_reveal_another_users_topic(): void
+    {
+        $other = User::factory()->create();
+        $topic = EventObject::factory()->create([
+            'user_id' => $other->id,
+            'concept' => 'flint',
+            'type' => 'topic',
+            'title' => 'Private thread',
+        ]);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->assertNotFound();
+    }
+
+    #[Test]
+    public function generic_evidence_keeps_its_source_type_and_block_time_falls_back_to_its_event(): void
+    {
+        $topic = $this->topic('Generic evidence');
+        $integration = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'calendar']);
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'calendar',
+            'action' => 'had_event',
+            'time' => '2026-09-13 18:30:00',
+        ]);
+        $block = Block::factory()->create(['event_id' => $event->id, 'time' => null]);
+        app(FlintTopicService::class)->update($this->user, $topic->id, [
+            'related_event_id' => $event->id,
+            'related_block_id' => $block->id,
+        ]);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $response = $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->assertOk();
+        $mentions = collect($response->json('data.mentions'));
+        $eventMention = $mentions->firstWhere('source_type', 'event');
+        $blockMention = $mentions->firstWhere('source_type', 'block');
+
+        $this->assertSame('spark://event/' . $event->id, $eventMention['deep_link']);
+        $this->assertNull($eventMention['digest_id']);
+        $this->assertSame($event->time->toIso8601String(), $blockMention['occurred_at']);
+        $this->assertSame($event->time->toDateString(), $blockMention['local_date']);
+    }
+
+    #[Test]
+    public function changes_an_owned_topics_kind_with_version_and_preserves_its_summary(): void
+    {
+        $topic = $this->topic('Work/life balance & resilience', kind: 'tactical');
+        $topic->update(['content' => 'NWDs can be skipped when work needs it.']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $version = $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")->json('data.version');
+
+        $this->patchJson("/api/v1/mobile/flint/topics/{$topic->id}", ['kind' => 'thematic'])
+            ->assertStatus(428);
+        $this->withHeader('If-Match', $version)
+            ->patchJson("/api/v1/mobile/flint/topics/{$topic->id}", ['kind' => 'thematic'])
+            ->assertOk()
+            ->assertJsonPath('data.kind', 'thematic')
+            ->assertJsonPath('data.content', 'NWDs can be skipped when work needs it.');
+        $this->withHeader('If-Match', $version)
+            ->patchJson("/api/v1/mobile/flint/topics/{$topic->id}", ['kind' => 'strategic'])
+            ->assertStatus(412);
+    }
+
+    #[Test]
+    public function task_blocks_have_independent_due_and_review_dates_and_can_be_completed(): void
+    {
+        $topic = $this->topic('Canada trip', kind: 'strategic');
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $body = [
+            'client_mutation_id' => (string) Str::uuid(),
+            'title' => 'Book final Vancouver hotel night',
+            'due_on' => '2027-08-01',
+            'review_on' => '2027-07-15',
+        ];
+        $first = $this->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", $body)
+            ->assertCreated()
+            ->assertJsonPath('data.due_on', '2027-08-01')
+            ->assertJsonPath('data.review_on', '2027-07-15');
+        $taskId = $first->json('data.id');
+        $this->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", $body)
+            ->assertJsonPath('data.id', $taskId);
+        $this->postJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks", [
+            ...$body, 'review_on' => '2027-07-16',
+        ])->assertStatus(409);
+        $this->getJson("/api/v1/mobile/flint/topics/{$topic->id}")
+            ->assertJsonCount(1, 'data.tasks')
+            ->assertJsonPath('data.tasks.0.id', $taskId)
+            ->assertJsonPath('data.next_review_at', null);
+        $completed = $this->withHeader('If-Match', $first->json('data.version'))
+            ->patchJson("/api/v1/mobile/flint/topics/{$topic->id}/tasks/{$taskId}", ['completed' => true])
+            ->assertOk();
+        $this->assertNotNull($completed->json('data.completed_at'));
+    }
+
+    #[Test]
+    public function one_users_task_cannot_be_created_on_or_modified_through_another_users_topic(): void
+    {
+        $other = User::factory()->create();
+        $foreign = EventObject::factory()->create([
+            'user_id' => $other->id, 'concept' => 'flint', 'type' => 'topic',
+            'title' => 'Private', 'metadata' => ['kind' => 'thematic'],
+        ]);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $this->postJson("/api/v1/mobile/flint/topics/{$foreign->id}/tasks", [
+            'client_mutation_id' => (string) Str::uuid(), 'title' => 'Intrusion',
+        ])->assertNotFound();
+    }
+
+    #[Test]
+    public function requires_authentication(): void
+    {
+        $this->getJson('/api/v1/mobile/flint/topics')->assertStatus(401);
+    }
+
+    private function topic(string $title, string $kind = 'thematic', string $status = 'active'): EventObject
+    {
+        return EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'flint',
+            'type' => 'topic',
+            'title' => $title,
+            'metadata' => ['kind' => $kind, 'status' => $status],
+        ]);
+    }
+}

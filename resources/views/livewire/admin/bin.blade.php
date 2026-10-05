@@ -6,7 +6,8 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
-use Illuminate\Support\Facades\Auth;
+use App\Support\AdminTenant;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
@@ -234,7 +235,7 @@ new class extends Component
         $totalItems = array_sum($totalCounts);
 
         if ($totalItems === 0) {
-            return new Illuminate\Pagination\LengthAwarePaginator(
+            return new LengthAwarePaginator(
                 collect([]),
                 0,
                 $this->perPage,
@@ -251,7 +252,7 @@ new class extends Component
         // Get items for current page using efficient chunked approach
         $items = $this->getItemsForPage($queries, $offset, $perPage);
 
-        return new Illuminate\Pagination\LengthAwarePaginator(
+        return new LengthAwarePaginator(
             $items,
             $totalItems,
             $perPage,
@@ -271,7 +272,7 @@ new class extends Component
     public function deleteAll(): void
     {
         // Dispatch the job to permanently delete all soft-deleted items
-        DeleteBinItemsBatch::dispatch(Auth::id());
+        DeleteBinItemsBatch::dispatch(AdminTenant::id());
 
         $this->success('Deletion process started. All items will be permanently deleted.');
     }
@@ -307,15 +308,27 @@ new class extends Component
         throw new InvalidArgumentException('Unknown item type');
     }
 
+    /**
+     * Resolve a trashed record by id, restricted to records the signed-in user
+     * owns.
+     *
+     * Restore and permanent-delete both funnel through here with ids taken
+     * from public Livewire properties, so the ownership predicates must match
+     * the ones getDeletedItemsByType() uses for the listing — otherwise a
+     * tampered selection reaches another tenant's records.
+     */
     private function findDeletedItem(string $itemId)
     {
-        // Try to find the item in each model's trashed records
+        $userId = AdminTenant::id();
+
         $models = [
-            'event' => Event::onlyTrashed(),
-            'object' => EventObject::onlyTrashed(),
-            'block' => Block::onlyTrashed(),
-            'integration' => Integration::onlyTrashed(),
-            'integration_group' => IntegrationGroup::onlyTrashed(),
+            'event' => Event::onlyTrashed()
+                ->whereHas('integration', fn ($q) => $q->where('user_id', $userId)),
+            'object' => EventObject::onlyTrashed()->where('user_id', $userId),
+            'block' => Block::onlyTrashed()
+                ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId)),
+            'integration' => Integration::onlyTrashed()->where('user_id', $userId),
+            'integration_group' => IntegrationGroup::onlyTrashed()->where('user_id', $userId),
         ];
 
         foreach ($models as $type => $query) {
@@ -330,13 +343,13 @@ new class extends Component
 
     private function buildOptimizedQueries()
     {
-        $userId = Auth::id();
+        $userId = AdminTenant::id();
 
         $queries = [];
 
         // Events query
         $eventsQuery = Event::onlyTrashed()
-            ->whereHas('integration', fn($q) => $q->where('user_id', $userId))
+            ->whereHas('integration', fn ($q) => $q->where('user_id', $userId))
             ->with(['target:id,title', 'integration:id,user_id'])
             ->orderBy('deleted_at', 'desc');
 
@@ -344,7 +357,7 @@ new class extends Component
             $eventsQuery->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
                     ->orWhere('action', 'ilike', '%' . $this->search . '%')
-                    ->orWhereHas('target', fn($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
+                    ->orWhereHas('target', fn ($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
             });
         }
         $queries['event'] = $eventsQuery;
@@ -365,7 +378,7 @@ new class extends Component
 
         // Blocks query
         $blocksQuery = Block::onlyTrashed()
-            ->whereHas('event.integration', fn($q) => $q->where('user_id', $userId))
+            ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId))
             ->with(['event:id,integration_id'])
             ->orderBy('deleted_at', 'desc');
 
@@ -460,14 +473,14 @@ new class extends Component
     {
         $query = match ($type) {
             'event' => Event::onlyTrashed()
-                ->whereHas('integration', fn($q) => $q->where('user_id', Auth::id()))
+                ->whereHas('integration', fn ($q) => $q->where('user_id', AdminTenant::id()))
                 ->with(['target:id,title', 'integration:id,user_id']),
-            'object' => EventObject::onlyTrashed()->where('user_id', Auth::id()),
+            'object' => EventObject::onlyTrashed()->where('user_id', AdminTenant::id()),
             'block' => Block::onlyTrashed()
-                ->whereHas('event.integration', fn($q) => $q->where('user_id', Auth::id()))
+                ->whereHas('event.integration', fn ($q) => $q->where('user_id', AdminTenant::id()))
                 ->with(['event:id,integration_id']),
-            'integration' => Integration::onlyTrashed()->where('user_id', Auth::id()),
-            'integration_group' => IntegrationGroup::onlyTrashed()->where('user_id', Auth::id()),
+            'integration' => Integration::onlyTrashed()->where('user_id', AdminTenant::id()),
+            'integration_group' => IntegrationGroup::onlyTrashed()->where('user_id', AdminTenant::id()),
             default => throw new InvalidArgumentException("Unknown type: {$type}")
         };
 
@@ -493,7 +506,7 @@ new class extends Component
             'event' => $query->where(function ($q) {
                 $q->where('service', 'ilike', '%' . $this->search . '%')
                     ->orWhere('action', 'ilike', '%' . $this->search . '%')
-                    ->orWhereHas('target', fn($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
+                    ->orWhereHas('target', fn ($tq) => $tq->where('title', 'ilike', '%' . $this->search . '%'));
             }),
             'object' => $query->where(function ($q) {
                 $q->where('title', 'ilike', '%' . $this->search . '%')

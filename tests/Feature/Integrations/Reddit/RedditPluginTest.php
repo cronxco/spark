@@ -10,13 +10,12 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class RedditPluginTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function oauth_flow_saves_tokens_and_account_id(): void
     {
         $user = User::factory()->create();
@@ -61,9 +60,7 @@ class RedditPluginTest extends TestCase
         $this->assertEquals('testuser', $group->account_id);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function pull_dispatches_processing_and_stores_cursor(): void
     {
         Bus::fake();
