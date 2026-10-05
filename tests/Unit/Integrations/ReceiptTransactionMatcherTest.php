@@ -169,11 +169,9 @@ class ReceiptTransactionMatcherTest extends TestCase
         // Empty candidates collection
         $this->matcher->flagForReview($receipt, collect());
 
-        $merchant->refresh();
-
-        $this->assertFalse($merchant->metadata['is_matched']);
-        $this->assertTrue($merchant->metadata['needs_review']);
-        $this->assertEmpty($merchant->metadata['candidate_matches']);
+        $this->assertSame('suggestions', $receipt->fresh()->event_metadata['receipt_matching']['status']);
+        $this->assertSame([], $receipt->fresh()->event_metadata['receipt_matching']['candidates']);
+        $this->assertFalse($merchant->fresh()->metadata['needs_review']);
     }
 
     #[Test]
@@ -414,10 +412,9 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertEquals(0.85, $relationship->metadata['match_confidence']);
         $this->assertEquals('automatic', $relationship->metadata['match_method']);
 
-        // Verify merchant metadata was updated
-        $receiptMerchant->refresh();
-        $this->assertTrue($receiptMerchant->metadata['is_matched']);
-        $this->assertEquals($transaction->id, $receiptMerchant->metadata['matched_transaction_id']);
+        // Matching state is receipt-specific, never written to the shared merchant.
+        $this->assertSame('matched', $receipt->fresh()->event_metadata['receipt_matching']['status']);
+        $this->assertFalse($receiptMerchant->fresh()->metadata['is_matched']);
     }
 
     #[Test]

@@ -318,8 +318,6 @@ class ProcessReceiptEmailJob implements ShouldQueue
                     'tax_id' => $receiptData['merchant']['tax_id'] ?? null,
                     'merchant_id' => $receiptData['merchant']['merchant_id'] ?? null,
                     'normalized_name' => strtolower($receiptData['merchant']['name']),
-                    'is_matched' => false,
-                    'needs_review' => false,
                     'raw_email_s3_key' => $this->s3ObjectKey,
                 ],
             ]
