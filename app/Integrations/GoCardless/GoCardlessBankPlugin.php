@@ -1140,6 +1140,9 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         return app(GoCardlessAccounts::class)->resolve($integration, $accountId, function ($existing) use ($integration, $account, $accountId) {
             $complete = isset($account['details']) || isset($account['ownerName']) || isset($account['cashAccountType']);
+            foreach (['iban', 'resourceId', 'bban', 'maskedPan', 'msisdn'] as $field) {
+                $complete = $complete || ! empty($account[$field]);
+            }
             if (! $complete || ($account['status'] ?? null) === 'rate_limited') {
                 return $existing;
             }

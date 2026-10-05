@@ -392,4 +392,19 @@ class GoCardlessAccountRenewalTest extends TestCase
         Http::assertSent(fn ($request) => $request->method() === 'DELETE' && $request->url() === $url);
     }
 
+
+    #[Test]
+    public function sparse_bank_details_create_an_account_but_id_only_payloads_do_not(): void
+    {
+        $this->assertNull($this->plugin->upsertAccountObject($this->integration, ['id' => 'old-account']));
+        $object = $this->plugin->upsertAccountObject($this->integration, [
+            'id' => 'old-account', 'iban' => 'GB82WEST12345698765432', 'currency' => 'GBP',
+        ]);
+        $this->assertNotNull($object);
+        $this->assertSame('old-account', $object->metadata['account_id']);
+        $this->assertSame('GB82WEST12345698765432', $object->metadata['raw']['iban']);
+        $this->assertSame($object->id, $this->plugin->upsertAccountObject($this->integration, ['id' => 'old-account'])->id);
+        $this->assertSame($object->id, $this->integration->fresh()->configuration['account_object_id']);
+    }
+
 }
