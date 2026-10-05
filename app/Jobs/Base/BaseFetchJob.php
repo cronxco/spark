@@ -7,8 +7,15 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Jobs\GoCardless\HandleExpiredEuaJob;
 use App\Models\Integration;
 use App\Notifications\IntegrationFailed;
+use App\Services\IntegrationRuns\IntegrationRunService;
+use App\Services\IntegrationRuns\RunBatchDispatcher;
+use App\Services\Notifications\NotificationIncidentResolver;
 use Exception;
+use Illuminate\Bus\Batchable;
+use Illuminate\Bus\BatchRepository;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Contracts\Bus\QueueingDispatcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -21,7 +28,7 @@ use Throwable;
 
 abstract class BaseFetchJob implements ShouldQueue
 {
-    use Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable, Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 120; // 2 minutes for API calls
 
@@ -63,14 +70,26 @@ abstract class BaseFetchJob implements ShouldQueue
                 'job_type' => $this->getJobType(),
             ]);
 
+            if ($this->batchId !== null) {
+                app(IntegrationRunService::class)->markFetching((string) $this->integration->id, $this->batchId);
+            }
+
             // Fetch the raw data
             $rawData = $this->fetchData();
 
             // Dispatch processing jobs with the fetched data
-            $this->dispatchProcessingJobs($rawData);
+            $this->dispatchProcessingJobsIntoRun($rawData);
+
+            if ($this->batchId !== null) {
+                app(IntegrationRunService::class)->markProcessing((string) $this->integration->id, $this->batchId);
+            }
 
             // Mark the integration as successfully updated
             $this->integration->markAsSuccessfullyUpdated();
+            app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
+                "integration_failed:{$this->integration->id}",
+                "integration_authentication_failed:{$this->integration->id}",
+            ]);
 
             // Log completion to all levels
             log_hierarchical($this->integration, 'info', "Completed {$this->getJobType()} fetch", [
@@ -162,6 +181,30 @@ abstract class BaseFetchJob implements ShouldQueue
     public function uniqueId(): string
     {
         return $this->serviceName . '_' . $this->getJobType() . '_' . $this->integration->id . '_' . now()->toDateString();
+    }
+
+    /**
+     * When this fetch is part of an integration run, the processing jobs it
+     * dispatches join the run's batch, so the run only finishes once they
+     * have. Outside a run they are dispatched exactly as before.
+     */
+    protected function dispatchProcessingJobsIntoRun(array $rawData): void
+    {
+        $dispatcher = app(Dispatcher::class);
+
+        if ($this->batchId === null || ! $dispatcher instanceof QueueingDispatcher) {
+            $this->dispatchProcessingJobs($rawData);
+
+            return;
+        }
+
+        app()->instance(Dispatcher::class, new RunBatchDispatcher($dispatcher, app(BatchRepository::class), $this->batchId));
+
+        try {
+            $this->dispatchProcessingJobs($rawData);
+        } finally {
+            app()->instance(Dispatcher::class, $dispatcher);
+        }
     }
 
     /**

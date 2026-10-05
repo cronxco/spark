@@ -7,6 +7,7 @@ use App\Jobs\OAuth\Hevy\HevyWorkoutPull;
 use App\Models\Integration;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -27,9 +28,7 @@ class HevyWorkoutPullTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function job_creation()
     {
         $job = $this->createTestableJob();
@@ -38,9 +37,7 @@ class HevyWorkoutPullTest extends TestCase
         $this->assertEquals('workout', $job->publicGetJobType());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unique_id_generation()
     {
         $job = $this->createTestableJob();
@@ -50,9 +47,7 @@ class HevyWorkoutPullTest extends TestCase
         $this->assertMatchesRegularExpression($expectedPattern, $uniqueId);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function fetch_data_success()
     {
         $mockResponse = [
@@ -97,9 +92,7 @@ class HevyWorkoutPullTest extends TestCase
         $this->assertEquals($mockResponse, $result);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function dispatch_processing_jobs()
     {
         Queue::fake();
@@ -122,9 +115,7 @@ class HevyWorkoutPullTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function api_error_handling()
     {
         Http::fake([
@@ -138,9 +129,7 @@ class HevyWorkoutPullTest extends TestCase
         $job->publicFetchData();
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function empty_workout_data()
     {
         Queue::fake();

@@ -5,13 +5,25 @@ return [
 
     'environment' => env('APP_ENV', 'production'),
 
-    'release' => file_exists(base_path('VERSION')) ? env('SENTRY_PROJECT_NAME') . '@' . file_get_contents(base_path('VERSION')) : null,
+    'release' => file_exists(base_path('VERSION'))
+        ? trim(file_get_contents(base_path('VERSION')))
+        : (env('SENTRY_RELEASE') ?: null),
+
+    'js' => [
+        'dsn' => env('VITE_SENTRY_DSN'),
+    ],
 
     'traces_sample_rate' => (float) env('SENTRY_TRACES_SAMPLE_RATE', 0.2),
 
     'profiles_sample_rate' => (float) env('SENTRY_PROFILES_SAMPLE_RATE', 0.0),
 
     'send_default_pii' => false,
+
+    // Named callables keep this configuration serialisable by `config:cache`.
+    'before_send' => 'redact_sentry_event',
+    'before_send_transaction' => 'redact_sentry_event',
+    'before_send_log' => 'redact_sentry_log',
+    'before_breadcrumb' => 'redact_sentry_breadcrumb',
 
     'breadcrumbs' => [
         'sql_queries' => true,

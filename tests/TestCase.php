@@ -3,18 +3,21 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
-use Illuminate\Foundation\Testing\WithFaker;
+use Illuminate\Support\Facades\Redis;
 
-abstract class TestCase extends BaseTestCase
+abstract class TestCase extends FrameworkTestCase
 {
-    use RefreshDatabase, WithFaker;
+    use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Ensure session is properly initialized for tests
-        $this->app['session']->start();
+        // Keep model broadcasts enabled without connecting to Redis for every fixture.
+        // Throttle tests can override this default with explicit expectations.
+        Redis::shouldReceive('set')
+            ->withArgs(fn ($key) => str_starts_with($key, 'broadcast:newevent:'))
+            ->byDefault()
+            ->andReturn(true);
     }
 }

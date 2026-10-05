@@ -39,6 +39,8 @@ class MatchReceiptToTransactionTask extends BaseTaskJob
                 });
             }
 
+            $this->recordOutcome('no_candidate');
+
             return;
         }
 
@@ -55,6 +57,8 @@ class MatchReceiptToTransactionTask extends BaseTaskJob
                 'automatic'
             );
 
+            $this->recordOutcome('matched');
+
             Log::info('Receipt: Auto-matched to transaction via TaskPipeline', [
                 'receipt_id' => $this->model->id,
                 'transaction_id' => $topMatch['transaction']->id,
@@ -63,6 +67,7 @@ class MatchReceiptToTransactionTask extends BaseTaskJob
         } elseif ($topMatch['confidence'] >= $reviewThreshold) {
             // Medium confidence: Flag for review
             $matcher->flagForReview($this->model, $candidates->take(3));
+            $this->recordOutcome('review_required', ['candidates' => min(3, $candidates->count())]);
 
             Log::info('Receipt: Flagged for manual review', [
                 'receipt_id' => $this->model->id,
@@ -71,6 +76,8 @@ class MatchReceiptToTransactionTask extends BaseTaskJob
             ]);
         } else {
             // Low confidence: Do nothing, just log
+            $this->recordOutcome('no_candidate');
+
             Log::info('Receipt: Low confidence matches only', [
                 'receipt_id' => $this->model->id,
                 'top_confidence' => $topMatch['confidence'],

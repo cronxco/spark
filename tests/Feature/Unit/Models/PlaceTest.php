@@ -10,15 +10,14 @@ use App\Models\Place;
 use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class PlaceTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function events_here_scopes_to_user_correctly(): void
     {
         // Create two users
@@ -77,9 +76,7 @@ class PlaceTest extends TestCase
         $this->assertFalse($eventsHere->contains($event2));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function events_nearby_scopes_to_user_correctly(): void
     {
         // Create two users
@@ -119,9 +116,7 @@ class PlaceTest extends TestCase
         $this->assertFalse($eventsNearby->contains($event2));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function events_nearby_returns_empty_query_when_place_has_no_location(): void
     {
         $user = User::factory()->create();

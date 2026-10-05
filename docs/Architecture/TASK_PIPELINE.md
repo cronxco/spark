@@ -63,8 +63,13 @@ Task executions are tracked in the `task_executions` table and mirrored to model
 - **Block**: Uses `metadata['task_executions']`
 - **EventObject**: Uses `metadata['task_executions']`
 - **Integration**: Uses `configuration['task_executions']`
+- **IntegrationGroup**: Uses `auth_metadata['task_executions']`
 
 The table is the source of truth for current state with one row per `entity_type`, `entity_id`, and `task_key`. `TaskExecutionStore` reads table rows first and falls back to legacy metadata for records that have not been backfilled yet.
+
+Not every task recorded this way is registered in `TaskRegistry` — cron and reactive jobs outside the event/block/object dependency pipeline (e.g. `TriggerFlintDigestRoutineJob`) build an ad-hoc `TaskDefinition` inline and call `TaskExecutionStore::recordStatus()` directly, anchored to whichever supported model they already have in hand. The admin Task Pipeline view unions these unregistered `task_key`/`entity_type` values observed in the table with the registry's own list, so no UI changes are needed to surface them.
+
+The Flint routines follow this pattern throughout. `TriggerFlintDigestRoutineJob` anchors to the digest `EventObject` it pre-creates; `TriggerFlintRoutineJob` (topic review, reading list, news roundup) and `SendDigestNotificationJob` anchor to the user's Flint `Integration`, resolved through `FlintDigestService::resolveIntegration()` so every side lands on the same row. Both of the latter record `not_applicable` for their no-op paths — an unconfigured routine webhook, and a notification with no digest to announce — because those are precisely the runs that would otherwise leave no trace at all.
 
 Structure:
 

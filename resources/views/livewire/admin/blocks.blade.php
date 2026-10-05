@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\Block;
-use Illuminate\Support\Facades\Auth;
+use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
@@ -80,17 +80,21 @@ new class extends Component
         }
 
         try {
-            DB::transaction(function () {
-                // Delete blocks
-                Block::whereIn('id', $this->selectedBlocks)->delete();
+            $count = DB::transaction(function () {
+                // $selectedBlocks is a public Livewire property; re-resolve it
+                // through the same ownership predicate getBlocks() uses.
+                return Block::whereHas('event.integration', function ($q) {
+                    $q->where('user_id', AdminTenant::id());
+                })
+                    ->whereIn('id', $this->selectedBlocks)
+                    ->delete();
             });
 
-            $count = count($this->selectedBlocks);
             $this->success("Successfully deleted {$count} block(s).");
 
             $this->selectedBlocks = [];
             $this->resetPage();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Failed to delete blocks: ' . $e->getMessage());
         }
     }
@@ -99,7 +103,7 @@ new class extends Component
     {
         $query = Block::with(['event.integration'])
             ->whereHas('event.integration', function ($q) {
-                $q->where('user_id', Auth::id());
+                $q->where('user_id', AdminTenant::id());
             });
 
         // Apply search filter
@@ -136,14 +140,14 @@ new class extends Component
     public function getUniqueBlockTypes()
     {
         return Block::whereHas('event.integration', function ($q) {
-            $q->where('user_id', Auth::id());
+            $q->where('user_id', AdminTenant::id());
         })->distinct()->pluck('block_type')->filter()->sort()->values();
     }
 
     public function getUniqueServices()
     {
         return Block::whereHas('event.integration', function ($q) {
-            $q->where('user_id', Auth::id());
+            $q->where('user_id', AdminTenant::id());
         })->join('events', 'events.id', '=', 'blocks.event_id')
             ->distinct()
             ->pluck('events.service')

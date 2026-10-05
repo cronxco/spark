@@ -8,16 +8,17 @@ use App\Models\EventObject;
 use App\Models\User;
 
 /**
- * Shared bookmark-creation logic used by both the public fetch API
- * (FetchApiController::bookmarkUrl) and the mobile share-extension endpoint
- * (Api\V1\Mobile\BookmarksController). Keeping it here guarantees dedupe and
- * fetch-job dispatch behaviour stays identical across both surfaces.
+ * Shared bookmark-creation logic behind POST /api/v1/bookmarks and the mobile
+ * share-extension endpoint (both Api\V1\Mobile\BookmarksController), and
+ * the MCP bookmark tools. Keeping it here guarantees dedupe and fetch-job
+ * dispatch behaviour stays identical across every surface.
  */
 class BookmarkUrlService
 {
     public function __construct(
         protected UrlSafetyValidator $urlSafety,
         protected FetchIntegrationResolver $integrationResolver,
+        protected BookmarkCreator $bookmarks,
     ) {}
 
     /**
@@ -39,46 +40,33 @@ class BookmarkUrlService
 
         $domain = parse_url($url, PHP_URL_HOST);
 
-        $existingBookmark = EventObject::where('user_id', $user->id)
-            ->where('concept', 'bookmark')
-            ->where('type', 'fetch_webpage')
-            ->where('url', $url)
-            ->first();
-
         $integration = $this->integrationResolver->resolve($user);
 
-        if ($existingBookmark) {
+        $result = $this->bookmarks->firstOrCreate($user->id, $url, ['title' => $url], [
+            'domain' => $domain,
+            'fetch_integration_id' => $integration?->id,
+            'subscription_source' => 'api',
+            'fetch_mode' => $fetchMode,
+            'enabled' => true,
+            'subscribed_at' => now()->toISOString(),
+            'fetch_count' => 0,
+        ]);
+        $bookmark = $result['bookmark'];
+
+        if (! $result['created']) {
             $jobDispatched = false;
             if ($forceRefresh && $fetchImmediately) {
-                FetchSingleUrl::dispatch($integration, $existingBookmark->id, $existingBookmark->url, true);
+                FetchSingleUrl::dispatch($integration, $bookmark->id, $bookmark->url, true);
                 $jobDispatched = true;
             }
 
             return [
                 'state' => $jobDispatched ? 'refreshed' : 'already_exists',
-                'bookmark' => $existingBookmark,
+                'bookmark' => $bookmark,
                 'job_dispatched' => $jobDispatched,
                 'created' => false,
             ];
         }
-
-        $bookmark = EventObject::create([
-            'user_id' => $user->id,
-            'concept' => 'bookmark',
-            'type' => 'fetch_webpage',
-            'title' => $url, // Will be updated with the real title after fetch
-            'url' => $url,
-            'time' => now(),
-            'metadata' => [
-                'domain' => $domain,
-                'fetch_integration_id' => $integration?->id,
-                'subscription_source' => 'api',
-                'fetch_mode' => $fetchMode,
-                'enabled' => true,
-                'subscribed_at' => now()->toISOString(),
-                'fetch_count' => 0,
-            ],
-        ]);
 
         $jobDispatched = false;
         if ($fetchImmediately && $integration) {

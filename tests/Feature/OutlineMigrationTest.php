@@ -11,6 +11,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
 
@@ -18,9 +19,7 @@ class OutlineMigrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function outline_migration_creates_progress_record(): void
     {
         Bus::fake();
@@ -67,9 +66,7 @@ class OutlineMigrationTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function outline_migration_dispatches_outline_migration_pull(): void
     {
         Bus::fake();
@@ -112,9 +109,7 @@ class OutlineMigrationTest extends TestCase
         });
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function outline_plugin_supports_migration(): void
     {
         $pluginClass = PluginRegistry::getPlugin('outline');

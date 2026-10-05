@@ -5,6 +5,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -26,7 +27,7 @@ class AnomaliesControllerTest extends TestCase
     #[Test]
     public function acknowledge_requires_write_ability(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
 
         $this->postJson('/api/v1/mobile/anomalies/00000000-0000-0000-0000-000000000000/acknowledge')
             ->assertStatus(403);
@@ -42,7 +43,7 @@ class AnomaliesControllerTest extends TestCase
             'acknowledged_at' => null,
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/anomalies/' . $anomaly->id . '/acknowledge', [
             'note' => 'Was sick',
@@ -63,7 +64,7 @@ class AnomaliesControllerTest extends TestCase
             'type' => 'anomaly_high',
         ]);
 
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/anomalies/' . $anomaly->id . '/acknowledge')
             ->assertStatus(404);
@@ -72,7 +73,7 @@ class AnomaliesControllerTest extends TestCase
     #[Test]
     public function acknowledge_returns_404_when_missing(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/anomalies/00000000-0000-0000-0000-000000000000/acknowledge')
             ->assertStatus(404);

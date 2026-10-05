@@ -168,7 +168,7 @@ $popoverBaseId = 'event-ref-' . $event->id;
                         @if ($event->target)
                             <div class="flex items-center gap-1 px-2 py-1 rounded bg-base-200 text-sm">
                                 <x-icon name="fas.bullseye" class="w-3 h-3 text-base-content/50" />
-                                <span class="font-medium truncate max-w-[120px]">{{ $event->target->title }}</span>
+                                <span class="font-medium truncate max-w-[120px]">{{ $event->displayTargetTitle() }}</span>
                             </div>
                         @endif
                     </div>

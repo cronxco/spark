@@ -3,13 +3,12 @@
 namespace Tests\Unit;
 
 use App\Integrations\Oura\OuraPlugin;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class OuraValueMappingTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function stress_level_mapping_for_storage(): void
     {
         $plugin = new OuraPlugin;
@@ -20,9 +19,7 @@ class OuraValueMappingTest extends TestCase
         $this->assertEquals(0, $plugin->mapValueForStorage('stress_day_summary', null));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function unknown_mapping_key_returns_null_for_storage(): void
     {
         $plugin = new OuraPlugin;
@@ -31,9 +28,7 @@ class OuraValueMappingTest extends TestCase
         $this->assertEquals(42.5, $plugin->mapValueForStorage('unknown_mapping', 42.5));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function resilience_level_mapping_for_storage(): void
     {
         $plugin = new OuraPlugin;

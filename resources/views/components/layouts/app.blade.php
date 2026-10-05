@@ -60,13 +60,13 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
-    @if (env('VITE_SENTRY_DSN'))
+    @if (config('sentry.js.dsn'))
     <script>
-        window.SENTRY_DSN = "{{ env('VITE_SENTRY_DSN') }}";
+        window.SENTRY_DSN = "{{ config('sentry.js.dsn') }}";
     </script>
     @endif
     <script>
-        window.SENTRY_RELEASE = "{{ env('SENTRY_RELEASE') }}";
+        window.SENTRY_RELEASE = "{{ config('sentry.release') }}";
         window.SENTRY_ENVIRONMENT = "{{ app()->environment() }}";
     </script>
 </head>
@@ -127,15 +127,13 @@
                                 }
                                 keysToRemove.forEach(key => localStorage.removeItem(key));
 
-                                // Clear server-side cache via API
-                                fetch('/api/clear-card-cache', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
-                                    }
-                                }).catch(err => console.error('Failed to clear cache:', err));
-
+                                /*
+                                 * The server-side call this used to make hit
+                                 * /api/clear-card-cache, which flushed every
+                                 * tenant's cache and has been removed. Card view
+                                 * history lives in localStorage, cleared above, so
+                                 * the control still does what it says.
+                                 */
                                 alert('Card view history cleared! All cards will show again on your next visit.');
                                 window.location.reload();
                             }
@@ -208,6 +206,7 @@
                     <x-menu-item title="Migrations" icon="fas.cog" link="{{ route('admin.migrations.index') }}" :active="request()->routeIs('admin.migrations.*')" />
                     <x-menu-item title="Logs" icon="fas.file-lines" link="{{ route('admin.logs.index') }}" :active="request()->routeIs('admin.logs.*')" />
                     <x-menu-item title="Bin" icon="fas.trash" link="{{ route('admin.bin.index') }}" :active="request()->routeIs('admin.bin.*')" />
+                    <x-menu-item title="Operator Access" icon="fas.user-shield" link="{{ route('admin.operator.index') }}" :active="request()->routeIs('admin.operator.*')" />
                 </x-menu-sub>
                 @endif
                 <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
@@ -216,6 +215,16 @@
 
         {{-- The `$slot` goes here --}}
         <x-slot:content class="bg-base-100">
+            @if (auth()->user()?->is_admin && ($operatorContext = \App\Support\AdminTenant::context()))
+                <div class="alert alert-warning mb-4" role="status">
+                    <x-icon name="fas.user-shield" class="w-5 h-5" />
+                    <span>Admin pages are showing another user's data. Every page you open is logged.</span>
+                    <form method="POST" action="{{ route('admin.operator.stop') }}">
+                        @csrf
+                        <button type="submit" class="btn btn-sm">Back to my data</button>
+                    </form>
+                </div>
+            @endif
             {{ $slot }}
         </x-slot:content>
 

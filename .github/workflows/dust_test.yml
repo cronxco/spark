@@ -5,6 +5,11 @@ on:
   issue_comment:
     types: [created]
 
+# Unrelated comments must not cancel a running PR test job.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}-${{ github.event_name == 'issue_comment' && !contains(github.event.comment.body, '/test') && !contains(github.event.comment.body, '/run-tests') && github.run_id || 'tests' }}
+  cancel-in-progress: true
+
 jobs:
   duster:
     if: |
@@ -82,12 +87,28 @@ jobs:
           # Use the commit SHA from duster to ensure we test the code after any duster fixes
           ref: ${{ needs.duster.outputs.commit_sha }}
 
+      - name: Create organization GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: cronxco
+          repositories: claude
+
+      - name: Checkout Claude skills
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: cronxco/claude
+          token: ${{ steps.app-token.outputs.token }}
+          path: claude
+
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: 8.4.1
           tools: composer:v2
-          coverage: xdebug
+          coverage: none
 
       - name: Get Composer cache directory
         id: composer-cache
@@ -131,82 +152,23 @@ jobs:
       - name: Run Migrations
         run: php artisan migrate --force
 
+      - name: Check Flint skill synchronization
+        run: php artisan flint:skills-check --claude-repo=claude
+
       - name: Build Assets
         run: npm run build
 
       - name: Run Tests
         id: tests
-        run: |
-          # Run PHPUnit with output capturing all test results
-          # Use tee so we still see output in Actions logs
-          ./vendor/bin/phpunit --teamcity | tee test_output.txt || true
+        run: bash .github/scripts/run-tests.sh
 
-          # Extract finished and failed test names
-          grep "##teamcity\[testFinished" test_output.txt \
-            | sed "s/.*name='\([^']*\)'.*/\1/" > all_finished.txt
-          grep "##teamcity\[testFailed" test_output.txt \
-            | sed "s/.*name='\([^']*\)'.*/\1/" | sort -u > failed_tests.txt
-
-          # Compute passed = finished − failed
-          sort -u all_finished.txt > all_finished_sorted.txt
-          comm -23 all_finished_sorted.txt failed_tests.txt > passed_tests.txt
-
-          # Derive counts from lists
-          TOTAL=$(wc -l < all_finished_sorted.txt)
-          FAILED=$(wc -l < failed_tests.txt)
-          PASSED=$(wc -l < passed_tests.txt)
-
-          # Clean up intermediate lists
-          rm -f all_finished.txt all_finished_sorted.txt
-
-          # Store test results for summary step
-          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
-          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
-
-          # Exit with error if any tests failed
-          if [ "${FAILED:-0}" -gt 0 ]; then
-            exit 1
-          fi
-
-      - name: Add Test Results to Summary
+      - name: Upload test reports
         if: always()
-        run: |
-          echo "# Deployment Summary :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Build & Test Results" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ steps.tests.outputs.failed }}" = "0" ]; then
-            echo "- ✅ CI Tests Passed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ❌ CI Tests Failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Test Statistics" >> $GITHUB_STEP_SUMMARY
-          echo "- Total Tests: \`${{ steps.tests.outputs.total }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Passed: \`${{ steps.tests.outputs.passed }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- ❌ Failed: \`${{ steps.tests.outputs.failed }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Add passed tests in expandable section
-          echo "<details><summary>✅ Passed Tests (${{ steps.tests.outputs.passed }})</summary>" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          cat passed_tests.txt >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "</details>" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Add failed tests in expandable section if any
-          if [ "${{ steps.tests.outputs.failed }}" != "0" ]; then
-            echo "<details><summary>❌ Failed Tests (${{ steps.tests.outputs.failed }})</summary>" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            cat failed_tests.txt >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            echo "</details>" >> $GITHUB_STEP_SUMMARY
-          fi
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/
+          if-no-files-found: warn
 
       - name: Comment success
         if: success() && github.event_name == 'issue_comment'
@@ -220,6 +182,8 @@ jobs:
             - Total: `${{ steps.tests.outputs.total }}`
             - Passed: `${{ steps.tests.outputs.passed }}`
             - Failed: `${{ steps.tests.outputs.failed }}`
+            - Errors: `${{ steps.tests.outputs.errors }}`
+            - Skipped: `${{ steps.tests.outputs.skipped }}`
 
             Triggered by comment from @${{ github.event.comment.user.login }}
 
@@ -235,6 +199,8 @@ jobs:
             - Total: `${{ steps.tests.outputs.total }}`
             - Passed: `${{ steps.tests.outputs.passed }}`
             - Failed: `${{ steps.tests.outputs.failed }}`
+            - Errors: `${{ steps.tests.outputs.errors }}`
+            - Skipped: `${{ steps.tests.outputs.skipped }}`
 
             Triggered by comment from @${{ github.event.comment.user.login }}
             Please check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.

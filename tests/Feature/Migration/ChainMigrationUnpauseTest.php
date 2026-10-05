@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ChainMigrationUnpauseTest extends TestCase
@@ -27,7 +28,7 @@ class ChainMigrationUnpauseTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    /** @test */
+    #[Test]
     public function it_unpauses_oura_integration_when_migration_completes()
     {
         // Arrange
@@ -112,7 +113,7 @@ class ChainMigrationUnpauseTest extends TestCase
         $this->assertFalse($integration->configuration['paused'] ?? false, 'Integration should be unpaused after migration completes');
     }
 
-    /** @test */
+    #[Test]
     public function it_unpauses_spotify_integration_when_migration_completes()
     {
         // Arrange
@@ -194,7 +195,7 @@ class ChainMigrationUnpauseTest extends TestCase
         $this->assertFalse($integration->configuration['paused'] ?? false, 'Integration should be unpaused after migration completes');
     }
 
-    /** @test */
+    #[Test]
     public function it_unpauses_github_integration_when_no_repositories_configured()
     {
         // Arrange
@@ -275,7 +276,7 @@ class ChainMigrationUnpauseTest extends TestCase
         $this->assertFalse($integration->configuration['paused'] ?? false, 'Integration should be unpaused when no repositories configured');
     }
 
-    /** @test */
+    #[Test]
     public function it_unpauses_github_integration_when_all_repositories_processed()
     {
         // Arrange
@@ -356,7 +357,7 @@ class ChainMigrationUnpauseTest extends TestCase
         $this->assertFalse($integration->configuration['paused'] ?? false, 'Integration should be unpaused when all repositories processed');
     }
 
-    /** @test */
+    #[Test]
     public function it_continues_chain_when_oura_has_more_data()
     {
         // Arrange

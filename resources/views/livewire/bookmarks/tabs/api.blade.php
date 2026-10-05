@@ -74,7 +74,7 @@
                         <div class="flex gap-2">
                             <input
                                 type="text"
-                                value="{{ url('/api/fetch/bookmarks') }}"
+                                value="{{ url('/api/v1/bookmarks') }}"
                                 readonly
                                 class="input input-bordered flex-1 font-mono text-sm"
                                 id="api-endpoint-url" />
@@ -177,7 +177,7 @@
                                         <li>Add a <strong>"Get URLs from Input"</strong> action</li>
                                         <li>Add a <strong>"Get Contents of URL"</strong> action with these settings:
                                             <ul class="mt-2">
-                                                <li>URL: <code class="bg-base-300 px-2 py-1 rounded text-xs">{{ url('/api/fetch/bookmarks') }}</code></li>
+                                                <li>URL: <code class="bg-base-300 px-2 py-1 rounded text-xs">{{ url('/api/v1/bookmarks') }}</code></li>
                                                 <li>Method: <strong>POST</strong></li>
                                                 <li>Headers:
                                                     <ul class="mt-1">
@@ -258,7 +258,7 @@
                                         <pre class="text-xs overflow-x-auto" id="bookmarklet-code"><code>javascript:(function(){
     const token = '{{ $this->getTokenForExamples() }}';
     const url = window.location.href;
-    fetch('{{ url('/api/fetch/bookmarks') }}', {
+    fetch('{{ url('/api/v1/bookmarks') }}', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -267,8 +267,7 @@
         },
         body: JSON.stringify({ url })
     })
-    .then(r => r.json())
-    .then(d => alert(d.success ? '✓ Saved to Fetch!' : 'Error: ' + d.message))
+    .then(r => r.json().then(d => alert(r.ok ? '✓ Saved to Fetch!' : 'Error: ' + d.message)))
     .catch(e => alert('Error saving bookmark'));
 })();</code></pre>
                                     </div>
@@ -337,7 +336,7 @@
                                             Copy
                                         </x-button>
                                     </div>
-                                    <pre class="bg-base-300 p-4 rounded-lg text-xs overflow-x-auto" id="curl-code"><code>curl -X POST {{ url('/api/fetch/bookmarks') }} \
+                                    <pre class="bg-base-300 p-4 rounded-lg text-xs overflow-x-auto" id="curl-code"><code>curl -X POST {{ url('/api/v1/bookmarks') }} \
   -H "Authorization: Bearer {{ $this->getTokenForExamples() }}" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
@@ -345,12 +344,10 @@
 
                                     <p class="text-sm mt-4"><strong>Response:</strong></p>
                                     <pre class="bg-base-300 p-4 rounded-lg text-xs overflow-x-auto"><code>{
-  "success": true,
+  "state": "queued",
   "bookmark": {
     "id": "uuid",
-    "url": "https://example.com/article",
-    "title": "Article Title",
-    "status": "pending"
+    "url": "https://example.com/article"
   },
   "job_dispatched": true
 }</code></pre>
@@ -407,7 +404,7 @@
                                         </x-button>
                                     </div>
                                     <pre class="bg-base-300 p-4 rounded-lg text-xs overflow-x-auto" id="javascript-code"><code>const API_TOKEN = '{{ $this->getTokenForExamples() }}';
-const API_ENDPOINT = '{{ url('/api/fetch/bookmarks') }}';
+const API_ENDPOINT = '{{ url('/api/v1/bookmarks') }}';
 
 async function saveToFetch(url) {
   try {
@@ -426,7 +423,7 @@ async function saveToFetch(url) {
 
     const data = await response.json();
 
-    if (data.success) {
+    if (response.ok) {
       console.log('Bookmark saved:', data.bookmark);
       return data.bookmark;
     } else {

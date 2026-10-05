@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\User;
+use App\Support\SparkAbility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -52,7 +53,7 @@ class MetricsControllerTest extends TestCase
     public function lists_all_metrics_for_user(): void
     {
         $this->seedMetric();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/metrics')
             ->assertOk()
@@ -71,7 +72,7 @@ class MetricsControllerTest extends TestCase
     #[Test]
     public function lists_empty_data_when_no_metrics_exist(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/metrics')
             ->assertOk()
@@ -82,7 +83,7 @@ class MetricsControllerTest extends TestCase
     public function returns_trend_payload_with_baseline(): void
     {
         $this->seedMetric();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/metrics/oura.sleep_score?from=today&to=today')
             ->assertOk()
@@ -101,7 +102,7 @@ class MetricsControllerTest extends TestCase
     public function returns_trend_payload_for_range_query(): void
     {
         $this->seedMetric();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         Carbon::setTestNow('2026-05-03 12:00:00');
 
@@ -118,7 +119,7 @@ class MetricsControllerTest extends TestCase
     #[Test]
     public function returns_404_for_unknown_metric(): void
     {
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->getJson('/api/v1/mobile/metrics/bogus.metric')
             ->assertStatus(404)
@@ -129,7 +130,7 @@ class MetricsControllerTest extends TestCase
     public function etag_returns_304_on_match(): void
     {
         $this->seedMetric();
-        Sanctum::actingAs($this->user, ['ios:read', 'ios:write']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $first = $this->getJson('/api/v1/mobile/metrics/oura.sleep_score?from=today&to=today')
             ->assertOk();

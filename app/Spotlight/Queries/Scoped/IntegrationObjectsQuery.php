@@ -3,8 +3,8 @@
 namespace App\Spotlight\Queries\Scoped;
 
 use App\Models\Event;
-use App\Models\EventObject;
 use App\Models\Integration;
+use App\Spotlight\Support\OwnedRecords;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
@@ -23,7 +23,7 @@ class IntegrationObjectsQuery
                 return collect();
             }
 
-            $integration = Integration::find($integrationId);
+            $integration = OwnedRecords::integrations()->find($integrationId);
             if (! $integration) {
                 return collect();
             }
@@ -34,7 +34,7 @@ class IntegrationObjectsQuery
                 ->distinct()
                 ->pluck('actor_id');
 
-            $objects = EventObject::whereIn('id', $objectIds)
+            $objects = OwnedRecords::objects()->whereIn('id', $objectIds)
                 ->when(! blank($query), function ($q) use ($query) {
                     $q->where('title', 'ilike', "%{$query}%");
                 })

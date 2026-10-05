@@ -5,6 +5,7 @@ namespace App\Spotlight\Queries\Scoped;
 use App\Integrations\PluginRegistry;
 use App\Models\Block;
 use App\Models\Integration;
+use App\Spotlight\Support\OwnedRecords;
 use Illuminate\Support\Str;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
@@ -22,7 +23,7 @@ class IntegrationBlocksQuery
                 return collect();
             }
 
-            $integration = Integration::find($integrationId);
+            $integration = OwnedRecords::integrations()->find($integrationId);
             if (! $integration) {
                 return collect();
             }

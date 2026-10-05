@@ -45,6 +45,16 @@ class IntegrationCompleted extends SparkNotification
         return route('integrations.details', $this->integration->id);
     }
 
+    public function getEntityType(): ?string
+    {
+        return 'integration';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return (string) $this->integration->id;
+    }
+
     /**
      * Get the mail representation of the notification
      */

@@ -736,6 +736,14 @@ new class extends Component
             <!-- Header -->
             <x-header title="Object Details" separator>
                 <x-slot:actions>
+                    @if ($this->object->concept === 'person')
+                    <x-button
+                        link="{{ route('people.show', $this->object->id) }}"
+                        class="btn-ghost btn-sm"
+                        icon="fas.user"
+                        label="Person page"
+                        wire:navigate />
+                    @endif
                     <x-button
                         @click="drawerOpen = !drawerOpen"
                         class="btn-ghost btn-sm"
@@ -833,7 +841,7 @@ new class extends Component
                     <x-slot:content>
                         <div class="max-w-prose mx-auto pt-4">
                             <div class="prose dark:prose-invert prose-base lg:prose-lg">
-                                {!! Str::markdown($this->object->content) !!}
+                                {!! render_markdown($this->object->content) !!}
                             </div>
                         </div>
                     </x-slot:content>
@@ -1313,7 +1321,7 @@ new class extends Component
                                 {!! json_encode($this->object->tags->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
                             </script>
                             <script type="application/json" id="tag-suggestions-{{ $this->object->id }}">
-                                {!! json_encode(\Spatie\Tags\Tag::query()->select(['name', 'type'])->get()->map(fn($tag) => ['value' => (string) $tag->name, 'type' => $tag->type ? (string) $tag->type : null])->values()->all()) !!}
+                                {!! json_encode(\App\Support\OwnedTagQuery::suggestionsFor(auth()->guard('web')->user())) !!}
                             </script>
                         </div>
                     </div>
@@ -1516,9 +1524,7 @@ new class extends Component
                                     Metadata
                                 </div>
                                 <script type="application/json" id="object-meta-json-{{ $this->object->id }}">
-                                    {
-                                        !!json_encode($this - > object - > metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!
-                                    }
+                                    {!! json_encode($this->object->metadata, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}
                                 </script>
                                 <x-button
                                     icon="o-clipboard"

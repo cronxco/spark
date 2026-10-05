@@ -5,9 +5,9 @@ current:
   major: 1
   minor: 0
   patch: 0
-  prerelease: ""
+  prerelease: dev.341
   buildmetadata: ""
-  commit: "000000"
+  commit: 2a4eeb
   timestamp:
     year: null
     month: null

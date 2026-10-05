@@ -3,19 +3,29 @@
 namespace App\Jobs\TaskPipeline;
 
 use App\Jobs\TaskPipeline\Concerns\InteractsWithTaskMetadata;
+use App\Models\Event;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 
-class ProcessTaskPipelineJob implements ShouldQueue
+/**
+ * Dispatched from model `created`/`updated` hooks, often from inside the
+ * caller's open transaction. Without ShouldQueueAfterCommit, the redis queue
+ * connection's after_commit=false default lets Horizon grab the job before
+ * that transaction commits, and restoreModel() throws ModelNotFoundException
+ * on the not-yet-visible row — with no retry (see $tries below), the whole
+ * pipeline run for that model is silently lost.
+ */
+class ProcessTaskPipelineJob implements ShouldQueue, ShouldQueueAfterCommit
 {
     use Batchable, Dispatchable, InteractsWithQueue, InteractsWithTaskMetadata, Queueable, SerializesModels;
 
@@ -33,6 +43,10 @@ class ProcessTaskPipelineJob implements ShouldQueue
 
     public function handle(): void
     {
+        if ($this->model instanceof Event && $this->model->isInternal()) {
+            return;
+        }
+
         $applicableTasks = TaskRegistry::getTasksForModel($this->model, $this->trigger);
         $tasks = $applicableTasks;
 

@@ -5,6 +5,11 @@ on:
     branches:
       - main
       - dev
+    # The prod deploy commits ":pushpin: Update version" back to the branch.
+    # Ignore version-only commits so they can never trigger another deploy.
+    paths-ignore:
+      - VERSION.txt
+      - config/version.yml
   workflow_dispatch:
 
 concurrency:
@@ -38,7 +43,7 @@ jobs:
         with:
           php-version: 8.4.1
           tools: composer:v2
-          coverage: xdebug
+          coverage: none
 
       - name: Get Composer cache directory
         id: composer-cache
@@ -78,77 +83,15 @@ jobs:
 
       - name: Run Tests
         id: tests
-        run: |
-          # Run PHPUnit with output capturing all test results
-          # Use tee so we still see output in Actions logs
-          ./vendor/bin/phpunit --teamcity | tee test_output.txt || true
+        run: bash .github/scripts/run-tests.sh
 
-          # Extract finished and failed test names
-          grep "##teamcity\[testFinished" test_output.txt \
-            | sed "s/.*name='\([^']*\)'.*/\1/" > all_finished.txt
-          grep "##teamcity\[testFailed" test_output.txt \
-            | sed "s/.*name='\([^']*\)'.*/\1/" | sort -u > failed_tests.txt
-
-          # Compute passed = finished − failed
-          sort -u all_finished.txt > all_finished_sorted.txt
-          comm -23 all_finished_sorted.txt failed_tests.txt > passed_tests.txt
-
-          # Derive counts from lists
-          TOTAL=$(wc -l < all_finished_sorted.txt)
-          FAILED=$(wc -l < failed_tests.txt)
-          PASSED=$(wc -l < passed_tests.txt)
-
-          # Clean up intermediate lists
-          rm -f all_finished.txt all_finished_sorted.txt
-
-          # Store test results for summary step
-          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
-          echo "failed=$FAILED" >> "$GITHUB_OUTPUT"
-
-          # Exit with error if any tests failed
-          if [ "${FAILED:-0}" -gt 0 ]; then
-            exit 1
-          fi
-
-      - name: Add Test Results to Summary
+      - name: Upload test reports
         if: always()
-        run: |
-          echo "# Deployment Summary :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Build & Test Results" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ steps.tests.outputs.failed }}" = "0" ]; then
-            echo "- ✅ CI Tests Passed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ❌ CI Tests Failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Test Statistics" >> $GITHUB_STEP_SUMMARY
-          echo "- Total Tests: \`${{ steps.tests.outputs.total }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Passed: \`${{ steps.tests.outputs.passed }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- ❌ Failed: \`${{ steps.tests.outputs.failed }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Add passed tests in expandable section
-          echo "<details><summary>✅ Passed Tests (${{ steps.tests.outputs.passed }})</summary>" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          cat passed_tests.txt >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "</details>" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Add failed tests in expandable section if any
-          if [ "${{ steps.tests.outputs.failed }}" != "0" ]; then
-            echo "<details><summary>❌ Failed Tests (${{ steps.tests.outputs.failed }})</summary>" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            cat failed_tests.txt >> $GITHUB_STEP_SUMMARY
-            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-            echo "</details>" >> $GITHUB_STEP_SUMMARY
-          fi
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/
+          if-no-files-found: warn
 
   version:
     name: Version
@@ -291,14 +234,8 @@ jobs:
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     permissions:
-      contents: write
+      contents: read
     steps:
-      - name: App Token
-        id: app_token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
-        with:
-          app-id: ${{ secrets.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
@@ -335,27 +272,22 @@ jobs:
           DEPLOYER_PATH: ${{ vars.DEV_DEPLOYER_PATH }}
           DEPLOYER_APP: ${{ vars.DEV_DEPLOYER_APP }}
           DEPLOYER_REPO: ${{ vars.DEPLOYER_REPO }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_TOKEN: ${{ secrets.SENTRY_TOKEN }}
+          SENTRY_PREFIX: ${{ vars.SENTRY_PREFIX }}
+          SENTRY_SERVER: ${{ vars.SENTRY_SERVER }}
+          SENTRY_PROJECT_ARRAY: ${{ vars.SENTRY_PROJECT_ARRAY }}
           WIRE_SECRET: ${{ secrets.WIRE_SECRET }}
         with:
           private-key: ${{ secrets.PRIVATE_KEY }}
           dep: deploy dev
 
+      # Expose the deployed release identifier for the Sentry release job.
+      # Dev does NOT commit the version back to the branch (prod does).
       - name: Get version
         if: github.ref == 'refs/heads/dev' && needs.version.outputs.version != ''
         id: get_version
-        run: |
-          echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
-          php artisan version:absorb
-          git add .
-
-      - name: Commit Changes
-        if: github.ref == 'refs/heads/main'
-        id: auto_commit_action
-        uses: dsanders11/github-app-commit-action@43de6da2f4d927e997c0784c7a0b61bd19ad6aac # v1
-        with:
-          message: ":pushpin: Update version"
-          token: ${{ steps.app_token.outputs.token }}
-          fail-on-no-changes: false
+        run: echo "version=$(cat VERSION.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Add Deployment Info to Summary
         run: |
@@ -388,14 +320,13 @@ jobs:
         with:
           environment: production
           release: ${{ needs.deploy-prod.outputs.version }}
-          release_prefix: ${{ vars.SENTRY_PREFIX }}
           projects: ${{ vars.SENTRY_PROJECT_ARRAY }}
           disable_telemetry: true
           ignore_missing: true
       - name: Add Monitoring Info to Summary
         run: |
           echo "## Monitoring" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ vars.SENTRY_PREFIX }}@${{ needs.deploy-prod.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ needs.deploy-prod.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
       - name: Add Related Changes to Summary
         env:
@@ -432,14 +363,13 @@ jobs:
         with:
           environment: dev
           release: ${{ needs.deploy-dev.outputs.version }}
-          release_prefix: ${{ vars.SENTRY_PREFIX }}
           projects: ${{ vars.SENTRY_PROJECT_ARRAY }}
           disable_telemetry: true
           ignore_missing: true
       - name: Add Monitoring Info to Summary
         run: |
           echo "## Monitoring" >> $GITHUB_STEP_SUMMARY
-          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ vars.SENTRY_PREFIX }}@${{ needs.deploy-dev.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 [Sentry Release](${{ vars.SENTRY_SERVER }}/organizations/${{ vars.SENTRY_ORG }}/releases/${{ needs.deploy-dev.outputs.version }}/)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
       - name: Add Related Changes to Summary
         env:

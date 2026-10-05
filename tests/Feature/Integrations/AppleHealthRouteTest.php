@@ -14,6 +14,7 @@ use App\Services\GeocodingService;
 use App\Services\PlaceDetectionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AppleHealthRouteTest extends TestCase
@@ -48,7 +49,7 @@ class AppleHealthRouteTest extends TestCase
         $this->plugin = new AppleHealthPlugin;
     }
 
-    /** @test */
+    #[Test]
     public function workout_with_route_data_extracts_gps_points(): void
     {
         $workoutData = [
@@ -91,7 +92,7 @@ class AppleHealthRouteTest extends TestCase
         $this->assertEquals(5.0, $firstPoint['accuracy']);
     }
 
-    /** @test */
+    #[Test]
     public function workout_route_summary_is_calculated(): void
     {
         $workoutData = [
@@ -120,7 +121,7 @@ class AppleHealthRouteTest extends TestCase
         $this->assertEquals(-1.8906, $summary['end_location']['lng']);
     }
 
-    /** @test */
+    #[Test]
     public function outdoor_workout_with_route_sets_event_location(): void
     {
         // Mock geocoding service
@@ -169,7 +170,7 @@ class AppleHealthRouteTest extends TestCase
         $this->assertEquals('apple_health_route', $event->location_source);
     }
 
-    /** @test */
+    #[Test]
     public function indoor_workout_does_not_set_location(): void
     {
         $workoutData = [
@@ -193,7 +194,7 @@ class AppleHealthRouteTest extends TestCase
         $this->assertNull($event->longitude);
     }
 
-    /** @test */
+    #[Test]
     public function outdoor_workout_with_route_links_to_place(): void
     {
         // Create an existing place
@@ -246,7 +247,7 @@ class AppleHealthRouteTest extends TestCase
         $this->assertNotNull($relationship);
     }
 
-    /** @test */
+    #[Test]
     public function workout_without_route_data_works(): void
     {
         $workoutData = [
@@ -266,7 +267,7 @@ class AppleHealthRouteTest extends TestCase
         $this->assertEquals(0, $eventData['event_metadata']['route_summary']['total_points']);
     }
 
-    /** @test */
+    #[Test]
     public function route_points_handle_missing_optional_fields(): void
     {
         $workoutData = [
@@ -297,7 +298,7 @@ class AppleHealthRouteTest extends TestCase
         $this->assertNull($point['accuracy']);
     }
 
-    /** @test */
+    #[Test]
     public function location_tag_stored_in_metadata(): void
     {
         $workoutData = [
@@ -322,7 +323,7 @@ class AppleHealthRouteTest extends TestCase
         ], $eventData['tags']);
     }
 
-    /** @test */
+    #[Test]
     public function empty_route_array_is_handled(): void
     {
         $workoutData = [

@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\User;
+use App\Support\SparkAbility;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Livewire\Volt\Component;
 use Livewire\Attributes\On;
 use Mary\Traits\Toast;
@@ -10,6 +12,7 @@ new class extends Component {
     use Toast;
 
     public string $tokenName = '';
+    public array $tokenAbilities = [];
     public array $tokens = [];
     public bool $showNewToken = false;
     public string $newToken = '';
@@ -45,6 +48,19 @@ new class extends Component {
         $this->tokens = $sorted->values()->toArray();
     }
 
+    /**
+     * Capabilities a token may be granted, for the creation form.
+     *
+     * Exposed as a method rather than referenced as a class constant from the
+     * template: the compiled Blade view does not inherit this file's imports.
+     *
+     * @return array<int, string>
+     */
+    public function availableAbilities(): array
+    {
+        return SparkAbility::DELEGABLE;
+    }
+
     public function headers(): array
     {
         return [
@@ -61,15 +77,20 @@ new class extends Component {
     {
         $this->validate([
             'tokenName' => 'required|string|max:255',
+            'tokenAbilities' => 'required|array|min:1|max:20',
+            'tokenAbilities.*' => ['string', 'distinct', Rule::in(SparkAbility::DELEGABLE)],
+        ], [
+            'tokenAbilities.required' => __('Select at least one capability for this token.'),
         ]);
 
         try {
             $user = Auth::user();
-            $token = $user->createToken($this->tokenName);
+            $token = $user->createToken($this->tokenName, array_values($this->tokenAbilities));
 
             $this->newToken = $token->plainTextToken;
             $this->showNewToken = true;
             $this->tokenName = '';
+            $this->tokenAbilities = [];
             $this->loadTokens();
 
             $this->success('API token created successfully!');
@@ -136,6 +157,30 @@ new class extends Component {
                         class="input input-bordered w-full"
                         required
                         autocomplete="off" />
+                </div>
+
+                <div class="form-control mt-4">
+                    <label class="label">
+                        <span class="label-text">{{ __('Capabilities') }}</span>
+                    </label>
+                    <p class="text-sm text-base-content/70 mb-2">
+                        {{ __('A token can only do what you grant it here. Choose the least it needs.') }}
+                    </p>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        @foreach ($this->availableAbilities() as $ability)
+                            <label class="flex cursor-pointer items-center gap-2" wire:key="ability-{{ $ability }}">
+                                <input
+                                    wire:model="tokenAbilities"
+                                    type="checkbox"
+                                    value="{{ $ability }}"
+                                    class="checkbox checkbox-sm" />
+                                <span class="font-mono text-sm">{{ $ability }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('tokenAbilities')
+                        <span class="mt-2 text-sm text-error">{{ $message }}</span>
+                    @enderror
                 </div>
 
                 <div class="flex justify-end mt-4">
