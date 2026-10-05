@@ -4,9 +4,9 @@ namespace Tests\Unit\Services\Flint;
 
 use App\Services\Flint\RoutineConfig;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
 
-class RoutineConfigTest extends TestCase
+class RoutineConfigTest extends FrameworkTestCase
 {
     #[Test]
     public function a_routine_uses_its_own_secret_when_it_has_one(): void

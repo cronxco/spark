@@ -9,10 +9,13 @@ use App\Services\LoggingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\IsolatesLogs;
 use Tests\TestCase;
 
 class HierarchicalLoggingTest extends TestCase
 {
+    use IsolatesLogs;
+
     use RefreshDatabase;
 
     private User $user;
@@ -38,20 +41,6 @@ class HierarchicalLoggingTest extends TestCase
             'integration_group_id' => $this->group->id,
             'service' => 'test',
         ]);
-    }
-
-    protected function tearDown(): void
-    {
-        // Clean up any log files created during tests
-        $logsPath = storage_path('logs');
-        if (File::exists($logsPath)) {
-            $files = File::glob($logsPath . '/*_{' . now()->format('Y-m-d') . '}.log');
-            foreach ($files as $file) {
-                File::delete($file);
-            }
-        }
-
-        parent::tearDown();
     }
 
     #[Test]

@@ -81,6 +81,27 @@ class NewsletterLinkFilter
     }
 
     /**
+     * URL-only guard for discovery copies and redirect destinations.
+     *
+     * @param  list<string>  $listUnsubscribeUrls
+     */
+    public function isDeniedUrl(string $url, array $listUnsubscribeUrls = []): bool
+    {
+        $identity = UrlCanonicalizer::canonicalize(html_entity_decode($url, ENT_QUOTES | ENT_HTML5));
+        foreach ($listUnsubscribeUrls as $unsubscribe) {
+            if ($identity === UrlCanonicalizer::canonicalize($unsubscribe)) {
+                return true;
+            }
+        }
+
+        $decoded = rawurldecode($url);
+        $path = (string) parse_url($decoded, PHP_URL_PATH);
+
+        return preg_match(self::ALWAYS_DENIED, $decoded) === 1
+            || preg_match(self::DENIED_PATH_SEGMENTS, $path) === 1;
+    }
+
+    /**
      * @param  array<string, int>  $unsubscribe
      */
     private function isDenied(LinkCandidate $candidate, array $unsubscribe): bool
@@ -101,7 +122,7 @@ class NewsletterLinkFilter
             }
         }
 
-        if (preg_match(self::ALWAYS_DENIED, $candidate->url) === 1
+        if ($this->isDeniedUrl($candidate->url)
             || preg_match(self::ALWAYS_DENIED, $candidate->anchorText) === 1
             || preg_match(self::DENIED_PATH_SEGMENTS, $path) === 1) {
             return true;

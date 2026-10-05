@@ -2,14 +2,14 @@
 
 namespace Tests\Unit;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use Tests\FrameworkTestCase;
+use Tests\Support\IsolatesLogs;
 
-class ApiWebhookLoggingHelpersTest extends TestCase
+class ApiWebhookLoggingHelpersTest extends FrameworkTestCase
 {
-    use RefreshDatabase;
+    use IsolatesLogs;
 
     #[Test]
     public function get_integration_log_channel_creates_per_instance_channels()

@@ -39,6 +39,7 @@ class LinkListExpanderTest extends TestCase
         parent::setUp();
 
         Queue::fake();
+        config(['fetch.list_detection.enabled' => true, 'fetch.list_detection.shadow' => false]);
         $this->mock(UrlSafetyValidator::class, fn ($mock) => $mock->shouldReceive('isSafe')->andReturnTrue());
 
         $this->user = User::factory()->create();
@@ -267,6 +268,77 @@ class LinkListExpanderTest extends TestCase
         $job->failed(new RuntimeException('boom'));
         $this->assertSame('failed', $this->list->fresh()->metadata['list_detection']['expansion_status']);
         $this->assertStringStartsWith((string) $this->list->id . ':', $job->uniqueId());
+    }
+
+    #[Test]
+    public function a_one_time_expansion_retries_transient_creation_failures(): void
+    {
+        $this->partialMock(BookmarkCreator::class, fn ($mock) => $mock
+            ->shouldReceive('firstOrCreate')->once()->andThrow(new RuntimeException('Temporary database failure')));
+        $job = new ExpandLinkListJob($this->integration, (string) $this->list->id,
+            [['url' => 'https://blog.example.com/p/post-9', 'title' => 'Post 9']], []);
+
+        try {
+            $job->handle(app(LinkListExpander::class));
+            $this->fail('The job must fail so the queue retries it.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('retrying unresolved', $exception->getMessage());
+        }
+
+        $this->assertSame('retryable_failed', Event::where('action', 'expanded')->sole()->blocks()->sole()->metadata['items'][0]['status']);
+        $this->app->instance(BookmarkCreator::class, new BookmarkCreator);
+        $job->handle(app(LinkListExpander::class));
+
+        $this->assertSame('complete', $this->list->fresh()->metadata['list_detection']['expansion_status']);
+        Queue::assertPushed(FetchSingleUrl::class, 1);
+    }
+
+    #[Test]
+    public function an_interrupted_dispatch_is_recovered_without_another_bookmark(): void
+    {
+        $child = app(BookmarkCreator::class)->firstOrCreate($this->user->id,
+            'https://blog.example.com/p/post-9', [], [
+                'via' => 'list_expansion', 'discovered_from_object_id' => $this->list->id,
+                'enabled' => true, 'fetch_count' => 0, 'fetch_dispatched_at' => null,
+            ])['bookmark'];
+
+        $result = $this->expand($this->items([9]));
+
+        $this->assertSame('queued', $result->entries[0]['status']);
+        $this->assertNotNull($child->fresh()->metadata['fetch_dispatched_at']);
+        $this->assertSame(2, EventObject::where('type', 'fetch_webpage')->count());
+        Queue::assertPushed(FetchSingleUrl::class, 1);
+    }
+
+    #[Test]
+    public function a_digest_expands_all_assessed_items_beyond_the_web_run_cap(): void
+    {
+        config(['fetch.list_expansion.max_new_per_run' => 2]);
+        $issue = Event::factory()->create(['integration_id' => $this->integration->id,
+            'service' => 'newsletter', 'action' => 'received_post']);
+
+        $result = app(LinkListExpander::class)->expandIssue($this->integration, $issue,
+            $this->items(range(1, 25)), [], 'newsletter_link_list');
+
+        $this->assertSame(25, $result->newCount());
+        Queue::assertPushed(FetchSingleUrl::class, 25);
+    }
+
+    #[Test]
+    public function queued_expansion_obeys_current_flags_and_bookmark_mode(): void
+    {
+        $job = new ExpandLinkListJob($this->integration, (string) $this->list->id,
+            [['url' => 'https://blog.example.com/p/post-9', 'title' => 'Post 9']], []);
+        foreach ([['enabled' => false, 'shadow' => false], ['enabled' => true, 'shadow' => true]] as $flags) {
+            config(['fetch.list_detection.enabled' => $flags['enabled'], 'fetch.list_detection.shadow' => $flags['shadow']]);
+            $job->handle(app(LinkListExpander::class));
+        }
+        config(['fetch.list_detection.enabled' => true, 'fetch.list_detection.shadow' => false]);
+        FetchMetadata::merge($this->list, ['list_detection' => ['mode' => 'off']]);
+        $job->handle(app(LinkListExpander::class));
+
+        $this->assertSame(1, EventObject::where('type', 'fetch_webpage')->count());
+        Queue::assertNotPushed(FetchSingleUrl::class);
     }
 
     /**

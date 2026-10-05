@@ -41,7 +41,13 @@ class FlintReviewService
             ->merge($this->receiptAutoMatches($user))
             ->merge($this->linkSuggestions($user))
             ->merge($this->autoLinks($user))
-            ->sortByDesc('created_at')
+            ->sort(function (array $left, array $right): int {
+                $leftNeedsDecision = in_array($left['kind'], ['receipt_suggestion', 'link_suggestion'], true);
+                $rightNeedsDecision = in_array($right['kind'], ['receipt_suggestion', 'link_suggestion'], true);
+
+                return ($rightNeedsDecision <=> $leftNeedsDecision)
+                    ?: strcmp($right['created_at'] ?? '', $left['created_at'] ?? '');
+            })
             ->values()
             ->all();
     }
@@ -171,7 +177,7 @@ class FlintReviewService
             'relationship_type' => $link->type,
             'subject' => $this->eventSummary($events[$link->from_id]),
             'linked' => $this->eventSummary($events[$link->to_id]),
-            'actions' => $kind === 'link_suggestion' ? ['confirm', 'dismiss'] : ['keep', 'undo'],
+            'actions' => $kind === 'link_suggestion' ? ['confirm', 'dismiss'] : ['undo'],
         ];
     }
 
@@ -237,11 +243,21 @@ class FlintReviewService
             ->pending()
             ->findOrFail($id);
 
-        match ($action) {
-            'confirm' => $link->approve(),
-            'dismiss' => $link->reject(),
-            default => throw new InvalidArgumentException('A link suggestion can be confirmed or dismissed.'),
-        };
+        if ($action === 'confirm') {
+            // A person approved this link. It must not reappear as an automatic
+            // decision merely because the detector originally set auto_linked.
+            $link->update(['metadata' => [...($link->metadata ?? []), 'reviewed_at' => now()->toIso8601String()]]);
+            $link->approve();
+
+            return;
+        }
+        if ($action === 'dismiss') {
+            $link->reject();
+
+            return;
+        }
+
+        throw new InvalidArgumentException('A link suggestion can be confirmed or dismissed.');
     }
 
     /** @return Builder<Event> */

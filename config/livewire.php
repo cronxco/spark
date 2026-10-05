@@ -38,7 +38,7 @@ return [
     |
     */
 
-    'component_layout' => 'components.layouts.app',
+    'layout' => 'components.layouts.app',
 
     /*
     |---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ return [
     |
     */
 
-    'component_placeholder' => null,
+    'lazy_placeholder' => null,
 
     /*
     |---------------------------------------------------------------------------
