@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Queue;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -195,8 +196,8 @@ class ReceiptMatchingPipelineTest extends TestCase
             $before = ReceiptMatchState::state($receipt->fresh());
             $job->handle(app(ReceiptTransactionMatcher::class));
             $this->assertSame($status, app(ReceiptTransactionMatcher::class)->matchReceipt($receipt));
-            $job->failed(new \RuntimeException('Late failure'));
-            $task->failed(new \RuntimeException('Late task failure'));
+            $job->failed(new RuntimeException('Late failure'));
+            $task->failed(new RuntimeException('Late task failure'));
             $this->assertSame($before, ReceiptMatchState::state($receipt->fresh()));
             $this->assertFalse(ReceiptMatchState::isMatched($receipt));
         }
