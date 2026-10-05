@@ -26,6 +26,9 @@ class NewsletterExpandLinksTask extends BaseTaskJob
 {
     public const BLOCK_TYPE = 'newsletter_link_list';
 
+    // Up to 40 links, each with a five-second total redirect budget, plus Jev.
+    public $timeout = 300;
+
     /**
      * The user's existing Fetch integration; link expansion never creates one.
      */
@@ -60,7 +63,12 @@ class NewsletterExpandLinksTask extends BaseTaskJob
             throw new Exception('Newsletter link expansion requires an Event model.');
         }
 
-        $event = $this->model->loadMissing(['target', 'integration']);
+        // Settings may have changed while the job was queued.
+        $event = $this->model->refresh()->load(['target', 'integration']);
+
+        if (! $event || ! self::isEnabledFor($event)) {
+            return;
+        }
         $html = $event->event_metadata['raw_html'] ?? null;
 
         if (! is_string($html) || $html === '') {
@@ -92,12 +100,19 @@ class NewsletterExpandLinksTask extends BaseTaskJob
         }
 
         $resolver = app(TrackingLinkResolver::class);
-        $items = array_map(
-            fn ($link): ListItem => new ListItem($resolver->resolve($link->url), $link->anchorText),
-            $assessment->acceptedItems,
-        );
+        $items = [];
+        foreach ($assessment->acceptedItems as $link) {
+            $url = $resolver->resolve($link->url, (array) ($event->event_metadata['list_unsubscribe'] ?? []));
+            if ($url !== null) {
+                $items[] = new ListItem($url, $link->anchorText);
+            }
+        }
 
         $result = app(LinkListExpander::class)->expandIssue($fetchIntegration, $event, $items, $record, self::BLOCK_TYPE);
+
+        if ($result->countWithStatus(LinkListExpander::STATUS_RETRYABLE_FAILED) > 0) {
+            throw new Exception('Some digest articles could not be bookmarked; retrying unresolved items.');
+        }
 
         Log::info('Newsletter: Digest links expanded', [
             'event_id' => $event->id,

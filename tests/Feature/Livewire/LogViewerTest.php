@@ -10,10 +10,13 @@ use App\Services\LoggingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\IsolatesLogs;
 use Tests\TestCase;
 
 class LogViewerTest extends TestCase
 {
+    use IsolatesLogs;
+
     use RefreshDatabase;
 
     private User $user;

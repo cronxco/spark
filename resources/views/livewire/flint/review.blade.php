@@ -29,8 +29,14 @@ new class extends Component
             $this->error($exception->getMessage());
 
             return;
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $exception) {
+            unset($this->items);
+            $this->error('That item is no longer available. The list has been refreshed.');
+
+            return;
         }
 
+        unset($this->chosen[$id]);
         unset($this->items);
         $this->success(match ($action) {
             'confirm' => 'Confirmed.',
@@ -41,84 +47,93 @@ new class extends Component
     }
 }; ?>
 
-<div class="space-y-4">
+@php
+    $needsDecision = collect($this->items)->filter(fn ($item) => in_array($item['kind'], ['receipt_suggestion', 'link_suggestion'], true));
+    $automatic = collect($this->items)->reject(fn ($item) => in_array($item['kind'], ['receipt_suggestion', 'link_suggestion'], true));
+@endphp
+
+<div class="space-y-6">
     <p class="text-sm text-base-content/70">
-        Decisions Spark made by itself, and suggestions it wasn't sure enough to act on. Automatic decisions stay here for
-        {{ \App\Services\Flint\FlintReviewService::AUTO_DECISION_DAYS }} days, or until you keep or undo them.
+        Decide on suggestions first. Spark's automatic links remain available to undo for
+        {{ FlintReviewService::AUTO_DECISION_DAYS }} days.
     </p>
 
-    @forelse ($this->items as $item)
-        <div wire:key="review-{{ $item['kind'] }}-{{ $item['id'] }}" class="card bg-base-200 shadow">
-            <div class="card-body p-4 gap-3">
-                <div class="flex items-start justify-between gap-2">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <div class="badge badge-outline badge-sm">
-                            {{ match ($item['kind']) {
-                                'receipt_suggestion' => 'Receipt suggestion',
-                                'receipt_auto_match' => 'Receipt linked automatically',
-                                'link_suggestion' => 'Link suggestion',
-                                default => 'Linked automatically',
-                            } }}
+    @foreach ([['Needs your decision', $needsDecision], ['Linked by Spark', $automatic]] as [$heading, $group])
+        @if ($group->isNotEmpty())
+            <section class="space-y-3" aria-label="{{ $heading }}">
+                <h3 class="text-lg font-semibold">{{ $heading }} <span class="text-base-content/60">({{ $group->count() }})</span></h3>
+
+                @foreach ($group as $item)
+                    <div wire:key="review-{{ $item['kind'] }}-{{ $item['id'] }}" class="card bg-base-200 shadow-sm">
+                        <div class="card-body p-4 gap-3">
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                                <span class="font-medium">{{ match ($item['kind']) {
+                                    'receipt_suggestion' => 'Receipt suggestion',
+                                    'receipt_auto_match' => 'Receipt linked automatically',
+                                    'link_suggestion' => 'Link suggestion',
+                                    default => 'Linked automatically',
+                                } }}</span>
+                                @if ($item['confidence'] !== null)
+                                    <span class="text-base-content/70">{{ round($item['confidence'] * 100) }}% match score</span>
+                                @endif
+                                @if ($item['created_at'] && ! in_array($item['kind'], ['receipt_suggestion'], true))
+                                    <span class="ml-auto text-base-content/60">{{ $heading === 'Linked by Spark' ? 'Linked' : 'Suggested' }} <x-user-time :time="$item['created_at']" format="j M Y, H:i" /></span>
+                                @endif
+                            </div>
+
+                            <p class="text-sm text-base-content/70">{{ $item['summary'] }}</p>
+                            <div class="grid gap-2 md:grid-cols-2">
+                                <x-flint-review-event-card :event="$item['subject']" :label="$item['kind'] === 'receipt_suggestion' || $item['kind'] === 'receipt_auto_match' ? 'Receipt' : 'First transaction'" />
+                                @if (isset($item['linked']))
+                                    <x-flint-review-event-card :event="$item['linked']" :label="$item['kind'] === 'receipt_auto_match' ? 'Transaction' : 'Linked transaction'" />
+                                @endif
+                            </div>
+
+                            @if ($item['kind'] === 'receipt_suggestion')
+                                @if (count($item['candidates']) > 0)
+                                    <fieldset class="space-y-2">
+                                        <legend class="mb-2 text-sm font-medium">Choose a transaction</legend>
+                                        @foreach ($item['candidates'] as $candidate)
+                                            <div wire:key="candidate-{{ $item['id'] }}-{{ $candidate['id'] }}" class="flex items-start gap-3">
+                                                <input type="radio" class="radio radio-sm mt-3" name="candidate-{{ $item['id'] }}"
+                                                    aria-label="Select {{ $candidate['title'] ?: 'transaction' }}"
+                                                    wire:model.live="chosen.{{ $item['id'] }}" value="{{ $candidate['id'] }}" />
+                                                <div class="min-w-0 flex-1">
+                                                    <x-flint-review-event-card :event="$candidate" :label="'Candidate · '.round($candidate['confidence'] * 100).'% match score'" />
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </fieldset>
+                                @else
+                                    <p class="text-sm text-base-content/70">No suggested transactions are available now. You can dismiss this suggestion.</p>
+                                @endif
+                            @elseif ($item['relationship_type'] ?? null)
+                                <p class="text-xs text-base-content/60">Relationship: {{ str_replace('_', ' ', $item['relationship_type']) }}</p>
+                            @endif
+
+                            <div class="flex flex-wrap gap-2">
+                                @foreach ($item['actions'] as $action)
+                                    <button type="button"
+                                        wire:click="act('{{ $item['kind'] }}', '{{ $item['id'] }}', '{{ $action }}')"
+                                        @if ($action === 'undo') wire:confirm="Undo this automatic link? The two events will be unlinked." @endif
+                                        @if ($action === 'confirm' && $item['kind'] === 'receipt_suggestion' && ! in_array($this->chosen[$item['id']] ?? null, array_column($item['candidates'], 'id'), true)) disabled @endif
+                                        wire:loading.attr="disabled"
+                                        class="btn btn-sm {{ $action === 'confirm' ? 'btn-primary' : 'btn-ghost' }}">
+                                        {{ match ($action) { 'confirm' => 'Confirm', 'undo' => 'Undo link', default => 'Dismiss' } }}
+                                    </button>
+                                @endforeach
+                            </div>
                         </div>
-                        @if ($item['confidence'] !== null)
-                            <div class="badge badge-ghost badge-sm">{{ round($item['confidence'] * 100) }}% confident</div>
-                        @endif
                     </div>
-                    @if ($item['created_at'])
-                        <span class="text-xs text-base-content/50"><x-user-time :time="$item['created_at']" format="j M" /></span>
-                    @endif
-                </div>
+                @endforeach
+            </section>
+        @endif
+    @endforeach
 
-                <div>
-                    <div class="font-medium">{{ $item['title'] }}</div>
-                    <div class="text-sm text-base-content/70">{{ $item['summary'] }}</div>
-                </div>
-
-                @if ($item['kind'] === 'receipt_suggestion')
-                    <div class="space-y-1">
-                        @foreach ($item['candidates'] as $candidate)
-                            <label wire:key="candidate-{{ $item['id'] }}-{{ $candidate['id'] }}" class="flex items-center gap-2 text-sm">
-                                <input type="radio" class="radio radio-sm" wire:model="chosen.{{ $item['id'] }}" value="{{ $candidate['id'] }}" />
-                                <span>{{ $candidate['title'] ?? 'Transaction' }}</span>
-                                <span class="text-base-content/60">{{ $candidate['amount'] }} {{ $candidate['unit'] }}</span>
-                                <span class="text-base-content/50">{{ round($candidate['confidence'] * 100) }}%</span>
-                            </label>
-                        @endforeach
-                    </div>
-                @elseif (isset($item['linked']))
-                    <div class="text-sm text-base-content/70">
-                        {{ $item['subject']['title'] ?? 'Transaction' }}
-                        <x-icon name="o-arrow-right" class="w-3 h-3 inline" />
-                        {{ $item['linked']['title'] ?? 'Transaction' }}
-                        <span class="text-base-content/50">({{ str_replace('_', ' ', $item['relationship_type']) }})</span>
-                    </div>
-                @endif
-
-                <div class="flex flex-wrap gap-2">
-                    @foreach ($item['actions'] as $action)
-                        <button
-                            type="button"
-                            wire:click="act('{{ $item['kind'] }}', '{{ $item['id'] }}', '{{ $action }}')"
-                            wire:loading.attr="disabled"
-                            class="btn btn-sm {{ in_array($action, ['confirm', 'keep'], true) ? 'btn-primary' : 'btn-ghost' }}"
-                        >
-                            {{ match ($action) {
-                                'confirm' => 'Confirm',
-                                'keep' => 'Keep',
-                                'undo' => 'Undo',
-                                default => 'Dismiss',
-                            } }}
-                        </button>
-                    @endforeach
-                </div>
-            </div>
-        </div>
-    @empty
-        <div class="card bg-base-200">
-            <div class="card-body items-center text-center text-base-content/60">
-                <x-icon name="o-check-circle" class="w-8 h-8" />
-                <p>Nothing to review.</p>
-            </div>
-        </div>
-    @endforelse
+    @if ($needsDecision->isEmpty() && $automatic->isEmpty())
+        <div class="card bg-base-200"><div class="card-body items-center text-center text-base-content/60">
+            <x-icon name="o-check-circle" class="w-8 h-8" />
+            <p>Nothing to review.</p>
+        </div></div>
+    @endif
 </div>
