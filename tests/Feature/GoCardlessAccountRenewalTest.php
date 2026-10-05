@@ -331,7 +331,8 @@ class GoCardlessAccountRenewalTest extends TestCase
     public function renewed_aliases_keep_duplicate_history_visible_and_repairable(): void
     {
         $canonical = $this->account();
-        $canonical->update(['created_at' => now()->subDay()]);
+        $canonical->created_at = now()->subDay();
+        $canonical->save();
         $duplicate = $this->account('Duplicate');
         $event = Event::create(['integration_id' => $this->integration->id, 'source_id' => 'old-alias-balance',
             'actor_id' => $duplicate->id, 'target_id' => $canonical->id, 'service' => 'gocardless', 'domain' => 'money',
