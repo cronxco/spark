@@ -3017,5 +3017,4 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         return $title;
     }
-
 }
