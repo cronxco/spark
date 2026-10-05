@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Support\SparkAbility;
 use App\Integrations\Financial\FinancialPlugin;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use App\Jobs\Data\GoCardless\GoCardlessAccountData;
@@ -16,6 +15,7 @@ use App\Models\User;
 use App\Services\GoCardlessAccounts;
 use App\Services\Mobile\ObjectLookup;
 use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Support\SparkAbility;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
