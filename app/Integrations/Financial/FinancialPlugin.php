@@ -385,7 +385,8 @@ class FinancialPlugin extends ManualPlugin
         return Event::whereIn('actor_id', app(GoCardlessAccounts::class)->memberIds($accountObject))
             ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
-            ->orderByDesc('time')->orderByDesc('id')
+            ->latest('time')
+            ->orderByDesc('id')
             ->first();
     }
 

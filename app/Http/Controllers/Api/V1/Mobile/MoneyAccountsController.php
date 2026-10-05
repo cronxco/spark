@@ -108,12 +108,17 @@ class MoneyAccountsController extends Controller
             return response()->json(['message' => 'Account not found.'], 404);
         }
 
+        $validated = $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'cursor' => ['nullable', 'string'],
+        ]);
+
         $paginator = Event::whereIn('actor_id', app(GoCardlessAccounts::class)->memberIds($account))
             ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->orderByDesc('time')
             ->orderByDesc('id')
-            ->cursorPaginate(25, ['*'], 'cursor', $request->query('cursor'));
+            ->cursorPaginate((int) ($validated['limit'] ?? 25), ['*'], 'cursor', $validated['cursor'] ?? null);
 
         return response()->json([
             'data' => BalanceEntryResource::collection($paginator->items()),
