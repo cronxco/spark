@@ -121,6 +121,7 @@ class NetWorthController extends Controller
             ->where('action', 'had_balance')
             ->where('time', '<=', $at)
             ->orderByDesc('time')
+            ->orderByDesc('id')
             ->first();
     }
 

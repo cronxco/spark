@@ -9,6 +9,7 @@ use App\Notifications\DailyDigestReady;
 use App\Notifications\FetchMultipleFailures;
 use App\Notifications\IntegrationAuthenticationFailed;
 use App\Notifications\IntegrationFailed;
+use App\Services\Fetch\FetchMetadata;
 use App\Services\Notifications\NotificationFeedService;
 use App\Services\Notifications\NotificationIncidentResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -131,11 +132,11 @@ class AutomaticNotificationLifecycleTest extends TestCase
         $first = $user->notifications()->first();
         $this->travel(1)->minutes();
 
-        $object->update(['metadata' => array_merge($object->metadata ?? [], ['last_checked_at' => now()->toJSON(), 'last_error' => null])]);
+        FetchMetadata::merge($object, ['last_checked_at' => now()->toJSON(), 'last_error' => null]);
 
         $this->assertSame('resolved', $first->fresh()->data['archive_reason']);
         $this->travel(1)->minutes();
-        $object->update(['metadata' => array_merge($object->metadata ?? [], ['last_error' => ['message' => 'blocked again']])]);
+        FetchMetadata::merge($object, ['last_error' => ['message' => 'blocked again']]);
         $user->notifyNow(new FetchMultipleFailures($object, 3, 'blocked again'), ['database']);
         DB::transaction(fn () => $object->delete());
         $this->assertSame(0, $user->notifications()->whereNull('archived_at')->count());

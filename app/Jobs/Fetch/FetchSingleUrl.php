@@ -10,6 +10,10 @@ use App\Jobs\Data\Fetch\ProcessFetchedContent;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Notifications\FetchMultipleFailures;
+use App\Services\Fetch\Assessment\ListPageDetector;
+use App\Services\Fetch\BookmarkCreator;
+use App\Services\Fetch\Expansion\ListItem;
+use App\Services\Fetch\FetchMetadata;
 use App\Services\Fetch\UrlSafetyValidator;
 use App\Services\Media\MediaDownloadHelper;
 use App\Services\Notifications\NotificationIncidentResolver;
@@ -140,7 +144,13 @@ class FetchSingleUrl implements ShouldQueue
             ]);
 
             // Extract content using Readability
-            $extraction = ContentExtractor::extract($html, $this->url, $webpage->user_id);
+            $parsed = ContentExtractor::parse($html, $this->url);
+            $extraction = ContentExtractor::validateParsed($parsed, $html, $this->url, $webpage->user_id);
+
+            // A list of articles is expanded instead of being treated as one article
+            if ($this->handleListPage($webpage, $engine, $result, $html, $parsed, $extraction, $durationMs)) {
+                return;
+            }
 
             if (! $extraction['success']) {
                 $reason = $extraction['reason'] ?? 'Unknown error';
@@ -177,13 +187,13 @@ class FetchSingleUrl implements ShouldQueue
                             $html = $archiveResult['html'];
 
                             // Update metadata to track archive usage
-                            $metadata = $webpage->metadata ?? [];
-                            $metadata['last_archive_bypass'] = [
-                                'timestamp' => now()->toIso8601String(),
-                                'archive_url' => $archiveResult['archive_url'],
-                                'original_error' => $reason,
-                            ];
-                            $webpage->update(['metadata' => $metadata]);
+                            FetchMetadata::merge($webpage, [
+                                'last_archive_bypass' => [
+                                    'timestamp' => now()->toIso8601String(),
+                                    'archive_url' => $archiveResult['archive_url'],
+                                    'original_error' => $reason,
+                                ],
+                            ]);
 
                             // Update history with archive success
                             $engine->updateLastHistoryEntry($webpage, [
@@ -254,15 +264,7 @@ class FetchSingleUrl implements ShouldQueue
             $this->handleImages($webpage, $html, $screenshot);
 
             // Update webpage metadata with fetch method
-            $metadata = $webpage->metadata ?? [];
-            $metadata['last_fetch_method'] = $method;
-            $metadata['last_selected_fetch_method'] = $result['selected_method'] ?? $method;
-            $metadata['last_actual_fetch_method'] = $result['actual_method'] ?? $method;
-            $metadata['last_playwright_error'] = $result['playwright_error'] ?? null;
-            $metadata['last_playwright_reached_worker'] = $result['playwright_reached_worker'] ?? null;
-            $metadata['last_playwright_worker_status'] = $result['playwright_worker_status'] ?? null;
-            $metadata['last_fallback_status_code'] = $result['fallback_status_code'] ?? null;
-            $webpage->update(['metadata' => $metadata]);
+            FetchMetadata::merge($webpage, $this->fetchMethodMetadata($result, $method));
             app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
                 "fetch_multiple_failures:{$webpage->id}",
             ]);
@@ -396,6 +398,95 @@ class FetchSingleUrl implements ShouldQueue
         return false;
     }
 
+    /**
+     * Treat the page as a list of articles when list detection says so:
+     * record the fetch, then hand the articles to ExpandLinkListJob instead of
+     * creating an article revision.
+     *
+     * @param  array<string, mixed>  $result
+     * @param  array{success: bool, reason: ?string, data: ?array}  $parsed
+     * @param  array{success: bool, reason: ?string}  $validation
+     */
+    private function handleListPage(
+        EventObject $webpage,
+        FetchEngineManager $engine,
+        array $result,
+        string $html,
+        array $parsed,
+        array $validation,
+        float $durationMs,
+    ): bool {
+        $assessment = app(ListPageDetector::class)->detect($webpage, $html, $result['final_url'] ?? $this->url, $parsed, $validation);
+
+        if ($assessment === null) {
+            return false;
+        }
+
+        $method = $result['method'] ?? 'unknown';
+        $title = trim((string) ($parsed['data']['title'] ?? ''));
+        if ($title !== '' && ! app(BookmarkCreator::class)->titleIsAvailable($webpage, $title)) {
+            $title = '';
+        }
+
+        FetchMetadata::mutate($webpage, function (array $metadata) use ($result, $method): array {
+            $once = ($metadata['fetch_mode'] ?? 'recurring') === 'once';
+
+            $metadata = array_merge($metadata, $this->fetchMethodMetadata($result, $method), [
+                'last_checked_at' => now()->toIso8601String(),
+                'fetch_count' => ($metadata['fetch_count'] ?? 0) + 1,
+                'last_error' => null,
+                'pipeline_status' => 'complete',
+            ]);
+
+            if ($once) {
+                $metadata['enabled'] = false;
+                $metadata['discovery_status'] = 'completed';
+            }
+
+            $metadata['list_detection'] = array_merge($metadata['list_detection'] ?? [], [
+                'expansion_status' => 'pending',
+            ]);
+
+            return $metadata;
+        }, $title !== '' ? ['title' => $title] : []);
+
+        app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
+            "fetch_multiple_failures:{$webpage->id}",
+        ]);
+
+        $engine->updateLastHistoryEntry($webpage, [
+            'outcome' => $this->fetchOutcome($result, true),
+            'content_kind' => 'list',
+            'duration_ms' => $durationMs,
+            'status_code' => $result['status_code'] ?? null,
+            'final_status_code' => $result['status_code'] ?? null,
+            'actual_method' => $result['actual_method'] ?? $method,
+            'playwright_error' => $result['playwright_error'] ?? null,
+            'playwright_reached_worker' => $result['playwright_reached_worker'] ?? null,
+            'playwright_worker_status' => $result['playwright_worker_status'] ?? null,
+            'fallback_status_code' => $result['fallback_status_code'] ?? null,
+            'playwright_meta' => $result['playwright_meta'] ?? null,
+        ]);
+
+        (new PlaywrightHealthMetrics)->recordFetch($method, true, (int) $durationMs);
+
+        ExpandLinkListJob::dispatch(
+            $this->integration,
+            (string) $webpage->id,
+            array_map(fn ($candidate): array => ListItem::fromCandidate($candidate)->toArray(), $assessment->acceptedItems),
+            $assessment->toArray(),
+        );
+
+        Log::info('Fetch: Page is a list of articles, expansion queued', [
+            'url' => $this->url,
+            'webpage_id' => $webpage->id,
+            'items' => count($assessment->acceptedItems),
+            'assessment' => $assessment->status,
+        ]);
+
+        return true;
+    }
+
     private function isHandledPermanentFetchFailure(string $error): bool
     {
         $lowerError = strtolower($error);
@@ -460,10 +551,10 @@ class FetchSingleUrl implements ShouldQueue
             );
 
             if ($media) {
-                $metadata = $webpage->metadata ?? [];
-                $metadata['last_error_screenshot_media_uuid'] = $media->uuid;
-                $metadata['last_error_screenshot_at'] = now()->toIso8601String();
-                $webpage->update(['metadata' => $metadata]);
+                FetchMetadata::merge($webpage, [
+                    'last_error_screenshot_media_uuid' => $media->uuid,
+                    'last_error_screenshot_at' => now()->toIso8601String(),
+                ]);
             }
 
             Log::info('Fetch: Saved screenshot of failed fetch', [
@@ -525,12 +616,11 @@ class FetchSingleUrl implements ShouldQueue
                 'url' => $this->url,
             ]);
 
-            // Update webpage metadata
-            $metadata = $webpage->metadata ?? [];
-            $metadata['last_checked_at'] = now()->toIso8601String();
-            $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
-            $metadata['last_error'] = null;
-            $webpage->update(['metadata' => $metadata]);
+            FetchMetadata::mutate($webpage, fn (array $metadata): array => array_merge($metadata, [
+                'last_checked_at' => now()->toIso8601String(),
+                'fetch_count' => ($metadata['fetch_count'] ?? 0) + 1,
+                'last_error' => null,
+            ]));
             app(NotificationIncidentResolver::class)->resolve($this->integration->user, [
                 "fetch_multiple_failures:{$webpage->id}",
             ]);
@@ -545,16 +635,27 @@ class FetchSingleUrl implements ShouldQueue
 
     private function updateWebpageError(EventObject $webpage, string $errorMessage): void
     {
-        $metadata = $webpage->metadata ?? [];
-        $metadata['last_checked_at'] = now()->toIso8601String();
-        $metadata['pipeline_status'] = 'failed';
-        $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
-        $consecutiveFailures = ($metadata['last_error']['consecutive_failures'] ?? 0) + 1;
-        $metadata['last_error'] = [
-            'message' => $errorMessage,
-            'timestamp' => now()->toIso8601String(),
-            'consecutive_failures' => $consecutiveFailures,
-        ];
+        $consecutiveFailures = 0;
+
+        FetchMetadata::mutate($webpage, function (array $metadata) use ($errorMessage, &$consecutiveFailures): array {
+            $consecutiveFailures = ($metadata['last_error']['consecutive_failures'] ?? 0) + 1;
+
+            $metadata['last_checked_at'] = now()->toIso8601String();
+            $metadata['pipeline_status'] = 'failed';
+            $metadata['fetch_count'] = ($metadata['fetch_count'] ?? 0) + 1;
+            $metadata['last_error'] = [
+                'message' => $errorMessage,
+                'timestamp' => now()->toIso8601String(),
+                'consecutive_failures' => $consecutiveFailures,
+            ];
+
+            // Auto-disable after 5 consecutive failures
+            if ($consecutiveFailures >= 5) {
+                $metadata['enabled'] = false;
+            }
+
+            return $metadata;
+        });
 
         // Send notification after 3 consecutive failures
         if ($consecutiveFailures >= 3) {
@@ -573,16 +674,29 @@ class FetchSingleUrl implements ShouldQueue
             ]);
         }
 
-        // Auto-disable after 5 consecutive failures
         if ($consecutiveFailures >= 5) {
-            $metadata['enabled'] = false;
             Log::warning('Fetch: Auto-disabled URL after 5 failures', [
                 'url' => $this->url,
                 'webpage_id' => $webpage->id,
             ]);
         }
+    }
 
-        $webpage->update(['metadata' => $metadata]);
+    /**
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function fetchMethodMetadata(array $result, string $method): array
+    {
+        return [
+            'last_fetch_method' => $method,
+            'last_selected_fetch_method' => $result['selected_method'] ?? $method,
+            'last_actual_fetch_method' => $result['actual_method'] ?? $method,
+            'last_playwright_error' => $result['playwright_error'] ?? null,
+            'last_playwright_reached_worker' => $result['playwright_reached_worker'] ?? null,
+            'last_playwright_worker_status' => $result['playwright_worker_status'] ?? null,
+            'last_fallback_status_code' => $result['fallback_status_code'] ?? null,
+        ];
     }
 
     /**

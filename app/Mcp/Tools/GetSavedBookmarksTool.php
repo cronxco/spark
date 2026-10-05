@@ -71,6 +71,7 @@ class GetSavedBookmarksTool extends Tool
                 'tldr' => $blocks->get('fetch_tldr')?->getContent(),
                 'summary' => $blocks->get('fetch_summary_paragraph')?->getContent(),
                 'key_takeaways' => $blocks->get('fetch_key_takeaways')?->getContent(),
+                ...$this->listDetails($bookmark),
             ];
         });
 
@@ -87,6 +88,27 @@ class GetSavedBookmarksTool extends Tool
         return [
             'query' => $schema->string()->description('Optional keyword filter across title and captured content.'),
             'limit' => $schema->integer()->description('Maximum distinct bookmarks, 1-100. Defaults to 50.')->default(50),
+        ];
+    }
+
+    /**
+     * List pages have no summary of their own; say so and how many articles
+     * were found on them.
+     *
+     * @return array<string, mixed>
+     */
+    private function listDetails(EventObject $bookmark): array
+    {
+        $listDetection = $bookmark->metadata['list_detection'] ?? [];
+
+        if (($listDetection['kind'] ?? null) !== 'list' || ($listDetection['shadow'] ?? false)) {
+            return [];
+        }
+
+        return [
+            'kind' => 'list',
+            'last_new_articles' => $listDetection['last_new_count'] ?? null,
+            'expanded_at' => $listDetection['expanded_at'] ?? null,
         ];
     }
 }
