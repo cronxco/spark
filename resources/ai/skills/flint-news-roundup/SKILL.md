@@ -1,7 +1,7 @@
 ---
 name: flint-news-roundup
 description: >
-  Selects three stories worth Will's attention from his newsletter and fetch
+  Selects three stories by default, or four on a busy news day, worth Will's attention from his newsletter and fetch
   sources plus a bounded UK politics and policy sweep. Reads the originals,
   researches what they left out, and briefs a UK reader on the gist, specifics,
   genuine disagreements, what to watch, and links he can tap.
@@ -32,7 +32,7 @@ timeout_seconds: 600
 
 Run once a day in the morning. Combine Will's recent newsletters, fetches and
 bookmarks with a bounded UK politics and policy sweep, then develop **three
-stories worth his attention**.
+stories worth his attention by default, or four when the day's developments merit it**.
 
 Write for a reader who lives in the UK and cares about technology and AI,
 politics and geopolitics. Give UK politics and policy a normal place in the main
@@ -145,7 +145,8 @@ you__you-search(query: "UK politics policy <weekday date>", count: 8, extraction
 
 Prefer dated reporting from UK mastheads, wires and primary records. If results
 are mostly index pages, weak snippets or no usable reporting, or identify a
-promising development without enough evidence, allow **one targeted follow-up**.
+promising development without enough evidence, use **two or three targeted follow-up searches where needed**, with a hard
+cap of three follow-ups.
 Use the named policy, institution or event, optionally a `site:` filter and
 `freshness: "week"` for an overnight or recent development. Verify the event
 date: publication today does not make an old development new.
@@ -157,8 +158,11 @@ A search result is a lead, not proof: establish the claims from substantive
 highlights of a citable article or record in Step 8. Never publish from a headline
 or ambiguous snippet alone.
 
-Keep this discovery bounded: one sweep plus at most one targeted follow-up.
-Record the candidates found and search limitations.
+Keep this research bounded: one sweep plus up to three targeted follow-ups.
+Use follow-ups to find substantive reporting, verify promising UK developments,
+and distinguish independent evidence from repeated coverage. Stop once the
+candidate pool is adequately grounded; do not run extra searches just to use the
+allowance. Record candidates, search counts and limitations.
 
 ## Step 6: Shortlist three stories and reserves
 
@@ -197,11 +201,12 @@ Write down an **initial three plus up to two ranked reserves**, including each
 candidate's relevance, novelty and supporting `event_id`s or sweep URLs,
 before story-specific research. Keep this record for the final review in Step 9.
 
-Aim for three, without padding. If a candidate fails verification or duplicates
+Aim for three, without padding; consider a fourth verified candidate on a busy
+day under Step 9. If a candidate fails verification or duplicates
 prior coverage, consider the reserves before publishing fewer. An incomplete
 search or exhausted budget is a coverage limitation, not evidence of a thin day.
 
-Allow **at most six feed-source opens across the whole run**, including dropped
+Allow **at most eight feed-source opens across the whole run**, including dropped
 candidates and replacements. Before opening, select the fullest supporting
 sources that fit the remaining budget; cite only those actually read.
 
@@ -217,16 +222,18 @@ Read `target.content`; summaries can omit terms, figures, names and dates.
 Use `spark__get-block-tool` for a needed block from an opened event. Note what
 the original adds or corrects, and links to reporting it only teases.
 
-Use Step 6's six-source budget, including replacements. Research-only UK
+Use Step 6's eight-source budget, including replacements. Research-only UK
 candidates have no feed original; verify them in Step 8.
 
 ## Step 8: Develop and verify the shortlisted stories
 
 Use `you__you-search` for both feed-backed and research-only UK candidates.
-Allow **at most two development searches per candidate and six across the run**,
-including dropped candidates and replacements. The one or two UK discovery
-searches in Step 5 are separate: **at most eight searches in total**. Reuse
-substantive discovery evidence; replacements do not reset any budget.
+Allow **at most two development searches per candidate**: normally six across
+the run, with up to eight when developing a possible fourth story. Include
+dropped candidates and replacements in these counts. Step 5's UK sweep and up
+to three targeted follow-ups are separate: **at most twelve searches in total**.
+Count each call once, in the phase where it was made. Reuse substantive UK
+research evidence; a replacement or fourth story does not reset any budget.
 
 Find the underlying article or primary record, useful specifics, an independent
 account, subsequent developments and the next dated event.
@@ -291,8 +298,9 @@ Replace or reorder an initial choice only when originals or research establish:
 - a shortlisted UK candidate or reserve has materially stronger verified
   consequences or relevance than the initial comparison suggested.
 
-Record the change and why. Reuse evidence and stay within the six feed opens,
-six development searches and two discovery searches. A replacement must meet
+Record the change and why. Reuse evidence and stay within eight feed-source opens,
+six development searches (up to eight for a possible fourth story) and four UK
+research searches (the sweep plus up to three targeted follow-ups). A replacement must meet
 the same sourcing and depth requirements; never fill a slot with an unverified
 reserve. General research must not introduce unrelated new candidates.
 
@@ -302,9 +310,18 @@ angle rather than a default US audience. If no UK candidate makes the cut,
 record whether none was found, verification failed, or named stronger stories
 displaced it. These are different outcomes.
 
-Publish three where the evidence supports them, otherwise explain the actual
-limitation. Do not add an automatic fourth card or shrink the edition merely
-because the first three were treated as irrevocable.
+**Three stories is the default; four is discretionary on a busy news day.**
+Add a fourth only when it is a distinct, consequential development that
+independently passes the same relevance, novelty, sourcing and depth tests as
+the main three. It may be feed-backed or a verified UK research candidate;
+there is no special geographic restriction on the fourth slot. Do not split
+one story across cards, lower the bar, or add a fourth merely because spare
+searches remain. Develop and verify it within the shared budgets before
+publication, and state why four were warranted in Run notes.
+
+Publish fewer than three when the evidence warrants it and explain the actual
+limitation; do not shrink the edition merely because the first three were
+treated as irrevocable.
 
 ## Step 10: Write it to Spark
 
@@ -393,7 +410,8 @@ it **last**. Record, in a few lines:
 
 - the source counts from Step 3 — newsletters, fetches, bookmarks;
 - any coverage gap, and the service it was in;
-- the candidates considered and why the three chosen beat the rest;
+- the candidates considered and why the selected stories beat the rest;
+- why a fourth story independently earned its place, if four were published;
 - whether a trigger payload arrived;
 - the originals opened, and what they added that the summaries lacked;
 - each search run, what it was looking for, and whether it found the article,
@@ -463,34 +481,16 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 
 # Checklist
 
-- [ ] Feed coverage recorded from section contents and sync status; errors and
-      empty feeds distinguished from an empty news day.
-- [ ] Relevant Notes to Flint read and materially used IDs retained.
-- [ ] Previous three days loaded with `all: true`; news cards inspected and
-      history gaps disclosed.
-- [ ] UK sweep completed before shortlisting; no more than one targeted follow-up.
-- [ ] Candidates ranked by consequences, UK-reader relevance and material novelty;
-      Topics, disagreement and feed repetition used as supporting signals.
-- [ ] Strongest UK candidate included or its exclusion explained; geographic and
-      subject spread checked without manufacturing a daily quota.
-- [ ] Initial three and reserves recorded before development research; any
-      replacements justified by evidence and verified within the same budgets.
-- [ ] No more than six feed-source opens, six development searches and two UK
-      discovery searches across the run, including dropped candidates.
-- [ ] Every cited feed original read; research-only UK cards verified from
-      substantive citable reporting and honestly labelled.
-- [ ] Repeated stories have a material development; no forced US framing or
-      unsupported UK connection.
-- [ ] Sources are primary records or recognised mastheads; no facts from memory.
-- [ ] Cards have useful depth; limitations and reasons for fewer than three
-      explained without mistaking incomplete research for a thin news day.
-- [ ] No repeated facts across card fields; `contested` only for genuine
-      disagreement; `why_it_matters` only for concrete relevance.
-- [ ] `what_to_watch` names a next event, dated where established.
-- [ ] Feed sources have event IDs in `referenced_event_ids`; research sources
-      have article URLs; research-only cards use an empty event-ID array.
-- [ ] Distinct `flint_news` titles; one-line-per-story index in final card order.
-- [ ] Styleguide fetched; Run notes last, with selection, sweep and budget outcomes.
-- [ ] Trigger token passed unchanged; tracked stories updated only when they
-      moved, concluded Topics resolved, new Topics meet all three criteria.
-- [ ] No user questions.
+- [ ] Coverage and relevant Notes checked; empty feeds, failed loads and partial history distinguished.
+- [ ] Previous three days' news cards inspected with `all: true`; repeated stories materially moved.
+- [ ] UK sweep preceded selection; up to three targeted follow-ups used where needed.
+- [ ] Selection prioritises consequences, UK relevance and novelty; UK omissions explained.
+- [ ] Initial three and reserves recorded; evidence-based replacements verified.
+- [ ] Fourth story, if any, independently clears the same bar and is justified.
+- [ ] At most eight feed opens, six development searches (eight for a possible fourth),
+      and four UK research searches; twelve searches total, including dropped candidates.
+- [ ] Every citation grounded; research-only UK cards honestly labelled with empty event-ID arrays.
+- [ ] No unsupported UK angle, default US framing, invented facts or padding.
+- [ ] Structured cards, distinct titles, field limits and final summary order checked.
+- [ ] Styleguide fetched; Run notes last with selection, sweep and budget outcomes.
+- [ ] Trigger token preserved when supplied; relevant Topics maintained; no questions.
