@@ -38,7 +38,10 @@ class GoCardlessAccountRenewalTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['app.enable_task_pipeline' => false]);
+        config([
+            'app.enable_task_pipeline' => false,
+            'ios.mobile_api_enabled' => true,
+        ]);
         Queue::fake();
         Cache::flush();
         Http::preventStrayRequests();
