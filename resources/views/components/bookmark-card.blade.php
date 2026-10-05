@@ -57,9 +57,10 @@
         }
     }
 
-    // Check if there's a linked_to relationship (URL discovered from this event's target)
-    $hasLinkedUrl = false;
-    if ($event->target) {
+    // Check if there's a linked_to relationship (URL discovered from this event's
+    // target, or an article found in this newsletter issue)
+    $hasLinkedUrl = $event->relationshipsFrom()->where('type', 'linked_to')->exists();
+    if (! $hasLinkedUrl && $event->target) {
         $hasLinkedUrl = $event->target->relationshipsFrom()
         ->where('type', 'linked_to')
         ->exists();
@@ -96,7 +97,7 @@
         <!-- Summary -->
         @if ($summary)
             <div class="text-sm text-base-content/70 line-clamp-5 leading-relaxed prose prose-sm max-w-none">
-                {!! Str::markdown($summary) !!}
+                {!! render_markdown($summary) !!}
             </div>
         @endif
 

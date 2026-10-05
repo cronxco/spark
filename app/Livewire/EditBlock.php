@@ -3,8 +3,10 @@
 namespace App\Livewire;
 
 use App\Models\Block;
+use App\Services\SourceFieldGuard;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class EditBlock extends Component
@@ -25,7 +27,13 @@ class EditBlock extends Component
 
     public ?string $url = null;
 
-    public function mount(Block $block): void
+    /**
+     * Whether the title, type and URL can be edited here. They can't when the
+     * block comes from an integration.
+     */
+    public bool $sourceFieldsEditable = true;
+
+    public function mount(Block $block, SourceFieldGuard $sourceFields): void
     {
         // Ensure user owns this block through event->integration
         $event = $block->event;
@@ -42,9 +50,10 @@ class EditBlock extends Component
         $this->value_unit = $block->value_unit;
         $this->time = $block->time?->format('Y-m-d\TH:i');
         $this->url = $block->url;
+        $this->sourceFieldsEditable = $sourceFields->sourceFieldsEditable($block);
     }
 
-    public function save(): void
+    public function save(SourceFieldGuard $sourceFields): void
     {
         $this->validate([
             'title' => 'nullable|string|max:255',
@@ -56,7 +65,7 @@ class EditBlock extends Component
             'url' => 'nullable|url|max:500',
         ]);
 
-        $this->block->update([
+        $attributes = [
             'title' => $this->title,
             'block_type' => $this->block_type,
             'value' => $this->value,
@@ -64,7 +73,19 @@ class EditBlock extends Component
             'value_unit' => $this->value_unit,
             'time' => $this->time ? Carbon::parse($this->time) : $this->block->time,
             'url' => $this->url,
-        ]);
+        ];
+
+        try {
+            $sourceFields->assertEditable($this->block, $attributes);
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $field => $messages) {
+                $this->addError($field, $messages[0]);
+            }
+
+            return;
+        }
+
+        $this->block->update($attributes);
 
         $this->dispatch('block-updated');
         $this->dispatch('close-modal');

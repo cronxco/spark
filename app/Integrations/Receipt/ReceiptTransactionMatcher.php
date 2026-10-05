@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 
 class ReceiptTransactionMatcher
 {
@@ -46,8 +47,21 @@ class ReceiptTransactionMatcher
             'time_range' => [$startTime->toIso8601String(), $endTime->toIso8601String()],
         ]);
 
-        // Query BOTH Monzo and GoCardless transactions
-        $candidates = Event::whereIn('service', ['monzo', 'gocardless'])
+        // Query BOTH Monzo and GoCardless transactions, restricted to the user
+        // who owns the receipt. Without this a receipt can be matched to — and
+        // have a relationship written against — another tenant's transaction.
+        $ownerId = $receiptEvent->integration?->user_id;
+
+        if ($ownerId === null) {
+            Log::warning('Receipt: Cannot resolve owning user for receipt', [
+                'receipt_id' => $receiptEvent->id,
+            ]);
+
+            return collect();
+        }
+
+        $candidates = Event::forUser($ownerId)
+            ->whereIn('service', ['monzo', 'gocardless'])
             ->where('domain', 'money')
             ->where(function ($query) {
                 // Monzo payment actions
@@ -97,6 +111,30 @@ class ReceiptTransactionMatcher
     }
 
     /**
+     * Confidence that an unmatched receipt belongs to a newly arrived
+     * transaction: amount 40%, time within four hours 30%, merchant name 30%.
+     */
+    public function calculateReverseMatchConfidence(Event $receipt, Event $transaction): float
+    {
+        $score = 0.0;
+
+        $amountDiff = abs($receipt->value - $transaction->value);
+        $amountScore = 1 - min(1, $amountDiff / max(1, $receipt->value));
+        $score += $amountScore * 0.4;
+
+        $timeDiff = abs($receipt->time->diffInMinutes($transaction->time));
+        $timeScore = max(0, 1 - ($timeDiff / 240));
+        $score += $timeScore * 0.3;
+
+        $receiptMerchant = strtolower($receipt->target->title ?? '');
+        $txnMerchant = strtolower($transaction->target->title ?? '');
+        similar_text($receiptMerchant, $txnMerchant, $percent);
+        $score += ($percent / 100) * 0.3;
+
+        return $score;
+    }
+
+    /**
      * Create a receipt_for relationship between receipt and transaction
      */
     public function createReceiptRelationship(
@@ -105,10 +143,16 @@ class ReceiptTransactionMatcher
         float $confidence,
         string $method
     ): Relationship {
+        $ownerId = $receipt->integration?->user_id;
+
+        if ($ownerId === null || $ownerId !== $transaction->integration?->user_id) {
+            throw new InvalidArgumentException('A receipt can only be linked to a transaction with the same owner.');
+        }
+
         $relationship = Relationship::findOrCreateRelationship(
             // Lookup attributes (used for finding existing relationship)
             [
-                'user_id' => $receipt->integration->user_id,
+                'user_id' => $ownerId,
                 'from_type' => Event::class,
                 'from_id' => $receipt->id,
                 'to_type' => Event::class,

@@ -2,11 +2,9 @@
 
 namespace App\Livewire\Media;
 
-use App\Models\Block;
-use App\Models\EventObject;
+use App\Support\OwnedMediaQuery;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +16,9 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Index extends Component
 {
     use Toast, WithPagination;
+
+    /** Columns the table may sort by; anything else falls back to created_at. */
+    private const SORTABLE_COLUMNS = ['name', 'model_type', 'collection_name', 'size', 'created_at', 'mime_type'];
 
     public string $search = '';
 
@@ -84,8 +85,12 @@ class Index extends Component
 
     public function media()
     {
-        // First, get deduplicated media (one per MD5 hash)
-        $deduplicatedQuery = Media::query()
+        // A file without an MD5 has no content identity, so it is its own
+        // group: falling back to the row id stops every unhashed file from
+        // collapsing into one "duplicate" row.
+        $dedupeKey = "COALESCE(NULLIF(custom_properties->>'md5_hash', ''), id::text)";
+
+        $ranked = Media::query()
             ->select([
                 'id',
                 'model_type',
@@ -106,68 +111,46 @@ class Index extends Component
                 'created_at',
                 'updated_at',
                 DB::raw("custom_properties->>'md5_hash' as md5_hash"),
-                DB::raw('COUNT(*) OVER (PARTITION BY custom_properties->>\'md5_hash\') as instances_count'),
-            ])
-            ->with(['model']);
+                DB::raw("COUNT(*) OVER (PARTITION BY {$dedupeKey}) as instances_count"),
+                DB::raw("ROW_NUMBER() OVER (PARTITION BY {$dedupeKey} ORDER BY created_at DESC, id DESC) as dedupe_rank"),
+            ]);
 
         // Only ever show media owned by the authenticated user.
-        $this->scopeToOwnedMedia($deduplicatedQuery);
+        $this->scopeToOwnedMedia($ranked);
 
-        // Search filter
         if ($this->search) {
-            $deduplicatedQuery->where(function ($q) {
+            $ranked->where(function ($q) {
                 $q->where('name', 'ilike', '%' . $this->search . '%')
                     ->orWhere('file_name', 'ilike', '%' . $this->search . '%');
             });
         }
 
-        // Model type filter
         if (! empty($this->modelFilter)) {
-            $deduplicatedQuery->whereIn('model_type', $this->modelFilter);
+            $ranked->whereIn('model_type', $this->modelFilter);
         }
 
-        // Collection filter
         if (! empty($this->collectionFilter)) {
-            $deduplicatedQuery->whereIn('collection_name', $this->collectionFilter);
+            $ranked->whereIn('collection_name', $this->collectionFilter);
         }
 
-        // MIME type filter
         if (! empty($this->mimeFilter)) {
-            $deduplicatedQuery->whereIn('mime_type', $this->mimeFilter);
+            $ranked->whereIn('mime_type', $this->mimeFilter);
         }
 
-        // Get all media with counts, then deduplicate by keeping only one per hash
-        $allMedia = $deduplicatedQuery->get();
+        $sortColumn = in_array($this->sortBy['column'] ?? null, self::SORTABLE_COLUMNS, true)
+            ? $this->sortBy['column']
+            : 'created_at';
+        $sortDirection = ($this->sortBy['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
-        // Group by MD5 hash and keep only the most recent one from each group
-        $deduplicatedMedia = $allMedia->groupBy('md5_hash')->map(function ($group) {
-            // Sort by created_at desc and take the first (most recent)
-            return $group->sortByDesc('created_at')->first();
-        })->values();
-
-        // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
-
-        if ($sortDirection === 'desc') {
-            $deduplicatedMedia = $deduplicatedMedia->sortByDesc($sortColumn)->values();
-        } else {
-            $deduplicatedMedia = $deduplicatedMedia->sortBy($sortColumn)->values();
-        }
-
-        // Manual pagination
-        $currentPage = $this->getPage();
-        $perPage = $this->perPage;
-        $total = $deduplicatedMedia->count();
-        $items = $deduplicatedMedia->slice(($currentPage - 1) * $perPage, $perPage)->values();
-
-        return new LengthAwarePaginator(
-            $items,
-            $total,
-            $perPage,
-            $currentPage,
-            ['path' => request()->url(), 'query' => request()->query()]
-        );
+        // Keep the most recent file of each group, then sort and page in the
+        // database rather than loading the whole library into memory.
+        return Media::query()
+            ->fromSub($ranked, 'media')
+            ->where('dedupe_rank', 1)
+            ->with(['model'])
+            ->orderBy($sortColumn, $sortDirection)
+            ->orderBy('id', $sortDirection)
+            ->paginate($this->perPage);
     }
 
     public function modelTypes()
@@ -265,19 +248,7 @@ class Index extends Component
      */
     private function scopeToOwnedMedia(Builder $query): Builder
     {
-        $userId = Auth::id();
-
-        return $query->whereHasMorph(
-            'model',
-            [EventObject::class, Block::class],
-            function (Builder $q, string $type) use ($userId) {
-                if ($type === EventObject::class) {
-                    $q->where('user_id', $userId);
-                } elseif ($type === Block::class) {
-                    $q->whereHas('event.integration', fn (Builder $iq) => $iq->where('user_id', $userId));
-                }
-            },
-        );
+        return OwnedMediaQuery::scope($query, Auth::id());
     }
 
     /**

@@ -3,7 +3,9 @@
 namespace App\Livewire;
 
 use App\Models\EventObject;
+use App\Services\SourceFieldGuard;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class EditObject extends Component
@@ -18,7 +20,13 @@ class EditObject extends Component
 
     public ?string $url = null;
 
-    public function mount(EventObject $object): void
+    /**
+     * Whether the title, type, concept and URL can be edited here. They can't
+     * when the object comes from an integration or is locked.
+     */
+    public bool $sourceFieldsEditable = true;
+
+    public function mount(EventObject $object, SourceFieldGuard $sourceFields): void
     {
         // Ensure user owns this object
         if ($object->user_id !== Auth::id()) {
@@ -30,9 +38,10 @@ class EditObject extends Component
         $this->type = $object->type;
         $this->concept = $object->concept;
         $this->url = $object->url;
+        $this->sourceFieldsEditable = $sourceFields->sourceFieldsEditable($object);
     }
 
-    public function save(): void
+    public function save(SourceFieldGuard $sourceFields): void
     {
         $this->validate([
             'title' => 'required|string|max:255',
@@ -41,12 +50,24 @@ class EditObject extends Component
             'url' => 'nullable|url|max:500',
         ]);
 
-        $this->object->update([
+        $attributes = [
             'title' => $this->title,
             'type' => $this->type,
             'concept' => $this->concept,
             'url' => $this->url,
-        ]);
+        ];
+
+        try {
+            $sourceFields->assertEditable($this->object, $attributes);
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $field => $messages) {
+                $this->addError($field, $messages[0]);
+            }
+
+            return;
+        }
+
+        $this->object->update($attributes);
 
         $this->dispatch('object-updated');
         $this->dispatch('close-modal');

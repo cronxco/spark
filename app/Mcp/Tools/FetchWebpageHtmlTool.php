@@ -4,6 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Exceptions\UnsafeUrlException;
 use App\Integrations\Fetch\PlaywrightFetchClient;
+use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Services\Fetch\UrlSafetyValidator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -14,6 +15,8 @@ use Laravel\Mcp\Server\Tool;
 #[Name('fetch-webpage-html')]
 class FetchWebpageHtmlTool extends Tool
 {
+    use RequiresSparkAbility;
+
     protected string $description = <<<'MARKDOWN'
         Render a website in Spark's Playwright browser and return its current raw HTML.
 
@@ -24,6 +27,9 @@ class FetchWebpageHtmlTool extends Tool
 
     public function handle(Request $request): Response
     {
+        if ($error = $this->requireAbility($request, 'web:fetch')) {
+            return $error;
+        }
         $user = $request->user();
 
         if (! $user) {

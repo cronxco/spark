@@ -2,6 +2,7 @@
 
 @php
 use App\Integrations\PluginRegistry;
+use App\Support\FlintQuestion;
 
 $pluginClass = PluginRegistry::getPlugin($block->event->service);
 $serviceName = $pluginClass ? $pluginClass::getDisplayName() : ucfirst($block->event->service);
@@ -10,14 +11,8 @@ $accentColor = $pluginClass ? $pluginClass::getAccentColor() : 'warning';
 
 $question = $block->metadata['question'] ?? $block->title;
 $topic = $block->metadata['topic'] ?? null;
-$priority = $block->metadata['priority'] ?? 'medium';
 $answeredAt = $block->metadata['answered_at'] ?? null;
-
-$priorityBadgeClass = match ($priority) {
-    'high' => 'badge-error',
-    'low' => 'badge-ghost',
-    default => 'badge-warning',
-};
+$retired = FlintQuestion::isRetired($block);
 
 $iconColorClass = match ($accentColor) {
     'primary' => 'text-primary',
@@ -36,16 +31,23 @@ $iconColorClass = match ($accentColor) {
         {{-- Header --}}
         <div class="flex items-start justify-between gap-2">
             <div class="flex items-center gap-2 flex-wrap">
-                <div class="badge {{ $priorityBadgeClass }} badge-outline badge-sm gap-1">
+                {{-- Priority is Flint's internal ordering, not something the
+                     reader is asked to weigh (ratified decision D11). --}}
+                <div class="badge badge-warning badge-outline badge-sm gap-1">
                     <x-icon name="fas.circle-question" class="w-3 h-3" />
-                    {{ ucfirst($priority) }} priority
+                    Question
                 </div>
                 @if ($topic)
                     <div class="badge badge-neutral badge-outline badge-sm">{{ ucfirst($topic) }}</div>
                 @endif
+                @if ($retired)
+                    {{-- Still answerable: retirement stops it presenting as
+                         outstanding, it does not close the question. --}}
+                    <div class="badge badge-ghost badge-sm">Stale</div>
+                @endif
             </div>
             <div class="text-xs text-base-content/50">
-                {{ $block->time->diffForHumans() }}
+                {{ $block->time?->diffForHumans() }}
             </div>
         </div>
 

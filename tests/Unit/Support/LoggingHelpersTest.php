@@ -7,10 +7,14 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\IsolatesLogs;
 use Tests\TestCase;
 
 class LoggingHelpersTest extends TestCase
 {
+    use IsolatesLogs;
+
     use RefreshDatabase;
 
     private User $user;
@@ -35,7 +39,7 @@ class LoggingHelpersTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function should_log_debug_returns_true_by_default(): void
     {
         config(['logging.debug_logging_default' => true]);
@@ -43,7 +47,7 @@ class LoggingHelpersTest extends TestCase
         $this->assertTrue(should_log_debug($this->user));
     }
 
-    /** @test */
+    #[Test]
     public function should_log_debug_respects_user_preference(): void
     {
         $this->user->disableDebugLogging();
@@ -55,7 +59,7 @@ class LoggingHelpersTest extends TestCase
         $this->assertTrue(should_log_debug($this->user));
     }
 
-    /** @test */
+    #[Test]
     public function should_log_debug_falls_back_to_config(): void
     {
         config(['logging.debug_logging_default' => false]);
@@ -67,7 +71,7 @@ class LoggingHelpersTest extends TestCase
         $this->assertTrue(should_log_debug($this->user));
     }
 
-    /** @test */
+    #[Test]
     public function log_to_user_calls_logging_service(): void
     {
         Log::spy();
@@ -77,7 +81,7 @@ class LoggingHelpersTest extends TestCase
         Log::shouldHaveReceived('log')->once();
     }
 
-    /** @test */
+    #[Test]
     public function log_to_group_calls_logging_service(): void
     {
         Log::spy();
@@ -87,7 +91,7 @@ class LoggingHelpersTest extends TestCase
         Log::shouldHaveReceived('log')->once();
     }
 
-    /** @test */
+    #[Test]
     public function log_to_integration_calls_logging_service(): void
     {
         Log::spy();
@@ -97,7 +101,7 @@ class LoggingHelpersTest extends TestCase
         Log::shouldHaveReceived('log')->once();
     }
 
-    /** @test */
+    #[Test]
     public function log_hierarchical_calls_logging_service(): void
     {
         Log::spy();
@@ -108,7 +112,7 @@ class LoggingHelpersTest extends TestCase
         Log::shouldHaveReceived('log')->times(3);
     }
 
-    /** @test */
+    #[Test]
     public function log_integration_api_request_uses_new_system_with_valid_uuid(): void
     {
         Log::spy();
@@ -125,7 +129,7 @@ class LoggingHelpersTest extends TestCase
         Log::shouldHaveReceived('log')->once();
     }
 
-    /** @test */
+    #[Test]
     public function log_integration_api_request_falls_back_with_invalid_uuid(): void
     {
         Log::spy();
@@ -143,7 +147,7 @@ class LoggingHelpersTest extends TestCase
         Log::shouldHaveReceived('debug')->once();
     }
 
-    /** @test */
+    #[Test]
     public function log_integration_api_response_uses_new_system_with_valid_uuid(): void
     {
         Log::spy();
@@ -161,7 +165,7 @@ class LoggingHelpersTest extends TestCase
         Log::shouldHaveReceived('log')->once();
     }
 
-    /** @test */
+    #[Test]
     public function log_integration_api_response_falls_back_with_invalid_uuid(): void
     {
         Log::spy();
@@ -180,7 +184,7 @@ class LoggingHelpersTest extends TestCase
         Log::shouldHaveReceived('debug')->once();
     }
 
-    /** @test */
+    #[Test]
     public function sanitize_headers_redacts_sensitive_headers(): void
     {
         $headers = [
@@ -198,7 +202,7 @@ class LoggingHelpersTest extends TestCase
         $this->assertEquals(['application/json'], $sanitized['Content-Type']);
     }
 
-    /** @test */
+    #[Test]
     public function sanitize_data_redacts_sensitive_keys(): void
     {
         $data = [
@@ -222,7 +226,7 @@ class LoggingHelpersTest extends TestCase
         $this->assertEquals('visible', $sanitized['metadata']['public_info']);
     }
 
-    /** @test */
+    #[Test]
     public function sanitize_data_handles_nested_arrays(): void
     {
         $data = [
@@ -240,7 +244,22 @@ class LoggingHelpersTest extends TestCase
         $this->assertEquals('visible', $sanitized['level1']['level2']['data']);
     }
 
-    /** @test */
+    #[Test]
+    public function sanitize_data_redacts_arbitrary_cookie_names(): void
+    {
+        $canary = 'private-session-cookie';
+
+        $sanitized = sanitizeData([
+            'auth_metadata' => [
+                'cookies' => ['arbitrary_cookie_name' => $canary],
+            ],
+        ]);
+
+        $this->assertSame('[REDACTED]', $sanitized['auth_metadata']['cookies']);
+        $this->assertStringNotContainsString($canary, json_encode($sanitized));
+    }
+
+    #[Test]
     public function generate_api_log_filename_creates_correct_format(): void
     {
         $filename = generate_api_log_filename('test_service', $this->integration->id, false);
@@ -248,7 +267,7 @@ class LoggingHelpersTest extends TestCase
         $this->assertEquals('api_test_service.log', $filename);
     }
 
-    /** @test */
+    #[Test]
     public function generate_api_log_filename_includes_uuid_block_when_per_instance(): void
     {
         $uuidBlock = explode('-', $this->integration->id)[0];

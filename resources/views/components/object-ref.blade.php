@@ -61,8 +61,9 @@ foreach ($accentColors as $key => $color) {
 $eventCount = $object->actorEvents()->count() + $object->targetEvents()->count();
 $relationshipCount = $object->allRelationships()->count();
 
-// Default href to object show page
-$linkHref = $href ?? route('objects.show', $object);
+// People have their own page; every other object links to the object show page
+$detailHref = $object->concept === 'person' ? route('people.show', $object->id) : route('objects.show', $object);
+$linkHref = $href ?? $detailHref;
 @endphp
 
 <span
@@ -262,13 +263,13 @@ $linkHref = $href ?? route('objects.show', $object);
                 {{-- Action footer --}}
                 <div class="flex items-center gap-2 pt-3 border-t border-base-300">
                     <a
-                        href="{{ route('objects.show', $object) }}"
+                        href="{{ $detailHref }}"
                         wire:navigate
                         @click.stop
                         class="btn btn-{{ $accentColor }} btn-sm flex-1 gap-1"
                     >
                         <x-icon name="fas.arrow-right" class="w-3 h-3" />
-                        View Object
+                        {{ $object->concept === 'person' ? 'View Person' : 'View Object' }}
                     </a>
                     @if ($object->url)
                         <a

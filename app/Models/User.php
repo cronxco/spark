@@ -75,6 +75,12 @@ class User extends Authenticatable
      */
     public function integrations()
     {
+        return $this->hasMany(Integration::class)->external();
+    }
+
+    /** Includes bookkeeping-only integrations for internal services. */
+    public function allIntegrations()
+    {
         return $this->hasMany(Integration::class);
     }
 
@@ -514,6 +520,25 @@ class User extends Authenticatable
     {
         $settings = $this->settings ?? [];
         $settings['fetch_discovery_auto_fetch'] = $enabled;
+        $this->update(['settings' => $settings]);
+    }
+
+    /**
+     * Whether articles found on list pages and in newsletter digests are
+     * bookmarked and fetched straight away. Defaults to true; when off they
+     * are bookmarked disabled, for review in the Discovery tab.
+     */
+    public function getFetchListExpansionAutoFetchEnabled(): bool
+    {
+        $settings = $this->settings ?? [];
+
+        return $settings['fetch_list_expansion_auto_fetch'] ?? true;
+    }
+
+    public function setFetchListExpansionAutoFetchEnabled(bool $enabled): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['fetch_list_expansion_auto_fetch'] = $enabled;
         $this->update(['settings' => $settings]);
     }
 

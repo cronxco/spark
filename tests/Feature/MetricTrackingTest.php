@@ -799,6 +799,60 @@ class MetricTrackingTest extends TestCase
     // -------------------------------------------------------------------------
 
     #[Test]
+    public function seven_consecutive_anomaly_dates_suggest_a_baseline_review(): void
+    {
+        $metric = MetricStatistic::factory()->create(['baseline_reset_suggested_at' => null]);
+
+        foreach (range(0, 6) as $daysAgo) {
+            MetricTrend::factory()->create([
+                'metric_statistic_id' => $metric->id,
+                'type' => 'anomaly_high',
+                'detected_at' => now()->subDays($daysAgo),
+                'start_date' => now()->subDays($daysAgo)->toDateString(),
+            ]);
+        }
+
+        $job = new class(Event::factory()->make()) extends DetectMetricAnomaliesJob
+        {
+            public function suggestBaselineReview(MetricStatistic $metric, string $type): void
+            {
+                $this->suggestBaselineReviewIfPersistent($metric, $type);
+            }
+        };
+
+        $job->suggestBaselineReview($metric, 'anomaly_high');
+
+        $this->assertNotNull($metric->fresh()->baseline_reset_suggested_at);
+    }
+
+    #[Test]
+    public function seven_distinct_anomaly_dates_with_a_gap_do_not_suggest_a_baseline_review(): void
+    {
+        $metric = MetricStatistic::factory()->create(['baseline_reset_suggested_at' => null]);
+
+        foreach ([0, 1, 2, 4, 5, 6, 7] as $daysAgo) {
+            MetricTrend::factory()->create([
+                'metric_statistic_id' => $metric->id,
+                'type' => 'anomaly_high',
+                'detected_at' => now()->subDays($daysAgo),
+                'start_date' => now()->subDays($daysAgo)->toDateString(),
+            ]);
+        }
+
+        $job = new class(Event::factory()->make()) extends DetectMetricAnomaliesJob
+        {
+            public function suggestBaselineReview(MetricStatistic $metric, string $type): void
+            {
+                $this->suggestBaselineReviewIfPersistent($metric, $type);
+            }
+        };
+
+        $job->suggestBaselineReview($metric, 'anomaly_high');
+
+        $this->assertNull($metric->fresh()->baseline_reset_suggested_at);
+    }
+
+    #[Test]
     public function monthly_trend_sets_baseline_reset_suggested_at(): void
     {
         $user = User::factory()->create();
