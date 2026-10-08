@@ -39,7 +39,7 @@ use Laravel\Mcp\Server\Prompt;
 use Laravel\Mcp\Server\Resource;
 use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Transport\JsonRpcRequest;
+use Laravel\Mcp\Transport\JsonRpcRequest;
 
 class SparkServer extends Server
 {
