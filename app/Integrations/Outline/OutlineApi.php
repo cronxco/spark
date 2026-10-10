@@ -20,7 +20,7 @@ class OutlineApi
 
         // Follow pagination with a sensible upper bound to avoid long-running jobs
         $pageCount = 0;
-        while (isset($data['pagination']['nextPath']) && ! empty($data['pagination']['nextPath'])) {
+        while (! empty($data['data']) && ! empty($data['pagination']['nextPath'])) {
             if ($pageCount++ >= 10) { // hard cap to prevent unbounded runtime
                 Log::warning('Outline collections pagination capped at 10 pages');
                 break;
@@ -47,7 +47,7 @@ class OutlineApi
 
         // Follow pagination with a sensible upper bound to avoid long-running jobs
         $pageCount = 0;
-        while (isset($data['pagination']['nextPath']) && ! empty($data['pagination']['nextPath'])) {
+        while (! empty($data['data']) && ! empty($data['pagination']['nextPath'])) {
             if ($pageCount++ >= 10) { // hard cap to prevent unbounded runtime
                 Log::warning('Outline documents pagination capped at 10 pages');
                 break;
@@ -133,7 +133,7 @@ class OutlineApi
 
         // Follow pagination with early termination
         $pageCount = 0;
-        while (isset($data['pagination']['nextPath']) && ! empty($data['pagination']['nextPath'])) {
+        while (! empty($data['data']) && ! empty($data['pagination']['nextPath'])) {
             if ($pageCount++ >= 5) { // Reduced cap for efficiency
                 Log::warning('Outline documents search pagination capped at 5 pages');
                 break;
@@ -170,7 +170,7 @@ class OutlineApi
 
         // Follow pagination with a sensible upper bound
         $pageCount = 0;
-        while (isset($data['pagination']['nextPath']) && ! empty($data['pagination']['nextPath'])) {
+        while (! empty($data['data']) && ! empty($data['pagination']['nextPath'])) {
             if ($pageCount++ >= 10) { // Reasonable cap for search results
                 Log::warning('Outline documents search pagination capped at 10 pages');
                 break;
@@ -337,7 +337,7 @@ class OutlineApi
                 ->acceptJson()
                 ->connectTimeout(10)
                 ->timeout(25)
-                ->retry(2, 500)
+                ->retry(2, 500, throw: false)
                 ->post($url, $payload);
             $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
 
