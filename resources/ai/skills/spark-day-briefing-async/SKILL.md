@@ -111,6 +111,14 @@ structure. Fetch it fresh before writing.
     closed unused”, “failed to”, or equivalent framing unless Will explicitly established
     the commitment.
 
+13. **Caveats belong in the run notes, not the briefing.** The restraint rules in this
+    skill decide what you claim; they are not things to tell Will. In `summary`, state
+    what is known in plain sentences. Mention uncertainty only when it would change what
+    Will does today, and then once, in one clause. Never tell Will what something does
+    *not* mean unless he would otherwise believe it. Never describe the absence of data,
+    a plan or a commitment unless the absence is itself the news. Write to Will as
+    “you”, never “Will”. See 10b for the patterns this rules out.
+
 ---
 
 # RUN SETUP
@@ -576,6 +584,12 @@ Hard rule:
 Examples:
 
 - Partial Apple Health at 08:00 → do not call low steps a quiet day.
+- **Evening, same-day activity.** Oura's activity reaches Apple Health late, so evening
+  step and exercise totals are often far below the settled figure. If today's steps or
+  exercise minutes are anomalously low against baseline, treat that as a sync gap: leave
+  them out of the evening `summary` entirely — no number, no caveat. The next morning's
+  settled figures decide whether it was genuinely a quiet day, and say so once if it was.
+  Report evening activity only when it is in line with or above baseline.
 - No newsletter events during incomplete coverage → do not say nothing was worth
   reading.
 - No workout on a fully synced completed day can be factual; the same absence during
@@ -1144,8 +1158,39 @@ Key reminders:
 - Active Topics are background memory, not required sections.
 - Omit thin sections rather than padding.
 - `THE NUMBER` is optional.
-- Corrections to revised source data should be explicit.
-- Technical sync caveats are short and only where they affect confidence.
+- Corrections to revised source data should be explicit, but only when the revision
+  changes the interpretation. A settled step count a few percent off the snapshot, or
+  an evening total left out as a sync gap that has now filled in normally, gets no
+  correction at all.
+- Technical sync caveats belong in the editorial block. In `summary` they appear only
+  when they change what Will would do, and at most once per briefing.
+- Compose `summary` last, after the editorial block is drafted, so the run-note
+  vocabulary (“established”, “provisional”, “coverage”, “stale”, “not revived”) stays
+  in the run notes.
+
+### Plain statements, not disclaimers
+
+Principle 13 in practice. These patterns do not belong in `summary`:
+
+- “X does not establish Y”, “is not evidence of”, “is not confirmation of”;
+- “not a prescription”, “not a verdict”, “not a reason to”;
+- “provisional” more than once per briefing;
+- “in the retrieved calendar”, “the calendar plan, not attendance”;
+- “rather than proving …”, and “rather than a …” used only to deny a reading nobody
+  made;
+- Will in the third person.
+
+Rewrites from real digests:
+
+| Before | After |
+|---|---|
+| No Saturday commitment appears in the retrieved calendar. That leaves little logistical briefing to do, rather than proving you have no plans. | Nothing on the calendar today. |
+| You're scheduled for the office, while Dan is working from home and meeting Seb at 19:30. … The work-location markers remain the calendar plan, not confirmation of attendance; Dan's evening appointment is his, not yours. | Office day; Dan's at home and seeing Seb at 19:30. |
+| These are provisional readings, not a prescription for how to spend Saturday. | *(cut)* |
+| Monday's step total has moved again, from this morning's 7,784 to 7,963. … this is a small correction, not a different account of the day. | *(cut — a 2% revision changes nothing)* |
+
+Before calling `create-flint-digest`, reread `summary` once and delete every sentence
+whose only job is to say what something does not mean.
 - Use deep-links only when actual UUIDs are available.
 - Do not mention internal Topic status or mechanics in ordinary briefing prose unless
   doing so is itself relevant.
@@ -1423,7 +1468,10 @@ Before writing today's digest verify:
 - [ ] zero questions, if chosen, has a structured reason plus at least three rejected candidates;
 - [ ] a third question, if used, independently clears the quality bar;
 - [ ] insights are useful but not forced into actionability;
-- [ ] corrections are explicit if source data changed;
+- [ ] corrections are explicit only where a revision changes the interpretation;
+- [ ] evening: anomalously low same-day activity left out as a sync gap, not caveated;
+- [ ] `summary` reread once with every disclaimer sentence deleted, and Will addressed
+      as “you” throughout;
 - [ ] no Topic writes were made;
 - [ ] editorial note is last.
 
