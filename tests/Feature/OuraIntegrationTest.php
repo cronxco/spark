@@ -18,6 +18,13 @@ class OuraIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::preventStrayRequests();
+    }
+
     #[Test]
     public function oura_plugin_has_correct_metadata_and_scopes(): void
     {
@@ -81,7 +88,7 @@ class OuraIntegrationTest extends TestCase
             'service' => 'oura',
             'name' => 'Oura Test',
             'instance_type' => 'activity',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         // Mock Oura API responses used by the plugin
@@ -155,7 +162,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'sleep_records',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -245,7 +252,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'heartrate',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         $day = now()->toDateString();
@@ -285,7 +292,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'workouts',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -328,7 +335,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'sessions',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -368,7 +375,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'tags',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -417,7 +424,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'readiness',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
         (new OuraPlugin)->fetchData($readiness);
         $this->assertEquals('had_readiness_score', Event::where('integration_id', $readiness->id)->first()->action);
@@ -428,7 +435,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'resilience',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
         (new OuraPlugin)->fetchData($resilience);
         $this->assertEquals('had_resilience_score', Event::where('integration_id', $resilience->id)->first()->action);
@@ -439,7 +446,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
         $plugin = new OuraPlugin;
         $stressData = $plugin->pullStressData($stress);
@@ -452,7 +459,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'spo2',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
         (new OuraPlugin)->fetchData($spo2);
         $this->assertEquals('had_spo2', Event::where('integration_id', $spo2->id)->first()->action);
@@ -474,7 +481,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         // Mock the new stress data format
@@ -566,7 +573,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -621,7 +628,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -676,7 +683,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([

@@ -116,11 +116,14 @@ class GoodreadsProgressData extends BaseProcessingJob
 
         // Create events
         $created = $this->createEventsPayload($events);
+        // createEvents skips events that already exist, so match inputs by source_id rather than position
+        $eventsBySource = collect($events)->keyBy('source_id');
 
         // Update book object metadata with current progress
-        foreach ($created as $index => $event) {
-            $bookObject = $events[$index]['book_object'] ?? null;
-            $progressPercentage = $events[$index]['value'] ?? null;
+        foreach ($created as $event) {
+            $input = $eventsBySource->get($event->source_id, []);
+            $bookObject = $input['book_object'] ?? null;
+            $progressPercentage = $input['value'] ?? null;
 
             if ($bookObject && $progressPercentage !== null) {
                 $metadata = $bookObject->metadata ?? [];
