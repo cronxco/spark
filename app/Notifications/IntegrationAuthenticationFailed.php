@@ -24,6 +24,11 @@ class IntegrationAuthenticationFailed extends SparkNotification
         return parent::isPriority();
     }
 
+    public function isIncidentAlert(): bool
+    {
+        return true;
+    }
+
     public function getIcon(): string
     {
         return 'o-shield-exclamation';

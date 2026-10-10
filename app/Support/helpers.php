@@ -439,7 +439,7 @@ if (! function_exists('format_event_display_value')) {
 if (! function_exists('sanitizeHeaders')) {
     function sanitizeHeaders(array $headers): array
     {
-        $sensitiveHeaders = ['authorization', 'x-api-key', 'x-auth-token', 'x-signature', 'x-hub-signature'];
+        $sensitiveHeaders = ['authorization', 'x-api-key', 'x-auth-token', 'x-signature', 'x-hub-signature', 'cookie', 'set-cookie', 'x-webhook-secret', 'session-id'];
         $sanitized = [];
 
         foreach ($headers as $key => $value) {
@@ -477,8 +477,20 @@ if (! function_exists('sensitive_log_keys')) {
             'server_url', 'cronxtools_url', 'you_mcp_url', 'you_mcp_key', 'cookies',
             // `plaintext` is the one-time Sanctum bearer token returned by
             // ApiTokensController::store.
-            'plaintext', 'plain_text_token', 'bearer',
+            'plaintext', 'plain_text_token', 'bearer', 'access', 'refresh', 'id_token',
+            'iban', 'bban', 'account_number', 'sort_code', 'maskedpan', 'resourceid',
         ];
+    }
+}
+
+if (! function_exists('is_log_safe_token_key')) {
+    /**
+     * Keys that contain "token" but hold pagination cursors or usage counts,
+     * not credentials. Keeping them visible lets pagination be debugged.
+     */
+    function is_log_safe_token_key(string $lowerKey): bool
+    {
+        return (bool) preg_match('/^(?:next_?(?:page_?|sync_?)?token|page_?token|sync_?token|(?:prompt|completion|total|input|output|cached|reasoning)_tokens)$/', $lowerKey);
     }
 }
 
@@ -490,7 +502,7 @@ if (! function_exists('sanitizeData')) {
 
         foreach ($data as $key => $value) {
             $lowerKey = strtolower((string) $key);
-            if (in_array($lowerKey, $sensitiveKeys, true)) {
+            if (in_array($lowerKey, $sensitiveKeys, true) || (preg_match('/(?:token|password|secret|signature)/i', $lowerKey) && ! is_log_safe_token_key($lowerKey))) {
                 $sanitized[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 $sanitized[$key] = sanitizeData($value);
@@ -794,6 +806,34 @@ if (! function_exists('log_integration_api_request')) {
     }
 }
 
+if (! function_exists('sanitize_api_response_body')) {
+    /**
+     * Sanitize the complete response before truncation can make JSON invalid.
+     * Token endpoints and non-JSON bodies are omitted rather than logged raw.
+     */
+    function sanitize_api_response_body(string $endpoint, string $body): string
+    {
+        $path = parse_url($endpoint, PHP_URL_PATH) ?: $endpoint;
+        if (preg_match('~(?:^|/)(?:token|oauth_token|access_token)(?:/|$)~i', $path)) {
+            return '[REDACTED TOKEN RESPONSE]';
+        }
+
+        $decoded = json_decode($body, true);
+        if (! is_array($decoded)) {
+            return $body === '' ? '' : '[NON-JSON RESPONSE OMITTED]';
+        }
+
+        $sanitized = json_encode(sanitizeData($decoded), JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($sanitized === false) {
+            return '[RESPONSE OMITTED]';
+        }
+
+        return strlen($sanitized) > 10000
+            ? substr($sanitized, 0, 10000) . '... [TRUNCATED]'
+            : $sanitized;
+    }
+}
+
 if (! function_exists('log_integration_api_response')) {
     /**
      * Log an API response for a specific integration
@@ -821,9 +861,7 @@ if (! function_exists('log_integration_api_response')) {
                     'headers' => array_map(function ($header) {
                         return is_array($header) ? $header : [$header];
                     }, sanitizeHeaders($headers)),
-                    'response_body' => strlen($body) > 10000
-                        ? substr($body, 0, 10000) . '... [TRUNCATED]'
-                        : $body,
+                    'response_body' => sanitize_api_response_body($endpoint, $body),
                     'timestamp' => now()->toISOString(),
                 ]);
 
@@ -856,9 +894,7 @@ if (! function_exists('log_integration_api_response')) {
                 'headers' => array_map(function ($header) {
                     return is_array($header) ? $header : [$header];
                 }, sanitizeHeaders($headers)),
-                'response_body' => strlen($body) > 10000
-                    ? substr($body, 0, 10000) . '... [TRUNCATED]'
-                    : $body,
+                'response_body' => sanitize_api_response_body($endpoint, $body),
                 'timestamp' => now()->toISOString(),
             ]);
 
@@ -874,9 +910,7 @@ if (! function_exists('log_integration_api_response')) {
             'headers' => array_map(function ($header) {
                 return is_array($header) ? $header : [$header];
             }, sanitizeHeaders($headers)),
-            'response_body' => strlen($body) > 10000
-                ? substr($body, 0, 10000) . '... [TRUNCATED]'
-                : $body,
+            'response_body' => sanitize_api_response_body($endpoint, $body),
             'timestamp' => now()->toISOString(),
         ]);
     }

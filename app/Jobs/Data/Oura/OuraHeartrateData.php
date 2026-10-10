@@ -146,6 +146,8 @@ class OuraHeartrateData extends BaseProcessingJob
             'value_unit' => 'bpm',
             'event_metadata' => [
                 'day' => $day,
+                'is_provisional' => $day === now()->utc()->toDateString(),
+                'aggregation_timezone' => 'UTC',
                 'min_bpm' => $min,
                 'max_bpm' => $max,
                 'avg_bpm' => $avg,

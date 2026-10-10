@@ -474,7 +474,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             $afterMs = (int) ($config['spotify_after_ms'] ?? 0);
 
             // Get recently played tracks
-            $recentlyPlayed = $this->getRecentlyPlayed($integration);
+            $recentlyPlayed = $this->getRecentlyPlayed($integration, $afterMs);
 
             // Advance 'after' cursor to the newest played_at we saw
             $maxPlayedMs = 0;
@@ -486,11 +486,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                     }
                 }
             }
-            if ($maxPlayedMs > $afterMs) {
-                $config['spotify_after_ms'] = $maxPlayedMs;
-            }
-
-            $integration->update(['configuration' => $config]);
+            $listeningData['after_ms'] = $maxPlayedMs;
 
             $listeningData['recently_played'] = $recentlyPlayed;
 
@@ -498,7 +494,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'integration_id' => $integration->id,
                 'track_count' => count($recentlyPlayed),
                 'used_after_ms' => $afterMs,
-                'new_after_ms' => $config['spotify_after_ms'] ?? null,
+                'fetched_after_ms' => $maxPlayedMs,
             ]);
         } catch (Exception $e) {
             Log::warning('Spotify: Failed to get recently played tracks', [
@@ -562,7 +558,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true // Use per-instance logging
@@ -663,12 +659,16 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'metadata' => $objectData['metadata'] ?? [],
                 'url' => $objectData['url'] ?? null,
                 'media_url' => $objectData['image_url'] ?? null,
-                'embeddings' => $objectData['embeddings'] ?? null,
+                ...(isset($objectData['embeddings']) ? ['embeddings' => $objectData['embeddings']] : []),
             ]
         );
     }
 
-    public function processListeningData(Integration $integration, array $listeningData): void
+    /**
+     * @param  bool  $skipFailedTracks  On the job's final attempt, skip tracks that
+     *                                  still fail so one bad item cannot stop the cursor forever.
+     */
+    public function processListeningData(Integration $integration, array $listeningData, bool $skipFailedTracks = false): void
     {
         // Check for potential duplicate processing
         $this->checkForDuplicateProcessing($integration, $listeningData);
@@ -686,8 +686,16 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                     Log::error('Spotify: Failed to process recently played track', [
                         'integration_id' => $integration->id,
                         'track_id' => $playedItem['track']['id'] ?? 'unknown',
+                        'played_at' => $playedItem['played_at'] ?? null,
                         'error' => $e->getMessage(),
+                        'skipped' => $skipFailedTracks,
                     ]);
+
+                    if (! $skipFailedTracks) {
+                        throw $e;
+                    }
+
+                    $skippedCount++;
                 }
             }
 
@@ -695,7 +703,20 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'integration_id' => $integration->id,
                 'total_tracks' => count($listeningData['recently_played']),
                 'processed_count' => $processedCount,
+                'skipped_count' => $skippedCount,
             ]);
+        }
+
+        if (($listeningData['after_ms'] ?? 0) > 0) {
+            $integration->getConnection()->transaction(function () use ($integration, $listeningData): void {
+                $current = Integration::query()->lockForUpdate()->findOrFail($integration->id);
+                $configuration = $current->configuration ?? [];
+                $configuration['spotify_after_ms'] = max(
+                    (int) ($configuration['spotify_after_ms'] ?? 0),
+                    (int) $listeningData['after_ms']
+                );
+                $current->update(['configuration' => $configuration]);
+            });
         }
 
         // Process podcast episode if currently playing
@@ -888,7 +909,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         }
     }
 
-    protected function getRecentlyPlayed(Integration $integration): array
+    protected function getRecentlyPlayed(Integration $integration, int $afterMs = 0): array
     {
         try {
             $hub = SentrySdk::getCurrentHub();
@@ -903,17 +924,18 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 }
                 $token = $group->access_token;
             }
+            $query = ['limit' => 50];
+            if ($afterMs > 0) {
+                $query['after'] = $afterMs;
+            }
+
             // Log the API request
             $this->logApiRequest('GET', '/me/player/recently-played', [
                 'Authorization' => '[REDACTED]',
-            ], [
-                'limit' => 50,
-            ], $integration->id);
+            ], $query, $integration->id);
 
             $response = Http::withToken($token)
-                ->get($this->baseUrl . '/me/player/recently-played', [
-                    'limit' => 50,
-                ]);
+                ->get($this->baseUrl . '/me/player/recently-played', $query);
             $span?->finish();
 
             // Log the API response
@@ -1479,27 +1501,5 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         }
 
         return $sanitized;
-    }
-
-    /**
-     * Sanitize response body for logging (limit size and remove sensitive data)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        // Limit response body size to prevent huge logs
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
-        }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
     }
 }
