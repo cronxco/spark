@@ -32,10 +32,9 @@ class RedditSavedPull extends BaseFetchJob
         $me = $rawData['me'] ?? [];
 
         $children = $saved['data']['children'] ?? [];
-        $after = $saved['data']['after'] ?? null;
 
         $config = $this->integration->configuration ?? [];
-        Arr::set($config, 'reddit.after', empty($children) ? null : $after);
+        Arr::set($config, 'reddit.after', null);
         $this->integration->update(['configuration' => $config]);
 
         if (empty($children)) {
