@@ -415,7 +415,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         Log::info("Fetching Spotify data for user {$accountId}");
 
         // Get recently played tracks (last 50)
-        $recentlyPlayed = $this->getRecentlyPlayed($integration);
+        $recentlyPlayed = $this->getRecentlyPlayed($integration, $afterMs);
 
         foreach ($recentlyPlayed as $playedItem) {
             $this->processTrackPlay($integration, $playedItem, 'recently_played');
@@ -888,7 +888,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         }
     }
 
-    protected function getRecentlyPlayed(Integration $integration): array
+    protected function getRecentlyPlayed(Integration $integration, int $afterMs = 0): array
     {
         try {
             $hub = SentrySdk::getCurrentHub();
@@ -903,17 +903,18 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 }
                 $token = $group->access_token;
             }
+            $query = ['limit' => 50];
+            if ($afterMs > 0) {
+                $query['after'] = $afterMs;
+            }
+
             // Log the API request
             $this->logApiRequest('GET', '/me/player/recently-played', [
                 'Authorization' => '[REDACTED]',
-            ], [
-                'limit' => 50,
-            ], $integration->id);
+            ], $query, $integration->id);
 
             $response = Http::withToken($token)
-                ->get($this->baseUrl . '/me/player/recently-played', [
-                    'limit' => 50,
-                ]);
+                ->get($this->baseUrl . '/me/player/recently-played', $query);
             $span?->finish();
 
             // Log the API response
