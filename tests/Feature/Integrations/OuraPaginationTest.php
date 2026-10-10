@@ -3,6 +3,7 @@
 namespace Tests\Feature\Integrations;
 
 use App\Integrations\Oura\OuraPlugin;
+use App\Jobs\Data\Oura\OuraHeartrateData;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Carbon\Carbon;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Http;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
+use ReflectionMethod;
 
 class OuraPaginationTest extends TestCase
 {
@@ -57,6 +59,36 @@ class OuraPaginationTest extends TestCase
 
         $this->expectExceptionMessage('repeated pagination token');
         (new OuraPlugin)->getJson('/usercollection/heartrate', $this->integration());
+    }
+
+    #[Test]
+    public function missing_collection_data_on_later_page_fails(): void
+    {
+        Http::fakeSequence()
+            ->push(['data' => [['bpm' => 60]], 'next_token' => 'second'])
+            ->push(['next_token' => null]);
+
+        $this->expectExceptionMessage('invalid collection page');
+        (new OuraPlugin)->getJson('/usercollection/heartrate', $this->integration());
+    }
+
+    #[Test]
+    public function current_day_aggregate_is_explicitly_provisional(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-10T11:38:00Z'));
+        try {
+            $job = new OuraHeartrateData($this->integration(), []);
+            $method = new ReflectionMethod($job, 'createHeartrateEvent');
+            $points = collect([['bpm' => 60], ['bpm' => 80]]);
+            $today = $method->invoke($job, '2026-10-10', $points, new OuraPlugin);
+            $yesterday = $method->invoke($job, '2026-10-09', $points, new OuraPlugin);
+
+            $this->assertTrue($today['event_metadata']['is_provisional']);
+            $this->assertFalse($yesterday['event_metadata']['is_provisional']);
+            $this->assertSame('UTC', $today['event_metadata']['aggregation_timezone']);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     #[Test]
