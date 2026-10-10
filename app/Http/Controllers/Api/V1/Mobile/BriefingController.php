@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Services\DayAheadService;
 use App\Services\DaySummaryService;
 use App\Services\EffectiveTimezoneResolver;
 use Carbon\Carbon;
@@ -12,13 +13,19 @@ use Illuminate\Http\Request;
 
 class BriefingController extends Controller
 {
-    public function __construct(protected DaySummaryService $summaryService) {}
+    public function __construct(
+        protected DaySummaryService $summaryService,
+        protected DayAheadService $aheadService,
+    ) {}
 
     /**
      * GET /api/v1/mobile/briefing/today
      *
      * Accepts `date` (YYYY-MM-DD or relative "today"/"yesterday") — defaults to today.
      * Optional `domains` (comma-separated) narrows the summary.
+     *
+     * A date after today also carries an `ahead` section: the schedule,
+     * plan, weather and sleep target the Looking ahead page renders.
      */
     public function today(Request $request): JsonResponse
     {
@@ -27,7 +34,8 @@ class BriefingController extends Controller
             return response()->json(['message' => 'Invalid date.'], 422);
         }
 
-        $date = $this->resolveDate($rawDate, app(EffectiveTimezoneResolver::class)->timezoneFor($request->user()));
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($request->user());
+        $date = $this->resolveDate($rawDate, $timezone);
 
         if ($date === null) {
             return response()->json(['message' => 'Invalid date.'], 422);
@@ -46,6 +54,10 @@ class BriefingController extends Controller
         }
 
         $summary = $this->summaryService->generateSummary($request->user(), $date, $domains);
+
+        if ($date->toDateString() > Carbon::today($timezone)->toDateString()) {
+            $summary['ahead'] = $this->aheadService->build($request->user(), $date);
+        }
 
         return response()
             ->json($summary)

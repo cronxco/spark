@@ -172,6 +172,22 @@ A client assembling one screen from several of these endpoints can rely on them 
 
 Day-scoped payloads also **render** in that zone: every timestamp inside `GET /briefing/today` (transaction `time`, `observed_at`, `sync_status.*`, `anomalies[].detected_at`) carries the day's UTC offset, e.g. `2026-09-25T01:06:53+01:00` — the same instant as `00:06:53Z`, but with the local clock time. For a **past** date the zone is the one acknowledged on that date (so a London day stays London after flying to Vancouver); today and future dates use the live effective zone. `GET /widgets/today` and `GET /widgets/spend` resolve "today" the same way. Parse these as offset-bearing ISO 8601; never assume `Z`.
 
+### Looking ahead (`ahead`)
+
+`GET /briefing/today?date=` for a date **after today** adds an `ahead` object alongside the usual (empty) sections. Everything is read at query time; nothing new is stored.
+
+| Field | Description |
+| --- | --- |
+| `headline` | Plain factual line: how much is on and when it starts, open tasks, birthdays, weather |
+| `digest_event_id` | The digest whose `flint_day_context` block is dated to this day (usually the evening digest), or `null` |
+| `weather` | `{location, condition, temp_high_c, rain_probability_pct}` from that block, or `null` |
+| `first_commitment` | `{title, start}` of the first timed entry, or `null` |
+| `calendar[]` | `{title, start, end, all_day, location, person, event_id}`. With a digest its list is authoritative (`person` is `will`, `dan` or `both`; a shared "Will · X"/"Dan · X" pair merges to `both`) and synced Google Calendar events only add `end`, `location` and `event_id`. Without one, synced events form the list and `person` is `null`. All-day items sort first. |
+| `birthdays[]` | `{title}`, from the digest, else all-day synced events whose title contains "birthday" |
+| `plan[]` | `{id, title, kind, done, topic_id, topic_title, url}`; `kind` is `day_note` (task blocks on that day's Outline day note, in note order), `topic_task` (Flint topic tasks with `due_on`/`review_on` that day) or `topic_review` (active topics whose `next_review_at` is that day) |
+| `day_note_url` | The day note in Outline, or `null` |
+| `sleep_target` | `{wake_by, bed_by, sleep_need_minutes, typical_wake, early_start, readiness_low_nights}`, only when the first commitment needs an earlier wake than the fortnight's median, or readiness has sat below its 30-day average for 3+ nights. `wake_by` is an hour before the first commitment; `bed_by` subtracts the median night's sleep plus 20 minutes. |
+
 ### Response Headers
 
 | Header          | Endpoints  | Description                        |
