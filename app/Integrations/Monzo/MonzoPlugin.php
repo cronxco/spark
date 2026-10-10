@@ -2004,4 +2004,3 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         }
     }
 }
-

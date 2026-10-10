@@ -21,23 +21,6 @@ class MonzoAuditRegressionTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function integration(string $type): Integration
-    {
-        $user = User::factory()->create();
-        $group = IntegrationGroup::factory()->create([
-            'user_id' => $user->id,
-            'service' => 'monzo',
-            'access_token' => 'test-token',
-        ]);
-
-        return Integration::factory()->create([
-            'user_id' => $user->id,
-            'integration_group_id' => $group->id,
-            'service' => 'monzo',
-            'instance_type' => $type,
-        ]);
-    }
-
     #[Test]
     public function declined_payments_are_not_mapped_as_spend(): void
     {
@@ -118,6 +101,7 @@ class MonzoAuditRegressionTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), '/transactions') && $request['since'] === 'tx_100' && ! isset($request['before']));
         Http::assertSent(fn ($request) => str_contains($request->url(), '/transactions') && $request['since'] === 'tx_200');
     }
+
     #[Test]
     public function failed_page_does_not_mark_sweep_complete(): void
     {
@@ -157,4 +141,20 @@ class MonzoAuditRegressionTest extends TestCase
         Http::assertSentCount(3);
     }
 
+    private function integration(string $type): Integration
+    {
+        $user = User::factory()->create();
+        $group = IntegrationGroup::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'monzo',
+            'access_token' => 'test-token',
+        ]);
+
+        return Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'monzo',
+            'instance_type' => $type,
+        ]);
+    }
 }

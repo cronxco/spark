@@ -92,4 +92,3 @@ class MonzoBalanceData extends BaseProcessingJob
         ]);
     }
 }
-

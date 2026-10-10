@@ -479,6 +479,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertEquals('USD', $relationship->value_unit);
         $this->assertEquals('manual', $relationship->metadata['match_method']);
     }
+
     #[Test]
     public function merchant_aliases_improve_both_match_directions(): void
     {
