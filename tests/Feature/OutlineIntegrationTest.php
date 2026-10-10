@@ -8,6 +8,7 @@ use App\Jobs\Outline\PinTodayDayNote;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\Integration;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
@@ -199,6 +200,7 @@ class OutlineIntegrationTest extends TestCase
 
         return $integration;
     }
+
     #[Test]
     public function empty_outline_pages_stop_even_with_a_next_path(): void
     {
@@ -207,6 +209,21 @@ class OutlineIntegrationTest extends TestCase
         ]);
         $api = new OutlineApi($this->makeIntegration());
         $this->assertSame([], $api->searchDocumentsLimited(['query' => '2026-10']));
+        Http::assertSentCount(1);
+    }
+
+    #[Test]
+    public function outline_total_stops_before_requesting_empty_pages(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'data' => [['id' => 'doc']],
+                'pagination' => ['nextPath' => '/api/documents.search?offset=100', 'offset' => 0, 'limit' => 100, 'total' => 31],
+            ], 200),
+        ]);
+
+        $api = new OutlineApi($this->makeIntegration());
+        $this->assertCount(1, $api->searchDocumentsLimited(['query' => '2026-10']));
         Http::assertSentCount(1);
     }
 
@@ -252,7 +269,7 @@ class OutlineIntegrationTest extends TestCase
         try {
             (new PinTodayDayNote($integration))->handle();
             $this->fail('Pin creation errors must fail the job.');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->assertStringContainsString('Outline API error: 400', $e->getMessage());
         }
 
