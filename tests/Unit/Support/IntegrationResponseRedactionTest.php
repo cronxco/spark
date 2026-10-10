@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Support;
 
+use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -60,11 +61,11 @@ class IntegrationResponseRedactionTest extends TestCase
     #[Test]
     public function fallback_response_logger_receives_only_sanitized_body(): void
     {
-        \Illuminate\Support\Facades\Log::spy();
+        Log::spy();
 
         log_integration_api_response('test', 'GET', '/accounts', 200, '{"access":"private-canary"}', [], 'invalid-uuid');
 
-        \Illuminate\Support\Facades\Log::shouldHaveReceived('debug')->withArgs(function (string $message, array $context): bool {
+        Log::shouldHaveReceived('debug')->withArgs(function (string $message, array $context): bool {
             return $message === 'API Response'
                 && ! str_contains($context['response_body'], 'private-canary')
                 && str_contains($context['response_body'], '[REDACTED]');

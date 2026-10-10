@@ -795,7 +795,6 @@ if (! function_exists('log_integration_api_request')) {
     }
 }
 
-
 if (! function_exists('sanitize_api_response_body')) {
     /**
      * Sanitize the complete response before truncation can make JSON invalid.
