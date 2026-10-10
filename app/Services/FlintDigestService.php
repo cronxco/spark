@@ -10,9 +10,9 @@ use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Flint\FlintRunCompletionService;
 use App\Services\Flint\FlintRunToken;
-use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\Flint\RoutineConfig;
 use App\Services\Flint\RoutineModel;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Support\FlintDigestOpener;
 use App\Support\FlintQuestion;
 use Carbon\Carbon;
@@ -155,25 +155,6 @@ class FlintDigestService
     }
 
     /**
-     * The driver of the tracked run that wrote this digest, or null when the
-     * digest has no run token or its attempt was not recorded.
-     *
-     * @param  array<string, mixed>|null  $run
-     */
-    private function runDriver(Integration $integration, ?array $run): ?string
-    {
-        if (! is_string($run['routine'] ?? null) || ! is_string($run['run_uuid'] ?? null)) {
-            return null;
-        }
-
-        $attempt = app(TaskExecutionStore::class)
-            ->trackedRunAttempt($integration, "flint_routine_{$run['routine']}", $run['run_uuid']);
-        $driver = $attempt['driver'] ?? null;
-
-        return is_string($driver) ? $driver : null;
-    }
-
-    /**
      * The user's one Flint integration (decision D-F4): the plugin's
      * `assistant` instance, oldest first, created on first use.
      */
@@ -228,6 +209,25 @@ class FlintDigestService
                 'generated_at' => now()->toIso8601String(),
             ], fn (mixed $value) => $value !== null)],
         );
+    }
+
+    /**
+     * The driver of the tracked run that wrote this digest, or null when the
+     * digest has no run token or its attempt was not recorded.
+     *
+     * @param  array<string, mixed>|null  $run
+     */
+    private function runDriver(Integration $integration, ?array $run): ?string
+    {
+        if (! is_string($run['routine'] ?? null) || ! is_string($run['run_uuid'] ?? null)) {
+            return null;
+        }
+
+        $attempt = app(TaskExecutionStore::class)
+            ->trackedRunAttempt($integration, "flint_routine_{$run['routine']}", $run['run_uuid']);
+        $driver = $attempt['driver'] ?? null;
+
+        return is_string($driver) ? $driver : null;
     }
 
     /** @param array<string, mixed> $data @param array<string, mixed>|null $run */
