@@ -161,7 +161,7 @@ class GoodreadsShelfData extends BaseProcessingJob
         }
 
         // Create events
-        $created = $this->createEventsPayload($events);
+        $created = $this->createEvents($events);
 
         // Tag events with author names and create series relationships
         foreach ($created as $index => $event) {
