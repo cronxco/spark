@@ -332,6 +332,17 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
         return ['events' => []];
     }
 
+    protected function sanitizeHeaders(array $headers): array
+    {
+        foreach ($headers as $key => $value) {
+            if (in_array(strtolower($key), ['x-original-url', 'x-forwarded-uri', 'referer'])) {
+                $headers[$key] = ['[REDACTED]'];
+            }
+        }
+
+        return parent::sanitizeHeaders($headers);
+    }
+
     /**
      * Parse SNS notification and extract the message
      */
@@ -399,17 +410,6 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
             && ! isset($parts['pass'])
             && (! isset($parts['port']) || $parts['port'] === 443)
             && ! isset($parts['fragment']);
-    }
-
-    protected function sanitizeHeaders(array $headers): array
-    {
-        foreach ($headers as $key => $value) {
-            if (in_array(strtolower($key), ['x-original-url', 'x-forwarded-uri', 'referer'])) {
-                $headers[$key] = ['[REDACTED]'];
-            }
-        }
-
-        return parent::sanitizeHeaders($headers);
     }
 
     /**
