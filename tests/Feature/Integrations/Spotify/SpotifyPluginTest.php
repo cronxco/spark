@@ -234,4 +234,43 @@ class SpotifyPluginTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), '/me/player/recently-played')
             && ! isset($request['after']) && (int) $request['limit'] === 50);
     }
+
+    #[Test]
+    public function fetched_cursor_is_acknowledged_only_after_successful_processing(): void
+    {
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'configuration' => ['spotify_after_ms' => 1000, 'unrelated' => 'preserved'],
+        ]);
+        $plugin = new class extends SpotifyPlugin
+        {
+            public bool $failProcessing = true;
+
+            public function checkForDuplicateProcessing(Integration $integration, array $listeningData): void {}
+
+            protected function processTrackPlay(Integration $integration, array $playData, string $source): void
+            {
+                if ($this->failProcessing) {
+                    throw new \RuntimeException('Processing failed');
+                }
+            }
+        };
+        $data = ['recently_played' => [['track' => ['id' => 'track']]], 'after_ms' => 2000];
+
+        try {
+            $plugin->processListeningData($integration, $data);
+            $this->fail('Failed track processing must be retried.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Processing failed', $exception->getMessage());
+        }
+        $this->assertSame(1000, $integration->fresh()->configuration['spotify_after_ms']);
+
+        $plugin->failProcessing = false;
+        $plugin->processListeningData($integration, $data);
+        $this->assertSame(2000, $integration->fresh()->configuration['spotify_after_ms']);
+        $this->assertSame('preserved', $integration->fresh()->configuration['unrelated']);
+
+        $plugin->processListeningData($integration, array_replace($data, ['after_ms' => 1500]));
+        $this->assertSame(2000, $integration->fresh()->configuration['spotify_after_ms']);
+    }
 }
