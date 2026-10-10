@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Integrations\Outline\OutlineApi;
 use App\Jobs\Outline\OutlineData;
+use App\Jobs\Outline\PinTodayDayNote;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -196,4 +199,66 @@ class OutlineIntegrationTest extends TestCase
 
         return $integration;
     }
+    #[Test]
+    public function empty_outline_pages_stop_even_with_a_next_path(): void
+    {
+        Http::fake([
+            '*' => Http::response(['data' => [], 'pagination' => ['nextPath' => '/api/documents.search?offset=100']], 200),
+        ]);
+        $api = new OutlineApi($this->makeIntegration());
+        $this->assertSame([], $api->searchDocumentsLimited(['query' => '2026-10']));
+        Http::assertSentCount(1);
+    }
+
+    #[Test]
+    public function pin_job_joins_sibling_documents_and_removes_only_old_daynote_pins(): void
+    {
+        $integration = $this->makeIntegration();
+        $title = now('UTC')->format('Y-m-d: l');
+        Http::fake([
+            '*documents.search*' => Http::response(['data' => [['document' => ['id' => 'today', 'title' => $title]]]], 200),
+            '*pins.list*' => Http::response(['data' => [
+                'pins' => [
+                    ['id' => 'old-pin', 'documentId' => 'old'],
+                    ['id' => 'project-pin', 'documentId' => 'project'],
+                ],
+                'documents' => [
+                    ['id' => 'old', 'title' => '2026-01-01: Thursday'],
+                    ['id' => 'project', 'title' => 'Spark Product'],
+                ],
+            ]], 200),
+            '*pins.delete*' => Http::response(['success' => true], 200),
+            '*pins.create*' => Http::response(['data' => ['id' => 'today-pin']], 200),
+        ]);
+
+        (new PinTodayDayNote($integration))->handle();
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'pins.delete') && $request['id'] === 'old-pin');
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'pins.delete') && $request['id'] === 'project-pin');
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'pins.create') && $request['documentId'] === 'today');
+        $this->assertNotEmpty($integration->fresh()->configuration['last_pin_success_at']);
+    }
+
+    #[Test]
+    public function failed_pin_creation_is_rethrown_and_does_not_record_success(): void
+    {
+        $integration = $this->makeIntegration();
+        Http::fake([
+            '*documents.search*' => Http::response(['data' => [['document' => ['id' => 'today', 'title' => now('UTC')->format('Y-m-d: l')]]]], 200),
+            '*pins.list*' => Http::response(['data' => ['pins' => [], 'documents' => []]], 200),
+            '*pins.create*' => Http::response(['error' => 'maximum_pins'], 400),
+        ]);
+
+        try {
+            (new PinTodayDayNote($integration))->handle();
+            $this->fail('Pin creation errors must fail the job.');
+        } catch (\Exception $e) {
+            $this->assertStringContainsString('Outline API error: 400', $e->getMessage());
+        }
+
+        $config = $integration->fresh()->configuration;
+        $this->assertNotEmpty($config['last_pin_attempt_at']);
+        $this->assertArrayNotHasKey('last_pin_success_at', $config);
+    }
+
 }
