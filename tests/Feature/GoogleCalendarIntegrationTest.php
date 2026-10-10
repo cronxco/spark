@@ -8,9 +8,12 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Notifications\IntegrationAuthenticationFailed;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
@@ -705,5 +708,57 @@ class GoogleCalendarIntegrationTest extends TestCase
             // Extract timeMin and timeMax from the request
             return str_contains($query, 'timeMin') && str_contains($query, 'timeMax');
         });
+    }
+
+    #[Test]
+    public function revoked_refresh_token_notifies_and_stops_before_fetching_events(): void
+    {
+        $notification = new IntegrationAuthenticationFailed($this->integration, 'expired');
+        $this->assertTrue($notification->isIncidentAlert());
+        $this->assertSame('integration_authentication_failed:' . $this->integration->id, $notification->getGroupKey());
+        Notification::fake();
+        $this->group->update(['expiry' => now()->subHour()]);
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response(['error' => 'invalid_grant'], 400),
+        ]);
+
+        try {
+            (new GoogleCalendarPlugin)->pullEventData($this->integration);
+            $this->fail('Revoked refresh tokens must fail the fetch.');
+        } catch (Exception $e) {
+            $this->assertSame('Failed to refresh Google Calendar token', $e->getMessage());
+        }
+
+        Notification::assertSentTo($this->user, IntegrationAuthenticationFailed::class);
+        Http::assertSentCount(1);
+        $this->assertSame('test_access_token', $this->group->fresh()->access_token);
+    }
+
+    #[Test]
+    public function failed_event_response_is_not_an_empty_success(): void
+    {
+        Http::fake([
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events*' => Http::response([], 403),
+        ]);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to fetch Google Calendar events: 403');
+        (new GoogleCalendarPlugin)->pullEventData($this->integration);
+    }
+
+    #[Test]
+    public function expired_token_without_refresh_token_stops_before_requesting_events(): void
+    {
+        $this->group->update(['expiry' => now()->subHour(), 'refresh_token' => null]);
+        Http::fake();
+
+        try {
+            (new GoogleCalendarPlugin)->pullEventData($this->integration);
+            $this->fail('Missing refresh tokens must fail the fetch.');
+        } catch (Exception $e) {
+            $this->assertStringContainsString('no refresh token available', $e->getMessage());
+        }
+
+        Http::assertNothingSent();
     }
 }
