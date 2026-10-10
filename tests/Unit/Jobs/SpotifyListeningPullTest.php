@@ -3,6 +3,8 @@
 namespace Tests\Unit\Jobs;
 
 use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
+use App\Jobs\Data\Spotify\SpotifyListeningData;
+use Illuminate\Support\Facades\Bus;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
@@ -192,5 +194,40 @@ class SpotifyListeningPullTest extends TestCase
 
         $job2 = new SpotifyListeningPull($mixedConfigIntegration);
         $this->assertInstanceOf(SpotifyListeningPull::class, $job2);
+    }
+
+    #[Test]
+    public function podcast_snapshot_is_dispatched_without_recent_track_plays(): void
+    {
+        Bus::fake();
+        $job = new class($this->integration) extends SpotifyListeningPull
+        {
+            public function dispatchForTest(array $rawData): void
+            {
+                $this->dispatchProcessingJobs($rawData);
+            }
+        };
+        $rawData = ['recently_played' => [], 'currently_playing_episode' => ['item' => ['id' => 'episode']]];
+
+        $job->dispatchForTest($rawData);
+
+        Bus::assertDispatched(SpotifyListeningData::class);
+    }
+
+    #[Test]
+    public function empty_listening_snapshot_does_not_dispatch_processing(): void
+    {
+        Bus::fake();
+        $job = new class($this->integration) extends SpotifyListeningPull
+        {
+            public function dispatchForTest(array $rawData): void
+            {
+                $this->dispatchProcessingJobs($rawData);
+            }
+        };
+
+        $job->dispatchForTest(['recently_played' => []]);
+
+        Bus::assertNotDispatched(SpotifyListeningData::class);
     }
 }
