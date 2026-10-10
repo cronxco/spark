@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Support;
 
+use App\Integrations\Oura\OuraPlugin;
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -70,5 +71,36 @@ class IntegrationResponseRedactionTest extends TestCase
                 && ! str_contains($context['response_body'], 'private-canary')
                 && str_contains($context['response_body'], '[REDACTED]');
         })->once();
+    }
+
+    #[Test]
+    public function pagination_cursors_and_token_counts_stay_visible(): void
+    {
+        $logged = sanitizeData([
+            'next_token' => 'cursor-1',
+            'nextPageToken' => 'cursor-2',
+            'usage' => ['total_tokens' => 42],
+            'access_token' => 'private-canary',
+            'refresh_token' => 'private-canary',
+        ]);
+
+        $this->assertSame('cursor-1', $logged['next_token']);
+        $this->assertSame('cursor-2', $logged['nextPageToken']);
+        $this->assertSame(42, $logged['usage']['total_tokens']);
+        $this->assertSame('[REDACTED]', $logged['access_token']);
+        $this->assertSame('[REDACTED]', $logged['refresh_token']);
+    }
+
+    #[Test]
+    public function plugin_loggers_pass_large_json_bodies_to_the_central_sanitizer(): void
+    {
+        $plugin = new OuraPlugin;
+        $this->assertFalse(method_exists($plugin, 'sanitizeResponseBody'));
+
+        $body = json_encode(['data' => array_fill(0, 600, ['bpm' => 60, 'source' => 'awake']), 'next_token' => 'abc']);
+        $logged = sanitize_api_response_body('/usercollection/heartrate', $body);
+
+        $this->assertStringStartsWith('{"data":', $logged);
+        $this->assertStringEndsWith('... [TRUNCATED]', $logged);
     }
 }
