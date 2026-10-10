@@ -11,19 +11,11 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
 use ReflectionMethod;
+use Tests\TestCase;
 
 class OuraPaginationTest extends TestCase
 {
-    private function integration(): Integration
-    {
-        $integration = new Integration(['id' => 'test', 'service' => 'oura']);
-        $integration->setRelation('group', new IntegrationGroup(['access_token' => 'test-token']));
-
-        return $integration;
-    }
-
     #[Test]
     public function all_pages_are_merged_without_losing_window_parameters(): void
     {
@@ -119,5 +111,13 @@ class OuraPaginationTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    private function integration(): Integration
+    {
+        $integration = new Integration(['id' => 'test', 'service' => 'oura']);
+        $integration->setRelation('group', new IntegrationGroup(['access_token' => 'test-token']));
+
+        return $integration;
     }
 }

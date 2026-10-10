@@ -1682,8 +1682,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
             try {
                 $response = Http::withToken($token)
-                ->connectTimeout(5)
-                ->timeout(30)
+                    ->connectTimeout(5)
+                    ->timeout(30)
                     ->get($this->baseUrl . $endpoint, $query);
             } finally {
                 $span?->finish();
