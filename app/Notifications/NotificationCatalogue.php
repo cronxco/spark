@@ -64,6 +64,16 @@ class NotificationCatalogue
             'active_hours' => null,
             'forced_delivery' => false,
         ],
+        'gocardless_consent_expiring' => [
+            'label' => 'Bank Connection Expiring',
+            'description' => 'Notify when a bank connection needs reconnecting before it stops syncing',
+            'apns_category' => 'INTEGRATION_ATTENTION',
+            'configurable' => true,
+            'stream' => 'attention',
+            'severity' => 'warning',
+            'active_hours' => null,
+            'forced_delivery' => false,
+        ],
         'cookie_auto_refreshed' => [
             'label' => 'Saved Login Refreshed',
             'description' => 'Notify when Spark successfully refreshes a saved website login',
