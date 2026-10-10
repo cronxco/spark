@@ -432,19 +432,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
      */
     protected function sanitizeHeaders(array $headers): array
     {
-        $sensitiveHeaders = ['authorization', 'x-api-key', 'x-auth-token'];
-        $sanitized = [];
-
-        foreach ($headers as $key => $value) {
-            $lowerKey = strtolower($key);
-            if (in_array($lowerKey, $sensitiveHeaders)) {
-                $sanitized[$key] = '[REDACTED]';
-            } else {
-                $sanitized[$key] = $value;
-            }
-        }
-
-        return $sanitized;
+        return sanitizeHeaders($headers);
     }
 
     /**
@@ -452,21 +440,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
      */
     protected function sanitizeData(array $data): array
     {
-        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth'];
-        $sanitized = [];
-
-        foreach ($data as $key => $value) {
-            $lowerKey = strtolower($key);
-            if (in_array($lowerKey, $sensitiveKeys)) {
-                $sanitized[$key] = '[REDACTED]';
-            } elseif (is_array($value)) {
-                $sanitized[$key] = $this->sanitizeData($value);
-            } else {
-                $sanitized[$key] = $value;
-            }
-        }
-
-        return $sanitized;
+        return sanitizeData($data);
     }
 
     /**
@@ -474,20 +448,6 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
      */
     protected function sanitizeResponseBody(string $body): string
     {
-        // Limit response body size to prevent huge logs
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
-        }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
+        return sanitize_api_response_body('', $body);
     }
 }

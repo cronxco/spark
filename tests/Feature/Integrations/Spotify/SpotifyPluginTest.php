@@ -3,8 +3,11 @@
 namespace Tests\Feature\Integrations\Spotify;
 
 use App\Integrations\Spotify\SpotifyPlugin;
+use App\Models\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 class SpotifyPluginTest extends TestCase
@@ -197,5 +200,97 @@ class SpotifyPluginTest extends TestCase
         // podcast_session_timeout_hours
         $this->assertEquals(1, $schema['podcast_session_timeout_hours']['min']);
         $this->assertEquals(24, $schema['podcast_session_timeout_hours']['max']);
+    }
+
+    #[Test]
+    public function recently_played_uses_saved_cursor_and_preserves_it_on_empty_response(): void
+    {
+        Http::fake(['*' => Http::response(['items' => []], 200)]);
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'instance_type' => 'listening',
+            'configuration' => ['spotify_after_ms' => 1750000000000, 'track_podcasts' => false],
+        ]);
+
+        $data = (new SpotifyPlugin)->pullListeningData($integration);
+
+        $this->assertSame([], $data['recently_played']);
+        $this->assertSame(1750000000000, $integration->fresh()->configuration['spotify_after_ms']);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/me/player/recently-played')
+            && (int) $request['after'] === 1750000000000 && (int) $request['limit'] === 50);
+    }
+
+    #[Test]
+    public function initial_recently_played_request_has_no_after_cursor(): void
+    {
+        Http::fake(['*' => Http::response(['items' => []], 200)]);
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'instance_type' => 'listening',
+            'configuration' => ['track_podcasts' => false],
+        ]);
+
+        (new SpotifyPlugin)->pullListeningData($integration);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/me/player/recently-played')
+            && ! isset($request['after']) && (int) $request['limit'] === 50);
+    }
+
+    #[Test]
+    public function fetched_cursor_is_acknowledged_only_after_successful_processing(): void
+    {
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'configuration' => ['spotify_after_ms' => 1000, 'unrelated' => 'preserved'],
+        ]);
+        $plugin = new class extends SpotifyPlugin
+        {
+            public bool $failProcessing = true;
+
+            public function checkForDuplicateProcessing(Integration $integration, array $listeningData): void {}
+
+            protected function processTrackPlay(Integration $integration, array $playData, string $source): void
+            {
+                if ($this->failProcessing) {
+                    throw new RuntimeException('Processing failed');
+                }
+            }
+        };
+        $data = ['recently_played' => [['track' => ['id' => 'track']]], 'after_ms' => 2000];
+
+        try {
+            $plugin->processListeningData($integration, $data);
+            $this->fail('Failed track processing must be retried.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Processing failed', $exception->getMessage());
+        }
+        $this->assertSame(1000, $integration->fresh()->configuration['spotify_after_ms']);
+
+        $plugin->failProcessing = false;
+        $plugin->processListeningData($integration, $data);
+        $this->assertSame(2000, $integration->fresh()->configuration['spotify_after_ms']);
+        $this->assertSame('preserved', $integration->fresh()->configuration['unrelated']);
+
+        $plugin->processListeningData($integration, array_replace($data, ['after_ms' => 1500]));
+        $this->assertSame(2000, $integration->fresh()->configuration['spotify_after_ms']);
+    }
+
+    #[Test]
+    public function fetching_new_tracks_does_not_commit_unprocessed_cursor(): void
+    {
+        Http::fake(['*' => Http::response(['items' => [
+            ['played_at' => '2026-10-10T10:00:00.000Z', 'track' => ['id' => 'track']],
+        ]], 200)]);
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'instance_type' => 'listening',
+            'configuration' => ['spotify_after_ms' => 1000, 'track_podcasts' => false],
+        ]);
+
+        $data = (new SpotifyPlugin)->pullListeningData($integration);
+
+        $this->assertGreaterThan(1000, $data['after_ms']);
+        $this->assertCount(1, $data['recently_played']);
+        $this->assertSame(1000, $integration->fresh()->configuration['spotify_after_ms']);
     }
 }
