@@ -740,6 +740,10 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
                     'category' => $tx['category'] ?? null,
                     'scheme' => $tx['scheme'] ?? null,
                     'notes' => $tx['notes'] ?? null,
+                    'include_in_spending' => $tx['include_in_spending'] ?? null,
+                    'decline_reason' => $tx['decline_reason'] ?? null,
+                    'settled' => $tx['settled'] ?? null,
+                    'amount_is_pending' => $tx['amount_is_pending'] ?? null,
                     'local_amount' => $tx['local_amount'] ?? null,
                     'local_currency' => $tx['local_currency'] ?? null,
                     'raw' => $tx,
@@ -1127,32 +1131,27 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
 
             $transactions = $response->json('transactions') ?? [];
 
-            // If we hit the limit, page forward using the oldest transaction created date
-            while (count($transactions) === 100) {
-                $lastCreated = end($transactions)['created'] ?? null;
-                if (! $lastCreated) {
-                    break;
+            $batch = $transactions;
+            $cursor = null;
+            while (count($batch) === 100) {
+                $nextCursor = end($batch)['id'] ?? null;
+                if (! $nextCursor || $nextCursor === $cursor) {
+                    throw new Exception('Monzo transaction pagination did not advance');
                 }
+                $cursor = $nextCursor;
                 $nextResp = Http::withHeaders($this->authHeaders($integration))
                     ->get($this->getBaseUrl() . '/transactions', [
                         'account_id' => $account['id'],
                         'expand[]' => 'merchant',
-                        'since' => $sinceIso,
-                        'before' => $lastCreated, // Monzo supports before cursor by created timestamp
+                        'since' => $cursor,
                         'limit' => 100,
                     ]);
                 $this->logApiResponse('GET', '/transactions', $nextResp->status(), $nextResp->body(), $nextResp->headers(), $integration->id);
                 if (! $nextResp->successful()) {
-                    break;
+                    throw new Exception('Failed to fetch transaction page from Monzo API');
                 }
                 $batch = $nextResp->json('transactions') ?? [];
-                if (empty($batch)) {
-                    break;
-                }
                 $transactions = array_merge($transactions, $batch);
-                if (count($batch) < 100) {
-                    break;
-                }
             }
             $allTransactions[$account['id']] = $transactions;
         }
@@ -1557,6 +1556,9 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         foreach ($pots as $pot) {
             // Upsert the pot object
             $potObject = $this->upsertPotObject($integration, $pot);
+            if ($pot['deleted'] ?? false) {
+                continue;
+            }
 
             // Create balance event for the pot
             $balance = (int) ($pot['balance'] ?? 0); // Monzo API returns balance in pence
@@ -1609,7 +1611,7 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         }
         $json = $resp->json();
         $balance = (int) ($json['balance'] ?? 0); // cents
-        $spendToday = (int) ($json['spent_today'] ?? 0); // cents
+        $spendToday = (int) ($json['spend_today'] ?? 0); // cents
         $date = now()->toDateString();
 
         // Create the target "day" object once (target_id is NOT NULL in events)
@@ -1795,7 +1797,11 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
     {
         $amount = (int) ($tx['amount'] ?? 0);
         $scheme = $tx['scheme'] ?? null;
-        $declined = (int) ($tx['declined'] ?? 0) === 1;
+        $declined = ! empty($tx['decline_reason']);
+
+        if ($declined) {
+            return 'declined_payment_to';
+        }
 
         // Salary detection (BACS, amount > £1500 and merchant name matches configured salary name)
         if ($scheme === 'bacs' && $amount > 150000) {
@@ -1806,10 +1812,6 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         }
 
         if ($scheme === 'mastercard') {
-            if ($declined) {
-                return 'declined_payment_to';
-            }
-
             return $amount < 0 ? 'card_payment_to' : 'card_refund_from';
         }
         if ($scheme === 'uk_retail_pot') {
@@ -1865,15 +1867,11 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         if (! empty($tx['merchant']['category'])) {
             $event->attachTag((string) $tx['merchant']['category'], 'merchant_category');
         }
-        // Decline / settled
-        if ((int) ($tx['declined'] ?? 0) === 1) {
-            $event->attachTag('declined', 'transaction_status');
-            if (! empty($tx['decline_reason'])) {
-                $event->attachTag((string) $tx['decline_reason'], 'decline_reason');
-            }
-        } elseif ((int) ($tx['pending'] ?? 0) !== 1) {
-            $event->attachTag('settled', 'transaction_status');
-        }
+        $declined = ! empty($tx['decline_reason']);
+        $pending = ! empty($tx['amount_is_pending'])
+            || (array_key_exists('settled', $tx) && empty($tx['settled']));
+        $event->syncTagsWithType([$declined ? 'declined' : ($pending ? 'pending' : 'settled')], 'transaction_status');
+        $event->syncTagsWithType($declined ? [(string) $tx['decline_reason']] : [], 'decline_reason');
     }
 
     private function maybeAddTransactionBlocks(Event $event, array $tx): void
@@ -2006,3 +2004,4 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         }
     }
 }
+

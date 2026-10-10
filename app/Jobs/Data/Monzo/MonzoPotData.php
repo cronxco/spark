@@ -57,6 +57,9 @@ class MonzoPotData extends BaseProcessingJob
         foreach ($pots as $pot) {
             // Upsert the pot object
             $potObject = $plugin->upsertPotObject($this->integration, $pot);
+            if ($pot['deleted'] ?? false) {
+                continue;
+            }
 
             // Create balance event for the pot
             $balance = (int) ($pot['balance'] ?? 0); // Monzo API returns balance in pence
@@ -91,3 +94,4 @@ class MonzoPotData extends BaseProcessingJob
         ]);
     }
 }
+

@@ -118,10 +118,7 @@ class ReceiptTransactionMatcher
         $timeScore = max(0, 1 - ($timeDiff / 240));
         $score += $timeScore * 0.3;
 
-        $receiptMerchant = strtolower($receipt->target->title ?? '');
-        $txnMerchant = strtolower($transaction->target->title ?? '');
-        similar_text($receiptMerchant, $txnMerchant, $percent);
-        $score += ($percent / 100) * 0.3;
+        $score += $this->merchantMatchScore($receipt, $transaction) * 0.3;
 
         return $score;
     }
@@ -360,9 +357,7 @@ class ReceiptTransactionMatcher
         $score += $timeScore * 0.2;
 
         // Merchant name fuzzy match (30% weight)
-        $receiptMerchant = $receipt->target->metadata['normalized_name'] ?? strtolower($receipt->target->title ?? '');
-        $txnMerchant = strtolower($transaction->target->title ?? '');
-        $merchantScore = $this->fuzzyMatch($receiptMerchant, $txnMerchant);
+        $merchantScore = $this->merchantMatchScore($receipt, $transaction);
         $score += $merchantScore * 0.3;
 
         // Card hint match (10% weight)
@@ -488,6 +483,23 @@ class ReceiptTransactionMatcher
         }
     }
 
+    private function merchantMatchScore(Event $receipt, Event $transaction): float
+    {
+        $aliases = $receipt->event_metadata['matching_hints']['suggested_merchant_names'] ?? [];
+        $names = is_array($aliases) ? $aliases : [];
+        $names[] = $receipt->target->title ?? '';
+        $names[] = $receipt->target->metadata['normalized_name'] ?? '';
+        $transactionName = strtolower(trim($transaction->target->title ?? ''));
+        $score = 0.0;
+        foreach ($names as $name) {
+            if (is_string($name) && trim($name) !== '') {
+                $score = max($score, $this->fuzzyMatch(strtolower(trim($name)), $transactionName));
+            }
+        }
+
+        return $score;
+    }
+
     /**
      * Fuzzy string matching using similar_text
      */
@@ -502,3 +514,4 @@ class ReceiptTransactionMatcher
         return $percent / 100;
     }
 }
+

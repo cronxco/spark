@@ -37,7 +37,7 @@ class MonzoBalanceData extends BaseProcessingJob
         unset($balanceData['_account']);
 
         $balance = (int) ($balanceData['balance'] ?? 0); // cents
-        $spendToday = (int) ($balanceData['spent_today'] ?? 0); // cents
+        $spendToday = (int) ($balanceData['spend_today'] ?? 0); // cents
         $date = now()->toDateString();
 
         Log::info('MonzoBalanceData: Processing balance data', [
@@ -92,3 +92,4 @@ class MonzoBalanceData extends BaseProcessingJob
         ]);
     }
 }
+

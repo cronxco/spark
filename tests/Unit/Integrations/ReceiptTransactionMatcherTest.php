@@ -478,4 +478,40 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertEquals('USD', $relationship->value_unit);
         $this->assertEquals('manual', $relationship->metadata['match_method']);
     }
+    #[Test]
+    public function merchant_aliases_improve_both_match_directions(): void
+    {
+        $receipt = new Event([
+            'value' => 1943,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'event_metadata' => ['matching_hints' => ['suggested_merchant_names' => ['Wingstop', 'Deliveroo']]],
+        ]);
+        $receipt->setRelation('target', new EventObject(['title' => 'Wingstop']));
+        $transaction = new Event(['value' => 1943, 'value_unit' => 'GBP', 'time' => $receipt->time]);
+        $transaction->setRelation('target', new EventObject(['title' => 'DELIVEROO']));
+
+        $this->assertEqualsWithDelta(1.0, $this->matcher->calculateReverseMatchConfidence($receipt, $transaction), 0.001);
+        $this->assertEqualsWithDelta(0.9, (new \ReflectionMethod($this->matcher, 'calculateMatchConfidence'))->invoke($this->matcher, $receipt, $transaction), 0.001);
+    }
+
+    #[Test]
+    public function malformed_merchant_aliases_preserve_title_matching(): void
+    {
+        $receipt = new Event([
+            'value' => 585,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'event_metadata' => ['matching_hints' => ['suggested_merchant_names' => [null, [], 123, '']]],
+        ]);
+        $receipt->setRelation('target', new EventObject(['title' => 'Marks & Spencer']));
+        $transaction = new Event(['value' => 585, 'value_unit' => 'GBP', 'time' => $receipt->time]);
+        $transaction->setRelation('target', new EventObject(['title' => 'MARKS & SPENCER']));
+
+        $this->assertEqualsWithDelta(1.0, $this->matcher->calculateReverseMatchConfidence($receipt, $transaction), 0.001);
+        $receipt->event_metadata = ['matching_hints' => ['suggested_merchant_names' => 'not an array']];
+        $this->assertEqualsWithDelta(0.9, (new \ReflectionMethod($this->matcher, 'calculateMatchConfidence'))->invoke($this->matcher, $receipt, $transaction), 0.001);
+    }
+
 }
+
