@@ -566,7 +566,7 @@ class GoogleCalendarIntegrationTest extends TestCase
             'service' => 'google_calendar',
             'domain' => 'health',
             'action' => 'had_event',
-            'time' => $now,
+            'time' => $now->copy()->addHours(3),
             'value' => 60,
             'event_metadata' => ['google_event_id' => 'old_event'],
         ]);
@@ -706,6 +706,7 @@ class GoogleCalendarIntegrationTest extends TestCase
             return str_contains($query, 'timeMin') && str_contains($query, 'timeMax');
         });
     }
+
     #[Test]
     public function reconciliation_preserves_historical_events_missing_from_calendar(): void
     {
