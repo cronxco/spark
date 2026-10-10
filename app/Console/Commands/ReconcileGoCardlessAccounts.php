@@ -72,20 +72,41 @@ class ReconcileGoCardlessAccounts extends Command
 
     private function assertCompatible(EventObject $canonical, EventObject $duplicate): void
     {
-        foreach (['currency', 'sort_code', 'interest_rate', 'start_date', 'is_negative_balance'] as $field) {
+        foreach (['currency', 'provider', 'account_number', 'account_type', 'sort_code', 'interest_rate', 'start_date', 'is_negative_balance'] as $field) {
             $left = $canonical->metadata[$field] ?? null;
             $right = $duplicate->metadata[$field] ?? null;
             if ($left !== null && $right !== null && $left !== $right) {
                 throw new RuntimeException("Conflicting {$field} on {$canonical->id} and {$duplicate->id}; resolve before merging.");
             }
         }
-        foreach (['resourceId', 'iban'] as $field) {
+        foreach (['iban', 'maskedPan', 'currency', 'ownerName', 'cashAccountType', 'resourceId'] as $field) {
             $left = $canonical->metadata['raw'][$field] ?? null;
             $right = $duplicate->metadata['raw'][$field] ?? null;
             if ($left && $right && $left !== $right) {
+                if ($field === 'resourceId' && $this->hasMatchingProviderIdentity($canonical, $duplicate)) {
+                    $this->line("Resource ID history differs on {$canonical->id} and {$duplicate->id}; verified provider identity matches.");
+
+                    continue;
+                }
                 throw new RuntimeException("Conflicting bank identity on {$canonical->id} and {$duplicate->id}; manual review required.");
             }
         }
+    }
+
+    private function hasMatchingProviderIdentity(EventObject $canonical, EventObject $duplicate): bool
+    {
+        if ($canonical->user_id !== $duplicate->user_id) {
+            return false;
+        }
+        foreach (['account_id', 'integration_id', 'provider', 'currency', 'account_number'] as $field) {
+            $left = $canonical->metadata[$field] ?? null;
+            $right = $duplicate->metadata[$field] ?? null;
+            if (! is_string($left) || trim($left) === '' || $left === 'unknown' || $left !== $right) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function merge(EventObject $canonical, EventObject $duplicate): void
@@ -105,6 +126,10 @@ class ReconcileGoCardlessAccounts extends Command
             'actor_events' => $actorEvents, 'target_events' => $targetEvents,
             'relationships' => $relationships->toArray(), 'tasks' => $tasks->toArray(),
             'media' => $duplicate->media()->pluck('id')->all(),
+            'bank_identity' => [
+                'canonical' => $canonical->metadata['raw'] ?? [],
+                'duplicate' => $duplicate->metadata['raw'] ?? [],
+            ],
         ];
         $duplicate->update(['metadata' => $metadata]);
         Event::withTrashed()->whereIn('id', $actorEvents)->update(['actor_id' => $canonical->id]);
@@ -141,6 +166,10 @@ class ReconcileGoCardlessAccounts extends Command
         $merged['is_pinned'] = ($merged['is_pinned'] ?? false) || ($metadata['is_pinned'] ?? false);
         $merged['gocardless_account_ids'] = array_values(array_unique(array_merge(
             $merged['gocardless_account_ids'] ?? [], $metadata['gocardless_account_ids'] ?? [], [$merged['account_id'], $metadata['account_id']])));
+        $merged['gocardless_resource_ids'] = array_values(array_unique(array_filter(array_merge(
+            $merged['gocardless_resource_ids'] ?? [], $metadata['gocardless_resource_ids'] ?? [],
+            [$merged['raw']['resourceId'] ?? null, $metadata['raw']['resourceId'] ?? null]
+        ), fn ($id) => is_string($id) && trim($id) !== '')));
         $canonical->update(['metadata' => $merged]);
         Integration::where('user_id', $owner)->where('service', 'gocardless')
             ->whereIn('configuration->account_id', $merged['gocardless_account_ids'])->get()->each(function ($integration) use ($canonical) {
