@@ -2,13 +2,13 @@
 
 namespace Tests\Unit\Jobs;
 
-use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
 use App\Jobs\Data\Spotify\SpotifyListeningData;
-use Illuminate\Support\Facades\Bus;
+use App\Jobs\OAuth\Spotify\SpotifyListeningPull;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
