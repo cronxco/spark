@@ -680,6 +680,11 @@ class GoogleCalendarPlugin extends OAuthPlugin
                     'creator' => $event['creator'] ?? null,
                     'organizer' => $event['organizer'] ?? null,
                     'status' => $status,
+                    // focusTime, outOfOffice and workingLocation matter for planning; declined meetings were not attended
+                    'event_type' => $event['eventType'] ?? null,
+                    'response_status' => $this->ownResponseStatus($event),
+                    'transparency' => $event['transparency'] ?? null,
+                    'attendee_count' => isset($event['attendees']) ? count($event['attendees']) : null,
                     'visibility' => $event['visibility'] ?? null,
                     'recurrence' => $event['recurrence'] ?? null,
                     'recurring_event_id' => $event['recurringEventId'] ?? null,
@@ -906,6 +911,20 @@ class GoogleCalendarPlugin extends OAuthPlugin
     /**
      * Check if event should be included based on filtering patterns
      */
+    /**
+     * The calendar owner's RSVP: their attendee entry, or accepted when they organised it.
+     */
+    protected function ownResponseStatus(array $event): ?string
+    {
+        foreach ($event['attendees'] ?? [] as $attendee) {
+            if (($attendee['self'] ?? false) === true) {
+                return $attendee['responseStatus'] ?? null;
+            }
+        }
+
+        return ($event['organizer']['self'] ?? false) === true ? 'accepted' : null;
+    }
+
     protected function shouldIncludeEvent(string $title, array $includePatterns, array $excludePatterns): bool
     {
         // Check exclude patterns first (any match = exclude)
