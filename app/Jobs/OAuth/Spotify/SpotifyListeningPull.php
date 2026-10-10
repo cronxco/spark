@@ -33,7 +33,7 @@ class SpotifyListeningPull extends BaseFetchJob
 
     protected function dispatchProcessingJobs(array $rawData): void
     {
-        if (empty($rawData['recently_played'])) {
+        if (empty($rawData['recently_played']) && empty($rawData['currently_playing_episode'])) {
             Log::info('Spotify: No listening data to process', [
                 'integration_id' => $this->integration->id,
             ]);
