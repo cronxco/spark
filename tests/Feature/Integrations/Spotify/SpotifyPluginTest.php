@@ -273,4 +273,23 @@ class SpotifyPluginTest extends TestCase
         $plugin->processListeningData($integration, array_replace($data, ['after_ms' => 1500]));
         $this->assertSame(2000, $integration->fresh()->configuration['spotify_after_ms']);
     }
+
+    #[Test]
+    public function fetching_new_tracks_does_not_commit_unprocessed_cursor(): void
+    {
+        Http::fake(['*' => Http::response(['items' => [
+            ['played_at' => '2026-10-10T10:00:00.000Z', 'track' => ['id' => 'track']],
+        ]], 200)]);
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'instance_type' => 'listening',
+            'configuration' => ['spotify_after_ms' => 1000, 'track_podcasts' => false],
+        ]);
+
+        $data = (new SpotifyPlugin)->pullListeningData($integration);
+
+        $this->assertGreaterThan(1000, $data['after_ms']);
+        $this->assertCount(1, $data['recently_played']);
+        $this->assertSame(1000, $integration->fresh()->configuration['spotify_after_ms']);
+    }
 }
