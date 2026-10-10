@@ -6,6 +6,7 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Integrations\Oura\Traits\HasOuraBlocks;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
+use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -60,6 +61,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
         $end = Arr::get($item, 'bedtime_end');
         $day = $start ? Str::substr($start, 0, 10) : (Arr::get($item, 'day') ?? now()->toDateString());
         $id = Arr::get($item, 'id') ?? md5(json_encode([$day, Arr::get($item, 'duration', 0), Arr::get($item, 'total', 0)]));
+        $start = $start ? Carbon::parse($start)->utc() : null;
         $sourceId = "oura_sleep_record_{$this->integration->id}_{$id}";
 
         $actor = [
@@ -73,8 +75,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
             'concept' => 'sleep',
             'type' => 'oura_sleep_record',
             'title' => 'Sleep Record',
-            'time' => $start ?? ($day . ' 00:00:00'),
-            'metadata' => $item,
+
         ];
 
         // Get the total_sleep_duration as the main value (instead of duration)
@@ -161,6 +162,10 @@ class OuraSleepRecordsData extends BaseProcessingJob
         // Build metadata with the sleep phases and movement arrays
         $eventMetadata = [
             'end' => $end,
+            'type' => $item['type'] ?? null,
+            'period' => $item['period'] ?? null,
+            'time_in_bed' => $item['time_in_bed'] ?? null,
+            'raw' => $item,
             'efficiency' => $efficiency,
         ];
 
