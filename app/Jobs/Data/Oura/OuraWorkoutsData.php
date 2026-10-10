@@ -6,6 +6,7 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use App\Models\EventObject;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class OuraWorkoutsData extends BaseProcessingJob
@@ -56,6 +57,9 @@ class OuraWorkoutsData extends BaseProcessingJob
             return;
         }
 
+        $start = Carbon::parse($start)->utc();
+        $endTime = $end ? Carbon::parse($end)->utc() : null;
+
         $sourceId = "oura_workout_{$this->integration->id}_{$id}";
         $exists = Event::where('source_id', $sourceId)
             ->where('integration_id', $this->integration->id)
@@ -79,7 +83,7 @@ class OuraWorkoutsData extends BaseProcessingJob
             'metadata' => [],
         ]);
 
-        $duration = $item['duration'] ?? 0;
+        $duration = $endTime ? max(0, (int) $start->diffInSeconds($endTime)) : 0;
         $calories = $item['calories'] ?? $item['total_calories'] ?? 0;
 
         [$encodedCalories, $caloriesMultiplier] = $plugin->encodeNumericValue($calories);
@@ -100,6 +104,10 @@ class OuraWorkoutsData extends BaseProcessingJob
                 'activity_type' => $activityType,
                 'workout_id' => $id,
                 'duration_seconds' => $duration,
+                'intensity' => $item['intensity'] ?? null,
+                'source' => $item['source'] ?? null,
+                'distance' => $item['distance'] ?? null,
+                'label' => $item['label'] ?? null,
             ],
             'target_id' => $target->id,
         ]);
@@ -150,7 +158,7 @@ class OuraWorkoutsData extends BaseProcessingJob
 
         foreach ($heartRateMetrics as $field => $config) {
             $value = $item[$field] ?? null;
-            if ($value !== null) {
+            if ($value !== null && is_numeric($value)) {
                 [$encodedValue, $valueMultiplier] = $plugin->encodeNumericValue($value);
                 $event->createBlock([
                     'block_type' => 'heart_rate',
@@ -166,7 +174,7 @@ class OuraWorkoutsData extends BaseProcessingJob
 
         // Add intensity and performance metrics
         $performanceMetrics = [
-            'intensity' => ['unit' => null, 'title' => 'Workout Intensity'],
+            'distance' => ['unit' => 'meters', 'title' => 'Distance'],
             'load' => ['unit' => null, 'title' => 'Training Load'],
             'rpe' => ['unit' => null, 'title' => 'Rate of Perceived Exertion'],
         ];
@@ -217,7 +225,7 @@ class OuraWorkoutsData extends BaseProcessingJob
                 'block_type' => 'workout_metric',
                 'time' => $event->time,
                 'title' => 'Workout Source',
-                'metadata' => ['type' => 'source'],
+                'metadata' => ['type' => 'source', 'source' => $source],
                 'content' => $source,
             ]);
         }
