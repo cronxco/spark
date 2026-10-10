@@ -486,11 +486,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                     }
                 }
             }
-            if ($maxPlayedMs > $afterMs) {
-                $config['spotify_after_ms'] = $maxPlayedMs;
-            }
-
-            $integration->update(['configuration' => $config]);
+            $listeningData['after_ms'] = $maxPlayedMs;
 
             $listeningData['recently_played'] = $recentlyPlayed;
 
@@ -498,7 +494,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'integration_id' => $integration->id,
                 'track_count' => count($recentlyPlayed),
                 'used_after_ms' => $afterMs,
-                'new_after_ms' => $config['spotify_after_ms'] ?? null,
+                'fetched_after_ms' => $maxPlayedMs,
             ]);
         } catch (Exception $e) {
             Log::warning('Spotify: Failed to get recently played tracks', [
@@ -688,6 +684,8 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                         'track_id' => $playedItem['track']['id'] ?? 'unknown',
                         'error' => $e->getMessage(),
                     ]);
+
+                    throw $e;
                 }
             }
 
@@ -696,6 +694,18 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'total_tracks' => count($listeningData['recently_played']),
                 'processed_count' => $processedCount,
             ]);
+        }
+
+        if (($listeningData['after_ms'] ?? 0) > 0) {
+            $integration->getConnection()->transaction(function () use ($integration, $listeningData): void {
+                $current = Integration::query()->lockForUpdate()->findOrFail($integration->id);
+                $configuration = $current->configuration ?? [];
+                $configuration['spotify_after_ms'] = max(
+                    (int) ($configuration['spotify_after_ms'] ?? 0),
+                    (int) $listeningData['after_ms']
+                );
+                $current->update(['configuration' => $configuration]);
+            });
         }
 
         // Process podcast episode if currently playing
