@@ -216,7 +216,7 @@ class SpotifyPluginTest extends TestCase
         $this->assertSame([], $data['recently_played']);
         $this->assertSame(1750000000000, $integration->fresh()->configuration['spotify_after_ms']);
         Http::assertSent(fn ($request) => str_contains($request->url(), '/me/player/recently-played')
-            && $request['after'] === 1750000000000 && $request['limit'] === 50);
+            && (int) $request['after'] === 1750000000000 && (int) $request['limit'] === 50);
     }
 
     #[Test]
@@ -232,6 +232,6 @@ class SpotifyPluginTest extends TestCase
         (new SpotifyPlugin)->pullListeningData($integration);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), '/me/player/recently-played')
-            && ! isset($request['after']) && $request['limit'] === 50);
+            && ! isset($request['after']) && (int) $request['limit'] === 50);
     }
 }
