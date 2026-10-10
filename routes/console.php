@@ -5,6 +5,7 @@ use App\Jobs\Fetch\CheckCookieExpiryJob;
 use App\Jobs\Fetch\RefreshExpiringCookies;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\Flint\TriggerFlintRoutineJob;
+use App\Jobs\GoCardless\CheckGoCardlessConsentExpiry;
 use App\Jobs\TaskPipeline\DispatchRetrospectiveAnomalyTasksJob;
 use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
 use App\Models\Event;
@@ -85,6 +86,13 @@ Schedule::command('notifications:send-digests')
 // Check cookie expiry daily at 6am
 Schedule::job(new CheckCookieExpiryJob)
     ->dailyAt('06:00')
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->sentryMonitor();
+
+// Warn before GoCardless bank agreements expire
+Schedule::job(new CheckGoCardlessConsentExpiry)
+    ->dailyAt('07:00')
     ->onOneServer()
     ->withoutOverlapping()
     ->sentryMonitor();
