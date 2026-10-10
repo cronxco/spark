@@ -15,7 +15,28 @@ class SkillRunner
     /** The manifest namespace for tools served by the You.com MCP server. */
     public const YOU_NAMESPACE = 'you';
 
+    /**
+     * Tools that change something outside the run. In a dry run each call to
+     * one of these is held for approval, recorded, and declined, so the skill
+     * runs end to end against live data without writing anything.
+     *
+     * @var array<int, string>
+     */
+    public const WRITE_TOOLS = [
+        'docs__update_document',
+        'spark__acknowledge-anomaly-tool',
+        'spark__complete-flint-run',
+        'spark__create-flint-digest',
+        'spark__manage-flint-topic',
+    ];
+
     private const ENDPOINT = 'https://api.openai.com/v1/responses';
+
+    /** manage-flint-topic operations that only read, approved even in a dry run. */
+    private const READ_ONLY_TOPIC_OPERATIONS = ['list', 'list_tasks'];
+
+    /** Approval round trips a dry run may take before it is abandoned. */
+    private const MAX_DRY_RUN_ROUNDS = 25;
 
     /** @param array<string, mixed> $payload */
     public function run(
@@ -24,6 +45,7 @@ class SkillRunner
         array $payload,
         ?ActionProgress $progress = null,
         ?SkillContinuation $continuation = null,
+        bool $dryRun = false,
     ): SkillRunResult {
         $serverUrl = config('services.flint_routine.cronxtools_url');
         if (! is_string($serverUrl) || $serverUrl === '') {
@@ -43,6 +65,7 @@ class SkillRunner
             'routine' => $payload['routine'] ?? null,
             'local_date' => $payload['local_date'] ?? null,
             'period' => $payload['period'] ?? null,
+            'dry_run' => $dryRun,
         ]);
         $agentSucceeded = false;
         $result = null;
@@ -57,36 +80,35 @@ class SkillRunner
                 'input' => json_encode($payload, JSON_THROW_ON_ERROR),
                 'stream' => true,
                 'max_tool_calls' => $skill->maxToolCalls,
-                'tools' => $this->mcpServers($skill, $serverUrl),
+                'tools' => $this->mcpServers($skill, $serverUrl, $dryRun),
             ];
             if ($continuation) {
                 $request['previous_response_id'] = $continuation->responseId;
             }
 
-            $response = Http::withToken($apiKey)
-                ->timeout($skill->timeoutSeconds)
-                ->connectTimeout(10)
-                ->accept('text/event-stream')
-                ->asJson()
-                ->withOptions(['stream' => true])
-                ->post(self::ENDPOINT, $request);
-            $providerResponded = true;
+            $results = [];
+            $captured = [];
+            $usage = new AiTokenUsage;
+            for ($round = 1; ; $round++) {
+                [$body, $streamFailures] = $this->send($apiKey, $skill, $request, $progress);
+                $providerResponded = true;
+                $usage = $this->addUsage($usage, AiTokenUsage::fromArray($body['usage'] ?? []));
+                $results[] = $this->interpret($skill, $body, $streamFailures, $progress, requireWrites: ! $dryRun);
 
-            if (! $response->successful()) {
-                throw new RuntimeException(
-                    "Skill {$skill->name} failed: HTTP {$response->status()} " . $this->safeError($response->body())
-                );
+                $approvals = $dryRun ? $this->answerApprovals($skill, $body, $captured) : [];
+                if ($approvals === []) {
+                    break;
+                }
+                if ($round >= self::MAX_DRY_RUN_ROUNDS || ! isset($body['id'])) {
+                    throw new RuntimeException("Skill {$skill->name} dry run did not finish within " . self::MAX_DRY_RUN_ROUNDS . ' rounds.');
+                }
+                $request['previous_response_id'] = (string) $body['id'];
+                $request['input'] = $approvals;
             }
-
-            [$body, $streamFailures] = $this->decodeResponse($response, $progress);
-            $result = $this->interpret($skill, $body, $streamFailures, $progress);
+            $result = $this->merge($skill, $results, $usage, $captured);
 
             try {
-                app(AiUsageRecorder::class)->complete(
-                    $reservation,
-                    AiTokenUsage::fromArray($body['usage'] ?? []),
-                    isset($body['id']) ? (string) $body['id'] : null,
-                );
+                app(AiUsageRecorder::class)->complete($reservation, $usage, $result->responseId);
             } catch (Exception $accountingException) {
                 // Never repeat a provider call after a successful response.
                 report($accountingException);
@@ -114,6 +136,101 @@ class SkillRunner
         }
     }
 
+    /** @param array<string, mixed> $request @return array{0: array<string, mixed>, 1: array<int, string>} */
+    private function send(string $apiKey, SkillDefinition $skill, array $request, ?ActionProgress $progress): array
+    {
+        $response = Http::withToken($apiKey)
+            ->timeout($skill->timeoutSeconds)
+            ->connectTimeout(10)
+            ->accept('text/event-stream')
+            ->asJson()
+            ->withOptions(['stream' => true])
+            ->post(self::ENDPOINT, $request);
+
+        if (! $response->successful()) {
+            throw new RuntimeException(
+                "Skill {$skill->name} failed: HTTP {$response->status()} " . $this->safeError($response->body())
+            );
+        }
+
+        return $this->decodeResponse($response, $progress);
+    }
+
+    /**
+     * Answers the approval requests a dry run's write tools raise: reads are
+     * approved, writes are recorded in $captured and declined.
+     *
+     * @param  array<string, mixed>  $body
+     * @param  array<int, array{tool: string, arguments: mixed}>  $captured
+     * @return array<int, array<string, mixed>>
+     */
+    private function answerApprovals(SkillDefinition $skill, array $body, array &$captured): array
+    {
+        $answers = [];
+        foreach ($body['output'] ?? [] as $item) {
+            if (($item['type'] ?? null) !== 'mcp_approval_request' || ! isset($item['id'])) {
+                continue;
+            }
+            $name = $this->qualifiedToolName($item);
+            if (! is_string($name) || ! in_array($name, $skill->allowedTools, true)) {
+                throw new RuntimeException("Skill {$skill->name} invoked an unapproved tool.");
+            }
+            $arguments = is_string($item['arguments'] ?? null)
+                ? (json_decode($item['arguments'], true) ?? $item['arguments'])
+                : ($item['arguments'] ?? null);
+            $approve = $name === 'spark__manage-flint-topic'
+                && in_array(is_array($arguments) ? ($arguments['operation'] ?? null) : null, self::READ_ONLY_TOPIC_OPERATIONS, true);
+            if (! $approve) {
+                $captured[] = ['tool' => $name, 'arguments' => $arguments];
+            }
+            $answers[] = [
+                'type' => 'mcp_approval_response',
+                'approval_request_id' => (string) $item['id'],
+                'approve' => $approve,
+            ];
+        }
+
+        return $answers;
+    }
+
+    /**
+     * @param  array<int, SkillRunResult>  $results
+     * @param  array<int, array{tool: string, arguments: mixed}>  $captured
+     */
+    private function merge(SkillDefinition $skill, array $results, AiTokenUsage $usage, array $captured): SkillRunResult
+    {
+        if (count($results) === 1 && $captured === []) {
+            return $results[0];
+        }
+        $last = $results[array_key_last($results)];
+        $mcpListTools = [];
+        foreach ($results as $result) {
+            $mcpListTools = array_merge($mcpListTools, $result->continuation?->mcpListTools ?? []);
+        }
+
+        return new SkillRunResult(
+            skill: $skill->name,
+            text: trim(implode("\n\n", array_filter(array_map(fn (SkillRunResult $result) => $result->text, $results)))),
+            toolsCalled: array_merge(...array_map(fn (SkillRunResult $result) => $result->toolsCalled, $results)),
+            inputTokens: $usage->inputTokens,
+            outputTokens: $usage->outputTokens,
+            responseId: $last->responseId,
+            continuation: $last->responseId ? new SkillContinuation($last->responseId, $mcpListTools) : null,
+            eventId: $last->eventId,
+            capturedWrites: $captured,
+        );
+    }
+
+    private function addUsage(AiTokenUsage $a, AiTokenUsage $b): AiTokenUsage
+    {
+        return new AiTokenUsage(
+            $a->inputTokens + $b->inputTokens,
+            $a->outputTokens + $b->outputTokens,
+            $a->cachedTokens + $b->cachedTokens,
+            $a->reasoningTokens + $b->reasoningTokens,
+        );
+    }
+
     /**
      * One MCP entry per server the skill needs. CronxTools serves every
      * namespaced tool under its own name; the You.com server names its tools
@@ -123,7 +240,7 @@ class SkillRunner
      *
      * @return array<int, array<string, mixed>>
      */
-    private function mcpServers(SkillDefinition $skill, string $cronxToolsUrl): array
+    private function mcpServers(SkillDefinition $skill, string $cronxToolsUrl, bool $dryRun = false): array
     {
         $cronxTools = [];
         $you = [];
@@ -141,7 +258,7 @@ class SkillRunner
             'server_description' => 'Spark, Karakeep, Fastmail, Outline and weather tools.',
             'server_url' => $cronxToolsUrl,
             'allowed_tools' => $cronxTools,
-            'require_approval' => 'never',
+            'require_approval' => $dryRun ? $this->dryRunApproval($cronxTools) : 'never',
         ]];
 
         $youUrl = config('services.flint_routine.you_mcp_url');
@@ -161,6 +278,26 @@ class SkillRunner
         }
 
         return $servers;
+    }
+
+    /**
+     * Writes wait for an approval the runner declines; everything else runs.
+     *
+     * @param  array<int, string>  $tools
+     * @return array<string, array{tool_names: array<int, string>}>|string
+     */
+    private function dryRunApproval(array $tools): array|string
+    {
+        $writes = array_values(array_intersect($tools, self::WRITE_TOOLS));
+        $reads = array_values(array_diff($tools, self::WRITE_TOOLS));
+        if ($writes === []) {
+            return 'never';
+        }
+
+        return array_filter([
+            'always' => ['tool_names' => $writes],
+            'never' => $reads === [] ? null : ['tool_names' => $reads],
+        ]);
     }
 
     /**
@@ -249,6 +386,7 @@ class SkillRunner
         array $body,
         array $streamFailures,
         ?ActionProgress $progress,
+        bool $requireWrites = true,
     ): SkillRunResult {
         if (($body['status'] ?? null) !== 'completed') {
             throw new RuntimeException("Skill {$skill->name} did not complete successfully.");
@@ -305,7 +443,7 @@ class SkillRunner
             }
         }
 
-        foreach ($skill->requiredSuccessTools as $requiredTool) {
+        foreach ($requireWrites ? $skill->requiredSuccessTools : [] as $requiredTool) {
             if (! in_array($requiredTool, $successfulTools, true)) {
                 throw new RuntimeException("Skill {$skill->name} did not complete required tool {$requiredTool}.");
             }

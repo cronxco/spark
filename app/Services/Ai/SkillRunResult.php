@@ -12,6 +12,7 @@ class SkillRunResult
 {
     /**
      * @param  array<int, string>  $toolsCalled
+     * @param  array<int, array{tool: string, arguments: mixed}>  $capturedWrites  Writes a dry run declined, kept out of toArray() so they never reach logs.
      */
     public function __construct(
         public readonly string $skill,
@@ -22,6 +23,7 @@ class SkillRunResult
         public readonly ?string $responseId = null,
         public readonly ?SkillContinuation $continuation = null,
         public readonly ?string $eventId = null,
+        public readonly array $capturedWrites = [],
     ) {}
 
     /**
