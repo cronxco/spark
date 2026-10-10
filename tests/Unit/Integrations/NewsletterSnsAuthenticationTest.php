@@ -18,6 +18,16 @@ class NewsletterSnsAuthenticationTest extends TestCase
 {
     private const TOPIC = 'arn:aws:sns:eu-west-1:123456789012:newsletters';
 
+    public static function notificationSignatures(): array
+    {
+        return [
+            'SHA1 without subject' => ['1', null],
+            'SHA256 without subject' => ['2', null],
+            'SHA1 with subject' => ['1', 'Newsletter subject'],
+            'SHA256 with subject' => ['2', 'Newsletter subject'],
+        ];
+    }
+
     #[Test]
     public function rejects_an_unconfigured_or_foreign_topic_before_any_http_request(): void
     {
@@ -91,16 +101,6 @@ class NewsletterSnsAuthenticationTest extends TestCase
         $payload['Message'] = json_encode(['content' => 'tampered']);
         $this->assertRejected($payload, 403);
         Queue::assertPushed(ProcessNewsletterEmailJob::class, 1);
-    }
-
-    public static function notificationSignatures(): array
-    {
-        return [
-            'SHA1 without subject' => ['1', null],
-            'SHA256 without subject' => ['2', null],
-            'SHA1 with subject' => ['1', 'Newsletter subject'],
-            'SHA256 with subject' => ['2', 'Newsletter subject'],
-        ];
     }
 
     #[Test]
