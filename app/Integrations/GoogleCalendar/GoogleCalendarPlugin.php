@@ -345,7 +345,6 @@ class GoogleCalendarPlugin extends OAuthPlugin
 
         if (! $response->successful()) {
             Log::error('Google Calendar token exchange failed', [
-                'response' => $response->body(),
                 'status' => $response->status(),
             ]);
             throw new Exception('Failed to exchange code for tokens: ' . $response->body());
@@ -411,8 +410,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 Log::warning('Failed to fetch calendar list from Google API', [
                     'group_id' => $group->id,
                     'status' => $response->status(),
-                    'response' => $response->body(),
-                ]);
+                    ]);
 
                 return [];
             }
@@ -533,7 +531,6 @@ class GoogleCalendarPlugin extends OAuthPlugin
             Log::warning('Failed to fetch Google Calendar events', [
                 'integration_id' => $integration->id,
                 'status' => $response->status(),
-                'response' => $response->body(),
             ]);
 
             throw new Exception('Failed to fetch Google Calendar events: ' . $response->status());
@@ -766,7 +763,6 @@ class GoogleCalendarPlugin extends OAuthPlugin
             Log::warning('Failed to fetch Google Calendar account info', [
                 'group_id' => $group->id,
                 'status' => $response->status(),
-                'response' => $response->body(),
             ]);
         }
     }
@@ -815,7 +811,6 @@ class GoogleCalendarPlugin extends OAuthPlugin
             Log::error('Failed to refresh Google Calendar token', [
                 'group_id' => $group->id,
                 'status' => $response->status(),
-                'response' => $response->body(),
             ]);
 
             // Check if refresh token is invalid
