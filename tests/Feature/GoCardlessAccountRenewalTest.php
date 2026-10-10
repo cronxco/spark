@@ -78,6 +78,8 @@ class GoCardlessAccountRenewalTest extends TestCase
             'missing card ending' => ['account_number', null],
             'different card ending' => ['account_number', '2003'],
             'blank card ending' => ['account_number', ' '],
+            'both providers unknown with whitespace' => ['provider', 'unknown ', true],
+            'both card endings unknown with whitespace' => ['account_number', ' unknown ', true],
             'conflicting IBAN' => ['raw.iban', 'GB82WEST12345698765432'],
             'conflicting raw card ending' => ['raw.maskedPan', '2003'],
             'conflicting raw currency' => ['raw.currency', 'EUR'],
@@ -435,7 +437,8 @@ class GoCardlessAccountRenewalTest extends TestCase
     public function changed_resource_ids_with_verified_identity_preserve_history_and_custom_account(): void
     {
         $canonical = $this->account('British Airways Premium Plus', $this->verifiedCardMetadata('current-resource'));
-        $canonical->update(['created_at' => now()->subDay()]);
+        $canonical->created_at = now()->subDay();
+        $canonical->save();
         $duplicate = $this->account('Bank supplied name', $this->verifiedCardMetadata('historical-resource'));
         $event = Event::create(['integration_id' => $this->integration->id, 'source_id' => 'resource-change-balance',
             'actor_id' => $duplicate->id, 'target_id' => $canonical->id, 'service' => 'gocardless',
@@ -473,12 +476,18 @@ class GoCardlessAccountRenewalTest extends TestCase
 
     #[Test]
     #[DataProvider('conflictingCardIdentity')]
-    public function changed_resource_ids_do_not_override_missing_or_conflicting_identity(string $field, mixed $value): void
+    public function changed_resource_ids_do_not_override_missing_or_conflicting_identity(string $field, mixed $value, bool $both = false): void
     {
         $canonical = $this->account('My card', $this->verifiedCardMetadata('current-resource'));
-        $canonical->update(['created_at' => now()->subDay()]);
+        $canonical->created_at = now()->subDay();
+        $canonical->save();
         $metadata = $this->verifiedCardMetadata('historical-resource');
         data_set($metadata, $field, $value);
+        if ($both) {
+            $canonicalMetadata = $canonical->metadata;
+            data_set($canonicalMetadata, $field, $value);
+            $canonical->update(['metadata' => $canonicalMetadata]);
+        }
         if ($field === 'account_id') {
             $canonicalMetadata = $canonical->metadata;
             $canonicalMetadata['gocardless_account_ids'] = [$value];

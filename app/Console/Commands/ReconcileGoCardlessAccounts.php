@@ -101,7 +101,7 @@ class ReconcileGoCardlessAccounts extends Command
         foreach (['account_id', 'integration_id', 'provider', 'currency', 'account_number'] as $field) {
             $left = $canonical->metadata[$field] ?? null;
             $right = $duplicate->metadata[$field] ?? null;
-            if (! is_string($left) || trim($left) === '' || $left === 'unknown' || $left !== $right) {
+            if (! is_string($left) || trim($left) === '' || trim($left) === 'unknown' || $left !== $right) {
                 return false;
             }
         }
