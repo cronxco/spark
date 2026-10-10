@@ -10,7 +10,9 @@ use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Flint\FlintRunCompletionService;
 use App\Services\Flint\FlintRunToken;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\Flint\RoutineConfig;
+use App\Services\Flint\RoutineModel;
 use App\Support\FlintDigestOpener;
 use App\Support\FlintQuestion;
 use Carbon\Carbon;
@@ -153,6 +155,25 @@ class FlintDigestService
     }
 
     /**
+     * The driver of the tracked run that wrote this digest, or null when the
+     * digest has no run token or its attempt was not recorded.
+     *
+     * @param  array<string, mixed>|null  $run
+     */
+    private function runDriver(Integration $integration, ?array $run): ?string
+    {
+        if (! is_string($run['routine'] ?? null) || ! is_string($run['run_uuid'] ?? null)) {
+            return null;
+        }
+
+        $attempt = app(TaskExecutionStore::class)
+            ->trackedRunAttempt($integration, "flint_routine_{$run['routine']}", $run['run_uuid']);
+        $driver = $attempt['driver'] ?? null;
+
+        return is_string($driver) ? $driver : null;
+    }
+
+    /**
      * The user's one Flint integration (decision D-F4): the plugin's
      * `assistant` instance, oldest first, created on first use.
      */
@@ -235,6 +256,7 @@ class FlintDigestService
             ['time' => now()],
         );
         $blocks = $data['blocks'] ?? [];
+        $driver = $this->runDriver($integration, $run);
         $metadata = array_filter([
             'period' => $period,
             'digest_object_id' => $digest->id,
@@ -249,6 +271,10 @@ class FlintDigestService
             'kind' => RoutineConfig::digestKind($run['routine'] ?? null),
             'skill' => $run['skill'] ?? null,
             'trigger_source' => $run['trigger_source'] ?? null,
+            // What wrote this digest, so outputs can be compared by driver and
+            // model. Null for a conversational digest with no tracked run.
+            'driver' => $driver,
+            'model' => RoutineModel::for($driver),
             'local_date' => $date->toDateString(),
             'note_ids_used' => $data['note_ids_used'] ?? null,
             'question_omission' => $data['question_omission'] ?? null,
