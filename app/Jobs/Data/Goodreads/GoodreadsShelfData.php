@@ -52,7 +52,7 @@ class GoodreadsShelfData extends BaseProcessingJob
                     ->first();
 
                 if ($existingBook && isset($existingBook->metadata['reading_started_at'])) {
-                    $storedStartDate = Carbon::parse($existingBook->metadata['reading_started_at']);
+                    $storedStartDate = Carbon::parse($existingBook->metadata['reading_started_at'])->utc();
                     logger()->info('Using stored start date for is_reading event', [
                         'book_id' => $bookId,
                         'stored_date' => $storedStartDate->toDateTimeString(),
@@ -98,7 +98,7 @@ class GoodreadsShelfData extends BaseProcessingJob
                 ],
                 'url' => $item['link'] ?? null,
                 'image_url' => $item['book_large_image_url'] ?? null,
-                'time' => $storedStartDate ?? ($item['pubDate'] ? Carbon::parse($item['pubDate']) : now()),
+                'time' => $storedStartDate ?? ($item['pubDate'] ? Carbon::parse($item['pubDate'])->utc() : now()->utc()),
             ];
 
             // Determine action and value based on shelf
@@ -132,7 +132,7 @@ class GoodreadsShelfData extends BaseProcessingJob
                     'value' => null,
                     'value_multiplier' => 1,
                     'value_unit' => null,
-                    'time' => $item['pubDate'] ? Carbon::parse($item['pubDate']) : now(),
+                    'time' => $item['pubDate'] ? Carbon::parse($item['pubDate'])->utc() : now()->utc(),
                 ];
             }
 
@@ -161,10 +161,13 @@ class GoodreadsShelfData extends BaseProcessingJob
         }
 
         // Create events
-        $created = $this->createEventsPayload($events);
+        $created = $this->createEvents($events);
+        // createEvents skips events that already exist, so match inputs by source_id rather than position
+        $eventsBySource = collect($events)->keyBy('source_id');
 
         // Tag events with author names and create series relationships
-        foreach ($created as $index => $event) {
+        foreach ($created as $event) {
+            $input = $eventsBySource->get($event->source_id, []);
             // Tag with author
             $tags = $event->event_metadata['__tags'] ?? [];
             foreach ($tags as $tag) {
@@ -172,13 +175,13 @@ class GoodreadsShelfData extends BaseProcessingJob
             }
 
             // Create series relationship if applicable
-            $seriesInfo = $events[$index]['series_info'] ?? null;
+            $seriesInfo = $input['series_info'] ?? null;
             if ($seriesInfo && $seriesInfo['series_name']) {
                 $this->createSeriesRelationship($event->target, $seriesInfo);
             }
 
             // Download book cover to Media Library
-            $bookCoverUrl = $events[$index]['target']['image_url'] ?? null;
+            $bookCoverUrl = $input['target']['image_url'] ?? null;
             if ($bookCoverUrl && $event->target) {
                 $this->downloadBookCover($event->target, $bookCoverUrl);
             }
@@ -243,6 +246,29 @@ class GoodreadsShelfData extends BaseProcessingJob
 
         // Fall back to parent method for other object types
         return parent::createOrUpdateObject($objectData);
+    }
+
+    /**
+     * Download book cover to Media Library
+     */
+    protected function downloadBookCover(EventObject $book, string $coverUrl): void
+    {
+        try {
+            $helper = app(MediaDownloadHelper::class);
+            $helper->downloadAndAttachMedia(
+                $coverUrl,
+                $book,
+                'downloaded_images',
+                ['alt' => $book->title]
+            );
+        } catch (Exception $e) {
+            // Log but don't fail the entire job
+            logger()->warning('Failed to download book cover', [
+                'book_id' => $book->id,
+                'cover_url' => $coverUrl,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -321,29 +347,6 @@ class GoodreadsShelfData extends BaseProcessingJob
                 'series_order' => $seriesInfo['series_number'],
             ],
         ]);
-    }
-
-    /**
-     * Download book cover to Media Library
-     */
-    private function downloadBookCover(EventObject $book, string $coverUrl): void
-    {
-        try {
-            $helper = app(MediaDownloadHelper::class);
-            $helper->downloadAndAttachMedia(
-                $coverUrl,
-                $book,
-                'downloaded_images',
-                ['alt' => $book->title]
-            );
-        } catch (Exception $e) {
-            // Log but don't fail the entire job
-            logger()->warning('Failed to download book cover', [
-                'book_id' => $book->id,
-                'cover_url' => $coverUrl,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 
     /**
