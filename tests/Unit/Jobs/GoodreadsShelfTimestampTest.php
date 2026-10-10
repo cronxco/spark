@@ -15,17 +15,7 @@ class GoodreadsShelfTimestampTest extends TestCase
     {
         $integration = new Integration;
         $integration->service = 'goodreads';
-        $job = new class($integration, [
-            'shelf' => 'read',
-            'items' => [[
-                'guid' => 'review-123',
-                'book_id' => '123',
-                'title' => 'Example Book',
-                'user_rating' => 4,
-                'pubDate' => 'Sun, 27 Sep 2026 23:08:03 -0700',
-                'book_large_image_url' => 'https://example.com/cover.jpg',
-            ]],
-        ]) extends GoodreadsShelfData
+        $job = new class($integration, ['shelf' => 'read', 'items' => [['guid' => 'review-123', 'book_id' => '123', 'title' => 'Example Book', 'user_rating' => 4, 'pubDate' => 'Sun, 27 Sep 2026 23:08:03 -0700', 'book_large_image_url' => 'https://example.com/cover.jpg']]]) extends GoodreadsShelfData
         {
             public array $captured = [];
 
