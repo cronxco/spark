@@ -209,7 +209,15 @@ Do not append dated bullets; the mention history is already kept for you by the
 `discussed_in` links, and the Spark UI shows it.
 
 A good summary answers: what is this, where does it stand, what is it waiting
-on, and what would change it. Keep it under about 200 words.
+on, and what would change it.
+
+**Keep `content` to 150 words or fewer.** When an update would push it past that,
+drop whatever the new development has superseded rather than squeezing it in; the
+`discussed_in` links keep the history. Do not carry caveats into it (“is not
+established”, “does not prove”, “no date is established”): say what is known and what
+the thread is waiting on. One topic is one story — do not fold an unrelated
+development into an existing topic because it shares a broad theme; it either clears
+the bar for its own topic or stays out.
 
 If a topic was mentioned but nothing changed, link it (`related_event_id`) and
 leave `content` alone. Linking is cheap; rewriting an unchanged summary is
@@ -298,6 +306,7 @@ correct run.
 - [ ] concluded topics marked `resolved`;
 - [ ] every topic today's digest genuinely advanced was updated and linked;
 - [ ] `content` rewritten as current understanding, not appended to as a log;
+- [ ] every `content` written is 150 words or fewer, with no caveat clauses;
 - [ ] every answered question in the window was checked for a thing with a horizon;
 - [ ] any dated commitment in the evidence has a topic with `next_review_at` on that date;
 - [ ] topics due for review lead with what is due, so the briefing can see it;
