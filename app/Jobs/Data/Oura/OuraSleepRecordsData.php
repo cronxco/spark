@@ -164,7 +164,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
             'type' => $item['type'] ?? null,
             'period' => $item['period'] ?? null,
             'time_in_bed' => $item['time_in_bed'] ?? null,
-            'raw' => $item,
+            'raw' => Arr::except($item, ['heart_rate', 'hrv', 'movement_30_sec', 'sleep_phase_5_min', 'sleep_phase_30_sec']),
             'efficiency' => $efficiency,
         ];
 

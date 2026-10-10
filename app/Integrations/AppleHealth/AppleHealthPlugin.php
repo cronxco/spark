@@ -671,7 +671,7 @@ class AppleHealthPlugin extends WebhookPlugin
                 'source' => Arr::get($workout, 'source'),
                 'activities' => Arr::get($workout, 'activities', []),
                 'isIndoor' => Arr::get($workout, 'isIndoor'),
-                'raw' => $workout,
+                'raw' => Arr::except($workout, ['route', 'heartRateData', 'heartRateRecovery', 'stepCount', 'walkingAndRunningDistance', 'activeEnergy', 'basalEnergy']),
                 'route_points' => $routePoints,
                 'route_summary' => [
                     'total_points' => count($routePoints),
