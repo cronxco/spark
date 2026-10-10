@@ -237,6 +237,88 @@ class SkillRunnerTest extends TestCase
         app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
     }
 
+    #[Test]
+    public function a_dry_run_declines_and_records_writes_but_lets_reads_through(): void
+    {
+        $paused = [
+            'id' => 'resp-paused',
+            'status' => 'completed',
+            'output' => [
+                ['type' => 'mcp_list_tools', 'tools' => [['name' => 'spark__manage-flint-topic']]],
+                [
+                    'type' => 'mcp_approval_request',
+                    'id' => 'mcpr-list',
+                    'server_label' => 'cronxtools',
+                    'name' => 'spark__manage-flint-topic',
+                    'arguments' => json_encode(['operation' => 'list']),
+                ],
+                [
+                    'type' => 'mcp_approval_request',
+                    'id' => 'mcpr-digest',
+                    'server_label' => 'cronxtools',
+                    'name' => 'spark__create-flint-digest',
+                    'arguments' => json_encode(['title' => 'News — 10 Oct', 'blocks' => []]),
+                ],
+            ],
+            'usage' => ['input_tokens' => 10, 'output_tokens' => 2],
+        ];
+        $finished = $this->completedBody([['type' => 'message', 'content' => [['text' => 'Run notes.']]]]);
+        Http::fakeSequence()->push($paused)->push($finished);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        $result = app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup'], dryRun: true);
+
+        $this->assertSame([[
+            'tool' => 'spark__create-flint-digest',
+            'arguments' => ['title' => 'News — 10 Oct', 'blocks' => []],
+        ]], $result->capturedWrites);
+        $this->assertSame('Run notes.', $result->text);
+        $this->assertSame(25, $result->inputTokens);
+        $this->assertArrayNotHasKey('captured_writes', $result->toArray());
+
+        $requests = Http::recorded()->map(fn ($pair) => $pair[0]);
+        $this->assertContains('spark__create-flint-digest', $requests[0]['tools'][0]['require_approval']['always']['tool_names']);
+        $this->assertNotContains('spark__get-event-tool', $requests[0]['tools'][0]['require_approval']['always']['tool_names']);
+        $this->assertSame('resp-paused', $requests[1]['previous_response_id']);
+        $this->assertSame([
+            ['type' => 'mcp_approval_response', 'approval_request_id' => 'mcpr-list', 'approve' => true],
+            ['type' => 'mcp_approval_response', 'approval_request_id' => 'mcpr-digest', 'approve' => false],
+        ], $requests[1]['input']);
+    }
+
+    #[Test]
+    public function a_normal_run_never_asks_for_approval(): void
+    {
+        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody())]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        $result = app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+
+        $this->assertSame([], $result->capturedWrites);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request['tools'][0]['require_approval'] === 'never');
+    }
+
+    #[Test]
+    public function a_dry_run_rejects_an_approval_request_for_an_unlisted_tool(): void
+    {
+        Http::fake(['api.openai.com/v1/responses' => Http::response([
+            'id' => 'resp-paused',
+            'status' => 'completed',
+            'output' => [[
+                'type' => 'mcp_approval_request',
+                'id' => 'mcpr-x',
+                'server_label' => 'cronxtools',
+                'name' => 'komodo__deploy_stack',
+                'arguments' => '{}',
+            ]],
+        ])]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        $this->expectException(RuntimeException::class);
+        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup'], dryRun: true);
+    }
+
     /** @param array<int, array<string, mixed>>|null $output */
     private function completedBody(?array $output = null): array
     {

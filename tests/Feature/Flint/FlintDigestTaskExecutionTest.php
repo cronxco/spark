@@ -3,6 +3,7 @@
 namespace Tests\Feature\Flint;
 
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
+use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\TaskExecution;
@@ -161,6 +162,42 @@ class FlintDigestTaskExecutionTest extends TestCase
         $this->assertSame('success', $execution->status);
         $this->assertSame($job->runUuid, $execution->last_success['run_uuid']);
         $this->assertSame($result['event_id'], $execution->last_success['event_id']);
+    }
+
+    #[Test]
+    public function a_run_bound_digest_records_the_driver_that_wrote_it(): void
+    {
+        Http::fake(['routine.test/*' => Http::response(['ok' => true], 200)]);
+        $user = User::factory()->create();
+        $job = new TriggerFlintDigestRoutineJob($user, 'morning', '2026-06-15', 'America/New_York', 'scheduled');
+        $job->handle();
+
+        $result = app(FlintDigestService::class)->create($user, [
+            'title' => 'Morning Digest',
+            'period' => 'morning',
+            'date' => '2026-06-15',
+            'run_token' => $job->runToken,
+            'blocks' => $this->routineDigestBlocks(),
+        ]);
+
+        $metadata = Event::findOrFail($result['event_id'])->event_metadata;
+        $this->assertSame('webhook', $metadata['driver']);
+        // A Claude Code Routine picks its own model, so Spark cannot name it.
+        $this->assertArrayNotHasKey('model', $metadata);
+    }
+
+    #[Test]
+    public function a_digest_without_a_run_token_records_no_driver(): void
+    {
+        $user = User::factory()->create();
+
+        $result = app(FlintDigestService::class)->create($user, [
+            'title' => 'Morning Digest',
+            'period' => 'morning',
+            'date' => '2026-06-15',
+        ]);
+
+        $this->assertArrayNotHasKey('driver', Event::findOrFail($result['event_id'])->event_metadata);
     }
 
     #[Test]
