@@ -71,24 +71,45 @@ class KarakeepBookmarksPull extends BaseFetchJob
 
         $userData = $userResponse->json();
 
-        // Fetch bookmarks
-        $bookmarksQuery = [
-            'limit' => $fetchLimit,
-            'sort' => 'updatedAt',
-            'order' => 'desc',
-        ];
-        $plugin->logApiRequest('GET', '/api/v1/bookmarks', ['Authorization' => '[REDACTED]'], $bookmarksQuery, (string) $this->integration->id);
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET /api/v1/bookmarks'));
-        $bookmarksResponse = Http::withToken($accessToken)
-            ->get($baseUrl . '/api/v1/bookmarks', $bookmarksQuery);
-        $span?->finish();
-        $plugin->logApiResponse('GET', '/api/v1/bookmarks', $bookmarksResponse->status(), $bookmarksResponse->body(), $bookmarksResponse->headers(), (string) $this->integration->id);
+        $bookmarksData = ['bookmarks' => []];
+        $cursor = null;
+        $seenCursors = [];
 
-        if (! $bookmarksResponse->successful()) {
-            throw new Exception('Failed to fetch Karakeep bookmarks: ' . $bookmarksResponse->body());
-        }
+        do {
+            $bookmarksQuery = [
+                'limit' => max(1, min(100, (int) $fetchLimit)),
+                'sortOrder' => 'desc',
+            ];
+            if ($cursor !== null) {
+                $bookmarksQuery['cursor'] = $cursor;
+            }
 
-        $bookmarksData = $bookmarksResponse->json();
+            $plugin->logApiRequest('GET', '/api/v1/bookmarks', ['Authorization' => '[REDACTED]'], $bookmarksQuery, (string) $this->integration->id);
+            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription('GET /api/v1/bookmarks'));
+            $bookmarksResponse = Http::withToken($accessToken)
+                ->timeout(30)
+                ->get($baseUrl . '/api/v1/bookmarks', $bookmarksQuery);
+            $span?->finish();
+            $plugin->logApiResponse('GET', '/api/v1/bookmarks', $bookmarksResponse->status(), $bookmarksResponse->body(), $bookmarksResponse->headers(), (string) $this->integration->id);
+
+            if (! $bookmarksResponse->successful()) {
+                throw new Exception('Failed to fetch Karakeep bookmarks: HTTP ' . $bookmarksResponse->status());
+            }
+
+            $page = $bookmarksResponse->json();
+            if (! is_array($page) || ! isset($page['bookmarks']) || ! is_array($page['bookmarks'])) {
+                throw new Exception('Invalid Karakeep bookmarks response');
+            }
+            $bookmarksData['bookmarks'] = array_merge($bookmarksData['bookmarks'], $page['bookmarks']);
+            $cursor = $page['nextCursor'] ?? null;
+
+            if ($cursor !== null) {
+                if (! is_string($cursor) || $cursor === '' || isset($seenCursors[$cursor])) {
+                    throw new Exception('Invalid or repeated Karakeep bookmarks cursor');
+                }
+                $seenCursors[$cursor] = true;
+            }
+        } while ($cursor !== null);
 
         // Fetch tags
         $plugin->logApiRequest('GET', '/api/v1/tags', ['Authorization' => '[REDACTED]'], [], (string) $this->integration->id);
