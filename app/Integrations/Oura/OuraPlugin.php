@@ -2827,7 +2827,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         return $sanitized;
     }
 
-
     protected function fetchCardiovascularAge(Integration $integration, string $startDate, string $endDate): void
     {
         $this->ensureUserProfile($integration);

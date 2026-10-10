@@ -2851,7 +2851,6 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
         return $sanitized;
     }
 
-
     /**
      * Track API call for monitoring purposes
      */

@@ -456,5 +456,4 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
 
         return $sanitized;
     }
-
 }

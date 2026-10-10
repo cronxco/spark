@@ -1114,5 +1114,4 @@ class GitHubPlugin extends OAuthPlugin
 
         return $sanitized;
     }
-
 }

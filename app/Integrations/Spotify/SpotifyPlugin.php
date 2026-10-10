@@ -1502,5 +1502,4 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
 
         return $sanitized;
     }
-
 }

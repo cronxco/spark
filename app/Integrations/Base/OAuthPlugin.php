@@ -442,5 +442,4 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
     {
         return sanitizeData($data);
     }
-
 }

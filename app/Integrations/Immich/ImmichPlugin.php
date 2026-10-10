@@ -468,5 +468,4 @@ class ImmichPlugin extends ManualPlugin
 
         return $sanitized;
     }
-
 }

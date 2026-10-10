@@ -346,5 +346,4 @@ class KarakeepPlugin extends ManualPlugin
 
         return $sanitized;
     }
-
 }

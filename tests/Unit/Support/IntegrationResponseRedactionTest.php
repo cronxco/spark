@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Support;
 
+use App\Integrations\Oura\OuraPlugin;
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -93,7 +94,7 @@ class IntegrationResponseRedactionTest extends TestCase
     #[Test]
     public function plugin_loggers_pass_large_json_bodies_to_the_central_sanitizer(): void
     {
-        $plugin = new \App\Integrations\Oura\OuraPlugin;
+        $plugin = new OuraPlugin;
         $this->assertFalse(method_exists($plugin, 'sanitizeResponseBody'));
 
         $body = json_encode(['data' => array_fill(0, 600, ['bpm' => 60, 'source' => 'awake']), 'next_token' => 'abc']);
