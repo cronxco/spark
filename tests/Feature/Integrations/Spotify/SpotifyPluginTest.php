@@ -4,9 +4,10 @@ namespace Tests\Feature\Integrations\Spotify;
 
 use App\Integrations\Spotify\SpotifyPlugin;
 use App\Models\Integration;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Tests\TestCase;
 
 class SpotifyPluginTest extends TestCase
@@ -251,7 +252,7 @@ class SpotifyPluginTest extends TestCase
             protected function processTrackPlay(Integration $integration, array $playData, string $source): void
             {
                 if ($this->failProcessing) {
-                    throw new \RuntimeException('Processing failed');
+                    throw new RuntimeException('Processing failed');
                 }
             }
         };
@@ -260,7 +261,7 @@ class SpotifyPluginTest extends TestCase
         try {
             $plugin->processListeningData($integration, $data);
             $this->fail('Failed track processing must be retried.');
-        } catch (\RuntimeException $exception) {
+        } catch (RuntimeException $exception) {
             $this->assertSame('Processing failed', $exception->getMessage());
         }
         $this->assertSame(1000, $integration->fresh()->configuration['spotify_after_ms']);
