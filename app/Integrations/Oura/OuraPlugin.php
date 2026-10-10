@@ -1676,16 +1676,28 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'Authorization' => '[REDACTED]',
             ], $query, $integration->id);
 
-            $response = Http::withToken($token)
+            $hub = SentrySdk::getCurrentHub();
+            $parentSpan = $hub->getSpan();
+            $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
+            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
+            try {
+                $response = Http::withToken($token)
                 ->connectTimeout(5)
                 ->timeout(30)
-                ->get($this->baseUrl . $endpoint, $query);
+                    ->get($this->baseUrl . $endpoint, $query);
+            } finally {
+                $span?->finish();
+            }
 
             $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
             $response->throw();
             $page = $response->json();
             if (! is_array($page)) {
                 throw new Exception('Oura API returned an invalid JSON response');
+            }
+            if ((array_key_exists('data', $page) && ! is_array($page['data']))
+                || ($result !== null && array_key_exists('data', $result) && ! array_key_exists('data', $page))) {
+                throw new Exception('Oura API returned an invalid collection page');
             }
             $result ??= $page;
             if (isset($page['data']) && is_array($page['data'])) {
