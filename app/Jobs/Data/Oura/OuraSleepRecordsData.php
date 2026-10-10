@@ -75,7 +75,6 @@ class OuraSleepRecordsData extends BaseProcessingJob
             'concept' => 'sleep',
             'type' => 'oura_sleep_record',
             'title' => 'Sleep Record',
-
         ];
 
         // Get the total_sleep_duration as the main value (instead of duration)
