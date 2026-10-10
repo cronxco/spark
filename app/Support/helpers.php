@@ -483,6 +483,17 @@ if (! function_exists('sensitive_log_keys')) {
     }
 }
 
+if (! function_exists('is_log_safe_token_key')) {
+    /**
+     * Keys that contain "token" but hold pagination cursors or usage counts,
+     * not credentials. Keeping them visible lets pagination be debugged.
+     */
+    function is_log_safe_token_key(string $lowerKey): bool
+    {
+        return (bool) preg_match('/^(?:next_?(?:page_?|sync_?)?token|page_?token|sync_?token|(?:prompt|completion|total|input|output|cached|reasoning)_tokens)$/', $lowerKey);
+    }
+}
+
 if (! function_exists('sanitizeData')) {
     function sanitizeData(array $data): array
     {
@@ -491,7 +502,7 @@ if (! function_exists('sanitizeData')) {
 
         foreach ($data as $key => $value) {
             $lowerKey = strtolower((string) $key);
-            if (in_array($lowerKey, $sensitiveKeys, true) || preg_match('/(?:token|password|secret|signature)/i', $lowerKey)) {
+            if (in_array($lowerKey, $sensitiveKeys, true) || (preg_match('/(?:token|password|secret|signature)/i', $lowerKey) && ! is_log_safe_token_key($lowerKey))) {
                 $sanitized[$key] = '[REDACTED]';
             } elseif (is_array($value)) {
                 $sanitized[$key] = sanitizeData($value);

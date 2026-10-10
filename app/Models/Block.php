@@ -117,8 +117,9 @@ class Block extends Model implements HasMedia
         $existingBlock = $query->first();
 
         if ($existingBlock) {
-            // Update the existing block
-            $existingBlock->update(array_merge($attributes, $values));
+            // Update the existing block. Mappers pass `embeddings => null` when
+            // they have no vector; that must not wipe a generated embedding.
+            $existingBlock->update(static::withoutNullEmbeddings(array_merge($attributes, $values)));
 
             return $existingBlock;
         }
@@ -134,10 +135,22 @@ class Block extends Model implements HasMedia
                 throw $e;
             }
 
-            $existingBlock->update(array_merge($attributes, $values));
+            $existingBlock->update(static::withoutNullEmbeddings(array_merge($attributes, $values)));
 
             return $existingBlock;
         }
+    }
+
+    /**
+     * Drop a null `embeddings` value so updates keep the existing vector.
+     */
+    public static function withoutNullEmbeddings(array $values): array
+    {
+        if (array_key_exists('embeddings', $values) && $values['embeddings'] === null) {
+            unset($values['embeddings']);
+        }
+
+        return $values;
     }
 
     /**

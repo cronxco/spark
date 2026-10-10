@@ -28,6 +28,9 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 {
     use GoCardlessRenewal;
 
+    /** Days either side of a booking date to look for the pending version of a transaction. */
+    public const PENDING_TWIN_DAYS = 5;
+
     // Cache configuration constants
     private const ACCOUNT_DETAILS_CACHE_TTL = 86400; // 24 hours
 
@@ -766,7 +769,7 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true // Use per-instance logging
@@ -865,6 +868,18 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
         $existingEvent = Event::where('integration_id', $integration->id)
             ->where('source_id', $sourceId)
             ->first();
+
+        // A pending transaction often books under a different date or counterparty name, which
+        // changes the content hash. Reuse the pending event's ID so it settles instead of duplicating.
+        if (! $existingEvent && $status === 'booked' && ($twin = $this->findPendingTwin($integration, $tx))) {
+            $sourceId = $twin->source_id;
+            $existingEvent = $twin;
+        }
+
+        // Never move a settled transaction back to pending
+        if ($existingEvent && $status === 'pending' && ($existingEvent->event_metadata['transaction_status'] ?? null) === 'booked') {
+            return;
+        }
 
         // Determine if this is a status change
         $isStatusChange = $existingEvent && $existingEvent->event_metadata['transaction_status'] !== $status;
@@ -1263,8 +1278,14 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
             throw new Exception('Daily GoCardless transaction API call limit exceeded for account. Please wait until tomorrow.');
         }
 
-        // Get date range for transactions (last 7 days by default)
+        // Get date range for transactions (last 7 days by default). Once a week the same
+        // call covers 60 days instead, so late bookings and corrections are picked up
+        // without spending one of the bank's few daily transaction calls on a separate sweep.
         $daysBack = (int) ($integration->configuration['days_back'] ?? 7);
+        $isSweep = $this->isSweepDue($integration);
+        if ($isSweep) {
+            $daysBack = max($daysBack, 60);
+        }
         $startDate = now()->subDays($daysBack)->toDateString();
         $endDate = now()->toDateString();
 
@@ -1325,6 +1346,10 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         // Record this API call for rate limiting
         $this->recordTransactionApiCall($accountId);
+
+        if ($isSweep) {
+            $this->markSwept($integration);
+        }
 
         return $data;
     }
@@ -1796,6 +1821,32 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
     }
 
     /**
+     * When an end-user agreement stops granting access.
+     *
+     * Returns null when the agreement has not been accepted yet or the API
+     * does not report it. Agreement reads do not count towards the per-account
+     * bank rate limits.
+     */
+    public function getAgreementExpiry(string $agreementId): ?Carbon
+    {
+        $endpoint = "/agreements/enduser/{$agreementId}/";
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+        ])->timeout(30)->get($this->getBaseUrl() . $endpoint);
+
+        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers());
+        $response->throw();
+
+        $accepted = $response->json('accepted');
+        $days = (int) ($response->json('access_valid_for_days') ?? 0);
+        if (! is_string($accepted) || $accepted === '' || $days <= 0) {
+            return null;
+        }
+
+        return Carbon::parse($accepted)->utc()->addDays($days);
+    }
+
+    /**
      * Attempt to reconfirm an existing EUA
      *
      * @throws Exception if reconfirmation not enabled or fails
@@ -1892,6 +1943,40 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
                 'requisition_id' => $requisitionId,
             ]);
         }
+    }
+
+    /**
+     * Find the pending event a booked transaction settles, when its content hash differs.
+     *
+     * Matches on account, direction, amount and currency within PENDING_TWIN_DAYS of the
+     * booking date, preferring the same counterparty and then the nearest time.
+     */
+    public function findPendingTwin(Integration $integration, array $tx): ?Event
+    {
+        $rawAmount = (float) ($tx['transactionAmount']['amount'] ?? 0);
+        $date = $tx['bookingDateTime'] ?? $tx['bookingDate'] ?? $tx['valueDate'] ?? null;
+        if ($rawAmount == 0 || ! $date) {
+            return null;
+        }
+        $bookedAt = Carbon::parse($date)->utc();
+
+        $candidates = Event::where('integration_id', $integration->id)
+            ->where('action', $this->determineTransactionAction($rawAmount, 'booked'))
+            ->where('value', abs((int) round($rawAmount * 100)))
+            ->where('value_unit', $tx['transactionAmount']['currency'] ?? 'EUR')
+            ->where('event_metadata->transaction_status', 'pending')
+            ->whereBetween('time', [
+                $bookedAt->copy()->subDays(self::PENDING_TWIN_DAYS)->startOfDay(),
+                $bookedAt->copy()->addDays(self::PENDING_TWIN_DAYS)->endOfDay(),
+            ])
+            ->get();
+
+        $counterparty = Str::lower((string) ($tx['creditorName'] ?? $tx['debtorName'] ?? ''));
+
+        return $candidates->sortBy(fn (Event $event) => [
+            $counterparty !== '' && Str::lower((string) ($event->event_metadata['raw']['creditorName'] ?? $event->event_metadata['raw']['debtorName'] ?? '')) === $counterparty ? 0 : 1,
+            abs($event->time->diffInSeconds($bookedAt)),
+        ])->first();
     }
 
     protected function getRequiredScopes(): string
@@ -2070,11 +2155,25 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
     /**
      * Perform a sweep if needed for any instance type
      */
+    protected function isSweepDue(Integration $integration): bool
+    {
+        $lastSweepAt = $integration->configuration['gocardless_last_sweep_at'] ?? null;
+
+        return ! $lastSweepAt || Carbon::parse($lastSweepAt)->lt(now()->subHours(self::getSweepSchedule()['period_hours']));
+    }
+
+    protected function markSwept(Integration $integration): void
+    {
+        $config = $integration->fresh()->configuration ?? [];
+        $config['gocardless_last_sweep_at'] = now()->toIso8601String();
+        $integration->update(['configuration' => $config]);
+    }
+
     protected function performSweepIfNeeded(Integration $integration): void
     {
         $config = $integration->configuration ?? [];
         $lastSweepAt = isset($config['gocardless_last_sweep_at']) ? Carbon::parse($config['gocardless_last_sweep_at']) : null;
-        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subDays(6));
+        $doSweep = $this->isSweepDue($integration);
 
         if ($doSweep) {
             Log::info('GoCardless sweep triggered', [
@@ -2849,28 +2948,6 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
         }
 
         return $sanitized;
-    }
-
-    /**
-     * Sanitize response body for logging (limit size and remove sensitive data)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        // Limit response body size to prevent huge logs
-        // $maxLength = 10000;
-        // if (strlen($body) > $maxLength) {
-        //     return substr($body, 0, $maxLength) . '... [TRUNCATED]';
-        // }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
     }
 
     /**

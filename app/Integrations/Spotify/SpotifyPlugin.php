@@ -558,7 +558,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true // Use per-instance logging
@@ -659,12 +659,16 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'metadata' => $objectData['metadata'] ?? [],
                 'url' => $objectData['url'] ?? null,
                 'media_url' => $objectData['image_url'] ?? null,
-                'embeddings' => $objectData['embeddings'] ?? null,
+                ...(isset($objectData['embeddings']) ? ['embeddings' => $objectData['embeddings']] : []),
             ]
         );
     }
 
-    public function processListeningData(Integration $integration, array $listeningData): void
+    /**
+     * @param  bool  $skipFailedTracks  On the job's final attempt, skip tracks that
+     *                                  still fail so one bad item cannot stop the cursor forever.
+     */
+    public function processListeningData(Integration $integration, array $listeningData, bool $skipFailedTracks = false): void
     {
         // Check for potential duplicate processing
         $this->checkForDuplicateProcessing($integration, $listeningData);
@@ -682,10 +686,16 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                     Log::error('Spotify: Failed to process recently played track', [
                         'integration_id' => $integration->id,
                         'track_id' => $playedItem['track']['id'] ?? 'unknown',
+                        'played_at' => $playedItem['played_at'] ?? null,
                         'error' => $e->getMessage(),
+                        'skipped' => $skipFailedTracks,
                     ]);
 
-                    throw $e;
+                    if (! $skipFailedTracks) {
+                        throw $e;
+                    }
+
+                    $skippedCount++;
                 }
             }
 
@@ -693,6 +703,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'integration_id' => $integration->id,
                 'total_tracks' => count($listeningData['recently_played']),
                 'processed_count' => $processedCount,
+                'skipped_count' => $skippedCount,
             ]);
         }
 
@@ -1490,27 +1501,5 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         }
 
         return $sanitized;
-    }
-
-    /**
-     * Sanitize response body for logging (limit size and remove sensitive data)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        // Limit response body size to prevent huge logs
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
-        }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
     }
 }

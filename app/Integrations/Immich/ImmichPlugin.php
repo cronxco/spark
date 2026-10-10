@@ -377,7 +377,7 @@ class ImmichPlugin extends ManualPlugin
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true
@@ -467,26 +467,5 @@ class ImmichPlugin extends ManualPlugin
         }
 
         return $sanitized;
-    }
-
-    /**
-     * Sanitize response body for logging (limit size)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . ' ... [TRUNCATED]';
-        }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
     }
 }

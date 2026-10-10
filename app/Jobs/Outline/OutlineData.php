@@ -3,6 +3,7 @@
 namespace App\Jobs\Outline;
 
 use App\Jobs\Base\BaseProcessingJob;
+use App\Models\Block;
 use App\Models\Event;
 use Carbon\CarbonImmutable;
 use DateTime;
@@ -249,7 +250,7 @@ class OutlineData extends BaseProcessingJob
                     ->first();
 
                 if ($activeBlock) {
-                    $activeBlock->update([
+                    $activeBlock->update(Block::withoutNullEmbeddings([
                         'time' => $b['time'] ?? $event->time,
                         'metadata' => $b['metadata'] ?? [],
                         'url' => $b['url'] ?? null,
@@ -258,7 +259,7 @@ class OutlineData extends BaseProcessingJob
                         'value_multiplier' => $b['value_multiplier'] ?? 1,
                         'value_unit' => $b['value_unit'] ?? null,
                         'embeddings' => $b['embeddings'] ?? null,
-                    ]);
+                    ]));
 
                     continue;
                 }

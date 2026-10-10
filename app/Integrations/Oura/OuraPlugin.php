@@ -1347,7 +1347,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true // Use per-instance logging
@@ -1597,7 +1597,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'metadata' => $objectData['metadata'] ?? [],
                 'url' => $objectData['url'] ?? null,
                 'media_url' => $objectData['image_url'] ?? null,
-                'embeddings' => $objectData['embeddings'] ?? null,
+                ...(isset($objectData['embeddings']) ? ['embeddings' => $objectData['embeddings']] : []),
             ]
         );
     }
@@ -1667,32 +1667,58 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             throw new Exception('Missing access token for authenticated request');
         }
 
-        // Log the API request
-        $this->logApiRequest('GET', $endpoint, [
-            'Authorization' => '[REDACTED]',
-        ], $query, $integration->id);
+        $result = null;
+        $items = [];
+        $seenTokens = [];
 
-        $hub = SentrySdk::getCurrentHub();
-        $parentSpan = $hub->getSpan();
-        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
-        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
-        $span?->finish();
+        do {
+            $this->logApiRequest('GET', $endpoint, [
+                'Authorization' => '[REDACTED]',
+            ], $query, $integration->id);
 
-        // Log the API response
-        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
+            $hub = SentrySdk::getCurrentHub();
+            $parentSpan = $hub->getSpan();
+            $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
+            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
+            try {
+                $response = Http::withToken($token)
+                    ->connectTimeout(5)
+                    ->timeout(30)
+                    ->get($this->baseUrl . $endpoint, $query);
+            } finally {
+                $span?->finish();
+            }
 
-        if (! $response->successful()) {
-            Log::warning('Oura API request failed', [
-                'endpoint' => $endpoint,
-                'status' => $response->status(),
-                'response' => $response->body(),
-            ]);
+            $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
+            $response->throw();
+            $page = $response->json();
+            if (! is_array($page)) {
+                throw new Exception('Oura API returned an invalid JSON response');
+            }
+            if ((array_key_exists('data', $page) && ! is_array($page['data']))
+                || ($result !== null && array_key_exists('data', $result) && ! array_key_exists('data', $page))) {
+                throw new Exception('Oura API returned an invalid collection page');
+            }
+            $result ??= $page;
+            if (isset($page['data']) && is_array($page['data'])) {
+                $items = array_merge($items, $page['data']);
+            }
+            $nextToken = $page['next_token'] ?? null;
+            if ($nextToken !== null && $nextToken !== '') {
+                if (! is_string($nextToken) || isset($seenTokens[$nextToken])) {
+                    throw new Exception('Oura API returned an invalid or repeated pagination token');
+                }
+                $seenTokens[$nextToken] = true;
+                $query['next_token'] = $nextToken;
+            }
+        } while ($nextToken !== null && $nextToken !== '');
 
-            return [];
+        if (array_key_exists('data', $result)) {
+            $result['data'] = $items;
+            $result['next_token'] = null;
         }
 
-        return $response->json();
+        return $result;
     }
 
     /**
@@ -1745,7 +1771,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
     {
         $config = $integration->configuration ?? [];
         $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
-        $startDatetime = now()->subDays($incrementalDays)->toIso8601String();
+        $startDatetime = now()->utc()->subDays($incrementalDays)->startOfDay()->toIso8601String();
         $endDatetime = now()->toIso8601String();
         $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
         $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
@@ -1759,7 +1785,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
 
         if ($doSweep) {
             $sweepData = $this->getJson('/usercollection/heartrate', $integration, [
-                'start_datetime' => now()->subDays(7)->toIso8601String(),
+                'start_datetime' => now()->utc()->subDays(7)->startOfDay()->toIso8601String(),
                 'end_datetime' => $endDatetime,
             ]);
             $sweepItems = $sweepData['data'] ?? [];
@@ -2825,28 +2851,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         }
 
         return $sanitized;
-    }
-
-    /**
-     * Sanitize response body for logging (limit size and remove sensitive data)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        // Limit response body size to prevent huge logs
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
-        }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
     }
 
     protected function fetchCardiovascularAge(Integration $integration, string $startDate, string $endDate): void

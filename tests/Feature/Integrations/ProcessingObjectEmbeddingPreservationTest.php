@@ -46,6 +46,29 @@ class ProcessingObjectEmbeddingPreservationTest extends TestCase
     }
 
     #[Test]
+    public function object_refresh_without_time_keeps_the_existing_time(): void
+    {
+        Queue::fake();
+        $integration = Integration::factory()->create(['service' => 'test']);
+        $job = $this->processingJob($integration);
+        $data = ['concept' => 'sleep', 'type' => 'test_sleep_record', 'title' => 'Sleep Record'];
+
+        $this->travelTo(now()->subDays(3));
+        $created = $job->upsertObject($data);
+        $createdAt = $created->fresh()->time->toIso8601String();
+        $this->travelBack();
+
+        $refreshed = $job->upsertObject($data);
+
+        $this->assertSame((string) $created->id, (string) $refreshed->id);
+        $this->assertSame($createdAt, $refreshed->fresh()->time->toIso8601String());
+        $this->assertFalse($refreshed->wasChanged('time'));
+
+        $explicit = now()->startOfMinute();
+        $this->assertSame($explicit->toIso8601String(), $job->upsertObject([...$data, 'time' => $explicit])->fresh()->time->toIso8601String());
+    }
+
+    #[Test]
     public function explicit_vector_is_used_on_creation_and_refresh(): void
     {
         Queue::fake();
