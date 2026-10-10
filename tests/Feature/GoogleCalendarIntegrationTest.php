@@ -795,4 +795,42 @@ class GoogleCalendarIntegrationTest extends TestCase
         $this->assertNotSoftDeleted('events', ['id' => $past->id]);
         $this->assertSoftDeleted('events', ['id' => $future->id]);
     }
+
+    #[Test]
+    public function process_event_data_records_rsvp_and_event_type(): void
+    {
+        $now = Carbon::now();
+        $timed = fn (string $id, array $extra) => [
+            'id' => $id, 'summary' => "Event {$id}", 'status' => 'confirmed',
+            'start' => ['dateTime' => $now->copy()->addHour()->toIso8601String()],
+            'end' => ['dateTime' => $now->copy()->addHours(2)->toIso8601String()],
+            ...$extra,
+        ];
+        $rawData = [
+            'events' => [
+                $timed('declined', ['attendees' => [
+                    ['email' => 'other@example.com', 'responseStatus' => 'accepted'],
+                    ['email' => 'me@example.com', 'self' => true, 'responseStatus' => 'declined'],
+                ]]),
+                $timed('focus', ['eventType' => 'focusTime', 'transparency' => 'opaque', 'organizer' => ['self' => true]]),
+            ],
+            'calendar_id' => 'primary',
+            'calendar_name' => 'Primary Calendar',
+            'sync_window' => [
+                'time_min' => $now->copy()->subDays(7)->toIso8601String(),
+                'time_max' => $now->copy()->addDays(30)->toIso8601String(),
+            ],
+        ];
+
+        (new GoogleCalendarPlugin)->processEventData($this->integration, $rawData);
+
+        $declined = Event::where('event_metadata->google_event_id', 'declined')->firstOrFail()->event_metadata;
+        $this->assertSame('declined', $declined['response_status']);
+        $this->assertSame(2, $declined['attendee_count']);
+
+        $focus = Event::where('event_metadata->google_event_id', 'focus')->firstOrFail()->event_metadata;
+        $this->assertSame('focusTime', $focus['event_type']);
+        $this->assertSame('accepted', $focus['response_status']);
+        $this->assertSame('opaque', $focus['transparency']);
+    }
 }
