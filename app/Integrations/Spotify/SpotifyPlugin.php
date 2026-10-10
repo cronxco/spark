@@ -474,7 +474,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             $afterMs = (int) ($config['spotify_after_ms'] ?? 0);
 
             // Get recently played tracks
-            $recentlyPlayed = $this->getRecentlyPlayed($integration);
+            $recentlyPlayed = $this->getRecentlyPlayed($integration, $afterMs);
 
             // Advance 'after' cursor to the newest played_at we saw
             $maxPlayedMs = 0;
@@ -486,11 +486,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                     }
                 }
             }
-            if ($maxPlayedMs > $afterMs) {
-                $config['spotify_after_ms'] = $maxPlayedMs;
-            }
-
-            $integration->update(['configuration' => $config]);
+            $listeningData['after_ms'] = $maxPlayedMs;
 
             $listeningData['recently_played'] = $recentlyPlayed;
 
@@ -498,7 +494,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'integration_id' => $integration->id,
                 'track_count' => count($recentlyPlayed),
                 'used_after_ms' => $afterMs,
-                'new_after_ms' => $config['spotify_after_ms'] ?? null,
+                'fetched_after_ms' => $maxPlayedMs,
             ]);
         } catch (Exception $e) {
             Log::warning('Spotify: Failed to get recently played tracks', [
@@ -688,6 +684,8 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                         'track_id' => $playedItem['track']['id'] ?? 'unknown',
                         'error' => $e->getMessage(),
                     ]);
+
+                    throw $e;
                 }
             }
 
@@ -696,6 +694,18 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'total_tracks' => count($listeningData['recently_played']),
                 'processed_count' => $processedCount,
             ]);
+        }
+
+        if (($listeningData['after_ms'] ?? 0) > 0) {
+            $integration->getConnection()->transaction(function () use ($integration, $listeningData): void {
+                $current = Integration::query()->lockForUpdate()->findOrFail($integration->id);
+                $configuration = $current->configuration ?? [];
+                $configuration['spotify_after_ms'] = max(
+                    (int) ($configuration['spotify_after_ms'] ?? 0),
+                    (int) $listeningData['after_ms']
+                );
+                $current->update(['configuration' => $configuration]);
+            });
         }
 
         // Process podcast episode if currently playing
@@ -888,7 +898,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         }
     }
 
-    protected function getRecentlyPlayed(Integration $integration): array
+    protected function getRecentlyPlayed(Integration $integration, int $afterMs = 0): array
     {
         try {
             $hub = SentrySdk::getCurrentHub();
@@ -903,17 +913,18 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 }
                 $token = $group->access_token;
             }
+            $query = ['limit' => 50];
+            if ($afterMs > 0) {
+                $query['after'] = $afterMs;
+            }
+
             // Log the API request
             $this->logApiRequest('GET', '/me/player/recently-played', [
                 'Authorization' => '[REDACTED]',
-            ], [
-                'limit' => 50,
-            ], $integration->id);
+            ], $query, $integration->id);
 
             $response = Http::withToken($token)
-                ->get($this->baseUrl . '/me/player/recently-played', [
-                    'limit' => 50,
-                ]);
+                ->get($this->baseUrl . '/me/player/recently-played', $query);
             $span?->finish();
 
             // Log the API response
