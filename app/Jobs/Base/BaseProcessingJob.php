@@ -308,20 +308,29 @@ abstract class BaseProcessingJob implements ShouldQueue
      */
     protected function createOrUpdateObject(array $objectData): EventObject
     {
+        $attributes = [
+            'user_id' => $this->integration->user_id,
+            'concept' => $objectData['concept'],
+            'type' => $objectData['type'],
+            'title' => $objectData['title'],
+        ];
+
+        // Shared objects (e.g. "Sleep Record") omit `time`. Stamping them with
+        // now() on every upsert rewrites the row and re-triggers the task
+        // pipeline, so only default the time when the object is first created.
+        if (! array_key_exists('time', $objectData) && ($existing = EventObject::where($attributes)->first())) {
+            $objectData['time'] = $existing->time;
+        }
+
         return EventObject::updateOrCreate(
-            [
-                'user_id' => $this->integration->user_id,
-                'concept' => $objectData['concept'],
-                'type' => $objectData['type'],
-                'title' => $objectData['title'],
-            ],
+            $attributes,
             [
                 'time' => $objectData['time'] ?? now(),
                 'content' => $objectData['content'] ?? null,
                 'metadata' => $objectData['metadata'] ?? [],
                 'url' => $objectData['url'] ?? null,
                 'media_url' => $objectData['image_url'] ?? null,
-                'embeddings' => $objectData['embeddings'] ?? null,
+                ...(isset($objectData['embeddings']) ? ['embeddings' => $objectData['embeddings']] : []),
             ]
         );
     }

@@ -9,6 +9,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -28,6 +29,8 @@ class OuraSweepTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Http::preventStrayRequests();
 
         $this->plugin = new OuraPlugin;
         $this->user = User::factory()->create();
@@ -205,7 +208,7 @@ class OuraSweepTest extends TestCase
     }
 
     #[Test]
-    public function perform_data_sweep_handles_api_errors_gracefully(): void
+    public function failed_sweep_propagates_api_errors_without_recording_completion(): void
     {
         // Mock API error response
         Http::fake([
@@ -218,12 +221,15 @@ class OuraSweepTest extends TestCase
         // Integration has no previous sweep timestamp
         $this->integration->update(['configuration' => []]);
 
-        // Call fetchData to trigger sweep - should not throw exception
-        $this->plugin->fetchData($this->integration);
+        try {
+            $this->plugin->fetchData($this->integration);
+            $this->fail('Expected the failed sweep to propagate the API error');
+        } catch (RequestException $exception) {
+            $this->assertSame(500, $exception->response->status());
+        }
 
-        // Verify sweep timestamp was still set
         $this->integration->refresh();
-        $this->assertNotNull($this->integration->configuration['oura_last_sweep_at']);
+        $this->assertNull($this->integration->configuration['oura_last_sweep_at'] ?? null);
 
         // Verify no events were created due to API errors
         $this->assertEquals(0, Event::where('integration_id', $this->integration->id)->count());

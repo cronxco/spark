@@ -471,8 +471,8 @@ new class extends Component {
                             <x-icon name="fas.plus" class="w-4 h-4" />
                             {{ __('Add Another Calendar') }}
                         </a>
-                        <!-- Re-authenticate option for Google Calendar -->
-                        <a href="{{ route('integrations.oauth', $plugin['identifier']) }}"
+                        <!-- Re-authenticate this group in place so its calendars keep the new tokens -->
+                        <a href="{{ route('integrations.reconnect', ['service' => $plugin['identifier'], 'group' => $group['id']]) }}"
                             class="btn btn-ghost btn-sm w-full text-xs">
                             <x-icon name="fas.rotate" class="w-3 h-3" />
                             {{ __('Re-authenticate') }}

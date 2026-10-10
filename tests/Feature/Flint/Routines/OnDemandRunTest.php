@@ -4,11 +4,14 @@ namespace Tests\Feature\Flint\Routines;
 
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\Flint\TriggerFlintRoutineJob;
+use App\Models\Event;
 use App\Models\User;
 use App\Services\FlintDigestService;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -111,5 +114,73 @@ class OnDemandRunTest extends TestCase
 
         $this->assertTrue($job->force);
         $this->assertSame('manual', $job->triggerReason);
+    }
+
+    #[Test]
+    public function a_dry_run_captures_the_writes_to_a_file_instead_of_applying_them(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        config([
+            'services.openai.api_key' => 'test-key',
+            'services.openai.models.reasoning' => 'test-reasoning-model',
+            'services.flint_routine.cronxtools_url' => 'https://mcp.example.test/token/sse',
+        ]);
+        Http::fakeSequence()
+            ->push([
+                'id' => 'resp-paused',
+                'status' => 'completed',
+                'output' => [[
+                    'type' => 'mcp_approval_request',
+                    'id' => 'mcpr-digest',
+                    'server_label' => 'cronxtools',
+                    'name' => 'spark__create-flint-digest',
+                    'arguments' => json_encode(['title' => 'News', 'blocks' => []]),
+                ]],
+            ])
+            ->push([
+                'id' => 'resp-done',
+                'status' => 'completed',
+                'output' => [['type' => 'message', 'content' => [['text' => 'Run notes.']]]],
+            ]);
+        $user = User::factory()->create();
+
+        $this->artisan('flint:run-skill', [
+            'skill' => 'flint-news-roundup',
+            '--user' => $user->email,
+            '--date' => '2026-03-04',
+            '--dry-run' => true,
+        ])->assertSuccessful();
+
+        $files = Storage::disk('local')->files('flint-dry-runs');
+        $this->assertCount(1, $files);
+        $record = json_decode(Storage::disk('local')->get($files[0]), true);
+        $this->assertSame('test-reasoning-model', $record['model']);
+        $this->assertSame('2026-03-04', $record['local_date']);
+        $this->assertSame('spark__create-flint-digest', $record['writes'][0]['tool']);
+        $this->assertSame('Run notes.', $record['text']);
+        $this->assertStringNotContainsString('mcp.example.test', json_encode($record));
+        $this->assertSame(0, Event::query()->where('service', 'flint')->count());
+        Queue::assertNothingPushed();
+        Http::assertSent(fn ($request) => is_string($request['input'])
+            && json_decode($request['input'], true)['dry_run'] === true);
+    }
+
+    #[Test]
+    public function a_dry_run_refuses_the_webhook_driver(): void
+    {
+        Storage::fake('local');
+        Http::fake();
+        $user = User::factory()->create();
+
+        $this->artisan('flint:run-skill', [
+            'skill' => 'flint-news-roundup',
+            '--user' => $user->email,
+            '--driver' => 'webhook',
+            '--dry-run' => true,
+        ])->assertFailed();
+
+        Http::assertNothingSent();
+        $this->assertSame([], Storage::disk('local')->files('flint-dry-runs'));
     }
 }

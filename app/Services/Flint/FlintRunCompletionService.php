@@ -59,6 +59,7 @@ class FlintRunCompletionService
                 'triggered_by' => $current['triggered_by'] ?? $claims['trigger_source'] ?? null,
                 'trigger_source' => $claims['trigger_source'] ?? null,
                 'driver' => $current['driver'] ?? null,
+                'model' => RoutineModel::for($current['driver'] ?? null),
                 'event_id' => $output['event_id'] ?? null,
                 'output_id' => $output['output_id'],
                 'persisted_at' => $output['persisted_at'],

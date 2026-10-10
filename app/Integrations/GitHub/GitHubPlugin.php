@@ -450,7 +450,7 @@ class GitHubPlugin extends OAuthPlugin
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true // Use per-instance logging
@@ -1044,7 +1044,7 @@ class GitHubPlugin extends OAuthPlugin
                 'metadata' => $objectData['metadata'] ?? [],
                 'url' => $objectData['url'] ?? null,
                 'image_url' => $objectData['image_url'] ?? null,
-                'embeddings' => $objectData['embeddings'] ?? null,
+                ...(isset($objectData['embeddings']) ? ['embeddings' => $objectData['embeddings']] : []),
             ]
         );
     }
@@ -1113,27 +1113,5 @@ class GitHubPlugin extends OAuthPlugin
         }
 
         return $sanitized;
-    }
-
-    /**
-     * Sanitize response body for logging (limit size and remove sensitive data)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        // Limit response body size to prevent huge logs
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
-        }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
     }
 }
