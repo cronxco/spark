@@ -83,6 +83,15 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         return true;
     }
 
+    /**
+     * Oura's main overnight period is `long_sleep`; shorter `sleep`, `late_nap` and `rest`
+     * periods are naps, which would otherwise drag down sleep duration baselines.
+     */
+    public static function sleepAction(array $item): string
+    {
+        return in_array($item['type'] ?? null, ['sleep', 'late_nap', 'rest'], true) ? 'napped_for' : 'slept_for';
+    }
+
     public static function getActionTypes(): array
     {
         return [
@@ -90,6 +99,15 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'icon' => 'fas.moon',
                 'display_name' => 'Sleep',
                 'description' => 'Sleep duration and quality data',
+                'display_with_object' => false,
+                'value_unit' => 'seconds',
+                'value_formatter' => '{{ format_duration($value) }}',
+                'hidden' => false,
+            ],
+            'napped_for' => [
+                'icon' => 'fas.moon',
+                'display_name' => 'Nap',
+                'description' => 'A nap or rest period, kept apart from the main sleep',
                 'display_with_object' => false,
                 'value_unit' => 'seconds',
                 'value_formatter' => '{{ format_duration($value) }}',
@@ -2382,12 +2400,13 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'actor_id' => $actor->id,
                 'service' => 'oura',
                 'domain' => self::getDomain(),
-                'action' => 'slept_for',
+                'action' => self::sleepAction($item),
                 'value' => $totalSleepDuration, // Use total_sleep_duration as main event value
                 'value_multiplier' => 1,
                 'value_unit' => 'seconds',
                 'event_metadata' => [
                     'end' => $end,
+                    'type' => Arr::get($item, 'type'),
                     'efficiency' => $efficiency,
                 ],
                 'target_id' => $target->id,
@@ -3307,12 +3326,13 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             'actor_id' => $actor->id,
             'service' => 'oura',
             'domain' => self::getDomain(),
-            'action' => 'slept_for',
+            'action' => self::sleepAction($item),
             'value' => $totalSleepDuration,
             'value_multiplier' => 1,
             'value_unit' => 'seconds',
             'event_metadata' => [
                 'end' => $end,
+                'type' => Arr::get($item, 'type'),
                 'efficiency' => $efficiency,
             ],
             'target_id' => $target->id,

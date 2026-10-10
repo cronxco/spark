@@ -95,6 +95,27 @@ class HealthIntegrationMappingTest extends TestCase
         $this->assertSame($item, $mapped['event_metadata']['raw']);
         $this->assertArrayNotHasKey('time', $mapped['target']);
         $this->assertArrayNotHasKey('metadata', $mapped['target']);
+        $this->assertSame('slept_for', $mapped['action']);
+    }
+
+    #[Test]
+    public function naps_and_rest_periods_are_kept_apart_from_the_main_sleep(): void
+    {
+        $integration = new Integration(['id' => 'test', 'service' => 'oura']);
+        $method = new ReflectionMethod(OuraSleepRecordsData::class, 'createSleepRecordEvent');
+
+        foreach (['sleep' => 'napped_for', 'late_nap' => 'napped_for', 'rest' => 'napped_for', 'long_sleep' => 'slept_for'] as $type => $action) {
+            $mapped = $method->invoke(new OuraSleepRecordsData($integration, []), [
+                'id' => "sleep-{$type}",
+                'bedtime_start' => '2026-10-10T14:00:00+01:00',
+                'bedtime_end' => '2026-10-10T14:40:00+01:00',
+                'type' => $type,
+                'total_sleep_duration' => 2400,
+            ], new OuraPlugin);
+
+            $this->assertSame($action, $mapped['action'], $type);
+        }
+        $this->assertSame('slept_for', OuraPlugin::sleepAction([]));
     }
 
     #[Test]

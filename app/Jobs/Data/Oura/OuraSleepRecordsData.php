@@ -266,7 +266,7 @@ class OuraSleepRecordsData extends BaseProcessingJob
             'actor' => $actor,
             'target' => $target,
             'domain' => 'health',
-            'action' => 'slept_for',
+            'action' => OuraPlugin::sleepAction($item),
             'value' => $totalSleepDuration, // Use total_sleep_duration as the main event value
             'value_multiplier' => 1,
             'value_unit' => 'seconds',

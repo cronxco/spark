@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Data\Untappd;
 
+use App\Integrations\Untappd\AlcoholUnits;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Jobs\OAuth\Untappd\UntappdBeerDetailPull;
 use App\Jobs\OAuth\Untappd\UntappdBreweryDetailPull;
@@ -85,6 +86,7 @@ class UntappdCheckinDetailData extends BaseProcessingJob
         $metadata['badges'] = $details['badges'];
 
         $event->update(['event_metadata' => $metadata]);
+        AlcoholUnits::applyTo($event);
 
         // Create badge blocks
         foreach ($details['badges'] as $badge) {
