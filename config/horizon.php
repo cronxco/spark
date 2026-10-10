@@ -92,6 +92,16 @@ return [
                 'memory' => 256,
                 'tries' => 1,
             ],
+            'supervisor-7' => [
+                'connection' => 'redis',
+                'queue' => ['effects', 'default'],
+                'balance' => 'auto',
+                'minProcesses' => 1,
+                'maxProcesses' => 2,
+                'memory' => 256,
+                'tries' => 1,
+                'timeout' => 300,
+            ],
         ],
 
         'staging' => [
@@ -144,6 +154,16 @@ return [
                 'memory' => 256,
                 'tries' => 1,
             ],
+            'supervisor-7' => [
+                'connection' => 'redis',
+                'queue' => ['effects', 'default'],
+                'balance' => 'auto',
+                'minProcesses' => 1,
+                'maxProcesses' => 2,
+                'memory' => 256,
+                'tries' => 1,
+                'timeout' => 300,
+            ],
         ],
 
         'local' => [
@@ -195,6 +215,16 @@ return [
                 'maxProcesses' => 2,
                 'memory' => 256,
                 'tries' => 1,
+            ],
+            'supervisor-7' => [
+                'connection' => 'redis',
+                'queue' => ['effects', 'default'],
+                'balance' => 'auto',
+                'minProcesses' => 1,
+                'maxProcesses' => 2,
+                'memory' => 256,
+                'tries' => 1,
+                'timeout' => 300,
             ],
         ],
     ],
