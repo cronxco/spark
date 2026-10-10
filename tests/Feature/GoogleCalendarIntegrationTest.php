@@ -706,4 +706,38 @@ class GoogleCalendarIntegrationTest extends TestCase
             return str_contains($query, 'timeMin') && str_contains($query, 'timeMax');
         });
     }
+    #[Test]
+    public function reconciliation_preserves_historical_events_missing_from_calendar(): void
+    {
+        $calendar = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $target = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $past = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'source_id' => 'google_calendar_primary_historical',
+            'actor_id' => $calendar->id,
+            'target_id' => $target->id,
+            'time' => now()->subDay(),
+        ]);
+        $future = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'source_id' => 'google_calendar_primary_future',
+            'actor_id' => $calendar->id,
+            'target_id' => $target->id,
+            'time' => now()->addDay(),
+        ]);
+
+        (new GoogleCalendarPlugin)->processEventData($this->integration, [
+            'events' => [],
+            'calendar_id' => 'primary',
+            'calendar_name' => 'Primary Calendar',
+            'sync_window' => [
+                'time_min' => now()->subDays(7)->toIso8601String(),
+                'time_max' => now()->addDays(30)->toIso8601String(),
+            ],
+        ]);
+
+        $this->assertNotSoftDeleted('events', ['id' => $past->id]);
+        $this->assertSoftDeleted('events', ['id' => $future->id]);
+    }
+
 }
