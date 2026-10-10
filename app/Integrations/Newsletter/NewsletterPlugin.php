@@ -11,8 +11,6 @@ use App\Jobs\TaskPipeline\Tasks\NewsletterGenerateSummariesTask;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Services\TaskPipeline\TaskDefinition;
-use Aws\Sns\Message;
-use Aws\Sns\MessageValidator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -243,17 +241,15 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
             }
 
             try {
-                $validator = new MessageValidator(function (string $url): string {
-                    $response = Http::withoutRedirecting()->timeout(10)->get($url);
-                    $response->throw();
-
-                    return $response->body();
-                });
-                $validator->validate(new Message($payload));
+                $validSignature = $this->hasValidSnsSignature($payload);
             } catch (Throwable $e) {
                 Log::warning('Newsletter: SNS signature validation failed', [
                     'integration_id' => $integration->id,
                 ]);
+                abort(403, 'Invalid SNS signature');
+            }
+
+            if (! $validSignature) {
                 abort(403, 'Invalid SNS signature');
             }
 
@@ -390,6 +386,57 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
         ]);
 
         return null;
+    }
+
+    private function hasValidSnsSignature(array $payload): bool
+    {
+        $algorithm = match ($payload['SignatureVersion'] ?? null) {
+            '1' => OPENSSL_ALGO_SHA1,
+            '2' => OPENSSL_ALGO_SHA256,
+            default => null,
+        };
+        $fields = match ($payload['Type'] ?? null) {
+            'Notification' => ['Message', 'MessageId', 'Subject', 'Timestamp', 'TopicArn', 'Type'],
+            'SubscriptionConfirmation', 'UnsubscribeConfirmation' => ['Message', 'MessageId', 'SubscribeURL', 'Timestamp', 'Token', 'TopicArn', 'Type'],
+            default => [],
+        };
+        if ($algorithm === null || $fields === [] || ! is_string($payload['Signature'] ?? null)) {
+            return false;
+        }
+
+        $signature = base64_decode($payload['Signature'], true);
+        if ($signature === false || $signature === '') {
+            return false;
+        }
+
+        // SNS signs these fields in byte-sort order, with one trailing newline.
+        $stringToSign = '';
+        foreach ($fields as $field) {
+            if ($field === 'Subject' && ! array_key_exists($field, $payload)) {
+                continue;
+            }
+            if (! is_string($payload[$field] ?? null)) {
+                return false;
+            }
+            $stringToSign .= $field . "\n" . $payload[$field] . "\n";
+        }
+
+        $url = $payload['SigningCertURL'];
+        $parts = parse_url($url);
+        if (! preg_match('~^/SimpleNotificationService-[a-zA-Z0-9-]+\\.pem$~', $parts['path'] ?? '') || isset($parts['query'])) {
+            return false;
+        }
+
+        // The caller restricts this URL to the configured topic's HTTPS SNS host.
+        $response = Http::withoutRedirecting()->timeout(10)->get($url);
+        $response->throw();
+        if ($response->status() !== 200) {
+            return false;
+        }
+        $publicKey = openssl_pkey_get_public($response->body());
+
+        return $publicKey !== false
+            && openssl_verify($stringToSign, $signature, $publicKey, $algorithm) === 1;
     }
 
     private function isTrustedSnsUrl(mixed $url, string $topicArn): bool
