@@ -184,23 +184,6 @@ class OutlineIntegrationTest extends TestCase
         $this->assertSame(['Other', 'Reused'], $blocks->whereNull('deleted_at')->pluck('title')->sort()->values()->all());
     }
 
-    private function makeIntegration(array $config = []): Integration
-    {
-        /** @var Integration $integration */
-        $integration = Integration::factory()->create([
-            'service' => 'outline',
-            'instance_type' => 'pull',
-            'configuration' => array_merge([
-                'api_url' => 'https://example-outline.test',
-                'access_token' => 'test-token',
-                'daynotes_collection_id' => '5622670a-e725-437d-b747-a17905038df8',
-                'poll_interval_minutes' => 15,
-            ], $config),
-        ]);
-
-        return $integration;
-    }
-
     #[Test]
     public function empty_outline_pages_stop_even_with_a_next_path(): void
     {
@@ -278,4 +261,20 @@ class OutlineIntegrationTest extends TestCase
         $this->assertArrayNotHasKey('last_pin_success_at', $config);
     }
 
+    private function makeIntegration(array $config = []): Integration
+    {
+        /** @var Integration $integration */
+        $integration = Integration::factory()->create([
+            'service' => 'outline',
+            'instance_type' => 'pull',
+            'configuration' => array_merge([
+                'api_url' => 'https://example-outline.test',
+                'access_token' => 'test-token',
+                'daynotes_collection_id' => '5622670a-e725-437d-b747-a17905038df8',
+                'poll_interval_minutes' => 15,
+            ], $config),
+        ]);
+
+        return $integration;
+    }
 }

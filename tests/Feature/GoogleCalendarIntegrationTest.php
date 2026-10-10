@@ -761,5 +761,4 @@ class GoogleCalendarIntegrationTest extends TestCase
 
         Http::assertNothingSent();
     }
-
 }

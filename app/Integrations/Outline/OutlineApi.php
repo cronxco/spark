@@ -183,21 +183,6 @@ class OutlineApi
         return $documents;
     }
 
-
-    private function hasNextPage(array $data): bool
-    {
-        if (empty($data['data']) || empty($data['pagination']['nextPath'])) {
-            return false;
-        }
-
-        $pagination = $data['pagination'];
-        if (isset($pagination['total'], $pagination['offset'], $pagination['limit'])) {
-            return (int) $pagination['offset'] + (int) $pagination['limit'] < (int) $pagination['total'];
-        }
-
-        return true;
-    }
-
     public function getDocument(string $documentId): array
     {
         $endpoint = '/api/documents.info';
@@ -398,5 +383,19 @@ class OutlineApi
             ]);
             throw new Exception('Outline API request failed: ' . $e->getMessage(), previous: $e);
         }
+    }
+
+    private function hasNextPage(array $data): bool
+    {
+        if (empty($data['data']) || empty($data['pagination']['nextPath'])) {
+            return false;
+        }
+
+        $pagination = $data['pagination'];
+        if (isset($pagination['total'], $pagination['offset'], $pagination['limit'])) {
+            return (int) $pagination['offset'] + (int) $pagination['limit'] < (int) $pagination['total'];
+        }
+
+        return true;
     }
 }

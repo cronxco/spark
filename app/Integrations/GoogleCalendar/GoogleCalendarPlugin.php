@@ -410,7 +410,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 Log::warning('Failed to fetch calendar list from Google API', [
                     'group_id' => $group->id,
                     'status' => $response->status(),
-                    ]);
+                ]);
 
                 return [];
             }
