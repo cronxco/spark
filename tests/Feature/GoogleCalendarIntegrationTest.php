@@ -713,6 +713,9 @@ class GoogleCalendarIntegrationTest extends TestCase
     #[Test]
     public function revoked_refresh_token_notifies_and_stops_before_fetching_events(): void
     {
+        $notification = new IntegrationAuthenticationFailed($this->integration, 'expired');
+        $this->assertTrue($notification->isIncidentAlert());
+        $this->assertSame('integration_authentication_failed:' . $this->integration->id, $notification->getGroupKey());
         Notification::fake();
         $this->group->update(['expiry' => now()->subHour()]);
         Http::fake([
