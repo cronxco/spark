@@ -6,8 +6,8 @@ use App\Integrations\Oura\OuraPlugin;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class OuraVO2MaxData extends BaseProcessingJob
 {
