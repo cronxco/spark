@@ -6,6 +6,7 @@ use App\Integrations\Base\WebhookPlugin;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -540,6 +541,8 @@ class AppleHealthPlugin extends WebhookPlugin
         }
         $start = (string) (Arr::get($workout, 'start') ?? Arr::get($workout, 'startDate') ?? now()->toIso8601String());
         $end = (string) (Arr::get($workout, 'end') ?? Arr::get($workout, 'endDate') ?? $start);
+        $start = Carbon::parse($start)->utc()->toIso8601String();
+        $end = Carbon::parse($end)->utc()->toIso8601String();
         $duration = Arr::get($workout, 'duration');
         $distanceQty = Arr::get($workout, 'distance.qty');
         $distanceUnit = Arr::get($workout, 'distance.units');
@@ -665,6 +668,10 @@ class AppleHealthPlugin extends WebhookPlugin
                 'intensity' => $intensityQty,
                 'intensity_unit' => $intensityUnit,
                 'location' => $location,
+                'source' => Arr::get($workout, 'source'),
+                'activities' => Arr::get($workout, 'activities', []),
+                'isIndoor' => Arr::get($workout, 'isIndoor'),
+                'raw' => $workout,
                 'route_points' => $routePoints,
                 'route_summary' => [
                     'total_points' => count($routePoints),
