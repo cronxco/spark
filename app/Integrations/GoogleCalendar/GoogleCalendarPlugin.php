@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Notifications\IntegrationAuthenticationFailed;
 use App\Services\GeocodingService;
 use App\Services\PlaceDetectionService;
 use Carbon\Carbon;
@@ -535,7 +536,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'response' => $response->body(),
             ]);
 
-            return [];
+            throw new Exception('Failed to fetch Google Calendar events: ' . $response->status());
         }
 
         $data = $response->json();
@@ -777,7 +778,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'group_id' => $group->id,
             ]);
 
-            return;
+            throw new Exception('Cannot refresh Google Calendar token: no refresh token available');
         }
 
         Log::info('Refreshing Google Calendar access token', [
@@ -825,8 +826,25 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 ]);
             }
 
-            // Don't throw exception - let caller handle the failure gracefully
-            return;
+            if (($errorData['error'] ?? '') === 'invalid_grant' || $response->status() === 401) {
+                $integration = $group->integrations()->first();
+                if ($integration) {
+                    try {
+                        $group->user->notify(new IntegrationAuthenticationFailed(
+                            $integration,
+                            'Your connection has expired and needs to be re-authorized.',
+                            ['error_code' => $errorData['error'] ?? '', 'status' => $response->status()]
+                        ));
+                    } catch (Exception $e) {
+                        Log::error('Failed to send Google Calendar authentication notification', [
+                            'group_id' => $group->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            throw new Exception('Failed to refresh Google Calendar token');
         }
 
         $tokenData = $response->json();
