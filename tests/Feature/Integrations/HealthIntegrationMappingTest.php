@@ -137,6 +137,29 @@ class HealthIntegrationMappingTest extends TestCase
     }
 
     #[Test]
+    public function winter_workout_times_stay_utc_and_reversed_duration_is_clamped(): void
+    {
+        Queue::fake();
+        $integration = Integration::factory()->create(['service' => 'oura']);
+        $actor = EventObject::factory()->create(['user_id' => $integration->user_id]);
+        $plugin = Mockery::mock(OuraPlugin::class)->makePartial();
+        $plugin->shouldReceive('ensureUserProfile')->once()->andReturn($actor);
+        $job = new OuraWorkoutsData($integration, []);
+        (new ReflectionMethod($job, 'createEnhancedWorkoutEvent'))->invoke($job, $plugin, [
+            'id' => 'winter-id',
+            'activity' => 'walking',
+            'start_datetime' => '2026-01-09T18:23:00Z',
+            'end_datetime' => '2026-01-09T18:13:00Z',
+            'calories' => 20,
+        ]);
+
+        $event = Event::where('integration_id', $integration->id)->firstOrFail();
+        $this->assertSame('2026-01-09 18:23:00', $event->time->format('Y-m-d H:i:s'));
+        $this->assertSame(0, $event->event_metadata['duration_seconds']);
+        $this->assertFalse($event->blocks()->where('title', 'Duration')->exists());
+    }
+
+    #[Test]
     public function hevy_workout_action_declares_weight_volume(): void
     {
         $this->assertSame('kg', HevyPlugin::getActionTypes()['completed_workout']['value_unit']);
