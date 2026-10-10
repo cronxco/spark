@@ -453,6 +453,14 @@ spark__manage-flint-topic(
 Rewrite `content` as where the story stands now — not a diary of every update.
 The link history records the days it moved.
 
+**Keep `content` to 150 words or fewer.** When an update would push it past that,
+drop whatever the new development has superseded rather than squeezing it in; the
+`discussed_in` links keep the history. Do not carry caveats into it (“is not
+established”, “does not prove”, “no date is established”): say what is known and what
+the thread is waiting on. One topic is one story — do not fold an unrelated
+development into an existing topic because it shares a broad theme; it either clears
+the bar for its own topic or stays out.
+
 **For a new story** — create a tactical Topic only when it clears the bar:
 
 1. It has run across **at least three separate days** of Will's sources;
@@ -494,3 +502,5 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 - [ ] Structured cards, distinct titles, field limits and final summary order checked.
 - [ ] Styleguide fetched; Run notes last with selection, sweep and budget outcomes.
 - [ ] Trigger token preserved when supplied; relevant Topics maintained; no questions.
+- [ ] Topic `content` rewritten to 150 words or fewer, one story per topic, no caveat
+      clauses.
