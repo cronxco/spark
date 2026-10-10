@@ -65,6 +65,28 @@ class GoCardlessAccountRenewalTest extends TestCase
         };
     }
 
+    public static function conflictingCardIdentity(): array
+    {
+        return [
+            'different provider account ID despite alias' => ['account_id', 'different-account'],
+            'missing integration' => ['integration_id', null],
+            'different integration' => ['integration_id', 'different-integration'],
+            'missing provider' => ['provider', null],
+            'different provider' => ['provider', 'Different bank'],
+            'missing currency' => ['currency', null],
+            'different currency' => ['currency', 'EUR'],
+            'missing card ending' => ['account_number', null],
+            'different card ending' => ['account_number', '2003'],
+            'blank card ending' => ['account_number', ' '],
+            'conflicting IBAN' => ['raw.iban', 'GB82WEST12345698765432'],
+            'conflicting raw card ending' => ['raw.maskedPan', '2003'],
+            'conflicting raw currency' => ['raw.currency', 'EUR'],
+            'conflicting owner' => ['raw.ownerName', 'OTHER OWNER'],
+            'conflicting account type' => ['raw.cashAccountType', 'CACC'],
+            'conflicting balance sign' => ['is_negative_balance', false],
+        ];
+    }
+
     #[Test]
     public function repeated_sync_preserves_custom_name_settings_and_identity(): void
     {
@@ -409,7 +431,6 @@ class GoCardlessAccountRenewalTest extends TestCase
         $this->assertSame($first->metadata['name'], $updated->metadata['name']);
     }
 
-
     #[Test]
     public function changed_resource_ids_with_verified_identity_preserve_history_and_custom_account(): void
     {
@@ -473,28 +494,6 @@ class GoCardlessAccountRenewalTest extends TestCase
         $this->assertSame($duplicateBefore, $duplicate->fresh()->metadata);
         $this->assertFalse($canonical->fresh()->trashed());
         $this->assertFalse($duplicate->fresh()->trashed());
-    }
-
-    public static function conflictingCardIdentity(): array
-    {
-        return [
-            'different provider account ID despite alias' => ['account_id', 'different-account'],
-            'missing integration' => ['integration_id', null],
-            'different integration' => ['integration_id', 'different-integration'],
-            'missing provider' => ['provider', null],
-            'different provider' => ['provider', 'Different bank'],
-            'missing currency' => ['currency', null],
-            'different currency' => ['currency', 'EUR'],
-            'missing card ending' => ['account_number', null],
-            'different card ending' => ['account_number', '2003'],
-            'blank card ending' => ['account_number', ' '],
-            'conflicting IBAN' => ['raw.iban', 'GB82WEST12345698765432'],
-            'conflicting raw card ending' => ['raw.maskedPan', '2003'],
-            'conflicting raw currency' => ['raw.currency', 'EUR'],
-            'conflicting owner' => ['raw.ownerName', 'OTHER OWNER'],
-            'conflicting account type' => ['raw.cashAccountType', 'CACC'],
-            'conflicting balance sign' => ['is_negative_balance', false],
-        ];
     }
 
     private function verifiedCardMetadata(string $resource): array
