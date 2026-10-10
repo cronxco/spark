@@ -1011,7 +1011,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
      */
     protected function handleEventDeletion(Integration $integration, array $processedEventIds, array $syncWindow): void
     {
-        $timeMin = Carbon::parse($syncWindow['time_min']);
+        $timeMin = Carbon::parse($syncWindow['time_min'])->max(now());
         $timeMax = Carbon::parse($syncWindow['time_max']);
 
         // Get all events in the sync window that weren't in the current sync
