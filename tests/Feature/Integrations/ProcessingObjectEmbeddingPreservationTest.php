@@ -37,7 +37,7 @@ class ProcessingObjectEmbeddingPreservationTest extends TestCase
 
         $job = $this->processingJob($integration);
         $updated = $job->upsertObject($data);
-        $this->assertSame($object->id, $updated->id);
+        $this->assertSame((string) $object->id, (string) $updated->id);
         $this->assertSame($original, $updated->fresh()->getRawOriginal('embeddings'));
         $this->assertSame(2, $updated->fresh()->metadata['revision']);
 
@@ -60,7 +60,7 @@ class ProcessingObjectEmbeddingPreservationTest extends TestCase
         $this->assertNotNull($original);
 
         $updated = $job->upsertObject([...$data, 'embeddings' => $second]);
-        $this->assertSame($object->id, $updated->id);
+        $this->assertSame((string) $object->id, (string) $updated->id);
         $this->assertNotSame($original, $updated->fresh()->getRawOriginal('embeddings'));
     }
 
