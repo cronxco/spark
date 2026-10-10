@@ -27,7 +27,7 @@ class OuraPaginationTest extends TestCase
 
         $this->assertCount(2, $result['data']);
         $this->assertNull($result['next_token']);
-        Http::assertSent(fn ($request) => $request['next_token'] === 'second' && $request['start_datetime'] === '2026-10-07T00:00:00Z');
+        Http::assertSent(fn ($request) => ($request['next_token'] ?? null) === 'second' && $request['start_datetime'] === '2026-10-07T00:00:00Z');
         Http::assertSentCount(2);
     }
 
