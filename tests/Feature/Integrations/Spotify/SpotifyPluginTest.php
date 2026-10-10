@@ -3,6 +3,8 @@
 namespace Tests\Feature\Integrations\Spotify;
 
 use App\Integrations\Spotify\SpotifyPlugin;
+use App\Models\Integration;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -197,5 +199,39 @@ class SpotifyPluginTest extends TestCase
         // podcast_session_timeout_hours
         $this->assertEquals(1, $schema['podcast_session_timeout_hours']['min']);
         $this->assertEquals(24, $schema['podcast_session_timeout_hours']['max']);
+    }
+
+    #[Test]
+    public function recently_played_uses_saved_cursor_and_preserves_it_on_empty_response(): void
+    {
+        Http::fake(['*' => Http::response(['items' => []], 200)]);
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'instance_type' => 'listening',
+            'configuration' => ['spotify_after_ms' => 1750000000000, 'track_podcasts' => false],
+        ]);
+
+        $data = (new SpotifyPlugin)->pullListeningData($integration);
+
+        $this->assertSame([], $data['recently_played']);
+        $this->assertSame(1750000000000, $integration->fresh()->configuration['spotify_after_ms']);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/me/player/recently-played')
+            && $request['after'] === 1750000000000 && $request['limit'] === 50);
+    }
+
+    #[Test]
+    public function initial_recently_played_request_has_no_after_cursor(): void
+    {
+        Http::fake(['*' => Http::response(['items' => []], 200)]);
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'instance_type' => 'listening',
+            'configuration' => ['track_podcasts' => false],
+        ]);
+
+        (new SpotifyPlugin)->pullListeningData($integration);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/me/player/recently-played')
+            && ! isset($request['after']) && $request['limit'] === 50);
     }
 }
