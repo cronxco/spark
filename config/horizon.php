@@ -69,7 +69,7 @@ return [
             ],
             'supervisor-4' => [
                 'connection' => 'redis',
-                'queue' => ['tasks'],
+                'queue' => ['tasks', 'effects', 'default'],
                 'balance' => 'auto',
                 'maxProcesses' => 1,
                 'memory' => 256,
@@ -121,7 +121,7 @@ return [
             ],
             'supervisor-4' => [
                 'connection' => 'redis',
-                'queue' => ['tasks'],
+                'queue' => ['tasks', 'effects', 'default'],
                 'balance' => 'auto',
                 'maxProcesses' => 1,
                 'memory' => 256,
@@ -173,7 +173,7 @@ return [
             ],
             'supervisor-4' => [
                 'connection' => 'redis',
-                'queue' => ['tasks'],
+                'queue' => ['tasks', 'effects', 'default'],
                 'balance' => 'auto',
                 'maxProcesses' => 1,
                 'memory' => 256,
