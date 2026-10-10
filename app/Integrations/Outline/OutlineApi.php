@@ -20,7 +20,7 @@ class OutlineApi
 
         // Follow pagination with a sensible upper bound to avoid long-running jobs
         $pageCount = 0;
-        while (! empty($data['data']) && ! empty($data['pagination']['nextPath'])) {
+        while ($this->hasNextPage($data)) {
             if ($pageCount++ >= 10) { // hard cap to prevent unbounded runtime
                 Log::warning('Outline collections pagination capped at 10 pages');
                 break;
@@ -47,7 +47,7 @@ class OutlineApi
 
         // Follow pagination with a sensible upper bound to avoid long-running jobs
         $pageCount = 0;
-        while (! empty($data['data']) && ! empty($data['pagination']['nextPath'])) {
+        while ($this->hasNextPage($data)) {
             if ($pageCount++ >= 10) { // hard cap to prevent unbounded runtime
                 Log::warning('Outline documents pagination capped at 10 pages');
                 break;
@@ -133,7 +133,7 @@ class OutlineApi
 
         // Follow pagination with early termination
         $pageCount = 0;
-        while (! empty($data['data']) && ! empty($data['pagination']['nextPath'])) {
+        while ($this->hasNextPage($data)) {
             if ($pageCount++ >= 5) { // Reduced cap for efficiency
                 Log::warning('Outline documents search pagination capped at 5 pages');
                 break;
@@ -170,7 +170,7 @@ class OutlineApi
 
         // Follow pagination with a sensible upper bound
         $pageCount = 0;
-        while (! empty($data['data']) && ! empty($data['pagination']['nextPath'])) {
+        while ($this->hasNextPage($data)) {
             if ($pageCount++ >= 10) { // Reasonable cap for search results
                 Log::warning('Outline documents search pagination capped at 10 pages');
                 break;
@@ -181,6 +181,21 @@ class OutlineApi
         }
 
         return $documents;
+    }
+
+
+    private function hasNextPage(array $data): bool
+    {
+        if (empty($data['data']) || empty($data['pagination']['nextPath'])) {
+            return false;
+        }
+
+        $pagination = $data['pagination'];
+        if (isset($pagination['total'], $pagination['offset'], $pagination['limit'])) {
+            return (int) $pagination['offset'] + (int) $pagination['limit'] < (int) $pagination['total'];
+        }
+
+        return true;
     }
 
     public function getDocument(string $documentId): array
