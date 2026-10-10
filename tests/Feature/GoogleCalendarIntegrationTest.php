@@ -740,5 +740,4 @@ class GoogleCalendarIntegrationTest extends TestCase
         $this->assertNotSoftDeleted('events', ['id' => $past->id]);
         $this->assertSoftDeleted('events', ['id' => $future->id]);
     }
-
 }
