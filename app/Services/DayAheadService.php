@@ -195,7 +195,7 @@ class DayAheadService
     private function mergeShared(Collection $entries): Collection
     {
         return $entries
-            ->groupBy(fn (array $entry): string => ($entry['start'] ?? 'all-day').'|'.Str::lower($this->withoutPersonPrefix($entry['title'])))
+            ->groupBy(fn (array $entry): string => ($entry['start'] ?? 'all-day') . '|' . Str::lower($this->withoutPersonPrefix($entry['title'])))
             ->map(function (Collection $group): array {
                 $first = $group->first();
                 $people = $group->pluck('person')->filter()->unique();
@@ -372,7 +372,7 @@ class DayAheadService
         } else {
             $line = $eventCount === 1 ? '1 thing on' : "{$eventCount} things on";
             if ($firstCommitment) {
-                $line .= ', first at '.Carbon::parse($firstCommitment['start'])->format('H:i');
+                $line .= ', first at ' . Carbon::parse($firstCommitment['start'])->format('H:i');
             }
             $parts[] = $line;
         }
@@ -388,7 +388,7 @@ class DayAheadService
         if ($weather && ($weather['condition'] ?? null)) {
             $line = $weather['condition'];
             if (($weather['temp_high_c'] ?? null) !== null) {
-                $line .= ', '.round((float) $weather['temp_high_c']).'°';
+                $line .= ', ' . round((float) $weather['temp_high_c']) . '°';
             }
             if (($weather['rain_probability_pct'] ?? 0) >= 40) {
                 $line .= ", {$weather['rain_probability_pct']}% chance of rain";
@@ -396,7 +396,7 @@ class DayAheadService
             $parts[] = $line;
         }
 
-        return implode('. ', $parts).'.';
+        return implode('. ', $parts) . '.';
     }
 
     /**
