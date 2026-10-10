@@ -415,7 +415,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         Log::info("Fetching Spotify data for user {$accountId}");
 
         // Get recently played tracks (last 50)
-        $recentlyPlayed = $this->getRecentlyPlayed($integration, $afterMs);
+        $recentlyPlayed = $this->getRecentlyPlayed($integration);
 
         foreach ($recentlyPlayed as $playedItem) {
             $this->processTrackPlay($integration, $playedItem, 'recently_played');
@@ -474,7 +474,7 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
             $afterMs = (int) ($config['spotify_after_ms'] ?? 0);
 
             // Get recently played tracks
-            $recentlyPlayed = $this->getRecentlyPlayed($integration);
+            $recentlyPlayed = $this->getRecentlyPlayed($integration, $afterMs);
 
             // Advance 'after' cursor to the newest played_at we saw
             $maxPlayedMs = 0;
