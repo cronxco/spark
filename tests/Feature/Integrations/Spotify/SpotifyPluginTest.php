@@ -293,4 +293,33 @@ class SpotifyPluginTest extends TestCase
         $this->assertCount(1, $data['recently_played']);
         $this->assertSame(1000, $integration->fresh()->configuration['spotify_after_ms']);
     }
+
+    #[Test]
+    public function final_attempt_skips_a_track_that_keeps_failing_and_advances_the_cursor(): void
+    {
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'configuration' => ['spotify_after_ms' => 1000],
+        ]);
+        $plugin = new class extends SpotifyPlugin
+        {
+            public array $processed = [];
+
+            public function checkForDuplicateProcessing(Integration $integration, array $listeningData): void {}
+
+            protected function processTrackPlay(Integration $integration, array $playData, string $source): void
+            {
+                if ($playData['track']['id'] === 'poison') {
+                    throw new RuntimeException('Always fails');
+                }
+                $this->processed[] = $playData['track']['id'];
+            }
+        };
+        $data = ['recently_played' => [['track' => ['id' => 'poison']], ['track' => ['id' => 'good']]], 'after_ms' => 3000];
+
+        $plugin->processListeningData($integration, $data, skipFailedTracks: true);
+
+        $this->assertSame(['good'], $plugin->processed);
+        $this->assertSame(3000, $integration->fresh()->configuration['spotify_after_ms']);
+    }
 }

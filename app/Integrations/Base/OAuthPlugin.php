@@ -243,7 +243,7 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true // Use per-instance logging
@@ -443,11 +443,4 @@ abstract class OAuthPlugin implements OAuthIntegrationPlugin
         return sanitizeData($data);
     }
 
-    /**
-     * Sanitize response body for logging (limit size and remove sensitive data)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        return sanitize_api_response_body('', $body);
-    }
 }
