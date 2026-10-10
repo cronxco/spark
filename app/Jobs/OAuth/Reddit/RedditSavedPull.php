@@ -34,6 +34,10 @@ class RedditSavedPull extends BaseFetchJob
         $children = $saved['data']['children'] ?? [];
         $after = $saved['data']['after'] ?? null;
 
+        $config = $this->integration->configuration ?? [];
+        Arr::set($config, 'reddit.after', empty($children) ? null : $after);
+        $this->integration->update(['configuration' => $config]);
+
         if (empty($children)) {
             return;
         }
@@ -43,9 +47,5 @@ class RedditSavedPull extends BaseFetchJob
             'me' => $me,
         ]);
 
-        // Persist pagination cursor for next run
-        $config = $this->integration->configuration ?? [];
-        Arr::set($config, 'reddit.after', $after);
-        $this->integration->update(['configuration' => $config]);
     }
 }
