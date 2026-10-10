@@ -7,7 +7,7 @@ use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class OuraVO2MaxData extends BaseProcessingJob
 {
@@ -73,7 +73,7 @@ class OuraVO2MaxData extends BaseProcessingJob
 
         Event::withTrashed()->updateOrCreate(['integration_id' => $this->integration->id, 'source_id' => $sourceId], [
             'source_id' => $sourceId,
-            'time' => $timestamp ? Str::substr($timestamp, 0, 19) : ($day . ' 00:00:00'),
+            'time' => $timestamp ? Carbon::parse($timestamp)->utc() : ($day . ' 00:00:00'),
             'integration_id' => $this->integration->id,
             'actor_id' => $actor->id,
             'service' => 'oura',
