@@ -61,7 +61,7 @@ class RedditPluginTest extends TestCase
     }
 
     #[Test]
-    public function pull_dispatches_processing_and_stores_cursor(): void
+    public function pull_dispatches_newest_saves_and_retires_stale_cursor(): void
     {
         Bus::fake();
 
@@ -70,6 +70,7 @@ class RedditPluginTest extends TestCase
             'user_id' => $user->id,
             'service' => 'reddit',
             'instance_type' => 'saved',
+            'configuration' => ['reddit' => ['after' => 't3_stale']],
         ]);
         $group = IntegrationGroup::factory()->create([
             'user_id' => $user->id,
@@ -116,7 +117,9 @@ class RedditPluginTest extends TestCase
         Bus::assertDispatched(RedditSavedData::class);
 
         $integration->refresh();
-        $this->assertEquals('t3_xyz', data_get($integration->configuration, 'reddit.after'));
+        $this->assertNull(data_get($integration->configuration, 'reddit.after'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/user/testuser/saved')
+            && ! str_contains($request->url(), 'after='));
     }
 
     #[Test]
