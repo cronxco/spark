@@ -10,6 +10,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
@@ -117,4 +118,43 @@ class MonzoAuditRegressionTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), '/transactions') && $request['since'] === 'tx_100' && ! isset($request['before']));
         Http::assertSent(fn ($request) => str_contains($request->url(), '/transactions') && $request['since'] === 'tx_200');
     }
+    #[Test]
+    public function failed_page_does_not_mark_sweep_complete(): void
+    {
+        $integration = $this->integration('transactions');
+        $transactions = array_map(fn ($i) => ['id' => 'tx_' . $i], range(1, 100));
+        Http::fake([
+            'api.monzo.com/accounts' => Http::response(['accounts' => [['id' => 'acc_test', 'type' => 'uk_retail']]]),
+            'api.monzo.com/transactions*' => Http::sequence()
+                ->push(['transactions' => $transactions])
+                ->push(['error' => 'unavailable'], 503),
+        ]);
+        try {
+            (new MonzoPlugin)->pullTransactionData($integration);
+            $this->fail('A failed page must fail the pull.');
+        } catch (Exception $exception) {
+            $this->assertSame('Failed to fetch transaction page from Monzo API', $exception->getMessage());
+        }
+        $this->assertArrayNotHasKey('monzo_last_sweep_at', $integration->fresh()->configuration ?? []);
+    }
+
+    #[Test]
+    public function repeated_cursor_fails_without_completing_sweep(): void
+    {
+        $integration = $this->integration('transactions');
+        $transactions = array_map(fn ($i) => ['id' => 'tx_' . $i], range(1, 100));
+        Http::fake([
+            'api.monzo.com/accounts' => Http::response(['accounts' => [['id' => 'acc_test', 'type' => 'uk_retail']]]),
+            'api.monzo.com/transactions*' => Http::response(['transactions' => $transactions]),
+        ]);
+        try {
+            (new MonzoPlugin)->pullTransactionData($integration);
+            $this->fail('A repeated cursor must fail the pull.');
+        } catch (Exception $exception) {
+            $this->assertSame('Monzo transaction pagination did not advance', $exception->getMessage());
+        }
+        $this->assertArrayNotHasKey('monzo_last_sweep_at', $integration->fresh()->configuration ?? []);
+        Http::assertSentCount(3);
+    }
+
 }

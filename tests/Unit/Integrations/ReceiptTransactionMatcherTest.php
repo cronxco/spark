@@ -11,6 +11,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionMethod;
 use Tests\TestCase;
 
 class ReceiptTransactionMatcherTest extends TestCase
@@ -492,7 +493,7 @@ class ReceiptTransactionMatcherTest extends TestCase
         $transaction->setRelation('target', new EventObject(['title' => 'DELIVEROO']));
 
         $this->assertEqualsWithDelta(1.0, $this->matcher->calculateReverseMatchConfidence($receipt, $transaction), 0.001);
-        $this->assertEqualsWithDelta(0.9, (new \ReflectionMethod($this->matcher, 'calculateMatchConfidence'))->invoke($this->matcher, $receipt, $transaction), 0.001);
+        $this->assertEqualsWithDelta(0.9, (new ReflectionMethod($this->matcher, 'calculateMatchConfidence'))->invoke($this->matcher, $receipt, $transaction), 0.001);
     }
 
     #[Test]
@@ -510,8 +511,6 @@ class ReceiptTransactionMatcherTest extends TestCase
 
         $this->assertEqualsWithDelta(1.0, $this->matcher->calculateReverseMatchConfidence($receipt, $transaction), 0.001);
         $receipt->event_metadata = ['matching_hints' => ['suggested_merchant_names' => 'not an array']];
-        $this->assertEqualsWithDelta(0.9, (new \ReflectionMethod($this->matcher, 'calculateMatchConfidence'))->invoke($this->matcher, $receipt, $transaction), 0.001);
+        $this->assertEqualsWithDelta(0.9, (new ReflectionMethod($this->matcher, 'calculateMatchConfidence'))->invoke($this->matcher, $receipt, $transaction), 0.001);
     }
-
 }
-

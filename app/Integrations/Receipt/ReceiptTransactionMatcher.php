@@ -514,4 +514,3 @@ class ReceiptTransactionMatcher
         return $percent / 100;
     }
 }
-
