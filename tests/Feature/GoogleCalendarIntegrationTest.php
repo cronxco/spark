@@ -10,6 +10,7 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Notifications\IntegrationAuthenticationFailed;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -708,6 +709,7 @@ class GoogleCalendarIntegrationTest extends TestCase
             return str_contains($query, 'timeMin') && str_contains($query, 'timeMax');
         });
     }
+
     #[Test]
     public function revoked_refresh_token_notifies_and_stops_before_fetching_events(): void
     {
@@ -720,7 +722,7 @@ class GoogleCalendarIntegrationTest extends TestCase
         try {
             (new GoogleCalendarPlugin)->pullEventData($this->integration);
             $this->fail('Revoked refresh tokens must fail the fetch.');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->assertSame('Failed to refresh Google Calendar token', $e->getMessage());
         }
 
@@ -736,7 +738,7 @@ class GoogleCalendarIntegrationTest extends TestCase
             'https://www.googleapis.com/calendar/v3/calendars/primary/events*' => Http::response([], 403),
         ]);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(Exception::class);
         $this->expectExceptionMessage('Failed to fetch Google Calendar events: 403');
         (new GoogleCalendarPlugin)->pullEventData($this->integration);
     }
@@ -750,7 +752,7 @@ class GoogleCalendarIntegrationTest extends TestCase
         try {
             (new GoogleCalendarPlugin)->pullEventData($this->integration);
             $this->fail('Missing refresh tokens must fail the fetch.');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->assertStringContainsString('no refresh token available', $e->getMessage());
         }
 
