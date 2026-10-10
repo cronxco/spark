@@ -52,7 +52,7 @@ class GoodreadsShelfData extends BaseProcessingJob
                     ->first();
 
                 if ($existingBook && isset($existingBook->metadata['reading_started_at'])) {
-                    $storedStartDate = Carbon::parse($existingBook->metadata['reading_started_at']);
+                    $storedStartDate = Carbon::parse($existingBook->metadata['reading_started_at'])->utc();
                     logger()->info('Using stored start date for is_reading event', [
                         'book_id' => $bookId,
                         'stored_date' => $storedStartDate->toDateTimeString(),
@@ -98,7 +98,7 @@ class GoodreadsShelfData extends BaseProcessingJob
                 ],
                 'url' => $item['link'] ?? null,
                 'image_url' => $item['book_large_image_url'] ?? null,
-                'time' => $storedStartDate ?? ($item['pubDate'] ? Carbon::parse($item['pubDate']) : now()),
+                'time' => $storedStartDate ?? ($item['pubDate'] ? Carbon::parse($item['pubDate'])->utc() : now()->utc()),
             ];
 
             // Determine action and value based on shelf
@@ -132,7 +132,7 @@ class GoodreadsShelfData extends BaseProcessingJob
                     'value' => null,
                     'value_multiplier' => 1,
                     'value_unit' => null,
-                    'time' => $item['pubDate'] ? Carbon::parse($item['pubDate']) : now(),
+                    'time' => $item['pubDate'] ? Carbon::parse($item['pubDate'])->utc() : now()->utc(),
                 ];
             }
 
