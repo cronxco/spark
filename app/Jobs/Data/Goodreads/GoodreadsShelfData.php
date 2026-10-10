@@ -162,9 +162,12 @@ class GoodreadsShelfData extends BaseProcessingJob
 
         // Create events
         $created = $this->createEvents($events);
+        // createEvents skips events that already exist, so match inputs by source_id rather than position
+        $eventsBySource = collect($events)->keyBy('source_id');
 
         // Tag events with author names and create series relationships
-        foreach ($created as $index => $event) {
+        foreach ($created as $event) {
+            $input = $eventsBySource->get($event->source_id, []);
             // Tag with author
             $tags = $event->event_metadata['__tags'] ?? [];
             foreach ($tags as $tag) {
@@ -172,13 +175,13 @@ class GoodreadsShelfData extends BaseProcessingJob
             }
 
             // Create series relationship if applicable
-            $seriesInfo = $events[$index]['series_info'] ?? null;
+            $seriesInfo = $input['series_info'] ?? null;
             if ($seriesInfo && $seriesInfo['series_name']) {
                 $this->createSeriesRelationship($event->target, $seriesInfo);
             }
 
             // Download book cover to Media Library
-            $bookCoverUrl = $events[$index]['target']['image_url'] ?? null;
+            $bookCoverUrl = $input['target']['image_url'] ?? null;
             if ($bookCoverUrl && $event->target) {
                 $this->downloadBookCover($event->target, $bookCoverUrl);
             }
@@ -243,6 +246,29 @@ class GoodreadsShelfData extends BaseProcessingJob
 
         // Fall back to parent method for other object types
         return parent::createOrUpdateObject($objectData);
+    }
+
+    /**
+     * Download book cover to Media Library
+     */
+    protected function downloadBookCover(EventObject $book, string $coverUrl): void
+    {
+        try {
+            $helper = app(MediaDownloadHelper::class);
+            $helper->downloadAndAttachMedia(
+                $coverUrl,
+                $book,
+                'downloaded_images',
+                ['alt' => $book->title]
+            );
+        } catch (Exception $e) {
+            // Log but don't fail the entire job
+            logger()->warning('Failed to download book cover', [
+                'book_id' => $book->id,
+                'cover_url' => $coverUrl,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -321,29 +347,6 @@ class GoodreadsShelfData extends BaseProcessingJob
                 'series_order' => $seriesInfo['series_number'],
             ],
         ]);
-    }
-
-    /**
-     * Download book cover to Media Library
-     */
-    private function downloadBookCover(EventObject $book, string $coverUrl): void
-    {
-        try {
-            $helper = app(MediaDownloadHelper::class);
-            $helper->downloadAndAttachMedia(
-                $coverUrl,
-                $book,
-                'downloaded_images',
-                ['alt' => $book->title]
-            );
-        } catch (Exception $e) {
-            // Log but don't fail the entire job
-            logger()->warning('Failed to download book cover', [
-                'book_id' => $book->id,
-                'cover_url' => $coverUrl,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 
     /**
