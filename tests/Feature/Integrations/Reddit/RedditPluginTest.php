@@ -61,7 +61,7 @@ class RedditPluginTest extends TestCase
     }
 
     #[Test]
-    public function pull_dispatches_processing_and_stores_cursor(): void
+    public function pull_dispatches_newest_saves_and_retires_stale_cursor(): void
     {
         Bus::fake();
 
@@ -70,6 +70,7 @@ class RedditPluginTest extends TestCase
             'user_id' => $user->id,
             'service' => 'reddit',
             'instance_type' => 'saved',
+            'configuration' => ['reddit' => ['after' => 't3_stale']],
         ]);
         $group = IntegrationGroup::factory()->create([
             'user_id' => $user->id,
@@ -116,6 +117,33 @@ class RedditPluginTest extends TestCase
         Bus::assertDispatched(RedditSavedData::class);
 
         $integration->refresh();
-        $this->assertEquals('t3_xyz', data_get($integration->configuration, 'reddit.after'));
+        $this->assertNull(data_get($integration->configuration, 'reddit.after'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/user/testuser/saved')
+            && ! str_contains($request->url(), 'after='));
+    }
+
+    #[Test]
+    public function empty_saved_page_clears_stale_cursor_without_dispatching(): void
+    {
+        Bus::fake();
+        $integration = Integration::factory()->create([
+            'service' => 'reddit',
+            'instance_type' => 'saved',
+            'configuration' => ['reddit' => ['after' => 't3_stale'], 'unrelated' => 'preserved'],
+        ]);
+        $job = new class($integration) extends RedditSavedPull
+        {
+            public function dispatchForTest(array $rawData): void
+            {
+                $this->dispatchProcessingJobs($rawData);
+            }
+        };
+
+        $job->dispatchForTest(['saved' => ['data' => ['children' => [], 'after' => null]]]);
+
+        $integration->refresh();
+        $this->assertNull(data_get($integration->configuration, 'reddit.after'));
+        $this->assertSame('preserved', $integration->configuration['unrelated']);
+        Bus::assertNotDispatched(RedditSavedData::class);
     }
 }
