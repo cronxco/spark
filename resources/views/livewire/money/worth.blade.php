@@ -27,7 +27,7 @@
 
     @if ($worth['excluded_accounts'] > 0)
         <p class="text-sm text-base-content/70">
-            {{ $worth['excluded_accounts'] }} {{ $worth['excluded_accounts'] === 1 ? 'account is' : 'accounts are' }} left out of the comparison because they are in another currency or have no balance history that far back.
+            {{ $worth['excluded_accounts'] }} {{ $worth['excluded_accounts'] === 1 ? 'account' : 'accounts' }} left out: other currency or no history that far back.
         </p>
     @endif
 

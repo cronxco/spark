@@ -36,7 +36,7 @@ class DataHealthTest extends TestCase
     public function it_reports_a_tidy_account_set(): void
     {
         Livewire::actingAs($this->user)->test(DataHealth::class)
-            ->assertSee('Everything looks tidy');
+            ->assertSee('Nothing to clean up');
     }
 
     #[Test]
@@ -74,7 +74,7 @@ class DataHealthTest extends TestCase
 
         Livewire::actingAs($this->user)->test(DataHealth::class)
             ->assertDontSee('Theirs')
-            ->assertSee('Everything looks tidy');
+            ->assertSee('Nothing to clean up');
     }
 
     #[Test]

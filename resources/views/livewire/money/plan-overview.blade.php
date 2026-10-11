@@ -20,7 +20,7 @@
         <div class="stat bg-base-200 rounded-box shadow">
             <div class="stat-title">Tax at the higher rate</div>
             <div class="stat-value text-2xl">{{ $money($strip['tax_estimate']) }}</div>
-            <div class="stat-desc">Estimate before the savings allowance; joint pots not split</div>
+            <div class="stat-desc">Before savings allowance; joint pots not split</div>
         </div>
     </div>
 
@@ -69,9 +69,6 @@
     <div class="card bg-base-200 shadow">
         <div class="card-body">
             <h2 class="card-title">Interest ledger</h2>
-            <p class="text-sm text-base-content/70">
-                Monzo does not report pot interest, so Spark works it out from each pot's balance on the 1st.
-            </p>
             @if (count($ledger) === 0)
                 <p class="text-sm text-base-content/70">No interest has been recorded yet.</p>
             @else

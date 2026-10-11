@@ -3,10 +3,7 @@
 @endphp
 <div class="card bg-base-200 shadow">
     <div class="card-body gap-4">
-        <div>
-            <h2 class="card-title">Budgets</h2>
-            <p class="text-sm text-base-content/70">Monthly limits on spending. Pots, bills and transfers never count.</p>
-        </div>
+        <h2 class="card-title">Budgets</h2>
 
         @forelse ($budgets as $budget)
             <div class="flex flex-col gap-1" wire:key="budget-{{ $budget['id'] }}">

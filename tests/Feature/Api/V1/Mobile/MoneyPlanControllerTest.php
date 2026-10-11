@@ -113,6 +113,19 @@ class MoneyPlanControllerTest extends TestCase
     }
 
     #[Test]
+    public function card_billing_days_can_be_set_and_cleared(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->patchJson("/api/v1/mobile/money/cards/{$this->card->id}", ['statement_day' => 7, 'payment_day' => 19])
+            ->assertOk()->assertJsonPath('data.statement_day', 7);
+        $this->patchJson("/api/v1/mobile/money/cards/{$this->card->id}", ['statement_day' => null])
+            ->assertOk()->assertJsonPath('data.payment_day', null);
+        $this->patchJson("/api/v1/mobile/money/cards/{$this->card->id}", ['statement_day' => 40])->assertUnprocessable();
+        $this->patchJson("/api/v1/mobile/money/cards/{$this->pot->id}", ['statement_day' => 7])->assertNotFound();
+    }
+
+    #[Test]
     public function buffer_previews_and_moves_money_only_when_enabled_and_confirmed_with_idempotency(): void
     {
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);

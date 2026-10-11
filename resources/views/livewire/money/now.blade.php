@@ -5,7 +5,7 @@
     @if ($dataIssues > 0)
         <div class="alert alert-warning">
             <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
-            <span>{{ $dataIssues }} money data {{ $dataIssues === 1 ? 'issue needs' : 'issues need' }} review.</span>
+            <span>{{ $dataIssues }} data {{ $dataIssues === 1 ? 'issue' : 'issues' }} to review.</span>
             <a class="btn btn-sm" href="{{ route('admin.sense-check.index', ['section' => 'money_data_health']) }}" wire:navigate>Review in Sense Check</a>
         </div>
     @endif
@@ -15,11 +15,11 @@
             <div class="stat-title">Safe to spend</div>
             <div class="stat-value text-3xl">{{ $money($safe['amount']) }}</div>
             <div class="stat-desc">
-                {{ $money($safe['available']) }} available, {{ $money($safe['owed_on_cards']) }} owed on cards, {{ $money($safe['upcoming_bills']) }} of bills
-                until {{ $safe['payday_known'] ? 'payday' : 'month end' }} ({{ \Carbon\Carbon::parse($safe['payday'])->format('j M') }})
+                {{ $money($safe['available']) }} available, {{ $money($safe['owed_on_cards']) }} on cards, {{ $money($safe['upcoming_bills']) }} bills
+                to {{ $safe['payday_known'] ? 'payday' : 'month end' }} ({{ \Carbon\Carbon::parse($safe['payday'])->format('j M') }})
             </div>
             @if (count($safe['stale_accounts']) > 0)
-                <div class="stat-desc text-warning">Left out, balance is out of date: {{ implode(', ', $safe['stale_accounts']) }}</div>
+                <div class="stat-desc text-warning">Stale, left out: {{ implode(', ', $safe['stale_accounts']) }}</div>
             @endif
         </div>
         <div class="stat bg-base-200 rounded-box shadow">
@@ -39,7 +39,7 @@
         <div class="card-body">
             <h2 class="card-title">Next bills</h2>
             @if (count($safe['bills']) === 0)
-                <p class="text-sm text-base-content/70">No recurring direct debits are due before {{ $safe['payday_known'] ? 'payday' : 'month end' }}.</p>
+                <p class="text-sm text-base-content/70">No direct debits due before {{ $safe['payday_known'] ? 'payday' : 'month end' }}.</p>
             @else
                 <ul class="flex flex-col divide-y divide-base-300">
                     @foreach ($safe['bills'] as $bill)
