@@ -3,13 +3,12 @@
 namespace Tests\Feature\Diagnostics;
 
 use App\Services\Diagnostics\ConfigurationAudit;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ConfigurationAuditTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function audit_does_not_expose_secret_values(): void
     {
         config()->set('services.jev.enabled', true);
@@ -27,9 +26,7 @@ class ConfigurationAuditTest extends TestCase
         $this->assertNotContains('extremely-secret-test-value', array_column($report['variables'], 'name'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function disabled_jev_with_enabled_list_detection_generates_warning(): void
     {
         config()->set('fetch.list_detection.enabled', true);
@@ -40,9 +37,7 @@ class ConfigurationAuditTest extends TestCase
         $this->assertContains('JEV_ENABLED', array_column($report['findings'], 'key'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function command_json_is_redacted(): void
     {
         config()->set('services.jev.api_key', 'do-not-print-me');
