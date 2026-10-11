@@ -105,12 +105,6 @@ class ScheduleEditor extends Component
         }
     }
 
-    /** @return list<string> */
-    private function visibleRoutines(): array
-    {
-        return $this->routine !== null ? [$this->routine] : FlintScheduleSettings::EDITABLE_ROUTINES;
-    }
-
     public function render(): View
     {
         $user = Auth::user();
@@ -132,6 +126,12 @@ class ScheduleEditor extends Component
             ])->only($this->visibleRoutines())->all(),
             'next' => $next,
         ]);
+    }
+
+    /** @return list<string> */
+    private function visibleRoutines(): array
+    {
+        return $this->routine !== null ? [$this->routine] : FlintScheduleSettings::EDITABLE_ROUTINES;
     }
 
     private function guard(string $routine): void
