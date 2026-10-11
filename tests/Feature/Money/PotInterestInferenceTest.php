@@ -127,6 +127,22 @@ class PotInterestInferenceTest extends TestCase
     }
 
     #[Test]
+    public function the_stored_at_time_of_a_snapshot_does_not_move_the_transfer_window(): void
+    {
+        $first = $this->snapshot('2026-09-30', 10_000_000);
+        $second = $this->snapshot('2026-10-01', 10_000_000 + 500_000 + 29_200);
+        $this->transferIn(500_000, '2026-09-30 15:00:00');
+        $this->transferIn(250_000, '2026-10-01 09:00:00');
+        $first->forceFill(['created_at' => '2026-12-01 10:00:00'])->saveQuietly();
+        $second->forceFill(['created_at' => '2026-12-01 10:05:00'])->saveQuietly();
+
+        $row = $this->inference()->plan($this->user->id)['rows'][0];
+
+        $this->assertSame(29_200, $row['amount']);
+        $this->assertSame(500_000, $row['transfers']);
+    }
+
+    #[Test]
     public function a_snapshot_gap_is_split_across_the_months_and_marked_estimated(): void
     {
         $this->snapshot('2025-12-31', 10_000_000);
@@ -258,14 +274,14 @@ class PotInterestInferenceTest extends TestCase
     {
         $day = EventObject::firstOrCreate(
             ['user_id' => $this->user->id, 'concept' => 'day', 'type' => 'day', 'title' => $date],
-            ['time' => $date . ' 00:00:00', 'metadata' => []],
+            ['time' => $date.' 00:00:00', 'metadata' => []],
         );
         $event = Event::create([
-            'integration_id' => $this->integration->id, 'source_id' => 'snap-' . (++$this->counter),
+            'integration_id' => $this->integration->id, 'source_id' => 'snap-'.(++$this->counter),
             'actor_id' => ($pot ?? $this->pot)->id, 'target_id' => $day->id, 'service' => 'monzo', 'domain' => 'money',
-            'action' => 'had_balance', 'time' => $date . ' 23:59:59', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+            'action' => 'had_balance', 'time' => $date.' 23:59:59', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
         ]);
-        $event->forceFill(['created_at' => $date . ' 00:26:00'])->saveQuietly();
+        $event->forceFill(['created_at' => $date.' 00:26:00'])->saveQuietly();
 
         return $event;
     }
@@ -283,7 +299,7 @@ class PotInterestInferenceTest extends TestCase
     private function movement(string $action, EventObject $actor, EventObject $target, int $pence, string $time): void
     {
         Event::create([
-            'integration_id' => $this->integration->id, 'source_id' => 'move-' . (++$this->counter), 'actor_id' => $actor->id,
+            'integration_id' => $this->integration->id, 'source_id' => 'move-'.(++$this->counter), 'actor_id' => $actor->id,
             'target_id' => $target->id, 'service' => 'monzo', 'domain' => 'money', 'action' => $action, 'time' => $time,
             'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
         ]);

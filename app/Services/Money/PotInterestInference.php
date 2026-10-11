@@ -77,7 +77,7 @@ class PotInterestInference
     private function inferPot(string $userId, EventObject $pot, ?CarbonImmutable $since): array
     {
         $snapshots = Event::where('actor_id', $pot->id)->where('action', 'had_balance')
-            ->orderBy('time')->get(['id', 'time', 'value', 'created_at'])
+            ->orderBy('time')->get(['id', 'time', 'value'])
             ->groupBy(fn ($event) => $event->time->toDateString())
             ->map(fn (Collection $day) => $day->last())
             ->values();
@@ -101,9 +101,9 @@ class PotInterestInference
 
             $opening = (int) $prev->value;
             $closing = (int) $cur->value;
-            $net = $this->netTransfers($transfers, $prev->created_at, $cur->created_at);
+            $net = $this->netTransfers($transfers, $prev->time, $cur->time);
             $residual = $closing - $opening - $net;
-            $label = $pot->title . ' (' . $prev->time->toDateString() . ' to ' . $cur->time->toDateString() . ')';
+            $label = $pot->title.' ('.$prev->time->toDateString().' to '.$cur->time->toDateString().')';
 
             if ($residual <= 0 || $opening <= 0) {
                 if ($residual < 0 || ($residual > 0 && $opening <= 0)) {
@@ -203,13 +203,23 @@ class PotInterestInference
     }
 
     /**
+     * A snapshot dated D is the balance from the daily sync, which runs shortly after midnight. Its
+     * `time` is only the day label (23:59:59), and Spark's own `created_at` says when it was stored,
+     * so neither gives the real moment. The interval therefore works in calendar days from the
+     * source dates alone: a transfer belongs to it when its day is on or after the earlier
+     * snapshot's day and before the later one's. Backfilled or late-imported snapshots give the
+     * same answer as live ones.
+     *
      * @param  list<array{0: DateTimeInterface, 1: int}>  $transfers
      */
-    private function netTransfers(array $transfers, DateTimeInterface $after, DateTimeInterface $until): int
+    private function netTransfers(array $transfers, DateTimeInterface $from, DateTimeInterface $to): int
     {
+        $fromDay = $from->format('Y-m-d');
+        $toDay = $to->format('Y-m-d');
         $net = 0;
         foreach ($transfers as [$time, $amount]) {
-            if ($time > $after && $time <= $until) {
+            $day = $time->format('Y-m-d');
+            if ($day >= $fromDay && $day < $toDay) {
                 $net += $amount;
             }
         }
@@ -224,13 +234,13 @@ class PotInterestInference
     {
         $day = EventObject::firstOrCreate(
             ['user_id' => $integration->user_id, 'concept' => 'day', 'type' => 'day', 'title' => $row['paid_on']],
-            ['time' => $row['paid_on'] . ' 00:00:00', 'content' => null, 'metadata' => []],
+            ['time' => $row['paid_on'].' 00:00:00', 'content' => null, 'metadata' => []],
         );
 
         $event = Event::updateOrCreate(
             ['integration_id' => $integration->id, 'source_id' => $row['source_id']],
             [
-                'time' => $row['paid_on'] . ' 00:00:00',
+                'time' => $row['paid_on'].' 00:00:00',
                 'actor_id' => $row['pot_id'],
                 'target_id' => $day->id,
                 'service' => 'monzo',
@@ -257,7 +267,7 @@ class PotInterestInference
 
     private function sourceId(EventObject $pot, string $month): string
     {
-        return 'monzo_pot_interest_' . ($pot->metadata['pot_id'] ?? $pot->id) . '_' . $month;
+        return 'monzo_pot_interest_'.($pot->metadata['pot_id'] ?? $pot->id).'_'.$month;
     }
 
     private function integration(string $userId): Integration
