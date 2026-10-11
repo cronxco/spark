@@ -221,7 +221,7 @@ new class extends Component
         }
 
         // Deployment configuration findings (redacted, no credential values)
-        $configFindings = app(\\App\\Services\\Diagnostics\\ConfigurationAudit::class)->run()['findings'];
+        $configFindings = app(\App\Services\Diagnostics\ConfigurationAudit::class)->run()['findings'];
         foreach ($configFindings as $finding) {
             if (! in_array($finding['severity'], ['error', 'warning'], true)) {
                 continue;
@@ -685,7 +685,7 @@ new class extends Component
                 'title' => 'Deployment configuration audit',
                 'description' => 'Explicit variables, inherited defaults and actionable configuration findings (values and credentials are never displayed).',
                 'icon' => 'fas.shield-halved',
-                'issue_count' => count(array_filter(app(\\App\\Services\\Diagnostics\\ConfigurationAudit::class)->run()['findings'], fn ($f) => in_array($f['severity'], ['error', 'warning'], true))),
+                'issue_count' => count(array_filter(app(\App\Services\Diagnostics\ConfigurationAudit::class)->run()['findings'], fn ($f) => in_array($f['severity'], ['error', 'warning'], true))),
                 'badge_value' => null,
             ],
             [
@@ -948,7 +948,7 @@ new class extends Component
                 @endif
 
                 @elseif ($section['key'] === 'configuration_audit')
-                @php($audit = app(\\App\\Services\\Diagnostics\\ConfigurationAudit::class)->run())
+                @php($audit = app(\App\Services\Diagnostics\ConfigurationAudit::class)->run())
                 <div class="flex flex-wrap gap-2 mb-4">
                     <span class="badge badge-outline">{{ $audit['summary']['total'] }} variables</span>
                     <span class="badge badge-success">{{ $audit['summary']['explicit'] }} explicitly configured</span>
