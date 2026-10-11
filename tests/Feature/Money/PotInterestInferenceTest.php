@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Money\PotInterestInference;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -79,7 +80,7 @@ class PotInterestInferenceTest extends TestCase
         $this->assertSame(29_200, (int) $event->value);
         $this->assertSame(100, (int) $event->value_multiplier);
         $this->assertSame((string) $this->pot->id, (string) $event->actor_id);
-        $this->assertSame('monzo_pot_interest_pot_growth_2026-10', $event->source_id);
+        $this->assertSame('monzo_pot_interest_pot_growth_2026-09', $event->source_id);
         $this->assertTrue($event->event_metadata['inferred']);
         $this->assertSame('balance_delta', $event->event_metadata['method']);
         $this->assertSame(10_000_000, $event->event_metadata['opening_balance']);
@@ -150,13 +151,14 @@ class PotInterestInferenceTest extends TestCase
 
         $rows = $this->inference()->plan($this->user->id)['rows'];
 
-        $this->assertSame(['2026-01', '2026-02', '2026-03'], array_column($rows, 'month'));
+        $this->assertSame(['2025-12', '2026-01', '2026-02'], array_column($rows, 'month'));
+        $this->assertSame(['2026-01-01', '2026-02-01', '2026-03-01'], array_column($rows, 'paid_on'));
         $this->assertSame(87_000, array_sum(array_column($rows, 'amount')));
         foreach ($rows as $row) {
             $this->assertTrue($row['estimated']);
             $this->assertSame('gap_prorata', $row['method']);
         }
-        $this->assertGreaterThan($rows[2]['amount'], $rows[0]['amount'], 'Feb, which March pays for, has fewer days than December.');
+        $this->assertGreaterThan($rows[2]['amount'], $rows[0]['amount'], 'February has fewer days than December.');
     }
 
     #[Test]
@@ -217,7 +219,8 @@ class PotInterestInferenceTest extends TestCase
         $recent = $this->inference()->plan($this->user->id, CarbonImmutable::parse('2026-10-01'))['rows'];
 
         $this->assertCount(2, $all);
-        $this->assertSame(['2026-10'], array_column($recent, 'month'));
+        $this->assertSame(['2026-09'], array_column($recent, 'month'));
+        $this->assertSame(['2026-10-01'], array_column($recent, 'paid_on'));
     }
 
     #[Test]
@@ -234,6 +237,106 @@ class PotInterestInferenceTest extends TestCase
 
         $this->assertSame(['Old pot'], array_column($rows, 'pot'));
         $this->assertSame([], $this->inference()->plan($stranger->id)['rows']);
+    }
+
+    #[Test]
+    public function the_month_is_the_one_the_interest_is_for_like_monzo_names_it(): void
+    {
+        $this->snapshot('2026-09-30', 10_000_000);
+        $this->snapshot('2026-10-01', 10_029_200);
+
+        $row = $this->inference()->plan($this->user->id)['rows'][0];
+
+        $this->assertSame('2026-09', $row['month']);
+        $this->assertSame('2026-10-01', $row['paid_on']);
+    }
+
+    #[Test]
+    public function a_first_of_month_top_up_already_in_the_snapshot_is_taken_out_of_the_interest(): void
+    {
+        $this->snapshot('2026-09-30', 10_000_000);
+        $this->snapshot('2026-10-01', 10_000_000 + 10_000 + 29_200);
+        $this->transferIn(10_000, '2026-10-01 00:00:05');
+
+        $row = $this->inference()->plan($this->user->id)['rows'][0];
+
+        $this->assertSame(29_200, $row['amount']);
+        $this->assertSame(10_000, $row['first_day_transfers']);
+        $this->assertSame('balance_delta_first_day', $row['method']);
+    }
+
+    #[Test]
+    public function a_first_of_month_top_up_after_the_snapshot_is_left_out(): void
+    {
+        $this->snapshot('2026-09-30', 10_000_000);
+        $this->snapshot('2026-10-01', 10_029_200);
+        $this->transferIn(10_000, '2026-10-01 09:00:00');
+
+        $row = $this->inference()->plan($this->user->id)['rows'][0];
+
+        $this->assertSame(29_200, $row['amount']);
+        $this->assertSame(0, $row['first_day_transfers']);
+        $this->assertSame('balance_delta', $row['method']);
+    }
+
+    #[Test]
+    public function when_both_readings_are_plausible_the_one_nearer_the_pots_usual_rate_wins(): void
+    {
+        $this->snapshot('2026-07-31', 10_000_000);
+        $this->snapshot('2026-08-01', 10_029_200);
+        $this->snapshot('2026-08-31', 10_029_200);
+        $this->snapshot('2026-09-01', 10_058_400);
+        $this->snapshot('2026-09-30', 10_058_400);
+        $this->snapshot('2026-10-01', 10_058_400 + 5_000 + 29_300);
+        $this->transferIn(5_000, '2026-10-01 00:01:00');
+
+        $rows = $this->inference()->plan($this->user->id)['rows'];
+
+        $october = collect($rows)->firstWhere('paid_on', '2026-10-01');
+        $this->assertSame(29_300, $october['amount'], 'Without the top-up taken out it would read 34,300, a rate of 4.1%.');
+        $this->assertSame(5_000, $october['first_day_transfers']);
+    }
+
+    #[Test]
+    public function a_small_pot_whose_rise_is_only_its_top_up_earns_nothing_and_is_not_flagged(): void
+    {
+        $small = $this->object('Birthdays', 'monzo_pot', ['pot_id' => 'pot_birthdays']);
+        $this->snapshot('2026-09-30', 100_000, $small);
+        $this->snapshot('2026-10-01', 105_000, $small);
+        $this->movement('pot_transfer_to', $this->account, $small, 5_000, '2026-10-01 00:00:10');
+
+        $plan = $this->inference()->plan($this->user->id);
+
+        $this->assertSame([], $plan['rows']);
+        $this->assertSame([], $plan['flagged']);
+    }
+
+    #[Test]
+    public function a_top_up_that_explains_neither_reading_is_still_flagged(): void
+    {
+        $this->snapshot('2026-09-30', 10_000_000);
+        $this->snapshot('2026-10-01', 10_000_000 + 900_000);
+        $this->transferIn(10_000, '2026-10-01 00:00:05');
+
+        $plan = $this->inference()->plan($this->user->id);
+
+        $this->assertSame([], $plan['rows']);
+        $this->assertCount(1, $plan['flagged']);
+    }
+
+    #[Test]
+    public function the_detail_view_lists_each_pot_with_its_total_and_rate(): void
+    {
+        $this->snapshot('2026-09-30', 10_000_000);
+        $this->snapshot('2026-10-01', 10_029_200);
+
+        $this->assertSame(0, Artisan::call('monzo:infer-interest', ['--user' => $this->user->id, '--detail' => true]));
+        $output = Artisan::output();
+
+        $this->assertStringContainsString('Growth Fund', $output);
+        $this->assertStringContainsString('292.00', $output);
+        $this->assertStringContainsString('3.50%', $output);
+        $this->assertStringContainsString('the month the interest is for', $output);
     }
 
     #[Test]

@@ -55,7 +55,7 @@ class PlanOverviewTest extends TestCase
         $this->assertSame(29_490, $overview['strip']['latest_interest']);
         $this->assertSame(29_490 * 12, $overview['strip']['run_rate']);
         $this->assertSame((int) round(29_490 * 12 * 0.4), $overview['strip']['tax_estimate']);
-        $this->assertSame('2026-10', $overview['strip']['latest_month']);
+        $this->assertSame('2026-09', $overview['strip']['latest_month']);
 
         $this->assertSame(['Gift', 'Holiday'], array_column($overview['pots'], 'name'));
         $this->assertSame(20_000_000, $overview['pots'][0]['goal']);
@@ -96,7 +96,7 @@ class PlanOverviewTest extends TestCase
 
         Livewire::actingAs($this->user)->test(PlanOverviewComponent::class)
             ->assertSee('Interest ledger')
-            ->assertSee('October 2026')
+            ->assertSee('September 2026')
             ->assertSee('£292')
             ->assertSee('Gift');
     }

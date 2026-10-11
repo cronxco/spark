@@ -13,6 +13,7 @@ class InferMonzoPotInterest extends Command
     protected $signature = 'monzo:infer-interest
         {--user= : Owner UUID; defaults to every user with Monzo}
         {--since= : Only consider snapshots on or after this date, e.g. "-45 days" or 2025-10-12}
+        {--detail : Also list each pot with its months, total and implied rate}
         {--apply : Write the interest_earned events; default is a read-only plan}';
 
     protected $description = 'Infer Monzo pot interest from daily balance snapshots (read-only unless --apply)';
@@ -48,10 +49,14 @@ class InferMonzoPotInterest extends Command
             $rows->where('estimated', true)->count(),
             $rows->whereIn('state', ['new', 'changed'])->count(),
         ])->values()->all();
-        $this->table(['Month', 'Pots', 'Interest £', 'Estimated', 'To write'], $months);
+        $this->table(['Interest for', 'Pots', 'Interest £', 'Estimated', 'To write'], $months);
 
         $total = collect($plan['rows'])->sum('amount') / 100;
         $this->line('Total inferred: £' . number_format($total, 2));
+        $this->comment('Months are the month the interest is for, as Monzo names it: the payment on 1 October is "September".');
+        if ($this->option('detail')) {
+            $this->potDetail($plan);
+        }
         foreach ($plan['flagged'] as $flag) {
             $this->warn("Flagged, not recorded: {$flag['window']} — {$flag['reason']} (residual £" . number_format($flag['residual'] / 100, 2) . ')');
         }
@@ -63,5 +68,32 @@ class InferMonzoPotInterest extends Command
         }
         $result = $inference->apply($userId, $since);
         $this->info("Wrote {$result['written']} events, {$result['unchanged']} already up to date, {$result['flagged']} flagged.");
+    }
+
+    /**
+     * @param  array{rows: list<array<string, mixed>>, flagged: list<array<string, mixed>>}  $plan
+     */
+    private function potDetail(array $plan): void
+    {
+        $flagged = collect($plan['flagged'])->countBy('pot');
+        $lines = collect($plan['rows'])->groupBy('pot')->map(function ($rows, $pot) use ($flagged) {
+            $rates = $rows->pluck('implied_aer')->filter(fn ($rate) => $rate > 0);
+
+            return [
+                'total' => $rows->sum('amount'),
+                'line' => [
+                    $pot,
+                    $rows->count(),
+                    number_format($rows->sum('amount') / 100, 2),
+                    $rates->isEmpty() ? '-' : number_format($rates->avg() * 100, 2) . '%',
+                    $rates->isEmpty() ? '-' : number_format($rates->min() * 100, 2) . '% to ' . number_format($rates->max() * 100, 2) . '%',
+                    $rows->where('method', 'balance_delta_first_day')->count(),
+                    $rows->where('estimated', true)->count(),
+                    $flagged->get($pot, 0),
+                ],
+            ];
+        })->sortByDesc('total')->pluck('line')->values()->all();
+
+        $this->table(['Pot', 'Months', 'Total £', 'Avg rate', 'Range', '1st-day top-up', 'Estimated', 'Flagged'], $lines);
     }
 }
