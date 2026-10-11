@@ -47,6 +47,7 @@ class SkillRegistry
         'spark__get-events-by-filter-tool',
         'spark__get-flint-notes',
         'spark__get-latest-flint-digest',
+        'spark__get-money-plan',
         'spark__get-metric-trend-tool',
         'spark__get-service-status-tool',
         'spark__get-saved-bookmarks',

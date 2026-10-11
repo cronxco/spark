@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\Mobile\FlintNotesController;
 use App\Http\Controllers\Api\V1\Mobile\FlintQuestionsController;
 use App\Http\Controllers\Api\V1\Mobile\FlintReviewController;
 use App\Http\Controllers\Api\V1\Mobile\FlintRoutineHealthController;
+use App\Http\Controllers\Api\V1\Mobile\FlintSchedulesController;
 use App\Http\Controllers\Api\V1\Mobile\FlintTopicsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\InsightDiscoveryController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
 use App\Http\Controllers\Api\V1\Mobile\MoneyAccountsController;
+use App\Http\Controllers\Api\V1\Mobile\MoneyPlanController;
 use App\Http\Controllers\Api\V1\Mobile\NetWorthController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationPreferencesController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationsController;
@@ -366,6 +368,14 @@ Route::post('up-to-speed/unmark', UpToSpeedUnmarkController::class)
 |--------------------------------------------------------------------------
 */
 
+Route::get('flint/schedules', [FlintSchedulesController::class, 'index'])
+    ->middleware('spark.ability:flint:read')
+    ->name('flint.schedules.index');
+
+Route::put('flint/schedules/{routine}', [FlintSchedulesController::class, 'update'])
+    ->middleware('spark.ability:flint:write')
+    ->name('flint.schedules.update');
+
 Route::get('flint/digests', [FlintDigestsController::class, 'index'])
     ->middleware('spark.ability:flint:read')
     ->name('flint.digests.index');
@@ -474,3 +484,12 @@ Route::get('money/net-worth', [NetWorthController::class, 'index'])
     ->name('money.net-worth');
 
 require __DIR__.'/knowledge.php';
+Route::get('money/plan', [MoneyPlanController::class, 'plan'])->middleware('spark.ability:finance:read')->name('money.plan');
+Route::get('money/spending', [MoneyPlanController::class, 'spending'])->middleware('spark.ability:finance:read')->name('money.spending');
+Route::get('money/budgets', [MoneyPlanController::class, 'budgetsIndex'])->middleware('spark.ability:finance:read')->name('money.budgets.index');
+Route::post('money/budgets', [MoneyPlanController::class, 'budgetsStore'])->middleware('spark.ability:finance:write')->name('money.budgets.store');
+Route::patch('money/budgets/{id}', [MoneyPlanController::class, 'budgetsUpdate'])->middleware('spark.ability:finance:write')->name('money.budgets.update');
+Route::delete('money/budgets/{id}', [MoneyPlanController::class, 'budgetsDestroy'])->middleware('spark.ability:finance:write')->name('money.budgets.destroy');
+Route::post('money/buffer/preview', [MoneyPlanController::class, 'bufferPreview'])->middleware('spark.ability:finance:write')->name('money.buffer.preview');
+Route::post('money/buffer', [MoneyPlanController::class, 'bufferStore'])->middleware('spark.ability:finance:write')->name('money.buffer.store');
+Route::patch('money/pots/{id}', [MoneyPlanController::class, 'potUpdate'])->middleware('spark.ability:finance:write')->name('money.pots.update');

@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Support\AdminTenant;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
@@ -48,6 +49,9 @@ new class extends Component
     /** @var array<string, int> */
     public array $blockCountsByType = [];
 
+    #[Url]
+    public ?string $section = null;
+
     /** @var array<string, bool> */
     public array $collapse = [
         'undefined_actions' => false,
@@ -60,12 +64,17 @@ new class extends Component
         'invalid_integrations' => false,
         'plugin_config_issues' => false,
         'embedding_health' => false,
+        'money_data_health' => false,
         'block_types_custom_layouts' => false,
     ];
 
     public function mount(): void
     {
         $this->loadData();
+
+        if ($this->section !== null && array_key_exists($this->section, $this->collapse)) {
+            $this->collapse[$this->section] = true;
+        }
     }
 
     public function toggle(string $key): void
@@ -660,6 +669,14 @@ new class extends Component
                 'badge_value' => null,
             ],
             [
+                'key' => 'money_data_health',
+                'title' => 'Money data health',
+                'description' => 'Duplicate bank accounts, archived pot snapshots, missing pot details and unnamed categories, with a preview before anything is applied.',
+                'icon' => 'fas.sterling-sign',
+                'issue_count' => count(app(\App\Services\Money\AccountCleanup::class)->plan((string) auth()->id())['steps']),
+                'badge_value' => null,
+            ],
+            [
                 'key' => 'embedding_health',
                 'title' => 'Embedding Health Dashboard',
                 'description' => 'Monitor semantic search embedding coverage across events, blocks, and objects.',
@@ -1038,6 +1055,9 @@ new class extends Component
                     @endforeach
                 </div>
                 @endif
+
+                @elseif ($section['key'] === 'money_data_health')
+                <livewire:money.data-health />
 
                 @elseif ($section['key'] === 'embedding_health')
                 @php($health = $this->embeddingHealth)

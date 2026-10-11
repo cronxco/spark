@@ -405,7 +405,15 @@ class FlintDigestService
             }
         }
 
-        if (in_array($routine, ['digest', 'news_roundup'], true)) {
+        if (in_array($routine, ['money_weekly', 'money_close'], true)) {
+            if ($types->filter(fn (string $type) => $type === 'flint_user_question')->count() > 3) {
+                throw ValidationException::withMessages([
+                    'blocks' => 'A money digest may ask at most three questions.',
+                ]);
+            }
+        }
+
+        if (in_array($routine, ['digest', 'news_roundup', 'money_weekly', 'money_close'], true)) {
             if ($types->filter(fn (string $type) => $type === 'flint_editorial_note')->count() !== 1
                 || $blocks->last()['block_type'] !== 'flint_editorial_note') {
                 throw ValidationException::withMessages([

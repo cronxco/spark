@@ -240,6 +240,9 @@ return [
     // Spark owns the timing (in the user's effective timezone) and POSTs to the
     // routine, which calls back via the create-flint-digest MCP tool.
     'flint_routine' => [
+        // Minutes after which a routine run that never reported back stops blocking the next one.
+        'running_stale_minutes' => (int) env('FLINT_ROUTINE_RUNNING_STALE_MINUTES', 45),
+
         // The CronxTools MCP endpoint OpenAI connects to when running a Flint
         // skill. The bearer token is embedded in the URL, so this value is a
         // credential: it must never reach a log, a span or a stored payload.
@@ -290,6 +293,16 @@ return [
                 'secret' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_SECRET'),
                 'driver' => env('FLINT_NEWS_ROUNDUP_DRIVER'),
             ],
+            'money_weekly' => [
+                'url' => env('FLINT_MONEY_WEEKLY_WEBHOOK_URL'),
+                'secret' => env('FLINT_MONEY_WEEKLY_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_MONEY_WEEKLY_DRIVER'),
+            ],
+            'money_close' => [
+                'url' => env('FLINT_MONEY_CLOSE_WEBHOOK_URL'),
+                'secret' => env('FLINT_MONEY_CLOSE_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_MONEY_CLOSE_DRIVER'),
+            ],
         ],
 
         'morning_time_weekday' => env('FLINT_MORNING_WEEKDAY', '07:30'),
@@ -302,6 +315,15 @@ return [
         'topics_time' => env('FLINT_TOPICS_TIME', '21:00'),
         'reading_list_time' => env('FLINT_READING_LIST_TIME', '20:00'),
         'news_roundup_time' => env('FLINT_NEWS_ROUNDUP_TIME', '07:00'),
+        'money_weekly_time' => env('FLINT_MONEY_WEEKLY_TIME', '09:00'),
+        'money_close_time' => env('FLINT_MONEY_CLOSE_TIME', '09:00'),
+
+        // How often each routine runs, for routines that are not daily. A user's
+        // settings.flint.schedules.{routine} replaces the whole entry.
+        'cadence' => [
+            'money_weekly' => ['frequency' => 'weekly', 'days' => ['sun']],
+            'money_close' => ['frequency' => 'monthly', 'day_of_month' => 2],
+        ],
     ],
 
 ];

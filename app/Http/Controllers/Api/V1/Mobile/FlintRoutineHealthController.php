@@ -30,7 +30,7 @@ class FlintRoutineHealthController extends Controller
             ->oldest()
             ->first();
         $executionState = $integration ? $executions->getTaskExecutions($integration) : [];
-        $routines = collect(['morning_digest', 'evening_digest', 'topics', 'reading_list', 'news_roundup'])
+        $routines = collect(['morning_digest', 'evening_digest', 'topics', 'reading_list', 'news_roundup', 'money_weekly', 'money_close'])
             ->map(function (string $routine) use ($user, $integration, $executionState, $schedule, $drivers): array {
                 $driverRoutine = str_ends_with($routine, '_digest') ? 'digest' : $routine;
                 $driver = $drivers->driverName($driverRoutine, user: $user);
