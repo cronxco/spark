@@ -133,7 +133,7 @@ class GoCardlessAccountRenewalTest extends TestCase
     public function both_cache_read_paths_return_the_same_identity(): void
     {
         Cache::put('gocardless_account_details_v2_old-account', ['account' => ['ownerName' => 'Owner']], 60);
-        Cache::put('gocardless_group_accounts_v2_' . $this->group->id . '_old-requisition', ['old-account'], 60);
+        Cache::put('gocardless_group_accounts_v2_'.$this->group->id.'_old-requisition', ['old-account'], 60);
         $this->assertSame('old-account', $this->plugin->getAccount('old-account')['id']);
         $this->assertSame('old-account', $this->plugin->pullAccountData($this->integration)['id']);
         $object = $this->plugin->upsertAccountObject($this->integration, $this->plugin->pullAccountData($this->integration));
@@ -144,7 +144,7 @@ class GoCardlessAccountRenewalTest extends TestCase
     #[Test]
     public function onboarding_is_read_only_and_instance_creation_is_idempotent(): void
     {
-        Cache::put('gocardless_group_accounts_v2_' . $this->group->id . '_old-requisition', ['old-account'], 60);
+        Cache::put('gocardless_group_accounts_v2_'.$this->group->id.'_old-requisition', ['old-account'], 60);
         Cache::put('gocardless_account_details_v2_old-account', $this->details(), 60);
         $this->assertCount(1, $this->plugin->getAvailableAccountsForOnboarding($this->group));
         $this->assertSame(0, EventObject::where('user_id', $this->owner->id)->count());
@@ -278,6 +278,40 @@ class GoCardlessAccountRenewalTest extends TestCase
             'reference' => 'pending-reference', 'mapping' => ['old-account' => 'new-account'],
         ])->assertRedirect('spark://integrations/reauth-complete?status=success&attempt_id=mobile-attempt');
         $this->assertArrayNotHasKey('mobile_reauth_origin', $this->group->fresh()->auth_metadata);
+    }
+
+    #[Test]
+    public function mapping_page_shows_balances_and_recognisable_details_for_each_option(): void
+    {
+        $this->account();
+        Event::create([
+            'integration_id' => $this->integration->id, 'source_id' => 'old-balance', 'user_id' => $this->owner->id,
+            'action' => 'had_balance', 'domain' => 'money', 'service' => 'gocardless', 'time' => '2026-10-01 00:00:00',
+            'value' => 123456, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+            'actor_id' => EventObject::where('concept', 'account')->first()->id,
+            'target_id' => EventObject::where('concept', 'account')->first()->id, 'event_metadata' => [],
+        ]);
+        $this->stage();
+        $first = array_merge($this->details('new-one', 'res-one'), ['cashAccountType' => 'CACC', 'iban' => 'GB29NWBK60161331926819']);
+        $second = $this->details('new-two', 'res-two');
+        Http::fake([
+            '*/requisitions/new-requisition/' => Http::response(['status' => 'LN', 'reference' => 'pending-reference',
+                'institution_id' => 'test-bank', 'accounts' => ['new-one', 'new-two']]),
+            '*/accounts/new-one/details/' => Http::response(['account' => $first]),
+            '*/accounts/new-two/details/' => Http::response(['account' => $second]),
+            '*/accounts/new-one/balances/' => Http::response(['balances' => [
+                ['balanceType' => 'interimAvailable', 'balanceAmount' => ['amount' => '1.00', 'currency' => 'GBP']],
+                ['balanceType' => 'closingBooked', 'balanceAmount' => ['amount' => '1234.56', 'currency' => 'GBP']]]]),
+            '*/accounts/new-two/balances/' => Http::response([], 500),
+        ]);
+        $this->plugin->completeRenewal($this->group, 'pending-reference');
+        $this->app->instance(GoCardlessBankPlugin::class, $this->plugin);
+
+        $this->actingAs($this->owner)->get(route('integrations.gocardless.renewal.show', $this->group))
+            ->assertOk()
+            ->assertSee('Last known balance £1,234.56 as of 1 Oct 2026', false)
+            ->assertSee('Current Account · Sort code 60-16-13 · ••6819 · Balance £1,234.56', false)
+            ->assertSee('Balance unavailable', false);
     }
 
     #[Test]
@@ -548,7 +582,7 @@ class GoCardlessAccountRenewalTest extends TestCase
         Http::fake([
             '*/requisitions/new-requisition/' => Http::response(['status' => $status,
                 'reference' => 'pending-reference', 'institution_id' => 'test-bank', 'accounts' => [$details['id']]]),
-            '*/accounts/' . $details['id'] . '/details/' => Http::response(['account' => $details]),
+            '*/accounts/'.$details['id'].'/details/' => Http::response(['account' => $details]),
         ]);
     }
 }

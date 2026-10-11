@@ -9,9 +9,11 @@ use App\Services\GoCardlessAccounts;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 trait GoCardlessRenewal
 {
@@ -23,7 +25,7 @@ trait GoCardlessRenewal
         }
         $institution = $group->auth_metadata['gocardless_institution_id']
             ?? $group->auth_metadata['institution_id']
-            ?? Session::get('gocardless_institution_id_' . $group->id);
+            ?? Session::get('gocardless_institution_id_'.$group->id);
         if (! $institution) {
             throw new RuntimeException('No bank institution selected for this connection.');
         }
@@ -193,8 +195,8 @@ trait GoCardlessRenewal
                 }
                 $integration->update(['configuration' => $config]);
                 if ($newId) {
-                    Cache::forget('gocardless_balances_' . $newId);
-                    Cache::forget('gocardless_account_validation_' . $newId);
+                    Cache::forget('gocardless_balances_'.$newId);
+                    Cache::forget('gocardless_account_validation_'.$newId);
                     $this->upsertAccountObject($integration, $accounts[$newId]);
                 }
             }
@@ -210,7 +212,7 @@ trait GoCardlessRenewal
             $meta['requires_reconfirmation'] = false;
             unset($meta['gocardless_pending'], $meta['eua_expired_at'], $meta['old_requisition_id']);
             $group->update(['account_id' => $pending['requisition_id'],
-                'access_token' => 'requisition:' . $pending['requisition_id'], 'auth_metadata' => $meta]);
+                'access_token' => 'requisition:'.$pending['requisition_id'], 'auth_metadata' => $meta]);
             $this->clearGroupCaches($group->id);
             $this->cacheAccountList($group->id, array_keys($accounts));
             if ($integrations->isNotEmpty()) {
@@ -222,6 +224,79 @@ trait GoCardlessRenewal
 
             return true;
         });
+    }
+
+    /**
+     * Best-effort balances for renewed accounts awaiting a manual match.
+     * Reuses the balance cache and daily call budget, and never throws.
+     *
+     * @param  list<string>  $accountIds
+     * @return array<string, array{amount: float, currency: ?string, date: ?string}>
+     */
+    public function pendingAccountBalances(array $accountIds): array
+    {
+        $result = [];
+        foreach ($accountIds as $accountId) {
+            try {
+                $data = Cache::get("gocardless_balances_{$accountId}");
+                if (! $data && $this->canMakeBalanceApiCall($accountId)) {
+                    $response = Http::withHeaders(['Authorization' => 'Bearer '.$this->getAccessToken()])
+                        ->get($this->getBaseUrl()."/accounts/{$accountId}/balances/");
+                    if ($response->successful()) {
+                        $data = $response->json();
+                        Cache::put("gocardless_balances_{$accountId}", $data, 3600);
+                        $this->recordBalanceApiCall($accountId);
+                    }
+                }
+                $balance = $this->preferredBalance($data['balances'] ?? []);
+                if ($balance && isset($balance['balanceAmount']['amount'])) {
+                    $result[$accountId] = [
+                        'amount' => abs((float) $balance['balanceAmount']['amount']),
+                        'currency' => $balance['balanceAmount']['currency'] ?? null,
+                        'date' => $balance['referenceDate'] ?? null,
+                    ];
+                }
+            } catch (Throwable) {
+                continue;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Account type, sort code and masked number a user can recognise an account by.
+     *
+     * @return array{type: ?string, sort_code: ?string, mask: ?string}
+     */
+    public function recognisableAccountDetails(array $details): array
+    {
+        $type = $this->mapCashAccountType($details['cashAccountType'] ?? null);
+        $iban = strtoupper(preg_replace('/\s+/', '', (string) ($details['iban'] ?? '')));
+        $bban = preg_replace('/\s+/', '', (string) ($details['bban'] ?? ''));
+        $sortCode = null;
+        if (str_starts_with($iban, 'GB') && strlen($iban) === 22) {
+            $sortCode = substr($iban, 8, 6);
+        } elseif (preg_match('/^\d{14}$/', $bban)) {
+            $sortCode = substr($bban, 0, 6);
+        }
+        $source = $iban ?: ($bban ?: (string) ($details['maskedPan'] ?? ''));
+
+        return [
+            'type' => $type === 'other' ? null : Str::headline($type),
+            'sort_code' => $sortCode ? implode('-', str_split($sortCode, 2)) : null,
+            'mask' => $source !== '' ? '••'.substr($source, -4) : null,
+        ];
+    }
+
+    /** @param  array<int, array<string, mixed>>  $balances */
+    private function preferredBalance(array $balances): ?array
+    {
+        $priority = ['closingBooked', 'interimBooked', 'openingBooked', 'closingAvailable', 'interimAvailable', 'openingAvailable'];
+        $rank = fn ($balance) => array_search($balance['balanceType'] ?? '', $priority, true);
+        usort($balances, fn ($a, $b) => ($rank($a) === false ? PHP_INT_MAX : $rank($a)) <=> ($rank($b) === false ? PHP_INT_MAX : $rank($b)));
+
+        return $balances[0] ?? null;
     }
 
     private function sameBankAccount(array $old, array $new): bool
