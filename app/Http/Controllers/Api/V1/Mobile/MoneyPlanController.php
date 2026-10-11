@@ -72,7 +72,7 @@ class MoneyPlanController extends Controller
             'budget' => ['nullable', 'string', 'max:64'],
         ]);
 
-        $month = CarbonImmutable::createFromFormat('Y-m-d', ($validated['month'] ?? now()->format('Y-m')).'-01')->startOfMonth();
+        $month = CarbonImmutable::createFromFormat('Y-m-d', ($validated['month'] ?? now()->format('Y-m')) . '-01')->startOfMonth();
         $entries = $this->scope->entries((string) $request->user()->id, $month, $month->endOfMonth(), array_filter([
             'category' => $validated['category'] ?? null,
             'account' => $validated['account'] ?? null,

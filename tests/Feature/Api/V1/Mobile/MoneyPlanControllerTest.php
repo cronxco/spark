@@ -66,7 +66,7 @@ class MoneyPlanControllerTest extends TestCase
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
         $this->spend(12_000, 'Hotel');
 
-        $this->getJson('/api/v1/mobile/money/spending?month='.now()->format('Y-m'))
+        $this->getJson('/api/v1/mobile/money/spending?month=' . now()->format('Y-m'))
             ->assertOk()
             ->assertJsonPath('data.total', 12_000)
             ->assertJsonPath('data.transactions.0.merchant', 'Hotel');
@@ -109,7 +109,7 @@ class MoneyPlanControllerTest extends TestCase
             ->assertOk()->assertJsonPath('data.card_buffer_pot_id', (string) $this->pot->id);
         $this->patchJson("/api/v1/mobile/money/pots/{$this->pot->id}", ['card_buffer' => false])
             ->assertOk()->assertJsonPath('data.card_buffer_pot_id', null);
-        $this->patchJson('/api/v1/mobile/money/pots/'.$this->card->id, ['card_buffer' => true])->assertNotFound();
+        $this->patchJson('/api/v1/mobile/money/pots/' . $this->card->id, ['card_buffer' => true])->assertNotFound();
     }
 
     #[Test]
@@ -144,7 +144,7 @@ class MoneyPlanControllerTest extends TestCase
         );
 
         return Event::create([
-            'integration_id' => $this->bank->id, 'source_id' => 'g-'.uniqid(), 'actor_id' => $this->card->id, 'target_id' => $target->id,
+            'integration_id' => $this->bank->id, 'source_id' => 'g-' . uniqid(), 'actor_id' => $this->card->id, 'target_id' => $target->id,
             'service' => 'gocardless', 'domain' => 'money', 'action' => 'payment_to', 'time' => now()->subHour(),
             'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => ['description' => $merchant, 'transaction_status' => 'booked'],
