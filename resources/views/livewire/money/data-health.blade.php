@@ -34,8 +34,14 @@
                         <li class="py-3 flex flex-col gap-2" wire:key="step-{{ $step['key'] }}">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="flex flex-col">
-                                    <span class="font-medium">{{ $step['label'] }}</span>
-                                    <span class="text-sm text-base-content/70">{{ $step['detail'] }}</span>
+                                    <span class="font-medium">
+                                        {{ $step['label'] }}
+                                        <span class="badge badge-sm {{ ['high' => 'badge-error', 'medium' => 'badge-warning', 'low' => 'badge-ghost'][$step['severity']] ?? 'badge-ghost' }}">{{ ucfirst($step['severity']) }}</span>
+                                    </span>
+                                    <span class="text-sm text-base-content/70">Evidence: {{ $step['detail'] }}</span>
+                                    @if ($step['impact'] !== '')
+                                        <span class="text-sm text-base-content/70">Impact: {{ $step['impact'] }}</span>
+                                    @endif
                                 </div>
                                 @if ($step['blocked'])
                                     <span class="badge badge-warning shrink-0">Blocked</span>
@@ -80,6 +86,20 @@
                         class="btn btn-primary btn-sm">
                         Apply
                     </button>
+                </div>
+            @endif
+
+            @if (count($audit) > 0)
+                <div class="flex flex-col gap-1">
+                    <h3 class="font-medium text-sm">Recently applied</h3>
+                    <ul class="text-sm text-base-content/70 flex flex-col gap-1">
+                        @foreach ($audit as $entry)
+                            <li wire:key="audit-{{ $entry['progress_id'] ?? $loop->index }}">
+                                {{ \Carbon\Carbon::parse($entry['applied_at'])->format('j M Y H:i') }}:
+                                {{ count($entry['applied']) }} applied, {{ count($entry['skipped']) }} skipped
+                            </li>
+                        @endforeach
+                    </ul>
                 </div>
             @endif
         </div>

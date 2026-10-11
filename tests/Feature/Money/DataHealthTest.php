@@ -50,6 +50,53 @@ class DataHealthTest extends TestCase
     }
 
     #[Test]
+    public function each_finding_shows_its_severity_impact_and_evidence(): void
+    {
+        $this->duplicates();
+
+        Livewire::actingAs($this->user)->test(DataHealth::class)
+            ->assertSee('High')
+            ->assertSee('Impact:')
+            ->assertSee('Evidence:');
+    }
+
+    #[Test]
+    public function another_users_duplicates_never_appear(): void
+    {
+        $other = User::factory()->create();
+        foreach (['Theirs one', 'Theirs two'] as $title) {
+            EventObject::create(['user_id' => $other->id, 'concept' => 'account', 'type' => 'bank_account',
+                'title' => $title, 'metadata' => ['account_id' => 'acc-9', 'currency' => 'GBP']]);
+        }
+
+        Livewire::actingAs($this->user)->test(DataHealth::class)
+            ->assertDontSee('Theirs')
+            ->assertSee('Everything looks tidy');
+    }
+
+    #[Test]
+    public function applying_records_an_audit_entry_and_a_stale_plan_is_refused(): void
+    {
+        [, $second] = $this->duplicates();
+        $plan = app(\App\Services\Money\AccountCleanup::class)->plan((string) $this->user->id);
+
+        $stale = \App\Models\ActionProgress::createProgress(userId: (string) $this->user->id, actionType: ApplyAccountCleanup::ACTION_TYPE, actionId: (string) \Illuminate\Support\Str::uuid(), step: 'queued', message: 'q', progress: 0);
+        (new ApplyAccountCleanup((string) $this->user->id, 'not-the-reviewed-plan', (string) $stale->id))->handle(app(\App\Services\Money\AccountCleanup::class));
+        $this->assertFalse($second->fresh()->trashed());
+        $this->assertArrayNotHasKey('money', $this->user->fresh()->settings ?? []);
+
+        $progress = \App\Models\ActionProgress::createProgress(userId: (string) $this->user->id, actionType: ApplyAccountCleanup::ACTION_TYPE, actionId: (string) \Illuminate\Support\Str::uuid(), step: 'queued', message: 'q', progress: 0);
+        (new ApplyAccountCleanup((string) $this->user->id, $plan['fingerprint'], (string) $progress->id))->handle(app(\App\Services\Money\AccountCleanup::class));
+
+        $audit = $this->user->fresh()->settings['money']['cleanup_audit'];
+        $this->assertCount(1, $audit);
+        $this->assertSame($plan['fingerprint'], $audit[0]['fingerprint']);
+        $this->assertNotEmpty($audit[0]['applied']);
+
+        Livewire::actingAs($this->user->fresh())->test(DataHealth::class)->assertSee('Recently applied');
+    }
+
+    #[Test]
     public function apply_queues_the_reviewed_plan_and_shows_progress(): void
     {
         Queue::fake();

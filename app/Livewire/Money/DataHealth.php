@@ -79,10 +79,19 @@ class DataHealth extends Component
 
     public function render(): View
     {
-        $plan = app(AccountCleanup::class)->plan((string) Auth::id());
+        $cleanup = app(AccountCleanup::class);
+        $plan = $cleanup->plan((string) Auth::id());
+        $order = ['high' => 0, 'medium' => 1, 'low' => 2];
+        $steps = collect($plan['steps'])
+            ->map(fn ($step) => $step + $cleanup->describe($step))
+            ->sortBy(fn ($step) => $order[$step['severity']] ?? 3)
+            ->values()
+            ->all();
+        $audit = Auth::user()?->settings['money']['cleanup_audit'] ?? [];
 
         return view('livewire.money.data-health', [
-            'steps' => $plan['steps'],
+            'steps' => $steps,
+            'audit' => array_slice($audit, 0, 5),
             'fingerprint' => $plan['fingerprint'],
             'progress' => $this->progress(),
             'runnable' => collect($plan['steps'])->filter(fn ($step) => $step['blocked'] === null && ! $step['needs_input'])->count(),

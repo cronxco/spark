@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Livewire\Money\DataHealth;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -198,6 +199,40 @@ class SenseCheckTenancyTest extends TestCase
     /**
      * @param  array<string, mixed>  $attributes
      */
+    #[Test]
+    public function the_money_data_health_panel_is_part_of_the_page(): void
+    {
+        $this->actingAs($this->admin);
+
+        Volt::test('admin.sense-check')
+            ->assertSee('Money data health')
+            ->assertSeeLivewire(DataHealth::class);
+    }
+
+    #[Test]
+    public function the_money_section_can_be_opened_from_a_link_and_lists_the_issue_count(): void
+    {
+        $this->withoutVite();
+        $this->actingAs($this->admin);
+        foreach (['One', 'Two'] as $title) {
+            EventObject::create(['user_id' => $this->admin->id, 'concept' => 'account', 'type' => 'bank_account',
+                'title' => $title, 'metadata' => ['account_id' => 'acc-1', 'currency' => 'GBP']]);
+        }
+
+        $this->get(route('admin.sense-check.index', ['section' => 'money_data_health']))->assertOk()->assertSee('Money data health');
+
+        \Livewire\Livewire::withQueryParams(['section' => 'money_data_health']);
+        Volt::test('admin.sense-check')
+            ->assertSet('collapse.money_data_health', true);
+    }
+
+    #[Test]
+    public function a_non_admin_cannot_reach_sense_check(): void
+    {
+        $this->withoutVite();
+        $this->actingAs(User::factory()->create())->get(route('admin.sense-check.index'))->assertForbidden();
+    }
+
     private function eventFor(User $user, array $attributes = []): Event
     {
         return Event::factory()->create(array_merge([

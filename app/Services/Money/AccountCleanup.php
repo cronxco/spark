@@ -440,6 +440,25 @@ class AccountCleanup
     }
 
     /**
+     * How serious a step's finding is and what it changes in plain words, for Sense Check.
+     *
+     * @param  array<string, mixed>  $step
+     * @return array{severity: string, impact: string}
+     */
+    public function describe(array $step): array
+    {
+        return match ($step['kind']) {
+            self::KIND_MERGE => ['severity' => 'high', 'impact' => 'Duplicate accounts double count balances and spending. Merging keeps one account and an alias for the other.'],
+            self::KIND_QUARANTINE => ['severity' => 'high', 'impact' => 'This account looks like a leftover and is skewing totals. It is hidden and can be restored.'],
+            self::KIND_RENAME => ['severity' => 'low', 'impact' => 'The account only has a placeholder name. Renaming changes how it is shown.'],
+            self::KIND_SNAPSHOTS => ['severity' => 'medium', 'impact' => 'Balance history from archived pots feeds net worth and inferred interest. Empty rows are removed.'],
+            self::KIND_POT_DETAILS => ['severity' => 'medium', 'impact' => 'Pot goals and interest rates are missing, so pot figures and interest checks are incomplete.'],
+            self::KIND_CATEGORY => ['severity' => 'low', 'impact' => 'Spending categories show a raw id until they are named.'],
+            default => ['severity' => 'low', 'impact' => ''],
+        };
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */

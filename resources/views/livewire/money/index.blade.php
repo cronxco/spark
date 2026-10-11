@@ -544,11 +544,6 @@
         </div>
     </div>
 </x-tab>
-<x-tab name="plan" label="Plan" icon="fas.compass">
-    <div class="flex flex-col gap-6">
-        <livewire:money.data-health />
-    </div>
-</x-tab>
 </x-tabs>
 
 <!-- Add Balance Update Modal -->
