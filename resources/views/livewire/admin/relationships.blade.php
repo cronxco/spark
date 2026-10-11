@@ -91,6 +91,8 @@ new class extends Component
 
         try {
             $count = DB::transaction(function () {
+                AdminTenant::recordAction('relationships_bulk_delete', ['ids' => array_values($this->selectedRelationships)]);
+
                 // $selectedRelationships is a public Livewire property; re-resolve
                 // it through the same ownership predicate the listing uses.
                 return AdminTenant::scope(Relationship::query())

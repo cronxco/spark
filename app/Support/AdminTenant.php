@@ -183,12 +183,13 @@ final class AdminTenant
      * Record a bulk or destructive admin action run in God Mode.
      *
      * @param  array<string, mixed>  $properties
+     * @param  bool|null  $godMode  God Mode state captured by the caller, so the audit matches the work done
      */
-    public static function recordAction(string $action, array $properties = []): void
+    public static function recordAction(string $action, array $properties = [], ?bool $godMode = null): void
     {
         $operator = Auth::user();
 
-        if ($operator instanceof User && self::isGodMode()) {
+        if ($operator instanceof User && ($godMode ?? self::isGodMode())) {
             self::audit('god_mode_action', $operator, [...$properties, 'action' => $action]);
         }
     }

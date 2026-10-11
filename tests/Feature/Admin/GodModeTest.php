@@ -208,7 +208,7 @@ class GodModeTest extends TestCase
     public function admin_views_never_filter_on_the_raw_tenant_id(): void
     {
         $offenders = collect(glob(base_path('resources/views/livewire/admin/{,*/}*.blade.php'), GLOB_BRACE))
-            ->filter(fn (string $file): bool => preg_match("/where\\('[a-z_.]+', AdminTenant::id\\(\\)\\)/", file_get_contents($file)) === 1);
+            ->filter(fn (string $file): bool => preg_match('/(where\s*\(\s*[\'"][a-z_.]+[\'"]\s*,\s*|forUser\s*\(\s*)AdminTenant::id\(\)/', file_get_contents($file)) === 1);
 
         $this->assertSame([], $offenders->values()->all(), 'Use AdminTenant::scope()/scoped() so God Mode can lift the user filter.');
     }

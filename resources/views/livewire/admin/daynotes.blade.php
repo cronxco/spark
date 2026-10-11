@@ -4,8 +4,8 @@ use App\Jobs\Outline\GenerateDayNotes;
 use App\Models\ActionProgress;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
-use App\Support\AdminTenant;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 
@@ -27,7 +27,7 @@ new class extends Component
     {
         // Find Outline IntegrationGroup (shared credentials)
         $this->group = IntegrationGroup::where('service', 'outline')
-            ->tap(AdminTenant::scoped())
+            ->where('user_id', Auth::id())
             ->first();
 
         if ($this->group) {
@@ -51,7 +51,7 @@ new class extends Component
 
         // Create progress tracker
         $progress = ActionProgress::createProgress(
-            (string) $this->group->user_id,
+            (string) Auth::id(),
             'outline_generate_daynotes',
             "year_{$year}",
             'starting',
@@ -87,7 +87,7 @@ new class extends Component
         $years = [2026, 2027, 2028];
 
         foreach ($years as $year) {
-            $progress = AdminTenant::scope(ActionProgress::query())
+            $progress = ActionProgress::where('user_id', Auth::id())
                 ->where('action_type', 'outline_generate_daynotes')
                 ->where('details->year', $year)
                 ->latest()

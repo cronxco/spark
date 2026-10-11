@@ -369,8 +369,9 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
     Route::get('block-view', [BlockViewController::class, 'index'])->name('block-view.index');
     Route::post('bin/delete', function () {
-        AdminTenant::recordAction('bin_purge');
-        DeleteBinItemsBatch::dispatch(AdminTenant::id() === null ? null : (string) AdminTenant::id());
+        $userId = AdminTenant::id();
+        AdminTenant::recordAction('bin_purge', [], $userId === null);
+        DeleteBinItemsBatch::dispatch($userId === null ? null : (string) $userId);
 
         return response()->json([
             'message' => 'Deletion process started. All items will be permanently deleted.',

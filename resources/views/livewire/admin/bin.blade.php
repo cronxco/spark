@@ -272,8 +272,9 @@ new class extends Component
     public function deleteAll(): void
     {
         // Dispatch the job to permanently delete all soft-deleted items
-        AdminTenant::recordAction('bin_purge');
-        DeleteBinItemsBatch::dispatch(AdminTenant::id() === null ? null : (string) AdminTenant::id());
+        $userId = AdminTenant::id();
+        AdminTenant::recordAction('bin_purge', [], $userId === null);
+        DeleteBinItemsBatch::dispatch($userId === null ? null : (string) $userId);
 
         $this->success('Deletion process started. All items will be permanently deleted.');
     }

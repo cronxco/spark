@@ -81,6 +81,8 @@ new class extends Component
 
         try {
             $count = DB::transaction(function () {
+                AdminTenant::recordAction('blocks_bulk_delete', ['ids' => array_values($this->selectedBlocks)]);
+
                 // $selectedBlocks is a public Livewire property; re-resolve it
                 // through the same ownership predicate getBlocks() uses.
                 return Block::whereHas('event.integration', function ($q) {

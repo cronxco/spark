@@ -97,6 +97,8 @@ new class extends Component
                     ->whereIn('id', $this->selectedEvents)
                     ->pluck('id');
 
+                AdminTenant::recordAction('events_bulk_delete', ['ids' => $ownedIds->all()]);
+
                 // Delete blocks first (cascade)
                 Block::whereIn('event_id', $ownedIds)->delete();
 

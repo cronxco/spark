@@ -80,6 +80,8 @@ new class extends Component
 
         try {
             $count = DB::transaction(function () {
+                AdminTenant::recordAction('objects_bulk_delete', ['ids' => array_values($this->selectedObjects)]);
+
                 // Delete objects (soft delete)
                 // $selectedObjects is a public Livewire property; re-resolve it
                 // through the owning-user predicate before mutating.
