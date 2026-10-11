@@ -561,6 +561,9 @@
         <livewire:money.buffer-pot />
     </div>
 </x-tab>
+<x-tab name="worth" label="Worth" icon="fas.scale-balanced">
+    <livewire:money.worth />
+</x-tab>
 </x-tabs>
 
 <!-- Add Balance Update Modal -->
