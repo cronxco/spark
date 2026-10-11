@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Money;
 
+use App\Livewire\Concerns\ToleratesRepeatedLazyLoad;
 use App\Services\Money\BudgetService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,8 @@ use Livewire\Component;
 #[Lazy]
 class Budgets extends Component
 {
+    use ToleratesRepeatedLazyLoad;
+
     public string $name = '';
 
     public string $amount = '';

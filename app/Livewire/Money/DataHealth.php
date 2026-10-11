@@ -3,6 +3,7 @@
 namespace App\Livewire\Money;
 
 use App\Jobs\Money\ApplyAccountCleanup;
+use App\Livewire\Concerns\ToleratesRepeatedLazyLoad;
 use App\Models\ActionProgress;
 use App\Services\Money\AccountCleanup;
 use Illuminate\Contracts\View\View;
@@ -15,6 +16,8 @@ use RuntimeException;
 #[Lazy]
 class DataHealth extends Component
 {
+    use ToleratesRepeatedLazyLoad;
+
     public ?string $progressId = null;
 
     /** @var array<string, string> */

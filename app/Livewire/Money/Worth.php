@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Money;
 
+use App\Livewire\Concerns\ToleratesRepeatedLazyLoad;
 use App\Services\Money\NetWorth;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -11,6 +12,8 @@ use Livewire\Component;
 #[Lazy]
 class Worth extends Component
 {
+    use ToleratesRepeatedLazyLoad;
+
     public string $window = '1month';
 
     public function placeholder(): string
