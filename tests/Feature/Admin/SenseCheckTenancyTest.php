@@ -7,6 +7,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -232,6 +233,55 @@ class SenseCheckTenancyTest extends TestCase
         Integration::withTrashed()->whereKey($integration->id)->forceDelete();
 
         return $event;
+    }
+
+    #[Test]
+    public function orphaned_objects_ignore_objects_referenced_by_relationships_or_event_source(): void
+    {
+        $linked = EventObject::factory()->create(['user_id' => $this->admin->id]);
+        $linkedFrom = EventObject::factory()->create(['user_id' => $this->admin->id]);
+        $sourceObject = EventObject::factory()->create(['user_id' => $this->admin->id]);
+        $deletedLink = EventObject::factory()->create(['user_id' => $this->admin->id]);
+        $truly = EventObject::factory()->create(['user_id' => $this->admin->id]);
+
+        $event = $this->eventFor($this->admin, ['source_id' => $sourceObject->id]);
+
+        // Place-style: an event occurred_at an object.
+        Relationship::createRelationship([
+            'user_id' => $this->admin->id,
+            'from_type' => Event::class,
+            'from_id' => $event->id,
+            'to_type' => EventObject::class,
+            'to_id' => $linked->id,
+            'type' => 'occurred_at',
+        ]);
+        // Flint-note-style: the object is only ever the "from" side.
+        Relationship::createRelationship([
+            'user_id' => $this->admin->id,
+            'from_type' => EventObject::class,
+            'from_id' => $linkedFrom->id,
+            'to_type' => Event::class,
+            'to_id' => $event->id,
+            'type' => 'linked_to',
+        ]);
+        // A soft-deleted relationship no longer keeps an object alive.
+        Relationship::createRelationship([
+            'user_id' => $this->admin->id,
+            'from_type' => Event::class,
+            'from_id' => $event->id,
+            'to_type' => EventObject::class,
+            'to_id' => $deletedLink->id,
+            'type' => 'occurred_at',
+        ])->delete();
+
+        $ids = Volt::actingAs($this->admin)
+            ->test('admin.sense-check')
+            ->instance()
+            ->getOrphanedObjectsProperty()['records']
+            ->pluck('id')
+            ->all();
+
+        $this->assertEqualsCanonicalizing([$truly->id, $deletedLink->id], $ids);
     }
 
     private function eventFor(User $user, array $attributes = []): Event

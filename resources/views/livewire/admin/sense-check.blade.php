@@ -380,9 +380,24 @@ new class extends Component
      */
     public function getOrphanedObjectsProperty(): array
     {
+        // An object is in use when anything points at it, not only as an event
+        // actor or target: events also reference it as their source, and
+        // places (event occurred_at), linked URLs, Flint notes and merged
+        // places are attached purely through live relationship rows in either
+        // direction. Relationship endpoints are matched on id alone because
+        // the stored type is sometimes EventObject and sometimes a subclass.
         $orphanedObjects = EventObject::where('user_id', AdminTenant::id())
             ->whereDoesntHave('actorEvents')
             ->whereDoesntHave('targetEvents')
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('events')
+                ->whereColumn('events.source_id', 'objects.id'))
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('relationships')
+                ->whereNull('relationships.deleted_at')
+                ->where(fn ($r) => $r
+                    ->whereColumn('relationships.from_id', 'objects.id')
+                    ->orWhereColumn('relationships.to_id', 'objects.id')))
             ->with('tags')
             ->get();
 
