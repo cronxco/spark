@@ -147,20 +147,6 @@ class KnowledgeTasks extends Component
         }
     }
 
-    private function resetTaskForm(): void
-    {
-        $this->reset('editing', 'version', 'title', 'content', 'message', 'lifecycle', 'due', 'project', 'threads', 'priority', 'recurrence', 'position', 'review', 'reminder', 'showTaskForm');
-        $this->resetErrorBag();
-        $this->availability = app(EffectiveTimezoneResolver::class)->today(Auth::user())->toDateString();
-        $this->captureID = (string) Str::uuid();
-    }
-
-    private function resetProjectForm(): void
-    {
-        $this->reset('projectTitle', 'projectContent', 'projectTarget', 'projectNext', 'projectState', 'projectHideTasks', 'editingProject', 'projectVersion', 'showProjectForm');
-        $this->resetErrorBag();
-    }
-
     public function act(string $id, string $action, string $version): void
     {
         try {
@@ -255,5 +241,19 @@ class KnowledgeTasks extends Component
 
         return view('livewire.knowledge-tasks', ['tasks' => $tasks, 'rows' => $rows, 'projects' => app(ProjectService::class)->query(Auth::user())->get()->map(fn ($p) => app(ProjectService::class)->payload($p)),
             'topics' => EventObject::where('user_id', Auth::id())->where('concept', 'flint')->where('type', 'topic')->orderBy('title')->get()]);
+    }
+
+    private function resetTaskForm(): void
+    {
+        $this->reset('editing', 'version', 'title', 'content', 'message', 'lifecycle', 'due', 'project', 'threads', 'priority', 'recurrence', 'position', 'review', 'reminder', 'showTaskForm');
+        $this->resetErrorBag();
+        $this->availability = app(EffectiveTimezoneResolver::class)->today(Auth::user())->toDateString();
+        $this->captureID = (string) Str::uuid();
+    }
+
+    private function resetProjectForm(): void
+    {
+        $this->reset('projectTitle', 'projectContent', 'projectTarget', 'projectNext', 'projectState', 'projectHideTasks', 'editingProject', 'projectVersion', 'showProjectForm');
+        $this->resetErrorBag();
     }
 }
