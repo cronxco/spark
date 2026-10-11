@@ -74,10 +74,21 @@ class BufferDeposit
         $to = CarbonImmutable::instance($events->max('time'))->endOfDay();
         $entries = $this->scope->entries($userId, $from, $to)->keyBy('id');
 
+        // SpendingScope also includes current-account payments. Buffer writes must
+        // remain restricted to credit-card transactions, not merely GoCardless.
+        $creditCardIds = EventObject::where('user_id', $userId)
+            ->where('concept', 'account')
+            ->where('type', 'bank_account')
+            ->whereIn('id', $events->pluck('actor_id'))
+            ->get()
+            ->filter(fn (EventObject $account): bool => ($account->metadata['account_type'] ?? null) === 'credit_card')
+            ->pluck('id')->map(fn ($id): string => (string) $id)->all();
+
         $transactions = [];
         foreach ($events as $event) {
             $entry = $entries->get((string) $event->id);
-            if ($entry === null || $entry['source'] !== 'gocardless' || $entry['amount'] <= 0) {
+            if ($entry === null || $entry['source'] !== 'gocardless' || $entry['amount'] <= 0
+                || ! in_array((string) $event->actor_id, $creditCardIds, true)) {
                 throw new RuntimeException('Only credit-card spending can be added to the buffer.');
             }
             if ($this->isBlocking($event)) {
