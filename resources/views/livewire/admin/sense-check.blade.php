@@ -381,8 +381,7 @@ new class extends Component
     public function getOrphanedObjectsProperty(): array
     {
         $orphanedObjects = EventObject::where('user_id', AdminTenant::id())
-            ->whereDoesntHave('actorEvents')
-            ->whereDoesntHave('targetEvents')
+            ->unreferenced()
             ->with('tags')
             ->get();
 

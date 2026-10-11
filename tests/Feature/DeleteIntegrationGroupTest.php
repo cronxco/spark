@@ -19,6 +19,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -193,8 +194,7 @@ class DeleteIntegrationGroupTest extends TestCase
 
         // Execute individual object deletion jobs for orphaned objects
         $orphanedObjects = EventObject::where('user_id', $user->id)
-            ->whereDoesntHave('actorEvents')
-            ->whereDoesntHave('targetEvents')
+            ->unreferenced()
             ->get();
 
         foreach ($orphanedObjects as $object) {
@@ -271,6 +271,33 @@ class DeleteIntegrationGroupTest extends TestCase
 
         // And event2 should still exist
         $this->assertDatabaseHas('events', ['id' => $event2->id]);
+    }
+
+    #[Test]
+    public function orphan_cleanup_preserves_objects_linked_only_by_relationships(): void
+    {
+        Queue::fake();
+
+        $user = User::factory()->create();
+        $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'github']);
+
+        $place = EventObject::factory()->create(['user_id' => $user->id, 'concept' => 'place']);
+        $note = EventObject::factory()->create(['user_id' => $user->id, 'concept' => 'document']);
+        $unused = EventObject::factory()->create(['user_id' => $user->id]);
+
+        Relationship::createRelationship([
+            'user_id' => $user->id,
+            'from_type' => EventObject::class,
+            'from_id' => $note->id,
+            'to_type' => EventObject::class,
+            'to_id' => $place->id,
+            'type' => 'linked_to',
+        ]);
+
+        (new DeleteOrphanedObjectsBatchJob($group->id, $user->id))->handle();
+
+        Queue::assertPushed(DeleteEventObjectJob::class, fn ($job) => $job->recordId === $unused->id);
+        Queue::assertNotPushed(DeleteEventObjectJob::class, fn ($job) => in_array($job->recordId, [$place->id, $note->id], true));
     }
 
     #[Test]
