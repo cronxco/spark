@@ -169,32 +169,6 @@ class FlintScheduleService
     }
 
     /**
-     * @param  array<string, mixed>  $cadence
-     * @return array<int, string>
-     */
-    private function times(array $cadence): array
-    {
-        $valid = array_filter(
-            (array) ($cadence['times'] ?? []),
-            fn (mixed $time): bool => is_string($time) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time) === 1,
-        );
-
-        return array_values(array_unique($valid));
-    }
-
-    /**
-     * @param  array<string, mixed>  $cadence
-     */
-    private function cronExpression(array $cadence): ?CronExpression
-    {
-        $cron = $cadence['cron'] ?? null;
-
-        return is_string($cron) && count(preg_split('/\s+/', trim($cron))) === 5 && CronExpression::isValidExpression($cron)
-            ? new CronExpression($cron)
-            : null;
-    }
-
-    /**
      * Whether the routine is due on this local day, before its time of day is considered.
      */
     public function occursOn(User $user, string $routine, Carbon $day): bool
@@ -229,6 +203,32 @@ class FlintScheduleService
         }
 
         return $now->copy()->addDay();
+    }
+
+    /**
+     * @param  array<string, mixed>  $cadence
+     * @return array<int, string>
+     */
+    private function times(array $cadence): array
+    {
+        $valid = array_filter(
+            (array) ($cadence['times'] ?? []),
+            fn (mixed $time): bool => is_string($time) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time) === 1,
+        );
+
+        return array_values(array_unique($valid));
+    }
+
+    /**
+     * @param  array<string, mixed>  $cadence
+     */
+    private function cronExpression(array $cadence): ?CronExpression
+    {
+        $cron = $cadence['cron'] ?? null;
+
+        return is_string($cron) && count(preg_split('/\s+/', trim($cron))) === 5 && CronExpression::isValidExpression($cron)
+            ? new CronExpression($cron)
+            : null;
     }
 
     private function isMonthlyDay(int|string $rule, Carbon $day): bool

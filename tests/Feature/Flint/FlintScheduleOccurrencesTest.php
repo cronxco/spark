@@ -237,7 +237,7 @@ class FlintScheduleOccurrencesTest extends TestCase
 
         $this->runRoutineDispatcher();
 
-                Bus::assertDispatched(TriggerFlintRoutineJob::class, fn ($job) => $job->user->id === $user->id && $job->routine === 'topics' && $job->occurrence === '13:00');
+        Bus::assertDispatched(TriggerFlintRoutineJob::class, fn ($job) => $job->user->id === $user->id && $job->routine === 'topics' && $job->occurrence === '13:00');
     }
 
     #[Test]
