@@ -89,7 +89,7 @@ class BufferDeposit
         $total = (int) array_sum(array_column($transactions, 'amount'));
         $cap = (int) config('money.buffer.cap_pence');
         if ($total > $cap) {
-            throw new RuntimeException('That is more than the £'.number_format($cap / 100).' limit for one go.');
+            throw new RuntimeException('That is more than the £' . number_format($cap / 100) . ' limit for one go.');
         }
 
         return [
@@ -111,7 +111,7 @@ class BufferDeposit
      */
     public function request(string $userId, array $eventIds, int $confirmedTotal): array
     {
-        $lock = Cache::lock('money-buffer:'.$userId, 60);
+        $lock = Cache::lock('money-buffer:' . $userId, 60);
         try {
             $lock->block((int) config('money.buffer.lock_wait_seconds', 5));
         } catch (LockTimeoutException) {
@@ -151,7 +151,7 @@ class BufferDeposit
         if (! $result['ok']) {
             $this->mark($events, 'failed', $plan, ['error' => $result['error'], 'phase' => 'refused']);
 
-            throw new RuntimeException('Monzo refused it: '.$result['error']);
+            throw new RuntimeException('Monzo refused it: ' . $result['error']);
         }
 
         $this->mark($events, 'requested', $plan, ['phase' => 'sent']);
@@ -210,7 +210,7 @@ class BufferDeposit
         $ids = collect($events)->map(fn (Event $event): string => (string) $event->id)->sort()->values()->all();
         $previous = collect($events)->map(fn (Event $event): int => (int) ($event->event_metadata['buffer']['retry'] ?? 0))->max();
 
-        return 'spark-buffer-'.substr(sha1(implode(',', $ids).'|'.$total), 0, 24).'-'.$previous;
+        return 'spark-buffer-' . substr(sha1(implode(',', $ids) . '|' . $total), 0, 24) . '-' . $previous;
     }
 
     private function monzoIntegration(string $userId): Integration

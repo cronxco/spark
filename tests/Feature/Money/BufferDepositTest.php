@@ -154,7 +154,7 @@ class BufferDepositTest extends TestCase
         config(['money.buffer.lock_wait_seconds' => 0]);
         $tx = $this->spend(4000, 'Hotel');
 
-        $held = Cache::lock('money-buffer:'.$this->user->id, 30);
+        $held = Cache::lock('money-buffer:' . $this->user->id, 30);
         $this->assertTrue($held->get());
 
         $this->assertRefusedOnRequest([(string) $tx->id], 4000, 'in progress');
@@ -269,7 +269,7 @@ class BufferDepositTest extends TestCase
     private function transfer(int $pence): Event
     {
         return Event::create([
-            'integration_id' => $this->monzo->id, 'source_id' => 'tr-'.(++$this->counter), 'actor_id' => $this->current->id, 'target_id' => $this->pot->id,
+            'integration_id' => $this->monzo->id, 'source_id' => 'tr-' . (++$this->counter), 'actor_id' => $this->current->id, 'target_id' => $this->pot->id,
             'service' => 'monzo', 'domain' => 'money', 'action' => 'pot_transfer_to', 'time' => now()->addMinutes(2),
             'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP', 'event_metadata' => [],
         ]);
@@ -278,7 +278,7 @@ class BufferDepositTest extends TestCase
     private function spend(int $pence, string $merchant, string $action = 'payment_to'): Event
     {
         return Event::create([
-            'integration_id' => $this->bank->id, 'source_id' => 'g-'.(++$this->counter), 'actor_id' => $this->card->id, 'target_id' => $this->target($merchant)->id,
+            'integration_id' => $this->bank->id, 'source_id' => 'g-' . (++$this->counter), 'actor_id' => $this->card->id, 'target_id' => $this->target($merchant)->id,
             'service' => 'gocardless', 'domain' => 'money', 'action' => $action, 'time' => now()->subDay(),
             'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => ['description' => $merchant, 'transaction_status' => 'booked'],
