@@ -25,7 +25,7 @@ use Throwable;
 
 /**
  * Fires the outbound webhook for a once-daily Flint routine that isn't the
- * digest — topic review, reading-list curation, or the news roundup.
+ * digest — topic review, reading-list curation, the news roundup, or the money check-ins.
  *
  * Same division of labour as {@see TriggerFlintDigestRoutineJob}: Spark owns
  * the timing (resolved in the user's effective timezone), the routine owns the
@@ -180,7 +180,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'idempotency_key' => $markerKey,
             'period' => $this->period(),
             'run_token' => $this->runToken,
-        ];
+        ] + $this->modePayload();
 
         $progress = $this->progress();
 
@@ -318,6 +318,20 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'news_roundup' => 'morning',
             'reading_list', 'topics' => 'evening',
             default => 'morning',
+        };
+    }
+
+    /**
+     * Routines that share a skill tell it which job it is doing.
+     *
+     * @return array<string, string>
+     */
+    private function modePayload(): array
+    {
+        return match ($this->routine) {
+            'money_weekly' => ['mode' => 'weekly'],
+            'money_close' => ['mode' => 'close'],
+            default => [],
         };
     }
 

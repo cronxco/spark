@@ -47,6 +47,7 @@ class SkillRegistry
         'spark__get-events-by-filter-tool',
         'spark__get-flint-notes',
         'spark__get-latest-flint-digest',
+        'spark__get-money-plan',
         'spark__get-metric-trend-tool',
         'spark__get-service-status-tool',
         'spark__get-saved-bookmarks',
@@ -69,7 +70,7 @@ class SkillRegistry
         if ($this->skills === null) {
             $this->skills = [];
 
-            foreach (File::glob($this->directory() . '/*/SKILL.md') as $path) {
+            foreach (File::glob($this->directory().'/*/SKILL.md') as $path) {
                 $skill = $this->parse($path);
                 $this->skills[$skill->name] = $skill;
             }

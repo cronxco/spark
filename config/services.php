@@ -79,7 +79,7 @@ return [
         'country' => env('GOCARDLESS_COUNTRY', 'GB'),
         'institution_id' => env('GOCARDLESS_INSTITUTION_ID'),
         // Redirect URI for requisition flow
-        'redirect' => env('GOCARDLESS_REDIRECT_URI', env('APP_URL') . '/integrations/gocardless/callback'),
+        'redirect' => env('GOCARDLESS_REDIRECT_URI', env('APP_URL').'/integrations/gocardless/callback'),
     ],
 
     'oura' => [
@@ -290,6 +290,16 @@ return [
                 'secret' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_SECRET'),
                 'driver' => env('FLINT_NEWS_ROUNDUP_DRIVER'),
             ],
+            'money_weekly' => [
+                'url' => env('FLINT_MONEY_WEEKLY_WEBHOOK_URL'),
+                'secret' => env('FLINT_MONEY_WEEKLY_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_MONEY_WEEKLY_DRIVER'),
+            ],
+            'money_close' => [
+                'url' => env('FLINT_MONEY_CLOSE_WEBHOOK_URL'),
+                'secret' => env('FLINT_MONEY_CLOSE_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_MONEY_CLOSE_DRIVER'),
+            ],
         ],
 
         'morning_time_weekday' => env('FLINT_MORNING_WEEKDAY', '07:30'),
@@ -302,6 +312,15 @@ return [
         'topics_time' => env('FLINT_TOPICS_TIME', '21:00'),
         'reading_list_time' => env('FLINT_READING_LIST_TIME', '20:00'),
         'news_roundup_time' => env('FLINT_NEWS_ROUNDUP_TIME', '07:00'),
+        'money_weekly_time' => env('FLINT_MONEY_WEEKLY_TIME', '09:00'),
+        'money_close_time' => env('FLINT_MONEY_CLOSE_TIME', '09:00'),
+
+        // How often each routine runs, for routines that are not daily. A user's
+        // settings.flint.schedules.{routine} replaces the whole entry.
+        'cadence' => [
+            'money_weekly' => ['frequency' => 'weekly', 'days' => ['sun']],
+            'money_close' => ['frequency' => 'monthly', 'day_of_month' => 2],
+        ],
     ],
 
 ];

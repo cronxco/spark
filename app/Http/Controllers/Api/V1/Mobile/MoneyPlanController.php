@@ -7,8 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Money\BudgetService;
 use App\Services\Money\BufferDeposit;
 use App\Services\Money\CardCover;
-use App\Services\Money\PlanOverview;
-use App\Services\Money\SafeToSpend;
+use App\Services\Money\PlanSnapshot;
 use App\Services\Money\SpendingScope;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -25,12 +24,11 @@ class MoneyPlanController extends Controller
     use HandlesIdempotency;
 
     public function __construct(
-        private PlanOverview $overview,
+        private PlanSnapshot $snapshot,
         private CardCover $cover,
         private BudgetService $budgets,
         private SpendingScope $scope,
         private BufferDeposit $buffer,
-        private SafeToSpend $safeToSpend,
     ) {}
 
     /**
@@ -38,19 +36,7 @@ class MoneyPlanController extends Controller
      */
     public function plan(Request $request): JsonResponse
     {
-        $userId = (string) $request->user()->id;
-        $cover = $this->cover->build($userId);
-        $overview = $this->overview->build($userId);
-
-        return response()->json(['data' => [
-            'safe_to_spend' => $this->safeToSpend->build($userId, $cover['owed']),
-            'cover' => $cover,
-            'budgets' => $this->budgets->progress($userId),
-            'strip' => $overview['strip'],
-            'pots' => $overview['pots'],
-            'interest' => array_slice($overview['ledger'], 0, 12),
-            'buffer_enabled' => (bool) config('money.buffer.enabled'),
-        ]]);
+        return response()->json(['data' => $this->snapshot->build((string) $request->user()->id)]);
     }
 
     /**

@@ -10,6 +10,8 @@ final class FlintScheduleSettings
         'topics_enabled',
         'reading_list_enabled',
         'news_roundup_enabled',
+        'money_weekly_enabled',
+        'money_close_enabled',
     ];
 
     /**

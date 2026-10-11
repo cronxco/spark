@@ -149,6 +149,7 @@ Schedule::call(function () {
         // Evening digest: pure time gate at the configured evening slot.
         $eveningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'evening');
         if (FlintScheduleSettings::enabled($settings, 'evening_digest_enabled')
+            && $flintSchedule->occursOn($user, 'evening_digest', $now)
             && $now->gte(Carbon::parse($eveningTime, $tz)) && ! Cache::has($eveningMarker)) {
             dispatch(new TriggerFlintDigestRoutineJob($user, 'evening', $today, $tz, 'scheduled'))
                 ->onQueue('flint');
@@ -160,6 +161,7 @@ Schedule::call(function () {
         // DispatchMorningDigestOnSleepScoreTask; this is the backstop.)
         $morningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'morning');
         if (FlintScheduleSettings::enabled($settings, 'morning_digest_enabled')
+            && $flintSchedule->occursOn($user, 'morning_digest', $now)
             && $now->gte(Carbon::parse($morningTime, $tz)) && ! Cache::has($morningMarker)) {
             $sleepEventId = $sleepScoreEventIdFor($user, $today);
 
@@ -199,8 +201,8 @@ Schedule::call(function () {
         $now = $resolver->now($user);
         $today = $resolver->today($user)->toDateString();
 
-        foreach (['topics', 'reading_list', 'news_roundup'] as $routine) {
-            if (! FlintScheduleSettings::enabled($settings, "{$routine}_enabled")) {
+        foreach (['topics', 'reading_list', 'news_roundup', 'money_weekly', 'money_close'] as $routine) {
+            if (! FlintScheduleSettings::enabled($settings, "{$routine}_enabled") || ! $flintSchedule->occursOn($user, $routine, $now)) {
                 continue;
             }
             $slot = $flintSchedule->slot($user, $routine, $now);

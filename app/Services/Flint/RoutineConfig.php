@@ -17,20 +17,23 @@ class RoutineConfig
      *
      * @var array<int, string>
      */
-    public const ROUTINES = ['digest', 'topics', 'reading_list', 'news_roundup'];
+    public const ROUTINES = ['digest', 'topics', 'reading_list', 'news_roundup', 'money_weekly', 'money_close'];
 
     public const SKILLS = [
         'digest' => 'spark-day-briefing-async',
         'topics' => 'flint-topics',
         'reading_list' => 'flint-reading-list',
         'news_roundup' => 'flint-news-roundup',
+        'money_weekly' => 'flint-money',
+        'money_close' => 'flint-money',
     ];
 
     /**
      * The kind of digest each routine produces, for clients that lay out a
      * news roundup differently from a briefing.
      *
-     * `topics` writes no digest, so it has no kind.
+     * `topics` writes no digest, so it has no kind. The money routines write ordinary briefing-shaped
+     * digests, and no kind of their own, so older app builds that only know the three kinds keep decoding.
      *
      * @var array<string, string>
      */
@@ -65,6 +68,10 @@ class RoutineConfig
 
     public static function routineFor(string $name): ?string
     {
+        if (isset(self::SKILLS[$name])) {
+            return $name;
+        }
+
         $skill = self::canonicalSkill($name);
 
         return $skill ? array_search($skill, self::SKILLS, true) ?: null : null;
