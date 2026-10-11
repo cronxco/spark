@@ -58,6 +58,21 @@ class SpendingScope
     }
 
     /**
+     * Whether an inbound credit-card line pays the card off, by its wording or a payment_for link.
+     */
+    public function isCardRepayment(Event $event): bool
+    {
+        $description = strtoupper((string) ($event->event_metadata['description'] ?? ''));
+        foreach ((array) config('money.repayment_phrases', []) as $phrase) {
+            if ($description !== '' && str_contains($description, strtoupper((string) $phrase))) {
+                return true;
+            }
+        }
+
+        return $this->isLinkedMovement($event);
+    }
+
+    /**
      * @param  list<string>  $spendingAccounts
      * @return Builder<Event>
      */
@@ -201,6 +216,7 @@ class SpendingScope
             'source' => $event->service,
             'pending' => $pending,
             'budget_id' => $budgetId,
+            'buffer' => $meta['buffer']['status'] ?? null,
         ];
     }
 

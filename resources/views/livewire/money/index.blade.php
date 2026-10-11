@@ -547,6 +547,7 @@
 <x-tab name="plan" label="Plan" icon="fas.compass">
     <div class="flex flex-col gap-6">
         <livewire:money.plan-overview />
+        <livewire:money.card-cover />
         <livewire:money.budgets />
         <livewire:money.spending />
     </div>
