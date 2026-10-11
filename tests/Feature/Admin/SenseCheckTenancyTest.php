@@ -181,23 +181,6 @@ class SenseCheckTenancyTest extends TestCase
     }
 
     /**
-     * An event whose integration row has gone, leaving only its actor object.
-     */
-    private function orphanedEventFor(User $user): Event
-    {
-        $integration = Integration::factory()->create(['user_id' => $user->id]);
-
-        $event = Event::factory()->create([
-            'integration_id' => $integration->id,
-            'actor_id' => EventObject::factory()->create(['user_id' => $user->id])->id,
-        ]);
-
-        Integration::withTrashed()->whereKey($integration->id)->forceDelete();
-
-        return $event;
-    }
-
-    /**
      * @param  array<string, mixed>  $attributes
      */
     #[Test]
@@ -232,6 +215,23 @@ class SenseCheckTenancyTest extends TestCase
     {
         $this->withoutVite();
         $this->actingAs(User::factory()->create())->get(route('admin.sense-check.index'))->assertForbidden();
+    }
+
+    /**
+     * An event whose integration row has gone, leaving only its actor object.
+     */
+    private function orphanedEventFor(User $user): Event
+    {
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'actor_id' => EventObject::factory()->create(['user_id' => $user->id])->id,
+        ]);
+
+        Integration::withTrashed()->whereKey($integration->id)->forceDelete();
+
+        return $event;
     }
 
     private function eventFor(User $user, array $attributes = []): Event
