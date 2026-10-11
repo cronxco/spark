@@ -121,14 +121,14 @@ class PlanOverviewTest extends TestCase
         foreach (['2026-09-30' => $values[0], '2026-10-01' => $values[1]] as $date => $pence) {
             $day = EventObject::firstOrCreate(
                 ['user_id' => $this->user->id, 'concept' => 'day', 'type' => 'day', 'title' => $date],
-                ['time' => $date.' 00:00:00', 'metadata' => []],
+                ['time' => $date . ' 00:00:00', 'metadata' => []],
             );
             $event = Event::create([
-                'integration_id' => $this->integration->id, 'source_id' => 'snap-'.(++$this->counter), 'actor_id' => $pot->id,
+                'integration_id' => $this->integration->id, 'source_id' => 'snap-' . (++$this->counter), 'actor_id' => $pot->id,
                 'target_id' => $day->id, 'service' => 'monzo', 'domain' => 'money', 'action' => 'had_balance',
-                'time' => $date.' 23:59:59', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+                'time' => $date . ' 23:59:59', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             ]);
-            $event->forceFill(['created_at' => $date.' 00:26:00'])->saveQuietly();
+            $event->forceFill(['created_at' => $date . ' 00:26:00'])->saveQuietly();
         }
     }
 }

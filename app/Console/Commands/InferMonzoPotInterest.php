@@ -51,9 +51,9 @@ class InferMonzoPotInterest extends Command
         $this->table(['Month', 'Pots', 'Interest £', 'Estimated', 'To write'], $months);
 
         $total = collect($plan['rows'])->sum('amount') / 100;
-        $this->line('Total inferred: £'.number_format($total, 2));
+        $this->line('Total inferred: £' . number_format($total, 2));
         foreach ($plan['flagged'] as $flag) {
-            $this->warn("Flagged, not recorded: {$flag['window']} — {$flag['reason']} (residual £".number_format($flag['residual'] / 100, 2).')');
+            $this->warn("Flagged, not recorded: {$flag['window']} — {$flag['reason']} (residual £" . number_format($flag['residual'] / 100, 2) . ')');
         }
 
         if (! $this->option('apply')) {

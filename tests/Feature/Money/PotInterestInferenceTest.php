@@ -258,14 +258,14 @@ class PotInterestInferenceTest extends TestCase
     {
         $day = EventObject::firstOrCreate(
             ['user_id' => $this->user->id, 'concept' => 'day', 'type' => 'day', 'title' => $date],
-            ['time' => $date.' 00:00:00', 'metadata' => []],
+            ['time' => $date . ' 00:00:00', 'metadata' => []],
         );
         $event = Event::create([
-            'integration_id' => $this->integration->id, 'source_id' => 'snap-'.(++$this->counter),
+            'integration_id' => $this->integration->id, 'source_id' => 'snap-' . (++$this->counter),
             'actor_id' => ($pot ?? $this->pot)->id, 'target_id' => $day->id, 'service' => 'monzo', 'domain' => 'money',
-            'action' => 'had_balance', 'time' => $date.' 23:59:59', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+            'action' => 'had_balance', 'time' => $date . ' 23:59:59', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
         ]);
-        $event->forceFill(['created_at' => $date.' 00:26:00'])->saveQuietly();
+        $event->forceFill(['created_at' => $date . ' 00:26:00'])->saveQuietly();
 
         return $event;
     }
@@ -283,7 +283,7 @@ class PotInterestInferenceTest extends TestCase
     private function movement(string $action, EventObject $actor, EventObject $target, int $pence, string $time): void
     {
         Event::create([
-            'integration_id' => $this->integration->id, 'source_id' => 'move-'.(++$this->counter), 'actor_id' => $actor->id,
+            'integration_id' => $this->integration->id, 'source_id' => 'move-' . (++$this->counter), 'actor_id' => $actor->id,
             'target_id' => $target->id, 'service' => 'monzo', 'domain' => 'money', 'action' => $action, 'time' => $time,
             'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
         ]);

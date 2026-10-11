@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 /**
@@ -102,7 +103,7 @@ class PotInterestInference
             $closing = (int) $cur->value;
             $net = $this->netTransfers($transfers, $prev->created_at, $cur->created_at);
             $residual = $closing - $opening - $net;
-            $label = $pot->title.' ('.$prev->time->toDateString().' to '.$cur->time->toDateString().')';
+            $label = $pot->title . ' (' . $prev->time->toDateString() . ' to ' . $cur->time->toDateString() . ')';
 
             if ($residual <= 0 || $opening <= 0) {
                 if ($residual < 0 || ($residual > 0 && $opening <= 0)) {
@@ -147,7 +148,7 @@ class PotInterestInference
      *
      * @return list<CarbonImmutable>
      */
-    private function boundaries(\DateTimeInterface $from, \DateTimeInterface $to): array
+    private function boundaries(DateTimeInterface $from, DateTimeInterface $to): array
     {
         $start = CarbonImmutable::parse($from)->startOfDay();
         $end = CarbonImmutable::parse($to)->startOfDay();
@@ -188,7 +189,7 @@ class PotInterestInference
     /**
      * Pot movements as [time, signed pence from the pot's point of view].
      *
-     * @return list<array{0: \DateTimeInterface, 1: int}>
+     * @return list<array{0: DateTimeInterface, 1: int}>
      */
     private function transfers(EventObject $pot): array
     {
@@ -202,9 +203,9 @@ class PotInterestInference
     }
 
     /**
-     * @param  list<array{0: \DateTimeInterface, 1: int}>  $transfers
+     * @param  list<array{0: DateTimeInterface, 1: int}>  $transfers
      */
-    private function netTransfers(array $transfers, \DateTimeInterface $after, \DateTimeInterface $until): int
+    private function netTransfers(array $transfers, DateTimeInterface $after, DateTimeInterface $until): int
     {
         $net = 0;
         foreach ($transfers as [$time, $amount]) {
@@ -223,13 +224,13 @@ class PotInterestInference
     {
         $day = EventObject::firstOrCreate(
             ['user_id' => $integration->user_id, 'concept' => 'day', 'type' => 'day', 'title' => $row['paid_on']],
-            ['time' => $row['paid_on'].' 00:00:00', 'content' => null, 'metadata' => []],
+            ['time' => $row['paid_on'] . ' 00:00:00', 'content' => null, 'metadata' => []],
         );
 
         $event = Event::updateOrCreate(
             ['integration_id' => $integration->id, 'source_id' => $row['source_id']],
             [
-                'time' => $row['paid_on'].' 00:00:00',
+                'time' => $row['paid_on'] . ' 00:00:00',
                 'actor_id' => $row['pot_id'],
                 'target_id' => $day->id,
                 'service' => 'monzo',
@@ -256,7 +257,7 @@ class PotInterestInference
 
     private function sourceId(EventObject $pot, string $month): string
     {
-        return 'monzo_pot_interest_'.($pot->metadata['pot_id'] ?? $pot->id).'_'.$month;
+        return 'monzo_pot_interest_' . ($pot->metadata['pot_id'] ?? $pot->id) . '_' . $month;
     }
 
     private function integration(string $userId): Integration
