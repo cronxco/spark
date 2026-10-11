@@ -24,10 +24,10 @@ class DeleteBinItemsBatch implements ShouldQueue
     public int $tries = 3;
 
     /**
-     * The user ID to filter records by
+     * The user ID to filter records by, or null to delete every user's records (God Mode)
      */
     public function __construct(
-        private string $userId,
+        private ?string $userId,
         private int $batchSize = 100
     ) {}
 
@@ -90,7 +90,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     {
         $query = Block::onlyTrashed()
             ->whereHas('event.integration', function ($q) {
-                $q->where('user_id', $this->userId);
+                $q->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId));
             });
 
         return $this->processBatch($query, 'blocks');
@@ -103,7 +103,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     {
         $events = Event::onlyTrashed()
             ->whereHas('integration', function ($q) {
-                $q->where('user_id', $this->userId);
+                $q->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId));
             })
             ->limit($this->batchSize)
             ->get();
@@ -138,7 +138,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     private function deleteIntegrations(): int
     {
         $integrations = Integration::onlyTrashed()
-            ->where('user_id', $this->userId)
+            ->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId))
             ->limit($this->batchSize)
             ->get();
 
@@ -176,7 +176,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     private function deleteIntegrationGroups(): int
     {
         $groups = IntegrationGroup::onlyTrashed()
-            ->where('user_id', $this->userId)
+            ->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId))
             ->limit($this->batchSize)
             ->get();
 
@@ -218,7 +218,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     private function deleteObjects(): int
     {
         $objects = EventObject::onlyTrashed()
-            ->where('user_id', $this->userId)
+            ->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId))
             ->limit($this->batchSize)
             ->get();
 

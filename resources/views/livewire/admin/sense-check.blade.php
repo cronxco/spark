@@ -336,16 +336,14 @@ new class extends Component
      */
     public function getOrphanedEventsProperty(): array
     {
-        $userId = AdminTenant::id();
-
         // integration() is a withTrashed() relation, so an event only counts as
         // orphaned once the integration row is gone outright — which takes its
         // user_id with it. The actor/target objects are the surviving ownership
         // signal, because those carry user_id directly.
         $orphanedEvents = Event::whereDoesntHave('integration')
             ->where(fn ($q) => $q
-                ->whereHas('actor', fn ($a) => $a->where('user_id', $userId))
-                ->orWhereHas('target', fn ($t) => $t->where('user_id', $userId)))
+                ->whereHas('actor', AdminTenant::scoped())
+                ->orWhereHas('target', AdminTenant::scoped()))
             ->with(['actor', 'target', 'blocks'])
             ->get();
 
@@ -365,7 +363,7 @@ new class extends Component
         // truly dangling one cannot be attributed to anybody and is shown to
         // nobody — an operator-level integrity sweep, not a per-user page.
         $orphanedBlocks = Block::whereDoesntHave('event')
-            ->whereIn('event_id', Event::withTrashed()->forUser(AdminTenant::id())->select('id'))
+            ->whereIn('event_id', Event::withTrashed()->tap(AdminTenant::scopedForUser())->select('id'))
             ->with('event')
             ->get();
 
@@ -380,7 +378,7 @@ new class extends Component
      */
     public function getOrphanedObjectsProperty(): array
     {
-        $orphanedObjects = EventObject::where('user_id', AdminTenant::id())
+        $orphanedObjects = AdminTenant::scope(EventObject::query())
             ->unreferenced()
             ->with('tags')
             ->get();
@@ -397,10 +395,8 @@ new class extends Component
     public function getInvalidIntegrationsProperty(): array
     {
         $issues = [];
-        $userId = AdminTenant::id();
-
         // Integrations with unknown services
-        $unknownServices = Integration::where('user_id', $userId)
+        $unknownServices = Integration::query()->tap(AdminTenant::scoped())
             ->whereNotIn(
                 'service',
                 PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()
@@ -417,7 +413,7 @@ new class extends Component
         // Integrations without groups
         // The owner predicate has to sit outside the OR group, or the
         // orWhereDoesntHave() would escape it and match every user's rows.
-        $noGroup = Integration::where('user_id', $userId)
+        $noGroup = Integration::query()->tap(AdminTenant::scoped())
             ->where(fn ($q) => $q->whereNull('integration_group_id')->orWhereDoesntHave('group'))
             ->get();
 
@@ -532,10 +528,9 @@ new class extends Component
      */
     public function getEmbeddingHealthProperty(): array
     {
-        $userId = AdminTenant::id();
-        $ownedEvents = fn () => Event::forUser($userId);
-        $ownedBlocks = fn () => Block::whereHas('event.integration', fn ($q) => $q->where('user_id', $userId));
-        $ownedObjects = fn () => EventObject::where('user_id', $userId);
+        $ownedEvents = fn () => Event::query()->tap(AdminTenant::scopedForUser());
+        $ownedBlocks = fn () => Block::whereHas('event.integration', AdminTenant::scoped());
+        $ownedObjects = fn () => EventObject::query()->tap(AdminTenant::scoped());
 
         // Events stats
         $totalEvents = $ownedEvents()->count();
@@ -760,11 +755,9 @@ new class extends Component
             })
             ->toArray();
 
-        $userId = AdminTenant::id();
-
         // DB actions grouped by service
         $actions = Event::query()
-            ->forUser($userId)
+            ->tap(AdminTenant::scopedForUser())
             ->select('service', 'action')
             ->distinct()
             ->get()
@@ -777,7 +770,7 @@ new class extends Component
         $blockTypes = Block::query()
             ->select('events.service', 'blocks.block_type')
             ->join('events', 'events.id', '=', 'blocks.event_id')
-            ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId))
+            ->whereHas('event.integration', AdminTenant::scoped())
             ->whereNotNull('blocks.block_type')
             ->distinct()
             ->get()
@@ -788,7 +781,7 @@ new class extends Component
 
         // DB object types (actor/target) grouped by service (via events)
         $actorTypes = Event::query()
-            ->forUser($userId)
+            ->tap(AdminTenant::scopedForUser())
             ->select('events.service', 'ao.type as object_type')
             ->leftJoin('objects as ao', 'ao.id', '=', 'events.actor_id')
             ->whereNotNull('ao.type')
@@ -796,7 +789,7 @@ new class extends Component
             ->get();
 
         $targetTypes = Event::query()
-            ->forUser($userId)
+            ->tap(AdminTenant::scopedForUser())
             ->select('events.service', 'to.type as object_type')
             ->leftJoin('objects as to', 'to.id', '=', 'events.target_id')
             ->whereNotNull('to.type')
@@ -831,7 +824,7 @@ new class extends Component
         // Block counts by type
         $this->blockCountsByType = Block::query()
             ->select('block_type', DB::raw('COUNT(*) as count'))
-            ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId))
+            ->whereHas('event.integration', AdminTenant::scoped())
             ->whereNotNull('block_type')
             ->groupBy('block_type')
             ->pluck('count', 'block_type')

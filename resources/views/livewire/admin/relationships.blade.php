@@ -91,9 +91,11 @@ new class extends Component
 
         try {
             $count = DB::transaction(function () {
+                AdminTenant::recordAction('relationships_bulk_delete', ['ids' => array_values($this->selectedRelationships)]);
+
                 // $selectedRelationships is a public Livewire property; re-resolve
                 // it through the same ownership predicate the listing uses.
-                return Relationship::where('user_id', AdminTenant::id())
+                return AdminTenant::scope(Relationship::query())
                     ->whereIn('id', $this->selectedRelationships)
                     ->delete();
             });
@@ -110,7 +112,7 @@ new class extends Component
     public function getRelationships()
     {
         $query = Relationship::with(['from', 'to'])
-            ->where('user_id', AdminTenant::id());
+            ->tap(AdminTenant::scoped());
 
         // Apply search filter
         if ($this->search) {
@@ -174,7 +176,7 @@ new class extends Component
 
     public function getUniqueFromTypes()
     {
-        return Relationship::where('user_id', AdminTenant::id())
+        return AdminTenant::scope(Relationship::query())
             ->distinct()
             ->pluck('from_type')
             ->filter()
@@ -185,7 +187,7 @@ new class extends Component
 
     public function getUniqueToTypes()
     {
-        return Relationship::where('user_id', AdminTenant::id())
+        return AdminTenant::scope(Relationship::query())
             ->distinct()
             ->pluck('to_type')
             ->filter()

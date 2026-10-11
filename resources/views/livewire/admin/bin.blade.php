@@ -272,7 +272,9 @@ new class extends Component
     public function deleteAll(): void
     {
         // Dispatch the job to permanently delete all soft-deleted items
-        DeleteBinItemsBatch::dispatch(AdminTenant::id());
+        $userId = AdminTenant::id();
+        AdminTenant::recordAction('bin_purge', [], $userId === null);
+        DeleteBinItemsBatch::dispatch($userId === null ? null : (string) $userId);
 
         $this->success('Deletion process started. All items will be permanently deleted.');
     }
@@ -319,16 +321,14 @@ new class extends Component
      */
     private function findDeletedItem(string $itemId)
     {
-        $userId = AdminTenant::id();
-
         $models = [
             'event' => Event::onlyTrashed()
-                ->whereHas('integration', fn ($q) => $q->where('user_id', $userId)),
-            'object' => EventObject::onlyTrashed()->where('user_id', $userId),
+                ->whereHas('integration', AdminTenant::scoped()),
+            'object' => EventObject::onlyTrashed()->tap(AdminTenant::scoped()),
             'block' => Block::onlyTrashed()
-                ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId)),
-            'integration' => Integration::onlyTrashed()->where('user_id', $userId),
-            'integration_group' => IntegrationGroup::onlyTrashed()->where('user_id', $userId),
+                ->whereHas('event.integration', AdminTenant::scoped()),
+            'integration' => Integration::onlyTrashed()->tap(AdminTenant::scoped()),
+            'integration_group' => IntegrationGroup::onlyTrashed()->tap(AdminTenant::scoped()),
         ];
 
         foreach ($models as $type => $query) {
@@ -343,13 +343,11 @@ new class extends Component
 
     private function buildOptimizedQueries()
     {
-        $userId = AdminTenant::id();
-
         $queries = [];
 
         // Events query
         $eventsQuery = Event::onlyTrashed()
-            ->whereHas('integration', fn ($q) => $q->where('user_id', $userId))
+            ->whereHas('integration', AdminTenant::scoped())
             ->with(['target:id,title', 'integration:id,user_id'])
             ->orderBy('deleted_at', 'desc');
 
@@ -364,7 +362,7 @@ new class extends Component
 
         // Objects query
         $objectsQuery = EventObject::onlyTrashed()
-            ->where('user_id', $userId)
+            ->tap(AdminTenant::scoped())
             ->orderBy('deleted_at', 'desc');
 
         if ($this->search) {
@@ -378,7 +376,7 @@ new class extends Component
 
         // Blocks query
         $blocksQuery = Block::onlyTrashed()
-            ->whereHas('event.integration', fn ($q) => $q->where('user_id', $userId))
+            ->whereHas('event.integration', AdminTenant::scoped())
             ->with(['event:id,integration_id'])
             ->orderBy('deleted_at', 'desc');
 
@@ -392,7 +390,7 @@ new class extends Component
 
         // Integrations query
         $integrationsQuery = Integration::onlyTrashed()
-            ->where('user_id', $userId)
+            ->tap(AdminTenant::scoped())
             ->orderBy('deleted_at', 'desc');
 
         if ($this->search) {
@@ -406,7 +404,7 @@ new class extends Component
 
         // Integration Groups query
         $integrationGroupsQuery = IntegrationGroup::onlyTrashed()
-            ->where('user_id', $userId)
+            ->tap(AdminTenant::scoped())
             ->orderBy('deleted_at', 'desc');
 
         if ($this->search) {
@@ -473,14 +471,14 @@ new class extends Component
     {
         $query = match ($type) {
             'event' => Event::onlyTrashed()
-                ->whereHas('integration', fn ($q) => $q->where('user_id', AdminTenant::id()))
+                ->whereHas('integration', fn ($q) => AdminTenant::scope($q))
                 ->with(['target:id,title', 'integration:id,user_id']),
-            'object' => EventObject::onlyTrashed()->where('user_id', AdminTenant::id()),
+            'object' => AdminTenant::scope(EventObject::onlyTrashed()),
             'block' => Block::onlyTrashed()
-                ->whereHas('event.integration', fn ($q) => $q->where('user_id', AdminTenant::id()))
+                ->whereHas('event.integration', fn ($q) => AdminTenant::scope($q))
                 ->with(['event:id,integration_id']),
-            'integration' => Integration::onlyTrashed()->where('user_id', AdminTenant::id()),
-            'integration_group' => IntegrationGroup::onlyTrashed()->where('user_id', AdminTenant::id()),
+            'integration' => AdminTenant::scope(Integration::onlyTrashed()),
+            'integration_group' => AdminTenant::scope(IntegrationGroup::onlyTrashed()),
             default => throw new InvalidArgumentException("Unknown type: {$type}")
         };
 

@@ -80,10 +80,12 @@ new class extends Component
 
         try {
             $count = DB::transaction(function () {
+                AdminTenant::recordAction('objects_bulk_delete', ['ids' => array_values($this->selectedObjects)]);
+
                 // Delete objects (soft delete)
                 // $selectedObjects is a public Livewire property; re-resolve it
                 // through the owning-user predicate before mutating.
-                return EventObject::where('user_id', AdminTenant::id())
+                return AdminTenant::scope(EventObject::query())
                     ->whereIn('id', $this->selectedObjects)
                     ->delete();
             });
@@ -99,7 +101,7 @@ new class extends Component
 
     public function getObjects()
     {
-        $query = EventObject::where('user_id', AdminTenant::id())
+        $query = AdminTenant::scope(EventObject::query())
             ->withCount(['actorEvents', 'targetEvents']);
 
         // Apply search filter
@@ -132,7 +134,7 @@ new class extends Component
 
     public function getUniqueConcepts()
     {
-        return EventObject::where('user_id', AdminTenant::id())
+        return AdminTenant::scope(EventObject::query())
             ->distinct()
             ->pluck('concept')
             ->filter()
@@ -142,7 +144,7 @@ new class extends Component
 
     public function getUniqueTypes()
     {
-        return EventObject::where('user_id', AdminTenant::id())
+        return AdminTenant::scope(EventObject::query())
             ->distinct()
             ->pluck('type')
             ->filter()
