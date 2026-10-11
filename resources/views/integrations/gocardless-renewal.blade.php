@@ -8,14 +8,17 @@
         <form method="POST" action="{{ route('integrations.gocardless.renewal.store', $group) }}" class="space-y-6">
             @csrf
             <input type="hidden" name="reference" value="{{ $pending['reference'] }}">
-            @foreach ($oldAccounts as $id => $title)
+            @foreach ($oldAccounts as $id => $old)
                 <label class="form-control block space-y-2">
-                    <span class="font-semibold">{{ $title }}</span>
+                    <span class="font-semibold">{{ $old['title'] }}</span>
+                    @if ($old['summary'] !== '')
+                        <span class="block text-sm opacity-70">{{ $old['summary'] }}</span>
+                    @endif
                     <select name="mapping[{{ $id }}]" class="select select-bordered w-full" required>
                         <option value="">Choose the matching account</option>
-                        @foreach ($pending['accounts'] as $newId => $details)
+                        @foreach ($newAccounts as $newId => $label)
                             <option value="{{ $newId }}" @selected(old('mapping.' . $id) === $newId)>
-                                {{ App\Integrations\GoCardless\GoCardlessBankPlugin::generateAccountName($details) }} · {{ $details['currency'] ?? '' }} · {{ substr($newId, 0, 8) }}
+                                {{ $label }} · {{ substr($newId, 0, 8) }}
                             </option>
                         @endforeach
                         <option value="__missing" @selected(old('mapping.' . $id) === '__missing')>Not available in this consent — keep paused</option>

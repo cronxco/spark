@@ -281,6 +281,40 @@ class GoCardlessAccountRenewalTest extends TestCase
     }
 
     #[Test]
+    public function mapping_page_shows_balances_and_recognisable_details_for_each_option(): void
+    {
+        $this->account();
+        Event::create([
+            'integration_id' => $this->integration->id, 'source_id' => 'old-balance', 'user_id' => $this->owner->id,
+            'action' => 'had_balance', 'domain' => 'money', 'service' => 'gocardless', 'time' => '2026-10-01 00:00:00',
+            'value' => 123456, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+            'actor_id' => EventObject::where('concept', 'account')->first()->id,
+            'target_id' => EventObject::where('concept', 'account')->first()->id, 'event_metadata' => [],
+        ]);
+        $this->stage();
+        $first = array_merge($this->details('new-one', 'res-one'), ['cashAccountType' => 'CACC', 'iban' => 'GB29NWBK60161331926819']);
+        $second = $this->details('new-two', 'res-two');
+        Http::fake([
+            '*/requisitions/new-requisition/' => Http::response(['status' => 'LN', 'reference' => 'pending-reference',
+                'institution_id' => 'test-bank', 'accounts' => ['new-one', 'new-two']]),
+            '*/accounts/new-one/details/' => Http::response(['account' => $first]),
+            '*/accounts/new-two/details/' => Http::response(['account' => $second]),
+            '*/accounts/new-one/balances/' => Http::response(['balances' => [
+                ['balanceType' => 'interimAvailable', 'balanceAmount' => ['amount' => '1.00', 'currency' => 'GBP']],
+                ['balanceType' => 'closingBooked', 'balanceAmount' => ['amount' => '1234.56', 'currency' => 'GBP']]]]),
+            '*/accounts/new-two/balances/' => Http::response([], 500),
+        ]);
+        $this->plugin->completeRenewal($this->group, 'pending-reference');
+        $this->app->instance(GoCardlessBankPlugin::class, $this->plugin);
+
+        $this->actingAs($this->owner)->get(route('integrations.gocardless.renewal.show', $this->group))
+            ->assertOk()
+            ->assertSee('Last known balance £1,234.56 as of 1 Oct 2026', false)
+            ->assertSee('Current Account · Sort code 60-16-13 · ••6819 · Balance £1,234.56', false)
+            ->assertSee('Balance unavailable', false);
+    }
+
+    #[Test]
     public function conflicting_repair_is_atomic_and_unknown_accounts_are_excluded_from_totals(): void
     {
         $first = $this->account();
