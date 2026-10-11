@@ -57,22 +57,6 @@ class GoCardlessAccountMerger
         return $left && $right && $left !== $right && $this->hasMatchingProviderIdentity($canonical, $duplicate);
     }
 
-    private function hasMatchingProviderIdentity(EventObject $canonical, EventObject $duplicate): bool
-    {
-        if ($canonical->user_id !== $duplicate->user_id) {
-            return false;
-        }
-        foreach (['account_id', 'integration_id', 'provider', 'currency', 'account_number'] as $field) {
-            $left = $canonical->metadata[$field] ?? null;
-            $right = $duplicate->metadata[$field] ?? null;
-            if (! is_string($left) || trim($left) === '' || trim($left) === 'unknown' || $left !== $right) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     public function merge(EventObject $canonical, EventObject $duplicate): void
     {
         $owner = $canonical->user_id;
@@ -149,5 +133,21 @@ class GoCardlessAccountMerger
                 $integration->update(['configuration' => $config]);
             });
         $duplicate->delete();
+    }
+
+    private function hasMatchingProviderIdentity(EventObject $canonical, EventObject $duplicate): bool
+    {
+        if ($canonical->user_id !== $duplicate->user_id) {
+            return false;
+        }
+        foreach (['account_id', 'integration_id', 'provider', 'currency', 'account_number'] as $field) {
+            $left = $canonical->metadata[$field] ?? null;
+            $right = $duplicate->metadata[$field] ?? null;
+            if (! is_string($left) || trim($left) === '' || trim($left) === 'unknown' || $left !== $right) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
