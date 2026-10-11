@@ -69,7 +69,7 @@ class Spending extends Component
 
         try {
             $result = app(BufferDeposit::class)->request((string) Auth::id(), $this->selected, (int) $this->review['total']);
-            $this->bufferNotice = 'Asked Monzo to move £'.number_format($result['total'] / 100, 2).' into '.$this->review['pot']['name'].'. The transactions will show as buffered once it appears in Monzo.';
+            $this->bufferNotice = 'Asked Monzo to move £' . number_format($result['total'] / 100, 2) . ' into ' . $this->review['pot']['name'] . '. The transactions will show as buffered once it appears in Monzo.';
             $this->selected = [];
         } catch (RuntimeException $e) {
             $this->bufferError = $e->getMessage();
