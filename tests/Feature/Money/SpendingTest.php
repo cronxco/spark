@@ -326,7 +326,7 @@ class SpendingTest extends TestCase
     private function monzoEvent(string $action, int $pence, string $merchant, string $category, array $extra = [], string $time = '2026-10-10 12:00:00'): Event
     {
         $event = Event::create([
-            'integration_id' => $this->monzo->id, 'source_id' => 'm-'.(++$this->counter), 'actor_id' => $this->current->id,
+            'integration_id' => $this->monzo->id, 'source_id' => 'm-' . (++$this->counter), 'actor_id' => $this->current->id,
             'target_id' => $this->merchant($merchant)->id, 'service' => 'monzo', 'domain' => 'money', 'action' => $action,
             'time' => $time, 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => ['category' => $category] + $extra,
@@ -339,7 +339,7 @@ class SpendingTest extends TestCase
     private function bankEvent(EventObject $account, string $action, int $pence, string $merchant, string $description): Event
     {
         return Event::create([
-            'integration_id' => $this->bank->id, 'source_id' => 'g-'.(++$this->counter), 'actor_id' => $account->id,
+            'integration_id' => $this->bank->id, 'source_id' => 'g-' . (++$this->counter), 'actor_id' => $account->id,
             'target_id' => $this->merchant($merchant)->id, 'service' => 'gocardless', 'domain' => 'money', 'action' => $action,
             'time' => '2026-10-10 12:00:00', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => ['description' => $description, 'transaction_status' => 'booked'],
