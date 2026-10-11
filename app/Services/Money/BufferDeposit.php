@@ -7,6 +7,8 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 use Throwable;
 
@@ -19,6 +21,14 @@ use Throwable;
  * confirmed total that must match what is about to move. The dedupe id is derived from the
  * transactions so a retry or double tap cannot move money twice. This only ever runs from an
  * explicit user action.
+ *
+ * Check-and-reserve runs under a per-user lock, so two overlapping requests cannot both pass the
+ * "already buffered" check: the second sees the first's reservation and is refused. The reservation
+ * is written before Monzo is called and carries the operation id (the dedupe id) and a phase:
+ * reserved (nothing sent yet), sending, sent, or unknown (Monzo did not answer, so the money may
+ * have moved; the transactions stay requested until the pot transfer syncs and links them). A
+ * reservation still in the reserved phase after ten minutes means the process died before calling
+ * Monzo, and is released.
  *
  * Statuses in event_metadata.buffer.status: requested, linked (set by BufferDepositLinker), failed.
  */
@@ -70,7 +80,7 @@ class BufferDeposit
             if ($entry === null || $entry['source'] !== 'gocardless' || $entry['amount'] <= 0) {
                 throw new RuntimeException('Only credit-card spending can be added to the buffer.');
             }
-            if (in_array($entry['buffer'], ['requested', 'linked'], true)) {
+            if ($this->isBlocking($event)) {
                 throw new RuntimeException("{$entry['merchant']} is already in the buffer.");
             }
             $transactions[] = $entry;
@@ -79,7 +89,7 @@ class BufferDeposit
         $total = (int) array_sum(array_column($transactions, 'amount'));
         $cap = (int) config('money.buffer.cap_pence');
         if ($total > $cap) {
-            throw new RuntimeException('That is more than the £' . number_format($cap / 100) . ' limit for one go.');
+            throw new RuntimeException('That is more than the £'.number_format($cap / 100).' limit for one go.');
         }
 
         return [
@@ -101,14 +111,27 @@ class BufferDeposit
      */
     public function request(string $userId, array $eventIds, int $confirmedTotal): array
     {
-        $plan = $this->prepare($userId, $eventIds);
-        if ($plan['total'] !== $confirmedTotal) {
-            throw new RuntimeException('The total changed since you reviewed it. Review it again.');
+        $lock = Cache::lock('money-buffer:'.$userId, 60);
+        try {
+            $lock->block((int) config('money.buffer.lock_wait_seconds', 5));
+        } catch (LockTimeoutException) {
+            throw new RuntimeException('Another Add to buffer is in progress. Try again in a moment.');
         }
 
-        $pot = EventObject::where('user_id', $userId)->findOrFail($plan['pot']['id']);
-        $events = Event::forUser($userId)->whereIn('id', array_column($plan['transactions'], 'id'))->get();
-        $this->mark($events, 'requested', $plan);
+        try {
+            $plan = $this->prepare($userId, $eventIds);
+            if ($plan['total'] !== $confirmedTotal) {
+                throw new RuntimeException('The total changed since you reviewed it. Review it again.');
+            }
+
+            $pot = EventObject::where('user_id', $userId)->findOrFail($plan['pot']['id']);
+            $events = Event::forUser($userId)->whereIn('id', array_column($plan['transactions'], 'id'))->get();
+            $this->mark($events, 'requested', $plan, ['phase' => 'reserved']);
+        } finally {
+            $lock->release();
+        }
+
+        $this->mark($events, 'requested', $plan, ['phase' => 'sending']);
 
         try {
             $result = (new MonzoPlugin)->depositIntoPot(
@@ -120,18 +143,37 @@ class BufferDeposit
             );
         } catch (Throwable $e) {
             // The outcome is unknown, so leave the transactions as requested. Retrying uses the same dedupe id.
-            $this->mark($events, 'requested', $plan, ['error' => $e->getMessage(), 'uncertain' => true]);
+            $this->mark($events, 'requested', $plan, ['error' => $e->getMessage(), 'uncertain' => true, 'phase' => 'unknown']);
 
             throw new RuntimeException('Monzo did not answer, so Spark cannot tell whether the money moved. Check Monzo before trying again.');
         }
 
         if (! $result['ok']) {
-            $this->mark($events, 'failed', $plan, ['error' => $result['error']]);
+            $this->mark($events, 'failed', $plan, ['error' => $result['error'], 'phase' => 'refused']);
 
-            throw new RuntimeException('Monzo refused it: ' . $result['error']);
+            throw new RuntimeException('Monzo refused it: '.$result['error']);
         }
 
+        $this->mark($events, 'requested', $plan, ['phase' => 'sent']);
+
         return ['total' => $plan['total'], 'status' => 'requested'];
+    }
+
+    private function isBlocking(Event $event): bool
+    {
+        $buffer = $event->event_metadata['buffer'] ?? [];
+        $status = $buffer['status'] ?? null;
+        if ($status === 'linked') {
+            return true;
+        }
+        if ($status !== 'requested') {
+            return false;
+        }
+
+        $abandoned = ($buffer['phase'] ?? null) === 'reserved'
+            && CarbonImmutable::parse($buffer['reserved_at'] ?? $buffer['requested_at'] ?? now())->lt(now()->subMinutes(10));
+
+        return ! $abandoned;
     }
 
     /**
@@ -151,6 +193,7 @@ class BufferDeposit
                 'amount' => $amounts[(string) $event->id] ?? null,
                 'pot_id' => $plan['pot']['id'],
                 'requested_at' => $previous['requested_at'] ?? now()->toIso8601String(),
+                'reserved_at' => ($extra['phase'] ?? null) === 'reserved' ? now()->toIso8601String() : ($previous['reserved_at'] ?? null),
                 'retry' => (int) ($previous['retry'] ?? 0) + ($status === 'failed' ? 1 : 0),
             ] + $extra, fn ($value) => $value !== null);
             $event->update(['event_metadata' => $metadata]);
@@ -167,7 +210,7 @@ class BufferDeposit
         $ids = collect($events)->map(fn (Event $event): string => (string) $event->id)->sort()->values()->all();
         $previous = collect($events)->map(fn (Event $event): int => (int) ($event->event_metadata['buffer']['retry'] ?? 0))->max();
 
-        return 'spark-buffer-' . substr(sha1(implode(',', $ids) . '|' . $total), 0, 24) . '-' . $previous;
+        return 'spark-buffer-'.substr(sha1(implode(',', $ids).'|'.$total), 0, 24).'-'.$previous;
     }
 
     private function monzoIntegration(string $userId): Integration

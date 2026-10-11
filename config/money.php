@@ -66,5 +66,6 @@ return [
         'enabled' => env('MONEY_BUFFER_ENABLED', false),
         'cap_pence' => (int) env('MONEY_BUFFER_CAP_PENCE', 500_000),
         'link_window_hours' => 48,
+        'lock_wait_seconds' => 5,
     ],
 ];

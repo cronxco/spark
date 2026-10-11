@@ -13,7 +13,9 @@ use App\Services\Money\BufferDeposit;
 use App\Services\Money\BufferDepositLinker;
 use App\Services\Money\CardCover;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -146,6 +148,62 @@ class BufferDepositTest extends TestCase
     }
 
     #[Test]
+    public function a_request_is_refused_while_another_is_reserving_transactions(): void
+    {
+        Http::fake();
+        config(['money.buffer.lock_wait_seconds' => 0]);
+        $tx = $this->spend(4000, 'Hotel');
+
+        $held = Cache::lock('money-buffer:'.$this->user->id, 30);
+        $this->assertTrue($held->get());
+
+        $this->assertRefusedOnRequest([(string) $tx->id], 4000, 'in progress');
+        Http::assertNothingSent();
+        $held->release();
+
+        app(BufferDeposit::class)->request($this->user->id, [(string) $tx->id], 4000);
+        Http::assertSentCount(1);
+    }
+
+    #[Test]
+    public function an_unknown_outcome_keeps_the_reservation_so_an_overlapping_set_cannot_move_it_twice(): void
+    {
+        $calls = 0;
+        Http::fake(['api.monzo.com/*' => function () use (&$calls): never {
+            $calls++;
+
+            throw new ConnectionException('timeout');
+        }]);
+        $first = $this->spend(4000, 'Hotel');
+        $second = $this->spend(1500, 'Taxi');
+
+        $this->assertRefusedOnRequest([(string) $first->id], 4000, 'cannot tell whether the money moved');
+        $buffer = $first->refresh()->event_metadata['buffer'];
+        $this->assertSame('requested', $buffer['status']);
+        $this->assertSame('unknown', $buffer['phase']);
+        $this->assertNotEmpty($buffer['dedupe_id']);
+
+        $this->assertRefusedOnRequest([(string) $first->id, (string) $second->id], 5500, 'already in the buffer');
+        $this->assertArrayNotHasKey('buffer', $second->refresh()->event_metadata);
+        $this->assertSame(1, $calls);
+    }
+
+    #[Test]
+    public function a_reservation_abandoned_before_calling_monzo_is_released(): void
+    {
+        Http::fake(['api.monzo.com/*' => Http::response(['id' => 'pot_1'])]);
+        $tx = $this->spend(4000, 'Hotel');
+        $metadata = $tx->event_metadata;
+        $metadata['buffer'] = ['status' => 'requested', 'phase' => 'reserved', 'reserved_at' => now()->subMinutes(30)->toIso8601String(), 'requested_at' => now()->subMinutes(30)->toIso8601String()];
+        $tx->update(['event_metadata' => $metadata]);
+
+        app(BufferDeposit::class)->request($this->user->id, [(string) $tx->id], 4000);
+
+        Http::assertSentCount(1);
+        $this->assertSame('sent', $tx->refresh()->event_metadata['buffer']['phase']);
+    }
+
+    #[Test]
     public function the_pot_transfer_links_the_requested_transactions_with_funded_by(): void
     {
         Http::fake(['api.monzo.com/*' => Http::response(['id' => 'pot_1'])]);
@@ -211,7 +269,7 @@ class BufferDepositTest extends TestCase
     private function transfer(int $pence): Event
     {
         return Event::create([
-            'integration_id' => $this->monzo->id, 'source_id' => 'tr-' . (++$this->counter), 'actor_id' => $this->current->id, 'target_id' => $this->pot->id,
+            'integration_id' => $this->monzo->id, 'source_id' => 'tr-'.(++$this->counter), 'actor_id' => $this->current->id, 'target_id' => $this->pot->id,
             'service' => 'monzo', 'domain' => 'money', 'action' => 'pot_transfer_to', 'time' => now()->addMinutes(2),
             'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP', 'event_metadata' => [],
         ]);
@@ -220,7 +278,7 @@ class BufferDepositTest extends TestCase
     private function spend(int $pence, string $merchant, string $action = 'payment_to'): Event
     {
         return Event::create([
-            'integration_id' => $this->bank->id, 'source_id' => 'g-' . (++$this->counter), 'actor_id' => $this->card->id, 'target_id' => $this->target($merchant)->id,
+            'integration_id' => $this->bank->id, 'source_id' => 'g-'.(++$this->counter), 'actor_id' => $this->card->id, 'target_id' => $this->target($merchant)->id,
             'service' => 'gocardless', 'domain' => 'money', 'action' => $action, 'time' => now()->subDay(),
             'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => ['description' => $merchant, 'transaction_status' => 'booked'],
