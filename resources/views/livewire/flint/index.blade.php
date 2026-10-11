@@ -40,7 +40,7 @@ new class extends Component
     // An empty string means "not chosen here": the default falls back to the
     // server's env value, and a routine falls back to the default.
     public string $driver = '';
-    public array $drivers = ['digest' => '', 'topics' => '', 'reading_list' => '', 'news_roundup' => ''];
+    public array $drivers = ['digest' => '', 'topics' => '', 'reading_list' => '', 'news_roundup' => '', 'money_weekly' => '', 'money_close' => ''];
     public int $usageDays = 7;
     public string $usageScope = 'all';
 
@@ -973,7 +973,7 @@ new class extends Component
                     <div class="card-body">
                         <h3 class="text-lg font-semibold mb-4">{{ __('Scheduled Flint items') }}</h3>
                         <p class="text-sm text-base-content/70 mb-4">
-                            {{ __('Spark owns the timing and asks the Flint routine to write the digest. Times are read in your effective timezone and checked every fifteen minutes.') }}
+                            {{ __('Times are in your timezone and checked every fifteen minutes.') }}
                         </p>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1001,12 +1001,12 @@ new class extends Component
                         @endphp
                         <h3 class="text-lg font-semibold mb-1">{{ __('How Flint runs') }}</h3>
                         <p class="text-sm text-base-content/70 mb-4">
-                            {{ __('Choose whether each routine is handed to a Claude Code routine by webhook or run in Spark with OpenAI. Anything left on the default follows the server configuration.') }}
+                            {{ __('Run each routine through a Claude Code webhook or in Spark with OpenAI.') }}
                         </p>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="form-control sm:col-span-2">
-                                <label class="label"><span class="label-text">{{ __('Default') }}</span></label>
+                                <label class="label"><span class="label-text">{{ __('Runs in') }}</span></label>
                                 <select wire:model="driver" class="select select-bordered">
                                     <option value="">{{ __('Server default (:driver)', ['driver' => $driverLabels[$serverDefault] ?? $serverDefault]) }}</option>
                                     @foreach ($driverLabels as $value => $label)
@@ -1019,17 +1019,19 @@ new class extends Component
                                 'topics' => __('Topic review'),
                                 'reading_list' => __('Reading list'),
                                 'news_roundup' => __('News roundup'),
+                                'money_weekly' => __('Money weekly check'),
+                                'money_close' => __('Money monthly close'),
                             ] as $routine => $label)
                                 <div class="form-control">
                                     <label class="label"><span class="label-text">{{ $label }}</span></label>
                                     <select wire:model="drivers.{{ $routine }}" class="select select-bordered">
-                                        <option value="">{{ __('Use default') }}</option>
+                                        <option value="">{{ __('Same as above') }}</option>
                                         @foreach ($driverLabels as $value => $driverLabel)
                                             <option value="{{ $value }}">{{ $driverLabel }}</option>
                                         @endforeach
                                     </select>
                                     @php $effective = app(RoutineDriverManager::class)->driverName($routine, user: Auth::user()); @endphp
-                                    <label class="label"><span class="label-text-alt">{{ __('Currently: :driver', ['driver' => $driverLabels[$effective] ?? $effective]) }}</span></label>
+                                    <label class="label"><span class="label-text-alt">{{ __('Runs in :driver', ['driver' => $driverLabels[$effective] ?? $effective]) }}</span></label>
                                 </div>
                             @endforeach
                         </div>
@@ -1040,7 +1042,7 @@ new class extends Component
                         <div class="card-body">
                             <h3 class="text-lg font-semibold mb-1">{{ __('Digest schedule') }}</h3>
                             <p class="text-sm text-base-content/70 mb-4">
-                                {{ __('The morning digest waits for your Oura sleep score, so it fires at the later of the morning slot and that reading — the fallback is the cutoff if sleep never lands.') }}
+                                {{ __('The morning briefing waits for your Oura sleep score. It runs at the later of the morning time and the score arriving, or at the fallback time if no score lands.') }}
                             </p>
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1151,7 +1153,7 @@ new class extends Component
                     <div class="card-body">
                         <h3 class="text-lg font-semibold">{{ __('Run now') }}</h3>
                         <p class="text-sm opacity-70 mb-4">
-                            {{ __('Runs a routine immediately instead of waiting for its slot. It goes through the same path as a scheduled run, so results appear exactly as they normally would.') }}
+                            {{ __('Run a routine now instead of waiting for its next slot.') }}
                         </p>
                         <div class="divide-y divide-base-300">
                             @foreach ([
@@ -1160,12 +1162,14 @@ new class extends Component
                                 ['flint-topics', 'evening', __('Topic review')],
                                 ['flint-reading-list', 'evening', __('Reading list')],
                                 ['flint-news-roundup', 'morning', __('News roundup')],
+                                ['money_weekly', 'morning', __('Money weekly check')],
+                                ['money_close', 'morning', __('Money monthly close')],
                             ] as [$skillName, $period, $skillLabel])
                                 <div class="flex flex-wrap items-center justify-between gap-3 py-3" wire:key="run-{{ $skillName }}-{{ $period }}">
                                     <span class="font-medium text-sm">{{ $skillLabel }}</span>
                                     <div class="flex flex-wrap gap-2">
-                                        <x-button wire:click="$dispatch('run-flint-routine', { skill: '{{ $skillName }}', period: '{{ $period }}' })" class="btn-outline btn-sm" icon="fas.play" label="{{ __('Run now') }}" />
-                                        <x-button wire:click="$dispatch('run-flint-routine', { skill: '{{ $skillName }}', period: '{{ $period }}', driverOverride: 'openai' })" class="btn-primary btn-sm" icon="fas.bolt" label="{{ __('Run with OpenAI') }}" />
+                                        <x-button wire:click="$dispatch('run-flint-routine', { {{ str_starts_with($skillName, 'money_') ? 'routine' : 'skill' }}: '{{ $skillName }}', period: '{{ $period }}' })" class="btn-outline btn-sm" icon="fas.play" label="{{ __('Run now') }}" />
+                                        <x-button wire:click="$dispatch('run-flint-routine', { {{ str_starts_with($skillName, 'money_') ? 'routine' : 'skill' }}: '{{ $skillName }}', period: '{{ $period }}', driverOverride: 'openai' })" class="btn-primary btn-sm" icon="fas.bolt" label="{{ __('Run with OpenAI') }}" />
                                     </div>
                                 </div>
                             @endforeach

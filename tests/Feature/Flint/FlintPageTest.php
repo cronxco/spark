@@ -350,6 +350,19 @@ class FlintPageTest extends TestCase
     }
 
     #[Test]
+    public function money_routines_can_have_their_own_driver(): void
+    {
+        Volt::test('flint.index')
+            ->set('drivers.money_weekly', 'webhook')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee('Money weekly check')
+            ->assertSee('Money monthly close');
+
+        $this->assertSame('webhook', $this->user->refresh()->settings['flint']['drivers']['money_weekly']);
+    }
+
+    #[Test]
     public function an_unknown_driver_is_rejected(): void
     {
         Volt::test('flint.index')

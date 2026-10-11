@@ -32,6 +32,22 @@ class FlintRunNowTest extends TestCase
     }
 
     #[Test]
+    public function the_run_now_action_queues_a_money_routine(): void
+    {
+        Queue::fake();
+
+        Volt::actingAs(User::factory()->create())
+            ->test('global-progress-indicator')
+            ->dispatch('run-flint-routine', routine: 'money_close')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(
+            TriggerFlintRoutineJob::class,
+            fn ($job) => $job->routine === 'money_close' && $job->force
+        );
+    }
+
+    #[Test]
     public function the_digest_routine_goes_through_the_digest_job(): void
     {
         Queue::fake();

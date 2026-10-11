@@ -1,7 +1,7 @@
 <div class="flex flex-col gap-4">
     <div>
         <h3 class="font-semibold">Schedules</h3>
-        <p class="text-sm text-base-content/70">Choose when each routine runs, in your timezone. Add several times for more than one run a day, or use a cron expression for anything unusual.</p>
+        <p class="text-sm text-base-content/70">Add several times for more than one run a day, or use a cron expression.</p>
     </div>
 
     @foreach ($routines as $routine => $label)
