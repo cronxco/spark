@@ -276,19 +276,21 @@ class DayAheadService
     private function plan(User $user, ?Event $dayNote, string $date): array
     {
         $tasks = app(TaskService::class);
-        $planned = $tasks->query($user)->with('event.target')->get()->map(function (Block $block) use ($tasks, $date): ?array {
-            $p = $tasks->payload($block, $date);
-            $completedOnDate = $p['status'] === 'completed' && ($p['availability_on'] === $date || substr($p['completed_at'] ?? '', 0, 10) === $date);
-            if (! $p['visible_on_date'] && ! $completedOnDate) {
-                return null;
-            }
+        $planned = $tasks->query($user)->with('event.target')->get()
+            ->sortBy(fn (Block $block) => [$block->block_type === 'day_task' ? 0 : 1, $block->metadata['line_number'] ?? 0, $block->metadata['task']['position'] ?? 0, $block->title])
+            ->map(function (Block $block) use ($tasks, $date): ?array {
+                $p = $tasks->payload($block, $date);
+                $completedOnDate = $p['status'] === 'completed' && ($p['availability_on'] === $date || substr($p['completed_at'] ?? '', 0, 10) === $date);
+                if (! $p['visible_on_date'] && ! $completedOnDate) {
+                    return null;
+                }
 
-            return array_merge($p, ['kind' => match ($block->block_type) {
-                'day_task' => 'day_note', 'flint_topic_task' => 'topic_task', default => 'task'
-            },
-                'done' => $p['status'] === 'completed', 'topic_id' => $p['thread_ids'][0] ?? null,
-                'topic_title' => $block->event?->target?->type === 'topic' ? $block->event->target->title : null, 'url' => $p['source_url']]);
-        })->filter();
+                return array_merge($p, ['kind' => match ($block->block_type) {
+                    'day_task' => 'day_note', 'flint_topic_task' => 'topic_task', default => 'task'
+                },
+                    'done' => $p['status'] === 'completed', 'topic_id' => $p['thread_ids'][0] ?? null,
+                    'topic_title' => $block->event?->target?->type === 'topic' ? $block->event->target->title : null, 'url' => $p['source_url']]);
+            })->filter();
 
         $topicReviews = EventObject::query()
             ->where('user_id', $user->id)

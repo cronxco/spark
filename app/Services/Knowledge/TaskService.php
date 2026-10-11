@@ -32,8 +32,11 @@ class TaskService
 
     public function query(User $user, bool $deleted = false): Builder
     {
-        return Block::query()->when($deleted, fn ($q) => $q->withTrashed())
-            ->select('blocks.*')->selectRaw('blocks.xmin AS xmin')
+        $query = Block::query();
+        $table = $query->getQuery()->getGrammar()->wrapTable($query->getModel()->getTable());
+
+        return $query->when($deleted, fn ($q) => $q->withTrashed())
+            ->selectRaw($table . '.*')->selectRaw($table . '.xmin AS xmin')
             ->with(['event.integration.user', 'relationshipsFrom' => fn ($q) => $q->where('user_id', $user->id)->whereNull('deleted_at')->whereIn('type', ['task_project', 'task_thread', 'task_context']), 'relationshipsFrom.to'])
             ->whereIn('block_type', self::TYPES)
             ->whereHas('event', fn ($q) => $q->whereNull('deleted_at')
@@ -78,11 +81,11 @@ class TaskService
         }
         $day = $block->block_type === 'day_task';
         $dates = array_filter([$m['due_on'] ?? null, $m['review_on'] ?? null]);
-        $start = $day ? $block->time?->toDateString() : ($dates ? min($dates) : null);
+        $start = $day ? ($block->event?->time ?? $block->time)?->toDateString() : ($dates ? min($dates) : null);
 
         return $this->lifecycle->schedule([
             'schema_version' => 1, 'lifecycle' => $day ? 'day' : 'persistent',
-            'status' => ($m['checked'] ?? false) || ! empty($m['completed_at']) ? 'completed' : 'open',
+            'status' => ($m['removed'] ?? false) ? 'deleted' : (($m['checked'] ?? false) || ! empty($m['completed_at']) ? 'completed' : 'open'),
             'availability_on' => $start, 'original_assigned_on' => $start, 'window_start_on' => $start,
             'schedule_timezone' => $this->timezones->timezoneFor($block->event?->integration?->user), 'due_on' => $m['due_on'] ?? null, 'review_on' => $m['review_on'] ?? null,
             'priority' => 'normal', 'content' => $m['content'] ?? null, 'completed_at' => $m['completed_at'] ?? null,
