@@ -27,7 +27,7 @@ new class extends Component
     {
         // Find Outline IntegrationGroup (shared credentials)
         $this->group = IntegrationGroup::where('service', 'outline')
-            ->where('user_id', AdminTenant::id())
+            ->tap(AdminTenant::scoped())
             ->first();
 
         if ($this->group) {
@@ -51,7 +51,7 @@ new class extends Component
 
         // Create progress tracker
         $progress = ActionProgress::createProgress(
-            (string) AdminTenant::id(),
+            (string) $this->group->user_id,
             'outline_generate_daynotes',
             "year_{$year}",
             'starting',
@@ -87,7 +87,7 @@ new class extends Component
         $years = [2026, 2027, 2028];
 
         foreach ($years as $year) {
-            $progress = ActionProgress::where('user_id', AdminTenant::id())
+            $progress = AdminTenant::scope(ActionProgress::query())
                 ->where('action_type', 'outline_generate_daynotes')
                 ->where('details->year', $year)
                 ->latest()

@@ -207,7 +207,7 @@
                     <x-menu-item title="Migrations" icon="fas.cog" link="{{ route('admin.migrations.index') }}" :active="request()->routeIs('admin.migrations.*')" />
                     <x-menu-item title="Logs" icon="fas.file-lines" link="{{ route('admin.logs.index') }}" :active="request()->routeIs('admin.logs.*')" />
                     <x-menu-item title="Bin" icon="fas.trash" link="{{ route('admin.bin.index') }}" :active="request()->routeIs('admin.bin.*')" />
-                    <x-menu-item title="Operator Access" icon="fas.user-shield" link="{{ route('admin.operator.index') }}" :active="request()->routeIs('admin.operator.*')" />
+                    <x-menu-item title="God Mode" icon="fas.user-shield" link="{{ route('admin.god-mode.index') }}" :active="request()->routeIs('admin.god-mode.*')" />
                 </x-menu-sub>
                 @endif
                 <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
@@ -216,13 +216,13 @@
 
         {{-- The `$slot` goes here --}}
         <x-slot:content class="bg-base-100">
-            @if (auth()->user()?->is_admin && ($operatorContext = \App\Support\AdminTenant::context()))
+            @if (auth()->user()?->is_admin && \App\Support\AdminTenant::isGodMode())
                 <div class="alert alert-warning mb-4" role="status">
                     <x-icon name="fas.user-shield" class="w-5 h-5" />
-                    <span>Admin pages are showing another user's data. Every page you open is logged.</span>
-                    <form method="POST" action="{{ route('admin.operator.stop') }}">
+                    <span>God Mode is on: admin pages show everything across all users. Every page you open is logged.</span>
+                    <form method="POST" action="{{ route('admin.god-mode.disable') }}">
                         @csrf
-                        <button type="submit" class="btn btn-sm">Back to my data</button>
+                        <button type="submit" class="btn btn-sm">Turn off God Mode</button>
                     </form>
                 </div>
             @endif

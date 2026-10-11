@@ -21,7 +21,7 @@ $search = function () {
     $this->duplicates = [];
 
     $service = app(DuplicateDetectionService::class);
-    $userId = AdminTenant::id();
+    $userId = AdminTenant::id() === null ? null : (string) AdminTenant::id();
 
     $results = match ($this->modelType) {
         'Event' => $service->findDuplicateEvents($userId, $this->threshold, $this->limit),

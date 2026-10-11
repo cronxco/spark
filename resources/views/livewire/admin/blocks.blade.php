@@ -84,7 +84,7 @@ new class extends Component
                 // $selectedBlocks is a public Livewire property; re-resolve it
                 // through the same ownership predicate getBlocks() uses.
                 return Block::whereHas('event.integration', function ($q) {
-                    $q->where('user_id', AdminTenant::id());
+                    AdminTenant::scope($q);
                 })
                     ->whereIn('id', $this->selectedBlocks)
                     ->delete();
@@ -103,7 +103,7 @@ new class extends Component
     {
         $query = Block::with(['event.integration'])
             ->whereHas('event.integration', function ($q) {
-                $q->where('user_id', AdminTenant::id());
+                AdminTenant::scope($q);
             });
 
         // Apply search filter
@@ -140,14 +140,14 @@ new class extends Component
     public function getUniqueBlockTypes()
     {
         return Block::whereHas('event.integration', function ($q) {
-            $q->where('user_id', AdminTenant::id());
+            AdminTenant::scope($q);
         })->distinct()->pluck('block_type')->filter()->sort()->values();
     }
 
     public function getUniqueServices()
     {
         return Block::whereHas('event.integration', function ($q) {
-            $q->where('user_id', AdminTenant::id());
+            AdminTenant::scope($q);
         })->join('events', 'events.id', '=', 'blocks.event_id')
             ->distinct()
             ->pluck('events.service')

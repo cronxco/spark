@@ -8,16 +8,15 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Writes each admin page viewed inside an operator context to the security
- * activity log (decision D-API-2).
+ * Writes each admin page viewed in God Mode to the security activity log.
  */
-class RecordOperatorAccess
+class RecordGodModeAccess
 {
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
 
-        if ($request->isMethod('GET') && AdminTenant::context() !== null) {
+        if ($request->isMethod('GET') && AdminTenant::isGodMode()) {
             AdminTenant::recordAccess((string) ($request->route()?->getName() ?? $request->path()));
         }
 

@@ -325,17 +325,29 @@ Route::get('auth/authelia/callback', function () {
     );
     Auth::login($authUser);
 
+    if (AdminTenant::pullReauthenticationRequest($authUser) && AdminTenant::isGlobalOperator($authUser)) {
+        AdminTenant::start($authUser);
+
+        return redirect()->route('admin.god-mode.index');
+    }
+
     return redirect('/today');
 });
 
 // Admin routes
-Route::middleware(['auth', 'verified', 'admin', 'admin.operator.audit'])->prefix('admin')->name('admin.')->group(function () {
-    Volt::route('operator', 'admin.operator')->middleware('password.confirm:password.confirm,900')->name('operator.index');
-    Route::post('operator/stop', function () {
+Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix('admin')->name('admin.')->group(function () {
+    Volt::route('god-mode', 'admin.god-mode')->name('god-mode.index');
+    Route::post('god-mode/enable', function () {
+        abort_unless(AdminTenant::isGlobalOperator(Auth::user()), 403);
+        AdminTenant::requestReauthentication(Auth::user());
+
+        return Socialite::driver('authelia')->with(['prompt' => 'login', 'max_age' => 0])->redirect();
+    })->name('god-mode.enable');
+    Route::post('god-mode/disable', function () {
         AdminTenant::end();
 
-        return redirect()->route('admin.operator.index');
-    })->name('operator.stop');
+        return redirect()->route('admin.god-mode.index');
+    })->name('god-mode.disable');
 
     Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
     Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
@@ -357,7 +369,8 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.operator.audit'])->prefix
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
     Route::get('block-view', [BlockViewController::class, 'index'])->name('block-view.index');
     Route::post('bin/delete', function () {
-        DeleteBinItemsBatch::dispatch(AdminTenant::id());
+        AdminTenant::recordAction('bin_purge');
+        DeleteBinItemsBatch::dispatch(AdminTenant::id() === null ? null : (string) AdminTenant::id());
 
         return response()->json([
             'message' => 'Deletion process started. All items will be permanently deleted.',

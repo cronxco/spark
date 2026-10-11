@@ -83,7 +83,7 @@ new class extends Component
     public function approveLink(string $linkId): void
     {
         try {
-            $relationship = Relationship::where('user_id', AdminTenant::id())->findOrFail($linkId);
+            $relationship = AdminTenant::scope(Relationship::query())->findOrFail($linkId);
 
             if (! $relationship->isPending()) {
                 $this->warning('This link has already been processed.');
@@ -101,7 +101,7 @@ new class extends Component
     public function rejectLink(string $linkId): void
     {
         try {
-            $relationship = Relationship::where('user_id', AdminTenant::id())->findOrFail($linkId);
+            $relationship = AdminTenant::scope(Relationship::query())->findOrFail($linkId);
 
             if (! $relationship->isPending()) {
                 $this->warning('This link has already been processed.');
@@ -127,7 +127,7 @@ new class extends Component
         $approved = 0;
         foreach ($this->selectedLinks as $linkId) {
             try {
-                $relationship = Relationship::where('user_id', AdminTenant::id())->find($linkId);
+                $relationship = AdminTenant::scope(Relationship::query())->find($linkId);
                 if ($relationship && $relationship->isPending()) {
                     $relationship->approve();
                     $approved++;
@@ -152,7 +152,7 @@ new class extends Component
         $rejected = 0;
         foreach ($this->selectedLinks as $linkId) {
             try {
-                $relationship = Relationship::where('user_id', AdminTenant::id())->find($linkId);
+                $relationship = AdminTenant::scope(Relationship::query())->find($linkId);
                 if ($relationship && $relationship->isPending()) {
                     $relationship->reject();
                     $rejected++;
@@ -169,7 +169,7 @@ new class extends Component
     public function getPendingLinks()
     {
         $query = Relationship::with(['from', 'to'])
-            ->where('user_id', AdminTenant::id())
+            ->tap(AdminTenant::scoped())
             ->where('from_type', Event::class)
             ->where('to_type', Event::class);
 
@@ -223,12 +223,12 @@ new class extends Component
     {
         $linkingService = app(TransactionLinkingService::class);
 
-        return $linkingService->getPendingStats(AdminTenant::id());
+        return $linkingService->getPendingStats(AdminTenant::id() === null ? null : (string) AdminTenant::id());
     }
 
     public function getUniqueStrategies()
     {
-        return Relationship::where('user_id', AdminTenant::id())
+        return AdminTenant::scope(Relationship::query())
             ->where('from_type', Event::class)
             ->where('to_type', Event::class)
             ->whereNotNull('metadata')
