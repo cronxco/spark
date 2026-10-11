@@ -33,7 +33,7 @@ class ScheduleEditor extends Component
                 'frequency' => $cadence['frequency'] ?? 'daily',
                 'days' => $cadence['days'] ?? [],
                 'day_of_month' => (string) ($cadence['day_of_month'] ?? '1'),
-                'times' => $cadence['times'] ?? [$service->slot(Auth::user(), $routine)],
+                'times' => $cadence['times'] ?? (isset($cadence['cron']) ? [] : [$service->slot(Auth::user(), $routine)]),
                 'cron' => $cadence['cron'] ?? '',
             ];
         }
