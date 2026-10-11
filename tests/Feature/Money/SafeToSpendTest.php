@@ -132,13 +132,13 @@ class SafeToSpendTest extends TestCase
     {
         $target ??= EventObject::firstOrCreate(
             ['user_id' => $this->user->id, 'concept' => 'day', 'type' => 'day', 'title' => $day],
-            ['time' => $day.' 00:00:00', 'metadata' => []],
+            ['time' => $day . ' 00:00:00', 'metadata' => []],
         );
 
         return Event::create([
-            'integration_id' => $this->integration->id, 'source_id' => 'e-'.(++$this->counter), 'actor_id' => $actor->id,
+            'integration_id' => $this->integration->id, 'source_id' => 'e-' . (++$this->counter), 'actor_id' => $actor->id,
             'target_id' => $target->id, 'service' => 'monzo', 'domain' => 'money', 'action' => $action,
-            'time' => $day.' 09:00:00', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+            'time' => $day . ' 09:00:00', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
         ]);
     }
 }
