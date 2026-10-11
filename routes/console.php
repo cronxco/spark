@@ -83,6 +83,13 @@ Schedule::command('notifications:send-digests')
     ->withoutOverlapping()
     ->sentryMonitor();
 
+// Monzo pays pot interest just after midnight on the 1st; infer it from the new snapshots on the 2nd.
+Schedule::command('monzo:infer-interest --apply --since="-45 days"')
+    ->monthlyOn(2, '06:00')
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->sentryMonitor();
+
 // Check cookie expiry daily at 6am
 Schedule::job(new CheckCookieExpiryJob)
     ->dailyAt('06:00')
