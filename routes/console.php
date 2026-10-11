@@ -6,6 +6,7 @@ use App\Jobs\Fetch\RefreshExpiringCookies;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Jobs\GoCardless\CheckGoCardlessConsentExpiry;
+use App\Jobs\Knowledge\MaintainTasks;
 use App\Jobs\TaskPipeline\DispatchRetrospectiveAnomalyTasksJob;
 use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
 use App\Models\Event;
@@ -24,6 +25,9 @@ use Laravel\Horizon\Horizon;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Schedule::job((new MaintainTasks)->onQueue('pull'))
+    ->everyMinute()->withoutOverlapping()->onOneServer();
 
 // Schedule integration update check job every minute
 Schedule::job(new CheckIntegrationUpdates)

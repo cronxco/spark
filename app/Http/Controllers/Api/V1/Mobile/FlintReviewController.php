@@ -24,6 +24,7 @@ class FlintReviewController extends Controller
         $validated = $request->validate([
             'action' => ['required', Rule::in(['confirm', 'dismiss', 'keep', 'undo'])],
             'transaction_id' => ['nullable', 'uuid'],
+            'changes' => ['sometimes', 'array'],
         ]);
 
         try {

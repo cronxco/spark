@@ -122,6 +122,11 @@ class FlintPlugin extends ManualPlugin
     public static function getBlockTypes(): array
     {
         return [
+            'knowledge_task' => [
+                'display_name' => 'Task', 'description' => 'A task managed in Knowledge',
+                'icon' => 'fas.list-check', 'display_with_object' => false, 'hidden' => false,
+                'supports_value' => false, 'value_unit' => null,
+            ],
             'flint_topic_task' => [
                 'display_name' => 'Topic Task',
                 'description' => 'An actionable task with optional due and review dates',

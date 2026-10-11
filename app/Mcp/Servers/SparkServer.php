@@ -24,6 +24,7 @@ use App\Mcp\Tools\GetMoneyPlanTool;
 use App\Mcp\Tools\GetObjectTool;
 use App\Mcp\Tools\GetSavedBookmarksTool;
 use App\Mcp\Tools\GetServiceStatusTool;
+use App\Mcp\Tools\KnowledgeTasksTool;
 use App\Mcp\Tools\ListIntegrationsTool;
 use App\Mcp\Tools\ManageFlintTopicTool;
 use App\Mcp\Tools\ManageRelationshipTool;
@@ -138,6 +139,7 @@ class SparkServer extends Server
      * @var array<int, class-string<Tool>>
      */
     protected array $tools = [
+        KnowledgeTasksTool::class,
         GetDaySummaryTool::class,
         GetDayContextTool::class,
         GetMetricTrendTool::class,

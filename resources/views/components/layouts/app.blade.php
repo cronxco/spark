@@ -172,6 +172,7 @@
                 <x-menu-item title="Yesterday" icon="fas.calendar-minus" link="{{ route('day.yesterday') }}" :active="request()->routeIs('day.*')" data-hotkey="g y" />
                 <x-menu-item title="Tomorrow" icon="fas.calendar-plus" link="{{ route('tomorrow') }}" :active="request()->routeIs('tomorrow')" />
                 <x-menu-item title="Flint" icon="fas.hexagon-nodes" link="{{ route('flint.index') }}" :active="request()->routeIs('flint.index')" />
+                <x-menu-item title="Tasks & Projects" icon="fas.list-check" link="{{ route('knowledge.tasks') }}" :active="request()->routeIs('knowledge.*')" />
                 <x-menu-item title="Map" icon="fas.map-location-dot" link="{{ route('map.index') }}" :active="request()->routeIs('map.*')" data-hotkey="g l" />
                 <x-menu-item title="Notifications" icon="fas.bell" link="{{ route('notifications.index') }}" :active="request()->routeIs('notifications.*')" data-hotkey="g n" />
                 <x-menu-item title="Bookmarks" icon="fas.bookmark" link="{{ route('bookmarks') }}" :active="request()->routeIs('bookmarks.*')" data-hotkey="g b" />

@@ -15,10 +15,14 @@ use App\Traits\HasProgressiveLoading;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
+use RuntimeException;
 use Throwable;
 
 class Day extends Component
@@ -39,11 +43,18 @@ class Day extends Component
     public bool $dayNoteOpen = false;
 
     // Day Note State
+    #[Locked]
     public ?string $dayNoteDocId = null;
 
+    #[Locked]
     public ?string $dayNoteIntegrationId = null;
 
     public string $dayNoteText = '';
+
+    public ?string $dayNoteError = null;
+
+    #[Locked]
+    public ?int $dayNoteRevision = null;
 
     public bool $dayNoteSaving = false;
 
@@ -247,6 +258,7 @@ class Day extends Component
             $this->dayNoteDocId = $docId;
             $this->dayNoteIntegrationId = (string) $event->integration_id;
             $this->dayNoteText = (string) ($text ?? '');
+            $this->dayNoteRevision = isset($metadata['revision']) ? (int) $metadata['revision'] : null;
         }
 
         $this->dayNoteLoaded = true;
@@ -605,16 +617,24 @@ class Day extends Component
 
         try {
             /** @var Integration $integration */
-            $integration = Integration::findOrFail($this->dayNoteIntegrationId);
+            $integration = Integration::where('user_id', Auth::id())->findOrFail($this->dayNoteIntegrationId);
             $api = new OutlineApi($integration);
-            $api->updateDocumentContent($this->dayNoteDocId, $this->dayNoteText, null, true);
+            if (! config('knowledge.outline_revision_writes_verified') || $this->dayNoteRevision === null) {
+                throw new RuntimeException('Saving to Outline is paused until safe revision checks are verified. Your text is still here; copy it or edit in Outline.');
+            }
+            Cache::lock('outline-task-document:' . $integration->id . ':' . $this->dayNoteDocId, 120)->block(5, function () use ($api) {
+                $result = $api->updateDocumentAtRevision($this->dayNoteDocId, $this->dayNoteText, $this->dayNoteRevision);
+                $this->dayNoteRevision = data_get($result, 'data.revision', $this->dayNoteRevision);
+            });
+            $this->dayNoteError = null;
 
             // Trigger a lightweight targeted refresh for this date to reconcile tasks/blocks
             OutlinePullTodayDayNote::dispatch($integration, $this->date)->onQueue('pull');
 
             $this->dayNoteSavedAt = now()->toIso8601String();
         } catch (Throwable $e) {
-            // Swallow; UI can show failure later if needed
+            Log::warning('Outline day note save failed', ['exception_class' => $e::class, 'document_id' => $this->dayNoteDocId]);
+            $this->dayNoteError = 'Could not save the note. Your draft is preserved. Refresh the source and retry; safe Outline revision checks must be enabled.';
         } finally {
             $this->dayNoteSaving = false;
         }

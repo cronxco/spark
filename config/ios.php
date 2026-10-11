@@ -18,6 +18,8 @@ return [
         '/events/*',
         '/objects/*',
         '/places/*',
+        '/tasks/*',
+        '/projects/*',
     ],
 
     /*
