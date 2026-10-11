@@ -86,6 +86,24 @@ class FlintScheduleEditorTest extends TestCase
     }
 
     #[Test]
+    public function a_cron_only_schedule_does_not_gain_an_unrequested_default_time(): void
+    {
+        $user = User::factory()->create(['settings' => [
+            'timezone' => 'Europe/London',
+            'flint' => ['schedules' => ['topics' => ['cron' => '30 7 * * 1-5']]],
+        ]]);
+
+        Livewire::actingAs($user)->test(ScheduleEditor::class)
+            ->assertSet('forms.topics.times', [])
+            ->call('save', 'topics')
+            ->assertHasNoErrors();
+
+        $saved = $user->fresh()->settings['flint']['schedules']['topics'];
+        $this->assertSame('30 7 * * 1-5', $saved['cron']);
+        $this->assertArrayNotHasKey('times', $saved);
+    }
+
+    #[Test]
     public function the_editor_shows_errors_and_stores_nothing_for_bad_input(): void
     {
         $user = User::factory()->create();
