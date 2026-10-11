@@ -240,6 +240,9 @@ return [
     // Spark owns the timing (in the user's effective timezone) and POSTs to the
     // routine, which calls back via the create-flint-digest MCP tool.
     'flint_routine' => [
+        // Minutes after which a routine run that never reported back stops blocking the next one.
+        'running_stale_minutes' => (int) env('FLINT_ROUTINE_RUNNING_STALE_MINUTES', 45),
+
         // The CronxTools MCP endpoint OpenAI connects to when running a Flint
         // skill. The bearer token is embedded in the URL, so this value is a
         // credential: it must never reach a log, a span or a stored payload.

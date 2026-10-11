@@ -202,14 +202,17 @@ Schedule::call(function () {
         $today = $resolver->today($user)->toDateString();
 
         foreach (['topics', 'reading_list', 'news_roundup', 'money_weekly', 'money_close'] as $routine) {
-            if (! FlintScheduleSettings::enabled($settings, "{$routine}_enabled") || ! $flintSchedule->occursOn($user, $routine, $now)) {
+            if (! FlintScheduleSettings::enabled($settings, "{$routine}_enabled")) {
                 continue;
             }
-            $slot = $flintSchedule->slot($user, $routine, $now);
-            $marker = TriggerFlintRoutineJob::markerKey($user->id, $today, $routine);
+            $due = $flintSchedule->dueOccurrence($user, $routine, $now);
+            if ($due === null) {
+                continue;
+            }
+            $marker = TriggerFlintRoutineJob::markerKey($user->id, $today, $routine, $due['key']);
 
-            if ($now->gte(Carbon::parse($slot, $tz)) && ! Cache::has($marker)) {
-                dispatch(new TriggerFlintRoutineJob($user, $routine, $today, $tz))->onQueue('flint');
+            if (! Cache::has($marker) && ! $flintSchedule->isRunning($user, $routine)) {
+                dispatch(new TriggerFlintRoutineJob($user, $routine, $today, $tz, occurrence: $due['key']))->onQueue('flint');
             }
         }
     }
