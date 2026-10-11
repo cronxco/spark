@@ -544,13 +544,20 @@
         </div>
     </div>
 </x-tab>
-<x-tab name="plan" label="Plan" icon="fas.compass">
+<x-tab name="overview" label="Overview" icon="fas.compass">
     <div class="flex flex-col gap-6">
         <livewire:money.plan-overview />
         <livewire:money.card-cover />
-        <livewire:money.budgets />
-        <livewire:money.spending />
     </div>
+</x-tab>
+<x-tab name="spending" label="Spending" icon="fas.receipt">
+    <livewire:money.spending />
+</x-tab>
+<x-tab name="budgets" label="Budgets" icon="fas.chart-pie">
+    <livewire:money.budgets />
+</x-tab>
+<x-tab name="pots" label="Pots" icon="fas.piggy-bank">
+    <livewire:money.plan-overview />
 </x-tab>
 </x-tabs>
 
