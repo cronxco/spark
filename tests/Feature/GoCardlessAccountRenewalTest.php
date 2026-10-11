@@ -133,7 +133,7 @@ class GoCardlessAccountRenewalTest extends TestCase
     public function both_cache_read_paths_return_the_same_identity(): void
     {
         Cache::put('gocardless_account_details_v2_old-account', ['account' => ['ownerName' => 'Owner']], 60);
-        Cache::put('gocardless_group_accounts_v2_'.$this->group->id.'_old-requisition', ['old-account'], 60);
+        Cache::put('gocardless_group_accounts_v2_' . $this->group->id . '_old-requisition', ['old-account'], 60);
         $this->assertSame('old-account', $this->plugin->getAccount('old-account')['id']);
         $this->assertSame('old-account', $this->plugin->pullAccountData($this->integration)['id']);
         $object = $this->plugin->upsertAccountObject($this->integration, $this->plugin->pullAccountData($this->integration));
@@ -144,7 +144,7 @@ class GoCardlessAccountRenewalTest extends TestCase
     #[Test]
     public function onboarding_is_read_only_and_instance_creation_is_idempotent(): void
     {
-        Cache::put('gocardless_group_accounts_v2_'.$this->group->id.'_old-requisition', ['old-account'], 60);
+        Cache::put('gocardless_group_accounts_v2_' . $this->group->id . '_old-requisition', ['old-account'], 60);
         Cache::put('gocardless_account_details_v2_old-account', $this->details(), 60);
         $this->assertCount(1, $this->plugin->getAvailableAccountsForOnboarding($this->group));
         $this->assertSame(0, EventObject::where('user_id', $this->owner->id)->count());
@@ -582,7 +582,7 @@ class GoCardlessAccountRenewalTest extends TestCase
         Http::fake([
             '*/requisitions/new-requisition/' => Http::response(['status' => $status,
                 'reference' => 'pending-reference', 'institution_id' => 'test-bank', 'accounts' => [$details['id']]]),
-            '*/accounts/'.$details['id'].'/details/' => Http::response(['account' => $details]),
+            '*/accounts/' . $details['id'] . '/details/' => Http::response(['account' => $details]),
         ]);
     }
 }

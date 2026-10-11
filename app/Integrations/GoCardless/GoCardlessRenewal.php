@@ -25,7 +25,7 @@ trait GoCardlessRenewal
         }
         $institution = $group->auth_metadata['gocardless_institution_id']
             ?? $group->auth_metadata['institution_id']
-            ?? Session::get('gocardless_institution_id_'.$group->id);
+            ?? Session::get('gocardless_institution_id_' . $group->id);
         if (! $institution) {
             throw new RuntimeException('No bank institution selected for this connection.');
         }
@@ -195,8 +195,8 @@ trait GoCardlessRenewal
                 }
                 $integration->update(['configuration' => $config]);
                 if ($newId) {
-                    Cache::forget('gocardless_balances_'.$newId);
-                    Cache::forget('gocardless_account_validation_'.$newId);
+                    Cache::forget('gocardless_balances_' . $newId);
+                    Cache::forget('gocardless_account_validation_' . $newId);
                     $this->upsertAccountObject($integration, $accounts[$newId]);
                 }
             }
@@ -212,7 +212,7 @@ trait GoCardlessRenewal
             $meta['requires_reconfirmation'] = false;
             unset($meta['gocardless_pending'], $meta['eua_expired_at'], $meta['old_requisition_id']);
             $group->update(['account_id' => $pending['requisition_id'],
-                'access_token' => 'requisition:'.$pending['requisition_id'], 'auth_metadata' => $meta]);
+                'access_token' => 'requisition:' . $pending['requisition_id'], 'auth_metadata' => $meta]);
             $this->clearGroupCaches($group->id);
             $this->cacheAccountList($group->id, array_keys($accounts));
             if ($integrations->isNotEmpty()) {
@@ -240,8 +240,8 @@ trait GoCardlessRenewal
             try {
                 $data = Cache::get("gocardless_balances_{$accountId}");
                 if (! $data && $this->canMakeBalanceApiCall($accountId)) {
-                    $response = Http::withHeaders(['Authorization' => 'Bearer '.$this->getAccessToken()])
-                        ->get($this->getBaseUrl()."/accounts/{$accountId}/balances/");
+                    $response = Http::withHeaders(['Authorization' => 'Bearer ' . $this->getAccessToken()])
+                        ->get($this->getBaseUrl() . "/accounts/{$accountId}/balances/");
                     if ($response->successful()) {
                         $data = $response->json();
                         Cache::put("gocardless_balances_{$accountId}", $data, 3600);
@@ -285,7 +285,7 @@ trait GoCardlessRenewal
         return [
             'type' => $type === 'other' ? null : Str::headline($type),
             'sort_code' => $sortCode ? implode('-', str_split($sortCode, 2)) : null,
-            'mask' => $source !== '' ? '••'.substr($source, -4) : null,
+            'mask' => $source !== '' ? '••' . substr($source, -4) : null,
         ];
     }
 

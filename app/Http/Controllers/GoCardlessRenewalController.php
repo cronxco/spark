@@ -29,7 +29,7 @@ class GoCardlessRenewalController extends Controller
         unset($meta['mobile_reauth_origin'], $meta['mobile_reauth_started_at'], $meta['mobile_reauth_attempt_id']);
         $group->update(['auth_metadata' => $meta]);
         if ($mobile) {
-            return redirect()->away('spark://integrations/reauth-complete?'.http_build_query(['status' => 'success', 'attempt_id' => $attemptId]));
+            return redirect()->away('spark://integrations/reauth-complete?' . http_build_query(['status' => 'success', 'attempt_id' => $attemptId]));
         }
 
         return redirect()->route('integrations.index')->with('success', 'Bank connection renewed. Previously paused accounts remain paused.');
@@ -50,8 +50,8 @@ class GoCardlessRenewalController extends Controller
                 return [$id => [
                     'title' => $object?->title ?? 'Previously linked account',
                     'summary' => $this->summary($details, $balance
-                        ? $this->money(abs((float) $balance->formatted_value), $balance->value_unit).
-                            ' as of '.$balance->time?->format('j M Y') : null, 'Last known balance'),
+                        ? $this->money(abs((float) $balance->formatted_value), $balance->value_unit) .
+                            ' as of ' . $balance->time?->format('j M Y') : null, 'Last known balance'),
                 ]];
             });
         $balances = $plugin->pendingAccountBalances(array_keys($pending['accounts'] ?? []));
@@ -75,15 +75,15 @@ class GoCardlessRenewalController extends Controller
     private function summary(array $details, ?string $balance, string $balanceLabel): string
     {
         return implode(' · ', array_filter([
-            $details['type'], $details['sort_code'] ? 'Sort code '.$details['sort_code'] : null,
-            $details['mask'], $balance ? $balanceLabel.' '.$balance : null,
+            $details['type'], $details['sort_code'] ? 'Sort code ' . $details['sort_code'] : null,
+            $details['mask'], $balance ? $balanceLabel . ' ' . $balance : null,
         ]));
     }
 
     private function money(float $amount, ?string $currency): string
     {
-        $symbol = ['GBP' => '£', 'EUR' => '€', 'USD' => '$'][$currency ?? ''] ?? (($currency ? $currency.' ' : ''));
+        $symbol = ['GBP' => '£', 'EUR' => '€', 'USD' => '$'][$currency ?? ''] ?? (($currency ? $currency . ' ' : ''));
 
-        return $symbol.number_format($amount, 2);
+        return $symbol . number_format($amount, 2);
     }
 }
