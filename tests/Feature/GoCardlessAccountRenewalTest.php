@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use InvalidArgumentException;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\TestCase;
@@ -62,6 +63,30 @@ class GoCardlessAccountRenewalTest extends TestCase
                 return 'test-token';
             }
         };
+    }
+
+    public static function conflictingCardIdentity(): array
+    {
+        return [
+            'different provider account ID despite alias' => ['account_id', 'different-account'],
+            'missing integration' => ['integration_id', null],
+            'different integration' => ['integration_id', 'different-integration'],
+            'missing provider' => ['provider', null],
+            'different provider' => ['provider', 'Different bank'],
+            'missing currency' => ['currency', null],
+            'different currency' => ['currency', 'EUR'],
+            'missing card ending' => ['account_number', null],
+            'different card ending' => ['account_number', '2003'],
+            'blank card ending' => ['account_number', ' '],
+            'both providers unknown with whitespace' => ['provider', 'unknown ', true],
+            'both card endings unknown with whitespace' => ['account_number', ' unknown ', true],
+            'conflicting IBAN' => ['raw.iban', 'GB82WEST12345698765432'],
+            'conflicting raw card ending' => ['raw.maskedPan', '2003'],
+            'conflicting raw currency' => ['raw.currency', 'EUR'],
+            'conflicting owner' => ['raw.ownerName', 'OTHER OWNER'],
+            'conflicting account type' => ['raw.cashAccountType', 'CACC'],
+            'conflicting balance sign' => ['is_negative_balance', false],
+        ];
     }
 
     #[Test]
@@ -406,6 +431,91 @@ class GoCardlessAccountRenewalTest extends TestCase
         $this->assertSame($second->id, $updated->id);
         $this->assertNotSame($first->title, $updated->title);
         $this->assertSame($first->metadata['name'], $updated->metadata['name']);
+    }
+
+    #[Test]
+    public function changed_resource_ids_with_verified_identity_preserve_history_and_custom_account(): void
+    {
+        $canonical = $this->account('British Airways Premium Plus', $this->verifiedCardMetadata('current-resource'));
+        $canonical->created_at = now()->subDay();
+        $canonical->save();
+        $duplicate = $this->account('Bank supplied name', $this->verifiedCardMetadata('historical-resource'));
+        $event = Event::create(['integration_id' => $this->integration->id, 'source_id' => 'resource-change-balance',
+            'actor_id' => $duplicate->id, 'target_id' => $canonical->id, 'service' => 'gocardless',
+            'domain' => 'money', 'action' => 'had_balance', 'time' => now(), 'value' => 12345,
+            'value_multiplier' => 100, 'value_unit' => 'GBP'])->refresh();
+        $before = $canonical->metadata;
+        $duplicateBefore = $duplicate->metadata;
+
+        $this->artisan('gocardless:reconcile-accounts', ['--user' => $this->owner->id])
+            ->expectsOutput("Resource ID history differs on {$canonical->id} and {$duplicate->id}; verified provider identity matches.")
+            ->assertSuccessful();
+        $this->assertSame($before, $canonical->fresh()->metadata);
+        $this->assertSame($duplicateBefore, $duplicate->fresh()->metadata);
+        $this->assertFalse($duplicate->fresh()->trashed());
+        $this->assertSame($duplicate->id, $event->fresh()->actor_id);
+
+        $this->artisan('gocardless:reconcile-accounts', ['--user' => $this->owner->id, '--apply' => true])->assertSuccessful();
+        $canonical->refresh();
+        $duplicate->refresh();
+        $this->assertSame('British Airways Premium Plus', $canonical->title);
+        $this->assertTrue($canonical->metadata['is_pinned']);
+        $this->assertSame($before['raw'], $canonical->metadata['raw']);
+        $this->assertSame(['previous-resource', 'current-resource', 'historical-resource'], $canonical->metadata['gocardless_resource_ids']);
+        $this->assertSame($canonical->id, $event->fresh()->actor_id);
+        $this->assertSame($canonical->id, $this->integration->fresh()->configuration['account_object_id']);
+        $this->assertTrue($duplicate->trashed());
+        $this->assertSame($canonical->id, $duplicate->metadata['merged_into']);
+        $this->assertSame($before['raw'], $duplicate->metadata['gocardless_merge_manifest']['bank_identity']['canonical']);
+        $this->assertSame($duplicateBefore['raw'], $duplicate->metadata['gocardless_merge_manifest']['bank_identity']['duplicate']);
+
+        $this->artisan('gocardless:reconcile-accounts', ['--user' => $this->owner->id, '--apply' => true])->assertSuccessful();
+        $this->assertSame($canonical->metadata, $canonical->fresh()->metadata);
+        $this->assertSame(1, Event::where('integration_id', $this->integration->id)->count());
+    }
+
+    #[Test]
+    #[DataProvider('conflictingCardIdentity')]
+    public function changed_resource_ids_do_not_override_missing_or_conflicting_identity(string $field, mixed $value, bool $both = false): void
+    {
+        $canonical = $this->account('My card', $this->verifiedCardMetadata('current-resource'));
+        $canonical->created_at = now()->subDay();
+        $canonical->save();
+        $metadata = $this->verifiedCardMetadata('historical-resource');
+        data_set($metadata, $field, $value);
+        if ($both) {
+            $canonicalMetadata = $canonical->metadata;
+            data_set($canonicalMetadata, $field, $value);
+            $canonical->update(['metadata' => $canonicalMetadata]);
+        }
+        if ($field === 'account_id') {
+            $canonicalMetadata = $canonical->metadata;
+            $canonicalMetadata['gocardless_account_ids'] = [$value];
+            $canonical->update(['metadata' => $canonicalMetadata]);
+        }
+        $duplicate = $this->account('Conflicting card', $metadata);
+        $before = $canonical->metadata;
+        $duplicateBefore = $duplicate->metadata;
+
+        $this->artisan('gocardless:reconcile-accounts', ['--user' => $this->owner->id])->assertFailed();
+        $this->artisan('gocardless:reconcile-accounts', ['--user' => $this->owner->id, '--apply' => true])->assertFailed();
+        $this->assertSame($before, $canonical->fresh()->metadata);
+        $this->assertSame($duplicateBefore, $duplicate->fresh()->metadata);
+        $this->assertFalse($canonical->fresh()->trashed());
+        $this->assertFalse($duplicate->fresh()->trashed());
+    }
+
+    private function verifiedCardMetadata(string $resource): array
+    {
+        return [
+            'account_id' => 'old-account', 'integration_id' => $this->integration->id,
+            'provider' => 'American Express', 'currency' => 'GBP', 'account_number' => '1002',
+            'account_type' => 'credit_card', 'is_pinned' => true, 'is_negative_balance' => true,
+            'gocardless_resource_ids' => ['previous-resource'],
+            'raw' => array_merge($this->details('old-account', $resource), [
+                'maskedPan' => '1002', 'ownerName' => 'TEST OWNER', 'iban' => 'GB29NWBK60161331926819',
+            ]),
+        ];
     }
 
     private function details(string $id = 'old-account', string $resource = 'bank-resource'): array
