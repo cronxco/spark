@@ -1,8 +1,6 @@
 name: Config Audit PHPCS Diagnostic
 on:
-  push:
-    branches:
-      - feat/config-audit-sense-check
+  pull_request:
 jobs:
   diagnostic:
     runs-on: ubuntu-latest
