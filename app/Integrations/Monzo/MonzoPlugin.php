@@ -752,7 +752,7 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
             ]
         );
 
-        $this->tagTransactionEvent($event, $tx);
+        $this->tagTransactionEvent($event, $tx, $master->configuration['category_names'] ?? []);
         $this->maybeAddTransactionBlocks($event, $tx);
         $this->setLocationFromTransaction($event, $target, $tx);
     }
@@ -799,7 +799,15 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
                 'pot_id' => $potId,
                 'deleted' => $isDeleted,
                 'currency' => 'GBP',
+                'monzo' => $this->potDetails($pot) ?: ($existingMetadata['monzo'] ?? []),
             ];
+
+            // Preserve Spark-owned keys that the API knows nothing about
+            foreach (['money', 'snapshot_cleanup'] as $sparkKey) {
+                if (isset($existingMetadata[$sparkKey])) {
+                    $newMetadata[$sparkKey] = $existingMetadata[$sparkKey];
+                }
+            }
 
             // Preserve user-edited fields
             foreach ($preservedFields as $field) {
@@ -855,10 +863,33 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
                 'pot_id' => $potId,
                 'deleted' => $isDeleted,
                 'currency' => 'GBP',
+                'monzo' => $this->potDetails($pot),
             ],
             'url' => null,
             'media_url' => null,
         ]);
+    }
+
+    /**
+     * The pot fields Monzo returns that Spark keeps (everything but name, balance and id).
+     *
+     * @param  array<string, mixed>  $pot
+     * @return array<string, mixed>
+     */
+    public function potDetails(array $pot): array
+    {
+        $details = [];
+        foreach ([
+            'goal_amount', 'type', 'style', 'current_account_id', 'product_id', 'round_up',
+            'round_up_multiplier', 'is_tax_pot', 'locked', 'isa_wrapper', 'available_for_bills',
+            'charity_id', 'created', 'updated',
+        ] as $field) {
+            if (array_key_exists($field, $pot) && $pot[$field] !== null) {
+                $details[$field] = $pot[$field];
+            }
+        }
+
+        return $details;
     }
 
     public function upsertAccountObject(Integration $integration, array $account): EventObject
@@ -1840,11 +1871,15 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         return $amount < 0 ? 'other_debit_to' : 'other_credit_from';
     }
 
-    private function tagTransactionEvent(Event $event, array $tx): void
+    /**
+     * @param  array<string, string>  $categoryNames  Monzo custom category id => display name
+     */
+    private function tagTransactionEvent(Event $event, array $tx, array $categoryNames = []): void
     {
-        // Category tag
+        // Category tag, using the display name for Monzo custom categories once it is known
         if (! empty($tx['category'])) {
-            $event->attachTag((string) $tx['category'], 'transaction_category');
+            $category = (string) $tx['category'];
+            $event->attachTag($categoryNames[$category] ?? $category, 'transaction_category');
         }
         // Debit/Credit tag
         $amount = (int) ($tx['amount'] ?? 0);
