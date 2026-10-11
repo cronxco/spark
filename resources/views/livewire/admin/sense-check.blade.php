@@ -63,6 +63,7 @@ new class extends Component
         'orphaned_objects' => false,
         'invalid_integrations' => false,
         'plugin_config_issues' => false,
+        'configuration_audit' => false,
         'embedding_health' => false,
         'money_data_health' => false,
         'block_types_custom_layouts' => false,
@@ -216,6 +217,25 @@ new class extends Component
                 ];
                 $issues['summary']['total_issues'] += $item['count'];
             }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Deployment configuration findings (redacted, no credential values)
+        $configFindings = app(\\App\\Services\\Diagnostics\\ConfigurationAudit::class)->run()['findings'];
+        foreach ($configFindings as $finding) {
+            if (! in_array($finding['severity'], ['error', 'warning'], true)) {
+                continue;
+            }
+            $issues['issues'][] = [
+                'category' => 'configuration_audit',
+                'severity' => $finding['severity'],
+                'key' => $finding['key'],
+                'issue' => $finding['message'],
+                'count' => 1,
+            ];
+            $issues['summary']['total_issues']++;
+        }
+        if (count(array_filter($configFindings, fn ($f) => in_array($f['severity'], ['error', 'warning'], true))) > 0) {
             $issues['summary']['total_issue_types']++;
         }
 
@@ -661,6 +681,14 @@ new class extends Component
                 'badge_value' => null,
             ],
             [
+                'key' => 'configuration_audit',
+                'title' => 'Deployment configuration audit',
+                'description' => 'Explicit variables, inherited defaults and actionable configuration findings (values and credentials are never displayed).',
+                'icon' => 'fas.shield-halved',
+                'issue_count' => count(array_filter(app(\\App\\Services\\Diagnostics\\ConfigurationAudit::class)->run()['findings'], fn ($f) => in_array($f['severity'], ['error', 'warning'], true))),
+                'badge_value' => null,
+            ],
+            [
                 'key' => 'plugin_config_issues',
                 'title' => 'Plugin configuration issues',
                 'description' => 'Missing required methods, invalid domains, or configuration errors in plugins.',
@@ -918,6 +946,29 @@ new class extends Component
                     @endforeach
                 </div>
                 @endif
+
+                @elseif ($section['key'] === 'configuration_audit')
+                @php($audit = app(\\App\\Services\\Diagnostics\\ConfigurationAudit::class)->run())
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <span class="badge badge-outline">{{ $audit['summary']['total'] }} variables</span>
+                    <span class="badge badge-success">{{ $audit['summary']['explicit'] }} explicitly configured</span>
+                    <span class="badge badge-ghost">{{ $audit['summary']['default_or_unset'] }} default or unset</span>
+                </div>
+                @foreach ($audit['findings'] as $finding)
+                    <div class="alert mb-2 {{ $finding['severity'] === 'error' ? 'alert-error' : ($finding['severity'] === 'warning' ? 'alert-warning' : 'alert-info') }}">
+                        <span><strong>{{ $finding['key'] }}</strong> — {{ $finding['message'] }}</span>
+                    </div>
+                @endforeach
+                <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table class="table table-sm">
+                        <thead><tr><th>Variable</th><th>Source</th></tr></thead>
+                        <tbody>
+                            @foreach ($audit['variables'] as $variable)
+                                <tr><td class="font-mono">{{ $variable['name'] }}</td><td>{{ $variable['source'] === 'explicit' ? 'Explicit' : 'Default or unset' }}</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
 
                 @elseif ($section['key'] === 'undefined_object_types')
                 @php($items = $this->undefinedObjectTypes)
