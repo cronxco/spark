@@ -44,7 +44,7 @@ class ConfigurationAudit
 
         $findings = [];
         $add = static function (string $severity, string $key, string $message) use (&$findings): void {
-            $findings[] = compact('severity', 'key', 'message');
+            $findings[] = ['severity' => $severity, 'key' => $key, 'message' => $message];
         };
 
         if (config('app.debug') && ! app()->environment(['local', 'testing'])) {
