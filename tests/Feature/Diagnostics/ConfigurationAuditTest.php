@@ -7,7 +7,10 @@ use Tests\TestCase;
 
 class ConfigurationAuditTest extends TestCase
 {
-    public function test_audit_does_not_expose_secret_values(): void
+    /**
+     * @test
+     */
+    public function audit_does_not_expose_secret_values(): void
     {
         config()->set('services.jev.enabled', true);
         config()->set('services.jev.api_key', 'extremely-secret-test-value');
@@ -24,7 +27,10 @@ class ConfigurationAuditTest extends TestCase
         $this->assertNotContains('extremely-secret-test-value', array_column($report['variables'], 'name'));
     }
 
-    public function test_disabled_jev_with_enabled_list_detection_generates_warning(): void
+    /**
+     * @test
+     */
+    public function disabled_jev_with_enabled_list_detection_generates_warning(): void
     {
         config()->set('fetch.list_detection.enabled', true);
         config()->set('services.jev.enabled', false);
@@ -34,7 +40,10 @@ class ConfigurationAuditTest extends TestCase
         $this->assertContains('JEV_ENABLED', array_column($report['findings'], 'key'));
     }
 
-    public function test_command_json_is_redacted(): void
+    /**
+     * @test
+     */
+    public function command_json_is_redacted(): void
     {
         config()->set('services.jev.api_key', 'do-not-print-me');
 
