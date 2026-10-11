@@ -16,6 +16,7 @@ use App\Livewire\Day;
 use App\Livewire\FinancialAccounts;
 use App\Livewire\FinancialAccountShow;
 use App\Livewire\IntegrationDetails;
+use App\Livewire\KnowledgeTasks;
 use App\Livewire\Media\Index;
 use App\Livewire\Media\Show;
 use App\Livewire\MetricDetail;
@@ -68,6 +69,9 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     // Day-based timeline routes
+    Route::get('knowledge/tasks', KnowledgeTasks::class)->name('knowledge.tasks');
+    Route::get('tasks/{id}', KnowledgeTasks::class)->whereUuid('id')->name('knowledge.task');
+    Route::get('projects/{projectId}', KnowledgeTasks::class)->whereUuid('projectId')->name('knowledge.project');
     Route::get('day/today', Day::class)->name('today.day');
     Route::get('today', Day::class)->name('today.main');
     Route::get('day/tomorrow', Day::class)->name('tomorrow');

@@ -91,7 +91,7 @@ class EventObject extends Model implements HasMedia
 
         static::created(function ($model): void {
             // Dispatch Task Pipeline to run applicable tasks
-            if (config('app.enable_task_pipeline', true)) {
+            if (! data_get($model->metadata, 'internal', false) && config('app.enable_task_pipeline', true)) {
                 ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
             }
         });
