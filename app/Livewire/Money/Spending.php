@@ -2,12 +2,14 @@
 
 namespace App\Livewire\Money;
 
+use App\Services\Money\BufferDeposit;
 use App\Services\Money\SpendingScope;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
+use RuntimeException;
 
 #[Lazy]
 class Spending extends Component
@@ -17,6 +19,16 @@ class Spending extends Component
     public string $category = '';
 
     public string $account = '';
+
+    /** @var list<string> */
+    public array $selected = [];
+
+    /** @var array<string, mixed>|null */
+    public ?array $review = null;
+
+    public ?string $bufferError = null;
+
+    public ?string $bufferNotice = null;
 
     public function placeholder(): string
     {
@@ -31,6 +43,38 @@ class Spending extends Component
     public function nextMonth(): void
     {
         $this->monthOffset = min(0, $this->monthOffset + 1);
+    }
+
+    public function reviewBuffer(): void
+    {
+        $this->bufferError = $this->bufferNotice = null;
+        try {
+            $this->review = app(BufferDeposit::class)->prepare((string) Auth::id(), $this->selected);
+        } catch (RuntimeException $e) {
+            $this->review = null;
+            $this->bufferError = $e->getMessage();
+        }
+    }
+
+    public function cancelBuffer(): void
+    {
+        $this->review = null;
+    }
+
+    public function confirmBuffer(): void
+    {
+        if ($this->review === null) {
+            return;
+        }
+
+        try {
+            $result = app(BufferDeposit::class)->request((string) Auth::id(), $this->selected, (int) $this->review['total']);
+            $this->bufferNotice = 'Asked Monzo to move £' . number_format($result['total'] / 100, 2) . ' into ' . $this->review['pot']['name'] . '. The transactions will show as buffered once it appears in Monzo.';
+            $this->selected = [];
+        } catch (RuntimeException $e) {
+            $this->bufferError = $e->getMessage();
+        }
+        $this->review = null;
     }
 
     public function render(): View
@@ -49,6 +93,7 @@ class Spending extends Component
             'count' => $entries->count(),
             'categories' => $all->pluck('category')->unique()->sort()->values(),
             'accounts' => $all->pluck('account', 'account_id')->unique()->sort(),
+            'bufferEnabled' => (bool) config('money.buffer.enabled'),
         ]);
     }
 }

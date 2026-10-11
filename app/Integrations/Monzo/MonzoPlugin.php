@@ -757,6 +757,29 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         $this->setLocationFromTransaction($event, $target, $tx);
     }
 
+    /**
+     * Move money from a current account into a pot. Monzo treats a repeated dedupe_id as the same
+     * request, so retrying with the same id can never move the money twice.
+     *
+     * @return array{ok: bool, status: int, error: ?string, body: array<string, mixed>}
+     */
+    public function depositIntoPot(Integration $integration, string $potId, string $sourceAccountId, int $amountPence, string $dedupeId): array
+    {
+        $path = '/pots/' . $potId . '/deposit';
+        $payload = ['source_account_id' => $sourceAccountId, 'amount' => $amountPence, 'dedupe_id' => $dedupeId];
+
+        $this->logApiRequest('PUT', $path, ['Authorization' => '[REDACTED]'], $payload, $integration->id);
+        $resp = Http::withHeaders($this->authHeaders($integration))->asForm()->put($this->apiBase . $path, $payload);
+        $this->logApiResponse('PUT', $path, $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
+        return [
+            'ok' => $resp->successful(),
+            'status' => $resp->status(),
+            'error' => $resp->successful() ? null : (string) ($resp->json('message') ?? $resp->json('code') ?? 'Monzo refused the deposit'),
+            'body' => (array) $resp->json(),
+        ];
+    }
+
     public function upsertPotObject(Integration $integration, array $pot): EventObject
     {
         $master = $this->resolveMasterIntegration($integration);
