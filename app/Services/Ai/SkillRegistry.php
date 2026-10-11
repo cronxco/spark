@@ -70,7 +70,7 @@ class SkillRegistry
         if ($this->skills === null) {
             $this->skills = [];
 
-            foreach (File::glob($this->directory().'/*/SKILL.md') as $path) {
+            foreach (File::glob($this->directory() . '/*/SKILL.md') as $path) {
                 $skill = $this->parse($path);
                 $this->skills[$skill->name] = $skill;
             }

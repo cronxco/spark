@@ -80,24 +80,6 @@ class FlintScheduleService
         };
     }
 
-    private function isMonthlyDay(int|string $rule, Carbon $day): bool
-    {
-        if ($rule === 'last') {
-            return $day->isSameDay($day->copy()->endOfMonth());
-        }
-
-        if ($rule === 'first_working') {
-            $first = $day->copy()->startOfMonth();
-            while ($first->isWeekend()) {
-                $first->addDay();
-            }
-
-            return $day->isSameDay($first);
-        }
-
-        return $day->day === min(max((int) $rule, 1), $day->daysInMonth);
-    }
-
     public function morningFallback(User $user): string
     {
         return (string) (($user->settings['flint']['morning_fallback'] ?? null)
@@ -114,12 +96,30 @@ class FlintScheduleService
             if (! $this->occursOn($user, $routine, $day)) {
                 continue;
             }
-            $candidate = Carbon::parse($day->toDateString().' '.$this->slot($user, $routine, $day), $timezone);
+            $candidate = Carbon::parse($day->toDateString() . ' ' . $this->slot($user, $routine, $day), $timezone);
             if ($candidate->gt($now)) {
                 return $candidate;
             }
         }
 
         return $now->copy()->addDay();
+    }
+
+    private function isMonthlyDay(int|string $rule, Carbon $day): bool
+    {
+        if ($rule === 'last') {
+            return $day->isSameDay($day->copy()->endOfMonth());
+        }
+
+        if ($rule === 'first_working') {
+            $first = $day->copy()->startOfMonth();
+            while ($first->isWeekend()) {
+                $first->addDay();
+            }
+
+            return $day->isSameDay($first);
+        }
+
+        return $day->day === min(max((int) $rule, 1), $day->daysInMonth);
     }
 }

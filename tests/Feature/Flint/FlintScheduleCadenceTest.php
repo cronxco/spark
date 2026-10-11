@@ -14,16 +14,6 @@ class FlintScheduleCadenceTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function user(array $flint = []): User
-    {
-        return User::factory()->create(['settings' => ['flint' => $flint]]);
-    }
-
-    private function service(): FlintScheduleService
-    {
-        return app(FlintScheduleService::class);
-    }
-
     #[Test]
     public function routines_without_a_schedule_run_every_day_at_their_legacy_time(): void
     {
@@ -108,5 +98,15 @@ class FlintScheduleCadenceTest extends TestCase
         $this->assertSame('money_close', RoutineConfig::routineFor('money_close'));
         $this->assertSame('money_weekly', RoutineConfig::routineFor('flint-money'));
         $this->assertNull(RoutineConfig::digestKind('money_weekly'));
+    }
+
+    private function user(array $flint = []): User
+    {
+        return User::factory()->create(['settings' => ['flint' => $flint]]);
+    }
+
+    private function service(): FlintScheduleService
+    {
+        return app(FlintScheduleService::class);
     }
 }
