@@ -207,6 +207,30 @@ class EventObject extends Model implements HasMedia
             ->performOnCollections('screenshots', 'error_screenshots', 'downloaded_images', 'article_images');
     }
 
+    /**
+     * Objects nothing points at. An object is in use when it is an event's
+     * actor, target or source (soft-deleted events included), or when a live
+     * relationship row names it on either side — places, linked URLs, Flint
+     * notes and merged places hang off relationships alone. Relationship
+     * endpoints match on id because the stored type is sometimes EventObject
+     * and sometimes a subclass such as Place.
+     */
+    public function scopeUnreferenced(Builder $query): Builder
+    {
+        return $query
+            ->whereDoesntHave('actorEvents')
+            ->whereDoesntHave('targetEvents')
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('events')
+                ->whereColumn('events.source_id', 'objects.id'))
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('relationships')
+                ->whereNull('relationships.deleted_at')
+                ->where(fn ($r) => $r
+                    ->whereColumn('relationships.from_id', 'objects.id')
+                    ->orWhereColumn('relationships.to_id', 'objects.id')));
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
