@@ -338,7 +338,7 @@ class AccountCleanupTest extends TestCase
     {
         return EventObject::create([
             'user_id' => $this->user->id, 'concept' => 'account', 'type' => $type, 'title' => $title,
-            'metadata' => ['name' => $title, 'pot_id' => 'pot_'.$title],
+            'metadata' => ['name' => $title, 'pot_id' => 'pot_' . $title],
         ]);
     }
 
@@ -351,13 +351,13 @@ class AccountCleanupTest extends TestCase
         $integration = $actor->type === 'bank_account' ? $this->gocardless : $this->monzo;
         $target = EventObject::firstOrCreate(
             ['user_id' => $this->user->id, 'concept' => 'day', 'type' => 'day', 'title' => $day],
-            ['time' => $day.' 00:00:00', 'metadata' => []],
+            ['time' => $day . ' 00:00:00', 'metadata' => []],
         );
 
         return Event::create([
-            'integration_id' => $integration->id, 'source_id' => 'evt-'.(++$counter), 'actor_id' => $actor->id,
+            'integration_id' => $integration->id, 'source_id' => 'evt-' . (++$counter), 'actor_id' => $actor->id,
             'target_id' => $target->id, 'service' => $integration->service, 'domain' => 'money', 'action' => $action,
-            'time' => $day.' 23:59:59', 'value' => $value, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+            'time' => $day . ' 23:59:59', 'value' => $value, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => $metadata,
         ]);
     }
