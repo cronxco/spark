@@ -181,7 +181,7 @@ new class extends Component
     {
         $fromRegistry = $this->allTasks->map(fn ($task) => ['key' => $task->key, 'name' => $task->name]);
 
-        $fromExecutions = TaskExecution::forUser(AdminTenant::id())
+        $fromExecutions = AdminTenant::scopeForUser(TaskExecution::query())
             ->select('task_key', 'task_name')
             ->distinct()
             ->get()
@@ -196,7 +196,7 @@ new class extends Component
      */
     public function getEntityTypeFilterOptionsProperty(): Collection
     {
-        $fromExecutions = TaskExecution::forUser(AdminTenant::id())->distinct()->pluck('entity_type');
+        $fromExecutions = AdminTenant::scopeForUser(TaskExecution::query())->distinct()->pluck('entity_type');
 
         return collect($this->uniqueAppliesTo)->concat($fromExecutions)->unique()->sort()->values();
     }
@@ -209,7 +209,7 @@ new class extends Component
 
     public function getActiveExecutionsProperty(): Collection
     {
-        return TaskExecution::forUser(AdminTenant::id())
+        return AdminTenant::scopeForUser(TaskExecution::query())
             ->whereIn('status', ['pending', 'running', 'waiting', 'blocked'])
             ->when($this->activeStatusFilter, fn ($q) => $q->where('status', $this->activeStatusFilter))
             ->latest('updated_at')
@@ -219,7 +219,7 @@ new class extends Component
 
     public function getRecentExecutionsProperty(): LengthAwarePaginator
     {
-        return TaskExecution::forUser(AdminTenant::id())
+        return AdminTenant::scopeForUser(TaskExecution::query())
             ->where('updated_at', '>=', $this->windowStart())
             ->when($this->execStatusFilter, fn ($q) => $q->where('status', $this->execStatusFilter))
             ->when($this->execTaskFilter, fn ($q) => $q->where('task_key', $this->execTaskFilter))
@@ -237,7 +237,7 @@ new class extends Component
 
     public function getRecentFailuresProperty(): LengthAwarePaginator
     {
-        return TaskExecution::forUser(AdminTenant::id())
+        return AdminTenant::scopeForUser(TaskExecution::query())
             ->where('status', 'failed')
             ->where('updated_at', '>=', $this->windowStart())
             ->latest('updated_at')
@@ -246,7 +246,7 @@ new class extends Component
 
     public function getStatsProperty(): array
     {
-        $liveCounts = TaskExecution::forUser(AdminTenant::id())
+        $liveCounts = AdminTenant::scopeForUser(TaskExecution::query())
             ->whereIn('status', ['pending', 'running', 'waiting', 'blocked'])
             ->selectRaw('status, count(*) as aggregate')
             ->groupBy('status')
@@ -257,12 +257,12 @@ new class extends Component
         $waiting = (int) ($liveCounts['waiting'] ?? 0);
         $blocked = (int) ($liveCounts['blocked'] ?? 0);
 
-        $stuck = TaskExecution::forUser(AdminTenant::id())
+        $stuck = AdminTenant::scopeForUser(TaskExecution::query())
             ->whereIn('status', ['pending', 'running'])
             ->where('updated_at', '<', $this->stuckThreshold())
             ->count();
 
-        $windowCounts = TaskExecution::forUser(AdminTenant::id())
+        $windowCounts = AdminTenant::scopeForUser(TaskExecution::query())
             ->whereIn('status', ['success', 'failed'])
             ->where('updated_at', '>=', $this->windowStart())
             ->selectRaw('status, count(*) as aggregate')
@@ -343,13 +343,13 @@ new class extends Component
     public function getSelectedExecutionProperty(): ?TaskExecution
     {
         return $this->selectedExecutionId
-            ? TaskExecution::forUser(AdminTenant::id())->whereKey($this->selectedExecutionId)->first()
+            ? AdminTenant::scopeForUser(TaskExecution::query())->whereKey($this->selectedExecutionId)->first()
             : null;
     }
 
     public function retryFailure(string $failureId): void
     {
-        $execution = TaskExecution::forUser(AdminTenant::id())->whereKey($failureId)->first();
+        $execution = AdminTenant::scopeForUser(TaskExecution::query())->whereKey($failureId)->first();
 
         if (! $execution) {
             $this->error('That task execution could not be found.');
@@ -363,7 +363,7 @@ new class extends Component
             return;
         }
 
-        $event = Event::forUser(AdminTenant::id())->whereKey($execution->entity_id)->first();
+        $event = AdminTenant::scopeForUser(Event::query())->whereKey($execution->entity_id)->first();
 
         if (! $event) {
             $this->error('The underlying event no longer exists.');
