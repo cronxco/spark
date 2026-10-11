@@ -105,6 +105,26 @@ class BufferDepositTest extends TestCase
     }
 
     #[Test]
+    public function open_banking_current_account_spending_cannot_be_moved_into_the_card_buffer(): void
+    {
+        Http::fake();
+        $account = EventObject::create([
+            'user_id' => $this->user->id, 'concept' => 'account', 'type' => 'bank_account',
+            'title' => 'Everyday current account', 'metadata' => ['account_type' => 'current'],
+        ]);
+        $payment = Event::create([
+            'integration_id' => $this->bank->id, 'source_id' => 'current-payment',
+            'actor_id' => $account->id, 'target_id' => $this->target('Groceries')->id,
+            'service' => 'gocardless', 'domain' => 'money', 'action' => 'payment_to',
+            'time' => now()->subDay(), 'value' => 1250, 'value_multiplier' => 100,
+            'value_unit' => 'GBP', 'event_metadata' => ['description' => 'Groceries', 'transaction_status' => 'booked'],
+        ]);
+
+        $this->assertRefused([(string) $payment->id], 'Only credit-card spending');
+        Http::assertNothingSent();
+    }
+
+    #[Test]
     public function it_refuses_over_the_cap_a_changed_total_and_a_missing_pot_or_source(): void
     {
         Http::fake();
