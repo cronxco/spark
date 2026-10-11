@@ -9,7 +9,7 @@
         </div>
 
         @if ($cover['status'] === 'no_buffer')
-            <div class="alert alert-warning"><span>No buffer pot is set. Pick one below to see whether your cards are covered.</span></div>
+            <div class="alert alert-warning"><span>No buffer pot is set. Choose one on the Pots view to see whether your cards are covered.</span></div>
         @elseif ($cover['status'] === 'covered')
             <div class="alert alert-success"><span>Covered. {{ $cover['pot']['name'] }} holds {{ $money($cover['pot']['balance']) }} against {{ $money($cover['owed']) }} owed.</span></div>
         @else
@@ -30,15 +30,5 @@
             </ul>
         @endif
 
-        <label class="form-control max-w-xs">
-            <span class="label-text">Buffer pot</span>
-            <select class="select select-bordered select-sm" wire:change="useAsBuffer($event.target.value)">
-                <option value="">None</option>
-                @foreach ($pots as $pot)
-                    <option value="{{ $pot['id'] }}" @selected(($cover['pot']['id'] ?? null) === $pot['id'])>{{ $pot['name'] }}</option>
-                @endforeach
-            </select>
-        </label>
-        @error('buffer') <p class="text-error text-sm">{{ $message }}</p> @enderror
     </div>
 </div>
