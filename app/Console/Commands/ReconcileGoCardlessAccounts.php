@@ -24,7 +24,7 @@ class ReconcileGoCardlessAccounts extends Command
 
         $plan = $cleanup->plan($userId, AccountCleanup::GOCARDLESS_KINDS);
         foreach ($plan['steps'] as $step) {
-            $this->line($step['label'].($step['blocked'] ? " [blocked: {$step['blocked']}]" : '').'.');
+            $this->line($step['label'] . ($step['blocked'] ? " [blocked: {$step['blocked']}]" : '') . '.');
         }
         if ($plan['steps'] === []) {
             $this->line('Nothing to reconcile.');
@@ -46,7 +46,7 @@ class ReconcileGoCardlessAccounts extends Command
         try {
             $result = $cleanup->apply($userId, $plan['fingerprint'], AccountCleanup::GOCARDLESS_KINDS);
         } catch (RuntimeException $e) {
-            $this->error($e->getMessage().' No repair was committed.');
+            $this->error($e->getMessage() . ' No repair was committed.');
 
             return self::FAILURE;
         }

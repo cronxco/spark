@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use RuntimeException;
+use Throwable;
 
 class ApplyAccountCleanup implements ShouldQueue
 {
@@ -47,7 +48,7 @@ class ApplyAccountCleanup implements ShouldQueue
         ]);
     }
 
-    public function failed(\Throwable $exception): void
+    public function failed(Throwable $exception): void
     {
         ActionProgress::find($this->progressId)?->markFailed($exception->getMessage());
     }

@@ -147,7 +147,7 @@ class AccountCleanup
                 continue;
             }
             $steps[] = $this->step(
-                self::KIND_QUARANTINE.':'.$object->id,
+                self::KIND_QUARANTINE . ':' . $object->id,
                 self::KIND_QUARANTINE,
                 "Set aside \"{$object->title}\"",
                 'It has no GoCardless account id and matches no other account. Its history is kept.',
@@ -164,7 +164,7 @@ class AccountCleanup
                 $clean = trim($matches[1]);
                 $blocked = in_array($clean, $taken, true) ? "Another account is already called \"{$clean}\"" : null;
                 $steps[] = $this->step(
-                    self::KIND_RENAME.':'.$object->id,
+                    self::KIND_RENAME . ':' . $object->id,
                     self::KIND_RENAME,
                     "Rename \"{$object->title}\" to \"{$clean}\"",
                     'The account id is part of its name.',
@@ -186,7 +186,7 @@ class AccountCleanup
             + Event::withTrashed()->where('target_id', $duplicate->id)->count();
 
         return $this->step(
-            self::KIND_MERGE.':'.$duplicate->id,
+            self::KIND_MERGE . ':' . $duplicate->id,
             self::KIND_MERGE,
             "Merge \"{$duplicate->title}\" into \"{$canonical->title}\"",
             "{$reason}. {$events} events move across and the old record is kept as an alias.",
@@ -234,7 +234,7 @@ class AccountCleanup
             self::KIND_SNAPSHOTS,
             self::KIND_SNAPSHOTS,
             'Remove daily £0 balances from archived pots',
-            number_format($total).' balance rows across '.count($perPot).' archived pots. Rows are soft-deleted and can be restored.',
+            number_format($total) . ' balance rows across ' . count($perPot) . ' archived pots. Rows are soft-deleted and can be restored.',
             ['pots' => $perPot, 'rows' => $total],
         )];
     }
@@ -273,7 +273,7 @@ class AccountCleanup
         return [$this->step(
             self::KIND_POT_DETAILS,
             self::KIND_POT_DETAILS,
-            'Fetch the missing details for '.$missing.' pots',
+            'Fetch the missing details for ' . $missing . ' pots',
             'Goal, type, owning account and round-up settings come from Monzo. This only reads from Monzo.',
             ['pots' => $missing],
             $integration ? null : 'No connected Monzo pots integration',
@@ -300,11 +300,11 @@ class AccountCleanup
             $merchants = $events->map(fn ($event) => $event->event_metadata['raw']['merchant']['name'] ?? null)
                 ->filter()->countBy()->sortDesc()->keys()->take(3)->implode(', ');
             $name = $names[$categoryId] ?? null;
-            $detail = $events->count().' transactions'.($merchants !== '' ? ", e.g. {$merchants}" : '').'.';
+            $detail = $events->count() . ' transactions' . ($merchants !== '' ? ", e.g. {$merchants}" : '') . '.';
 
             if ($name === null || $name === '') {
                 $steps[] = $this->step(
-                    self::KIND_CATEGORY.':'.$categoryId,
+                    self::KIND_CATEGORY . ':' . $categoryId,
                     self::KIND_CATEGORY,
                     "Name the Monzo category {$categoryId}",
                     $detail,
@@ -319,7 +319,7 @@ class AccountCleanup
                 continue;
             }
             $steps[] = $this->step(
-                self::KIND_CATEGORY.':'.$categoryId,
+                self::KIND_CATEGORY . ':' . $categoryId,
                 self::KIND_CATEGORY,
                 "Rename category {$categoryId} to \"{$name}\"",
                 $detail,
@@ -402,11 +402,11 @@ class AccountCleanup
 
         $table = DB::table('taggables');
         $already = (clone $table)->where('tag_id', $new->id)->get(['taggable_id', 'taggable_type'])
-            ->map(fn ($row) => $row->taggable_type.'|'.$row->taggable_id)->all();
+            ->map(fn ($row) => $row->taggable_type . '|' . $row->taggable_id)->all();
         foreach ((clone $table)->where('tag_id', $old->id)->get() as $row) {
             $query = DB::table('taggables')->where('tag_id', $old->id)
                 ->where('taggable_id', $row->taggable_id)->where('taggable_type', $row->taggable_type);
-            if (in_array($row->taggable_type.'|'.$row->taggable_id, $already, true)) {
+            if (in_array($row->taggable_type . '|' . $row->taggable_id, $already, true)) {
                 $query->delete();
             } else {
                 $query->update(['tag_id' => $new->id]);
