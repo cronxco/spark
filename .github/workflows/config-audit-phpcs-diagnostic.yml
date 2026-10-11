@@ -12,4 +12,4 @@ jobs:
           tools: composer
       - run: composer global require tightenco/duster:^3.4 --no-interaction --no-progress
       - name: Show specific PHP_CodeSniffer failures
-        run: ~/.config/composer/vendor/bin/duster lint --using=phpcs
+        run: ~/.composer/vendor/bin/duster lint --using=phpcs
