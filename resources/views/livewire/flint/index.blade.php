@@ -30,6 +30,8 @@ new class extends Component
     public bool $topicsEnabled = true;
     public bool $readingListEnabled = true;
     public bool $newsRoundupEnabled = true;
+    public bool $moneyWeeklyEnabled = false;
+    public bool $moneyCloseEnabled = false;
     public string $morningTimeWeekday = '07:30';
     public string $morningTimeWeekend = '09:30';
     public string $morningFallback = '11:00';
@@ -77,6 +79,8 @@ new class extends Component
         $this->topicsEnabled = FlintScheduleSettings::enabled($settings, 'topics_enabled');
         $this->readingListEnabled = FlintScheduleSettings::enabled($settings, 'reading_list_enabled');
         $this->newsRoundupEnabled = FlintScheduleSettings::enabled($settings, 'news_roundup_enabled');
+        $this->moneyWeeklyEnabled = FlintScheduleSettings::enabled($settings, 'money_weekly_enabled');
+        $this->moneyCloseEnabled = FlintScheduleSettings::enabled($settings, 'money_close_enabled');
         $this->morningTimeWeekday = $settings['morning_time_weekday'] ?? config('services.flint_routine.morning_time_weekday');
         $this->morningTimeWeekend = $settings['morning_time_weekend'] ?? config('services.flint_routine.morning_time_weekend');
         $this->morningFallback = $settings['morning_fallback'] ?? config('services.flint_routine.morning_fallback');
@@ -413,6 +417,8 @@ new class extends Component
             'topics_enabled' => $this->topicsEnabled,
             'reading_list_enabled' => $this->readingListEnabled,
             'news_roundup_enabled' => $this->newsRoundupEnabled,
+            'money_weekly_enabled' => $this->moneyWeeklyEnabled,
+            'money_close_enabled' => $this->moneyCloseEnabled,
             'morning_time_weekday' => $this->morningTimeWeekday,
             'morning_time_weekend' => $this->morningTimeWeekend,
             'morning_fallback' => $this->morningFallback,
@@ -428,6 +434,8 @@ new class extends Component
 
         $user->settings = $settings;
         $user->save();
+
+        $this->dispatch('save-flint-schedules');
 
         $this->success('Flint settings saved.');
     }
@@ -969,119 +977,100 @@ new class extends Component
             @php $feedback = $this->feedbackStats(); @endphp
 
             <div class="space-y-4 lg:space-y-6">
+                @php
+                    $driverLabels = $this->driverLabels();
+                    $serverDefault = app(RoutineDriverManager::class)->configuredDriver();
+                    $routineCards = [
+                        ['toggle' => 'morningDigestEnabled', 'label' => __('Morning briefing'), 'driver' => 'digest', 'run' => "skill: 'spark-day-briefing-async', period: 'morning'", 'digest' => 'morning'],
+                        ['toggle' => 'eveningDigestEnabled', 'label' => __('Evening briefing'), 'driver' => 'digest', 'run' => "skill: 'spark-day-briefing-async', period: 'evening'", 'digest' => 'evening'],
+                        ['toggle' => 'topicsEnabled', 'label' => __('Topic review'), 'driver' => 'topics', 'run' => "skill: 'flint-topics', period: 'evening'", 'schedule' => 'topics'],
+                        ['toggle' => 'readingListEnabled', 'label' => __('Reading list'), 'driver' => 'reading_list', 'run' => "skill: 'flint-reading-list', period: 'evening'", 'schedule' => 'reading_list'],
+                        ['toggle' => 'newsRoundupEnabled', 'label' => __('News roundup'), 'driver' => 'news_roundup', 'run' => "skill: 'flint-news-roundup', period: 'morning'", 'schedule' => 'news_roundup'],
+                        ['toggle' => 'moneyWeeklyEnabled', 'label' => __('Money weekly check'), 'driver' => 'money_weekly', 'run' => "routine: 'money_weekly', period: 'morning'", 'schedule' => 'money_weekly'],
+                        ['toggle' => 'moneyCloseEnabled', 'label' => __('Money monthly close'), 'driver' => 'money_close', 'run' => "routine: 'money_close', period: 'morning'", 'schedule' => 'money_close'],
+                    ];
+                @endphp
+
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-4">{{ __('Scheduled Flint items') }}</h3>
-                        <p class="text-sm text-base-content/70 mb-4">
-                            {{ __('Times are in your timezone and checked every fifteen minutes.') }}
-                        </p>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            @foreach ([
-                                'morningDigestEnabled' => __('Morning briefing'),
-                                'eveningDigestEnabled' => __('Evening briefing'),
-                                'topicsEnabled' => __('Topic review'),
-                                'readingListEnabled' => __('Reading list'),
-                                'newsRoundupEnabled' => __('News roundup'),
-                            ] as $setting => $label)
-                                <label class="flex items-center justify-between gap-3 p-3 bg-base-100 rounded-lg">
-                                    <span class="font-medium text-sm">{{ $label }}</span>
-                                    <input type="checkbox" class="toggle toggle-primary" wire:model="{{ $setting }}" />
-                                </label>
-                            @endforeach
+                        <div class="form-control max-w-md">
+                            <label class="label"><span class="label-text">{{ __('Default runner') }}</span></label>
+                            <select wire:model="driver" class="select select-bordered">
+                                <option value="">{{ __('Server default (:driver)', ['driver' => $driverLabels[$serverDefault] ?? $serverDefault]) }}</option>
+                                @foreach ($driverLabels as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                <div class="card bg-base-200 shadow">
-                    <div class="card-body">
-                        @php
-                            $driverLabels = $this->driverLabels();
-                            $serverDefault = app(RoutineDriverManager::class)->configuredDriver();
-                        @endphp
-                        <h3 class="text-lg font-semibold mb-1">{{ __('How Flint runs') }}</h3>
-                        <p class="text-sm text-base-content/70 mb-4">
-                            {{ __('Run each routine through a Claude Code webhook or in Spark with OpenAI.') }}
-                        </p>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div class="form-control sm:col-span-2">
-                                <label class="label"><span class="label-text">{{ __('Runs in') }}</span></label>
-                                <select wire:model="driver" class="select select-bordered">
-                                    <option value="">{{ __('Server default (:driver)', ['driver' => $driverLabels[$serverDefault] ?? $serverDefault]) }}</option>
-                                    @foreach ($driverLabels as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
+                @foreach ($routineCards as $card)
+                    <div class="card bg-base-200 shadow" wire:key="routine-{{ $card['toggle'] }}">
+                        <div class="card-body gap-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <label class="flex items-center gap-3 font-semibold text-lg">
+                                    <input type="checkbox" class="toggle toggle-primary" wire:model.live="{{ $card['toggle'] }}" aria-label="{{ $card['label'] }} on or off" />
+                                    {{ $card['label'] }}
+                                </label>
+                                <div class="join">
+                                    <x-button wire:click="$dispatch('run-flint-routine', { {{ $card['run'] }} })" class="btn-outline btn-sm join-item" icon="fas.play" label="{{ __('Run now') }}" />
+                                    <div class="dropdown dropdown-end join-item">
+                                        <button type="button" tabindex="0" class="btn btn-outline btn-sm join-item" aria-label="{{ __('Run with a specific runner') }}">
+                                            <x-icon name="o-chevron-down" class="w-4 h-4" />
+                                        </button>
+                                        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow">
+                                            <li><button type="button" wire:click="$dispatch('run-flint-routine', { {{ $card['run'] }}, driverOverride: 'webhook' })">{{ __('Run with Webhook') }}</button></li>
+                                            <li><button type="button" wire:click="$dispatch('run-flint-routine', { {{ $card['run'] }}, driverOverride: 'openai' })">{{ __('Run with OpenAI') }}</button></li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
-                            @foreach ([
-                                'digest' => __('Morning and evening briefings'),
-                                'topics' => __('Topic review'),
-                                'reading_list' => __('Reading list'),
-                                'news_roundup' => __('News roundup'),
-                                'money_weekly' => __('Money weekly check'),
-                                'money_close' => __('Money monthly close'),
-                            ] as $routine => $label)
-                                <div class="form-control">
-                                    <label class="label"><span class="label-text">{{ $label }}</span></label>
-                                    <select wire:model="drivers.{{ $routine }}" class="select select-bordered">
-                                        <option value="">{{ __('Same as above') }}</option>
+
+                            <fieldset @disabled(! $this->{$card['toggle']}) @class(['flex flex-col gap-4', 'opacity-50' => ! $this->{$card['toggle']}])>
+                                @if (($card['digest'] ?? null) === 'morning')
+                                    <p class="text-sm text-base-content/70">{{ __('Waits for your Oura sleep score: runs at the later of the morning time and the score arriving, or at the fallback time if none lands.') }}</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        @foreach (['morningTimeWeekday' => __('Mon–Fri'), 'morningTimeWeekend' => __('Sat–Sun'), 'morningFallback' => __('Fallback')] as $property => $timeLabel)
+                                            <div class="form-control">
+                                                <label class="label"><span class="label-text">{{ $timeLabel }}</span></label>
+                                                <select wire:model="{{ $property }}" class="select select-bordered select-sm">
+                                                    @foreach ($timeOptions as $value => $option)
+                                                        <option value="{{ $value }}">{{ $option }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @elseif (($card['digest'] ?? null) === 'evening')
+                                    <div class="form-control max-w-xs">
+                                        <label class="label"><span class="label-text">{{ __('Time') }}</span></label>
+                                        <select wire:model="eveningTime" class="select select-bordered select-sm">
+                                            @foreach ($timeOptions as $value => $option)
+                                                <option value="{{ $value }}">{{ $option }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                @else
+                                    <livewire:flint.schedule-editor :routine="$card['schedule']" :key="'schedule-'.$card['schedule']" />
+                                @endif
+
+                                <div class="form-control max-w-xs">
+                                    <label class="label"><span class="label-text">{{ __('Runs in') }}</span></label>
+                                    <select wire:model="drivers.{{ $card['driver'] }}" class="select select-bordered select-sm">
+                                        <option value="">{{ __('Default runner') }}</option>
                                         @foreach ($driverLabels as $value => $driverLabel)
                                             <option value="{{ $value }}">{{ $driverLabel }}</option>
                                         @endforeach
                                     </select>
-                                    @php $effective = app(RoutineDriverManager::class)->driverName($routine, user: Auth::user()); @endphp
-                                    <label class="label"><span class="label-text-alt">{{ __('Runs in :driver', ['driver' => $driverLabels[$effective] ?? $effective]) }}</span></label>
+                                    @if ($card['driver'] === 'digest')
+                                        <label class="label"><span class="label-text-alt">{{ __('Shared by both briefings') }}</span></label>
+                                    @endif
                                 </div>
-                            @endforeach
+                            </fieldset>
                         </div>
                     </div>
-                </div>
-
-                    <div class="card bg-base-200 shadow">
-                        <div class="card-body">
-                            <h3 class="text-lg font-semibold mb-1">{{ __('Digest schedule') }}</h3>
-                            <p class="text-sm text-base-content/70 mb-4">
-                                {{ __('The morning briefing waits for your Oura sleep score. It runs at the later of the morning time and the score arriving, or at the fallback time if no score lands.') }}
-                            </p>
-
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div class="form-control">
-                                    <label class="label"><span class="label-text">{{ __('Morning (Mon–Fri)') }}</span></label>
-                                    <select wire:model="morningTimeWeekday" class="select select-bordered">
-                                        @foreach ($timeOptions as $value => $label)
-                                            <option value="{{ $value }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="form-control">
-                                    <label class="label"><span class="label-text">{{ __('Morning (Sat–Sun)') }}</span></label>
-                                    <select wire:model="morningTimeWeekend" class="select select-bordered">
-                                        @foreach ($timeOptions as $value => $label)
-                                            <option value="{{ $value }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="form-control">
-                                    <label class="label"><span class="label-text">{{ __('Morning fallback') }}</span></label>
-                                    <select wire:model="morningFallback" class="select select-bordered">
-                                        @foreach ($timeOptions as $value => $label)
-                                            <option value="{{ $value }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="form-control">
-                                    <label class="label"><span class="label-text">{{ __('Evening') }}</span></label>
-                                    <select wire:model="eveningTime" class="select select-bordered">
-                                        @foreach ($timeOptions as $value => $label)
-                                            <option value="{{ $value }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                <livewire:flint.schedule-editor />
+                @endforeach
 
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
@@ -1148,34 +1137,6 @@ new class extends Component
                         </div>
                     </div>
                 @endif
-
-                <div class="card bg-base-200 shadow">
-                    <div class="card-body">
-                        <h3 class="text-lg font-semibold">{{ __('Run now') }}</h3>
-                        <p class="text-sm opacity-70 mb-4">
-                            {{ __('Run a routine now instead of waiting for its next slot.') }}
-                        </p>
-                        <div class="divide-y divide-base-300">
-                            @foreach ([
-                                ['spark-day-briefing-async', 'morning', __('Morning briefing')],
-                                ['spark-day-briefing-async', 'evening', __('Evening briefing')],
-                                ['flint-topics', 'evening', __('Topic review')],
-                                ['flint-reading-list', 'evening', __('Reading list')],
-                                ['flint-news-roundup', 'morning', __('News roundup')],
-                                ['money_weekly', 'morning', __('Money weekly check')],
-                                ['money_close', 'morning', __('Money monthly close')],
-                            ] as [$skillName, $period, $skillLabel])
-                                <div class="flex flex-wrap items-center justify-between gap-3 py-3" wire:key="run-{{ $skillName }}-{{ $period }}">
-                                    <span class="font-medium text-sm">{{ $skillLabel }}</span>
-                                    <div class="flex flex-wrap gap-2">
-                                        <x-button wire:click="$dispatch('run-flint-routine', { {{ str_starts_with($skillName, 'money_') ? 'routine' : 'skill' }}: '{{ $skillName }}', period: '{{ $period }}' })" class="btn-outline btn-sm" icon="fas.play" label="{{ __('Run now') }}" />
-                                        <x-button wire:click="$dispatch('run-flint-routine', { {{ str_starts_with($skillName, 'money_') ? 'routine' : 'skill' }}: '{{ $skillName }}', period: '{{ $period }}', driverOverride: 'openai' })" class="btn-primary btn-sm" icon="fas.bolt" label="{{ __('Run with OpenAI') }}" />
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
 
                 <div class="flex justify-end">
                     <x-button label="{{ __('Save Settings') }}" wire:click="save" class="btn-primary" spinner="save" />

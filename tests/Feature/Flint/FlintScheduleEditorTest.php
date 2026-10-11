@@ -125,7 +125,7 @@ class FlintScheduleEditorTest extends TestCase
     }
 
     #[Test]
-    public function times_can_be_added_and_removed_and_the_money_routines_have_their_own_switch(): void
+    public function times_can_be_added_and_removed(): void
     {
         $user = User::factory()->create();
 
@@ -134,14 +134,13 @@ class FlintScheduleEditorTest extends TestCase
             ->assertSet('forms.topics.times.1', '09:00')
             ->call('removeTime', 'topics', 0)
             ->assertCount('forms.topics.times', 1)
-            ->set('forms.money_close.enabled', true)
             ->set('forms.money_close.frequency', 'monthly')
             ->set('forms.money_close.day_of_month', '2')
             ->call('save', 'money_close')
             ->assertHasNoErrors();
 
         $settings = $user->fresh()->settings['flint'];
-        $this->assertTrue($settings['money_close_enabled']);
+        $this->assertArrayNotHasKey('money_close_enabled', $settings);
         $this->assertSame(2, $settings['schedules']['money_close']['day_of_month']);
     }
 
@@ -151,6 +150,29 @@ class FlintScheduleEditorTest extends TestCase
         $this->actingAs(User::factory()->create());
 
         Volt::test('flint.index')->assertSeeLivewire(ScheduleEditor::class);
+    }
+
+    #[Test]
+    public function the_page_save_saves_every_schedule_card(): void
+    {
+        $user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
+        $this->actingAs($user);
+
+        Livewire::test(ScheduleEditor::class, ['routine' => 'reading_list'])
+            ->set('forms.reading_list.times', ['06:00'])
+            ->dispatch('save-flint-schedules')
+            ->assertHasNoErrors();
+
+        $this->assertSame(['06:00'], $user->fresh()->settings['flint']['schedules']['reading_list']['times']);
+        $this->assertArrayNotHasKey('topics', $user->fresh()->settings['flint']['schedules']);
+    }
+
+    #[Test]
+    public function an_editor_for_one_routine_refuses_unknown_routines(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test(ScheduleEditor::class, ['routine' => 'morning_digest'])->assertStatus(404);
     }
 
     #[Test]
