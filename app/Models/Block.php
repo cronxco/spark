@@ -184,7 +184,7 @@ class Block extends Model implements HasMedia
 
         static::created(function ($model): void {
             // Dispatch Task Pipeline to run applicable tasks
-            if (config('app.enable_task_pipeline', true)) {
+            if (! $model->event?->isInternal() && config('app.enable_task_pipeline', true)) {
                 ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
             }
         });
@@ -491,7 +491,7 @@ class Block extends Model implements HasMedia
      */
     public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
-        $embeddingString = '[' . implode(',', $embedding) . ']';
+        $embeddingString = '['.implode(',', $embedding).']';
 
         if ($temporalWeight > 0) {
             // Apply temporal weighting: recent blocks get a small boost
@@ -529,7 +529,7 @@ class Block extends Model implements HasMedia
      */
     public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
-        $embeddingString = '[' . implode(',', $embedding) . ']';
+        $embeddingString = '['.implode(',', $embedding).']';
 
         if ($temporalWeight > 0) {
             $query->selectRaw('

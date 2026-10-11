@@ -140,7 +140,7 @@ class OutlineIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function moved_tasks_with_same_titles_can_be_recreated_after_soft_delete(): void
+    public function moved_tasks_keep_their_ids_without_creating_tombstones(): void
     {
         $integration = $this->makeIntegration();
 
@@ -178,9 +178,9 @@ class OutlineIntegrationTest extends TestCase
 
         $blocks = $event->blocks()->withTrashed()->get();
 
-        $this->assertSame(4, $blocks->count());
+        $this->assertSame(2, $blocks->count());
         $this->assertSame(2, $blocks->whereNull('deleted_at')->count());
-        $this->assertSame(2, $blocks->whereNotNull('deleted_at')->count());
+        $this->assertSame(0, $blocks->whereNotNull('deleted_at')->count());
         $this->assertSame(['Other', 'Reused'], $blocks->whereNull('deleted_at')->pluck('title')->sort()->values()->all());
     }
 
@@ -259,6 +259,22 @@ class OutlineIntegrationTest extends TestCase
         $config = $integration->fresh()->configuration;
         $this->assertNotEmpty($config['last_pin_attempt_at']);
         $this->assertArrayNotHasKey('last_pin_success_at', $config);
+    }
+
+    #[Test]
+    public function duplicate_titles_stay_separate_and_markers_preserve_identity_on_rename(): void
+    {
+        $integration = $this->makeIntegration();
+        $doc = ['id' => 'duplicate-doc', 'title' => 'Checklist', 'collectionId' => 'col', 'createdAt' => now()->toIso8601String(),
+            'text' => "- [ ] Same title\n- [ ] Same title"];
+        (new OutlineData($integration, ['documents' => [$doc]]))->handle();
+        $blocks = Block::where('metadata->outline_document_id', 'duplicate-doc')->get();
+        $this->assertCount(2, $blocks);
+        $first = $blocks->first();
+        $doc['text'] = '- [ ] Renamed [Open in Spark]('.route('knowledge.task', $first->id).")\n- [ ] Same title";
+        (new OutlineData($integration, ['documents' => [$doc]]))->handle();
+        $this->assertSame('Renamed', $first->fresh()->title);
+        $this->assertSame(2, Block::where('metadata->outline_document_id', 'duplicate-doc')->count());
     }
 
     private function makeIntegration(array $config = []): Integration

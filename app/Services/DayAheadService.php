@@ -6,6 +6,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
+use App\Services\Knowledge\TaskService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -195,7 +196,7 @@ class DayAheadService
     private function mergeShared(Collection $entries): Collection
     {
         return $entries
-            ->groupBy(fn (array $entry): string => ($entry['start'] ?? 'all-day') . '|' . Str::lower($this->withoutPersonPrefix($entry['title'])))
+            ->groupBy(fn (array $entry): string => ($entry['start'] ?? 'all-day').'|'.Str::lower($this->withoutPersonPrefix($entry['title'])))
             ->map(function (Collection $group): array {
                 $first = $group->first();
                 $people = $group->pluck('person')->filter()->unique();
@@ -274,41 +275,20 @@ class DayAheadService
      */
     private function plan(User $user, ?Event $dayNote, string $date): array
     {
-        $dayTasks = collect($dayNote?->blocks ?? [])
-            ->where('block_type', 'day_task')
-            ->reject(fn (Block $block): bool => (bool) ($block->metadata['removed'] ?? false))
-            ->sortBy(fn (Block $block): int => (int) ($block->metadata['line_number'] ?? 0))
-            ->map(fn (Block $block): array => [
-                'id' => (string) $block->id,
-                'title' => $block->title,
-                'kind' => 'day_note',
-                'done' => (bool) ($block->metadata['checked'] ?? false),
-                'topic_id' => null,
-                'topic_title' => null,
-                'url' => $block->url,
-            ]);
+        $tasks = app(TaskService::class);
+        $planned = $tasks->query($user)->with('event.target')->get()->map(function (Block $block) use ($tasks, $date): ?array {
+            $p = $tasks->payload($block, $date);
+            $completedOnDate = $p['status'] === 'completed' && ($p['availability_on'] === $date || substr($p['completed_at'] ?? '', 0, 10) === $date);
+            if (! $p['visible_on_date'] && ! $completedOnDate) {
+                return null;
+            }
 
-        $topicTasks = Block::query()
-            ->where('block_type', 'flint_topic_task')
-            ->where(fn (Builder $query) => $query
-                ->where('metadata->due_on', $date)
-                ->orWhere('metadata->review_on', $date))
-            ->whereHas('event', fn (Builder $event) => $event
-                ->where('service', 'flint')
-                ->where('action', 'had_topic_task')
-                ->whereHas('integration', fn (Builder $integration) => $integration->where('user_id', $user->id)))
-            ->with('event.target')
-            ->orderBy('created_at')
-            ->get()
-            ->map(fn (Block $block): array => [
-                'id' => (string) $block->id,
-                'title' => $block->title,
-                'kind' => 'topic_task',
-                'done' => ($block->metadata['completed_at'] ?? null) !== null,
-                'topic_id' => $block->event?->target_id ? (string) $block->event->target_id : null,
-                'topic_title' => $block->event?->target?->title,
-                'url' => null,
-            ]);
+            return array_merge($p, ['kind' => match ($block->block_type) {
+                'day_task' => 'day_note', 'flint_topic_task' => 'topic_task', default => 'task'
+            },
+                'done' => $p['status'] === 'completed', 'topic_id' => $p['thread_ids'][0] ?? null,
+                'topic_title' => $block->event?->target?->type === 'topic' ? $block->event->target->title : null, 'url' => $p['source_url']]);
+        })->filter();
 
         $topicReviews = EventObject::query()
             ->where('user_id', $user->id)
@@ -330,7 +310,7 @@ class DayAheadService
                 'url' => null,
             ]);
 
-        return $dayTasks->concat($topicTasks)->concat($topicReviews)->values()->all();
+        return $planned->concat($topicReviews)->values()->all();
     }
 
     /**
@@ -372,7 +352,7 @@ class DayAheadService
         } else {
             $line = $eventCount === 1 ? '1 thing on' : "{$eventCount} things on";
             if ($firstCommitment) {
-                $line .= ', first at ' . Carbon::parse($firstCommitment['start'])->format('H:i');
+                $line .= ', first at '.Carbon::parse($firstCommitment['start'])->format('H:i');
             }
             $parts[] = $line;
         }
@@ -388,7 +368,7 @@ class DayAheadService
         if ($weather && ($weather['condition'] ?? null)) {
             $line = $weather['condition'];
             if (($weather['temp_high_c'] ?? null) !== null) {
-                $line .= ', ' . round((float) $weather['temp_high_c']) . '°';
+                $line .= ', '.round((float) $weather['temp_high_c']).'°';
             }
             if (($weather['rain_probability_pct'] ?? 0) >= 40) {
                 $line .= ", {$weather['rain_probability_pct']}% chance of rain";
@@ -396,7 +376,7 @@ class DayAheadService
             $parts[] = $line;
         }
 
-        return implode('. ', $parts) . '.';
+        return implode('. ', $parts).'.';
     }
 
     /**

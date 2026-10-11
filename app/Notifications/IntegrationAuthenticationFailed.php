@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\Knowledge\IntegrationTaskService;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class IntegrationAuthenticationFailed extends SparkNotification
@@ -63,7 +64,12 @@ class IntegrationAuthenticationFailed extends SparkNotification
 
     public function getActionUrl(): ?string
     {
-        return route('integrations.details', $this->integration->id);
+        return app(IntegrationTaskService::class)->action($this->integration)['url'];
+    }
+
+    public function getDeepLink(): ?string
+    {
+        return 'integration-reauth:'.$this->integration->id;
     }
 
     public function getEntityType(): ?string

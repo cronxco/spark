@@ -15,6 +15,8 @@ return [
     'bundle_id' => 'co.cronx.sparkapp',
 
     'aasa_paths' => [
+        '/tasks/*',
+        '/projects/*',
         '/events/*',
         '/objects/*',
         '/places/*',

@@ -15,9 +15,12 @@ use App\Traits\HasProgressiveLoading;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
@@ -39,11 +42,18 @@ class Day extends Component
     public bool $dayNoteOpen = false;
 
     // Day Note State
+    #[Locked]
     public ?string $dayNoteDocId = null;
 
+    #[Locked]
     public ?string $dayNoteIntegrationId = null;
 
     public string $dayNoteText = '';
+
+    public ?string $dayNoteError = null;
+
+    #[Locked]
+    public ?int $dayNoteRevision = null;
 
     public bool $dayNoteSaving = false;
 
@@ -247,6 +257,7 @@ class Day extends Component
             $this->dayNoteDocId = $docId;
             $this->dayNoteIntegrationId = (string) $event->integration_id;
             $this->dayNoteText = (string) ($text ?? '');
+            $this->dayNoteRevision = isset($metadata['revision']) ? (int) $metadata['revision'] : null;
         }
 
         $this->dayNoteLoaded = true;
@@ -386,7 +397,7 @@ class Day extends Component
         $currentHour = null;
 
         foreach ($this->events as $event) {
-            $key = $event->service . '::' . $event->action;
+            $key = $event->service.'::'.$event->action;
             $hour = to_user_timezone($event->time, auth()->user())->format('H');
 
             if ($currentKey !== $key || $currentHour !== $hour) {
@@ -396,7 +407,7 @@ class Day extends Component
                 $currentKey = $key;
                 $currentHour = $hour;
                 $current = [
-                    'key' => $key . '::h:' . ($hour ?? '00') . '::' . ($event->id),
+                    'key' => $key.'::h:'.($hour ?? '00').'::'.($event->id),
                     'service' => $event->service,
                     'action' => $event->action,
                     'hour' => $hour,
@@ -432,7 +443,7 @@ class Day extends Component
             $group['formatted_action'] = format_action_title($group['action']);
             $group['count'] = $count;
             $group['object_type_plural'] = $objectTypePlural;
-            $group['summary'] = $group['formatted_action'] . ' ' . $count . ' ' . $objectTypePlural;
+            $group['summary'] = $group['formatted_action'].' '.$count.' '.$objectTypePlural;
         }
 
         return $groups;
@@ -605,16 +616,23 @@ class Day extends Component
 
         try {
             /** @var Integration $integration */
-            $integration = Integration::findOrFail($this->dayNoteIntegrationId);
+            $integration = Integration::where('user_id', Auth::id())->findOrFail($this->dayNoteIntegrationId);
             $api = new OutlineApi($integration);
-            $api->updateDocumentContent($this->dayNoteDocId, $this->dayNoteText, null, true);
+            if (! config('knowledge.outline_revision_writes_verified') || $this->dayNoteRevision === null) {
+                throw new \RuntimeException('Saving to Outline is paused until safe revision checks are verified. Your text is still here; copy it or edit in Outline.');
+            }
+            Cache::lock('outline-task-document:'.$integration->id.':'.$this->dayNoteDocId, 120)->block(5, function () use ($api) {
+                $result = $api->updateDocumentAtRevision($this->dayNoteDocId, $this->dayNoteText, $this->dayNoteRevision);
+                $this->dayNoteRevision = data_get($result, 'data.revision', $this->dayNoteRevision);
+            });
+            $this->dayNoteError = null;
 
             // Trigger a lightweight targeted refresh for this date to reconcile tasks/blocks
             OutlinePullTodayDayNote::dispatch($integration, $this->date)->onQueue('pull');
 
             $this->dayNoteSavedAt = now()->toIso8601String();
         } catch (Throwable $e) {
-            // Swallow; UI can show failure later if needed
+            $this->dayNoteError = 'Could not save the note. Your draft is preserved. Refresh the source and retry; safe Outline revision checks must be enabled.';
         } finally {
             $this->dayNoteSaving = false;
         }
@@ -801,7 +819,7 @@ class Day extends Component
     {
         $pluginClass = PluginRegistry::getPlugin($service);
         if ($pluginClass) {
-            return 'text-' . ($pluginClass::getAccentColor() ?: 'primary');
+            return 'text-'.($pluginClass::getAccentColor() ?: 'primary');
         }
 
         return 'text-primary';
@@ -811,7 +829,7 @@ class Day extends Component
     {
         $pluginClass = PluginRegistry::getPlugin($service);
         if ($pluginClass) {
-            return 'badge-' . ($pluginClass::getAccentColor() ?: 'primary');
+            return 'badge-'.($pluginClass::getAccentColor() ?: 'primary');
         }
 
         return 'badge-primary';
@@ -895,7 +913,7 @@ class Day extends Component
             // Show milliseconds if under a second
             $ms = (int) round($seconds * 1000);
 
-            return $ms . 'ms';
+            return $ms.'ms';
         }
 
         $total = (int) round($seconds);
@@ -905,13 +923,13 @@ class Day extends Component
 
         $parts = [];
         if ($h > 0) {
-            $parts[] = $h . 'h';
+            $parts[] = $h.'h';
         }
         if ($m > 0 || $h > 0) {
-            $parts[] = $m . 'm';
+            $parts[] = $m.'m';
         }
         if ($h === 0) {
-            $parts[] = $s . 's';
+            $parts[] = $s.'s';
         }
 
         return implode('', $parts);

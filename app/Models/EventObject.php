@@ -91,7 +91,7 @@ class EventObject extends Model implements HasMedia
 
         static::created(function ($model): void {
             // Dispatch Task Pipeline to run applicable tasks
-            if (config('app.enable_task_pipeline', true)) {
+            if (! data_get($model->metadata, 'internal', false) && config('app.enable_task_pipeline', true)) {
                 ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
             }
         });
@@ -403,7 +403,7 @@ class EventObject extends Model implements HasMedia
      */
     public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
-        $embeddingString = '[' . implode(',', $embedding) . ']';
+        $embeddingString = '['.implode(',', $embedding).']';
 
         if ($temporalWeight > 0) {
             // Apply temporal weighting: recent objects get a small boost
@@ -550,7 +550,7 @@ class EventObject extends Model implements HasMedia
 
         // If it's an array, convert to vector format without quotes
         if (is_array($value)) {
-            $this->attributes['embeddings'] = '[' . implode(',', $value) . ']';
+            $this->attributes['embeddings'] = '['.implode(',', $value).']';
 
             return;
         }

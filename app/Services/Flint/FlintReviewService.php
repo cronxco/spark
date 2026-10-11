@@ -6,6 +6,7 @@ use App\Integrations\Receipt\ReceiptTransactionMatcher;
 use App\Models\Event;
 use App\Models\Relationship;
 use App\Models\User;
+use App\Services\Knowledge\TaskProposalService;
 use App\Services\Receipt\ReceiptMatchState;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -29,7 +30,7 @@ use InvalidArgumentException;
  */
 class FlintReviewService
 {
-    public const KINDS = ['receipt_suggestion', 'receipt_auto_match', 'link_suggestion', 'auto_link'];
+    public const KINDS = ['receipt_suggestion', 'receipt_auto_match', 'link_suggestion', 'auto_link', 'task_proposal'];
 
     public const AUTO_DECISION_DAYS = 30;
 
@@ -39,6 +40,7 @@ class FlintReviewService
     public function items(User $user): array
     {
         return collect()
+            ->merge(app(TaskProposalService::class)->items($user))
             ->merge($this->receiptSuggestions($user))
             ->merge($this->receiptAutoMatches($user))
             ->merge($this->linkSuggestions($user))
@@ -67,6 +69,7 @@ class FlintReviewService
     public function act(User $user, string $kind, string $id, string $action, array $input = []): void
     {
         match ($kind) {
+            'task_proposal' => app(TaskProposalService::class)->act($user, $id, $action, $input['changes'] ?? []),
             'receipt_suggestion' => $this->actOnReceiptSuggestion($user, $id, $action, $input['transaction_id'] ?? null),
             'receipt_auto_match', 'auto_link' => $this->actOnAutoDecision($user, $kind, $id, $action),
             'link_suggestion' => $this->actOnLinkSuggestion($user, $id, $action),

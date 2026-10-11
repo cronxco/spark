@@ -472,3 +472,5 @@ Route::post('money/accounts/{id}/balances', [MoneyAccountsController::class, 'ad
 Route::get('money/net-worth', [NetWorthController::class, 'index'])
     ->middleware('spark.ability:finance:read')
     ->name('money.net-worth');
+
+require __DIR__.'/knowledge.php';

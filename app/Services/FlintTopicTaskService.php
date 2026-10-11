@@ -7,6 +7,8 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\User;
 use App\Services\Api\ResourceVersion;
+use App\Services\Knowledge\KnowledgeFeature;
+use App\Services\Knowledge\TaskService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -41,13 +43,14 @@ class FlintTopicTaskService
      */
     public function create(User $user, string $topicId, array $data): ?array
     {
+        KnowledgeFeature::ensure($user, 'writes');
         $topic = $this->topic($user, $topicId);
         if (! $topic) {
             return null;
         }
 
         $integration = $this->digests->resolveIntegration($user);
-        $sourceId = 'flint_topic_task:' . ($data['client_mutation_id'] ?? Str::uuid());
+        $sourceId = 'flint_topic_task:'.($data['client_mutation_id'] ?? Str::uuid());
         $requestHash = hash('sha256', json_encode([
             'title' => $data['title'],
             'content' => $data['content'] ?? null,
@@ -57,6 +60,7 @@ class FlintTopicTaskService
 
         try {
             return DB::transaction(function () use ($user, $topic, $data, $integration, $sourceId, $requestHash): array {
+                User::whereKey($user->id)->lockForUpdate()->firstOrFail();
                 $existing = Event::query()->where('integration_id', $integration->id)
                     ->where('source_id', $sourceId)->lockForUpdate()->first();
                 if ($existing) {
@@ -115,6 +119,7 @@ class FlintTopicTaskService
         }
 
         return DB::transaction(function () use ($user, $topicId, $taskId, $data, $etag): ?array {
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             $block = $this->blocks($user, $topicId)->lockForUpdate()->find($taskId);
             if (! $block) {
                 return null;
@@ -126,21 +131,8 @@ class FlintTopicTaskService
                     'etag' => $current,
                 ], $etag ? 412 : 428)->header('ETag', $current));
             }
-            $metadata = $block->metadata ?? [];
-            foreach (['content', 'due_on', 'review_on'] as $key) {
-                if (array_key_exists($key, $data)) {
-                    $metadata[$key] = $data[$key];
-                }
-            }
-            if (array_key_exists('completed', $data)) {
-                $metadata['completed_at'] = $data['completed'] ? ($metadata['completed_at'] ?? now()->toIso8601String()) : null;
-            }
-            $block->update([
-                'title' => $data['title'] ?? $block->title,
-                'metadata' => $metadata,
-            ]);
 
-            return $this->payload($block);
+            return app(TaskService::class)->update($user, $taskId, $data, $etag);
         });
     }
 
@@ -160,12 +152,14 @@ class FlintTopicTaskService
     /** @return Builder<Block> */
     private function blocks(User $user, string $topicId): Builder
     {
-        return Block::query()->where('block_type', 'flint_topic_task')
-            ->whereHas('event', fn (Builder $query) => $query
-                ->where('target_id', $topicId)
-                ->where('service', 'flint')
-                ->where('action', 'had_topic_task')
-                ->whereHas('integration', fn (Builder $integration) => $integration->where('user_id', $user->id)));
+        return app(TaskService::class)->query($user)
+            ->where(function (Builder $query) use ($topicId) {
+                $query->whereHas('relationshipsFrom', fn (Builder $links) => $links
+                    ->where('type', 'task_thread')->where('to_id', $topicId)->whereNull('deleted_at'))
+                    ->orWhere(fn (Builder $legacy) => $legacy->where('block_type', 'flint_topic_task')
+                        ->whereRaw("COALESCE(metadata->'task'->>'thread_links_migrated', 'false') != 'true'")
+                        ->whereHas('event', fn (Builder $event) => $event->where('target_id', $topicId)));
+            });
     }
 
     private function topic(User $user, string $id): ?EventObject
@@ -177,16 +171,6 @@ class FlintTopicTaskService
     /** @return array<string, mixed> */
     private function payload(Block $block): array
     {
-        $metadata = $block->metadata ?? [];
-
-        return [
-            'id' => (string) $block->id,
-            'title' => $block->title,
-            'content' => $metadata['content'] ?? null,
-            'due_on' => $metadata['due_on'] ?? null,
-            'review_on' => $metadata['review_on'] ?? null,
-            'completed_at' => $metadata['completed_at'] ?? null,
-            'version' => $this->versions->etag($block),
-        ];
+        return app(TaskService::class)->payload($block);
     }
 }

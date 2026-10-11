@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\User;
 use App\Notifications\Channels\ApnsChannel;
+use App\Services\Knowledge\IntegrationTaskService;
 use App\Services\Notifications\NotificationDeliveryRecorder;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -73,6 +74,9 @@ abstract class SparkNotification extends Notification implements ShouldQueue
     {
         $this->occurredAt ??= now()->toJSON();
         $this->afterCommit();
+        if ($this instanceof IntegrationAuthenticationFailed || $this instanceof IntegrationFailed || $this instanceof GoCardlessConsentExpiring) {
+            app(IntegrationTaskService::class)->report($notifiable, $this->integration, ! ($this instanceof IntegrationFailed), $this instanceof GoCardlessConsentExpiring);
+        }
         $channels = ['database'];
 
         if ($this->isPriority()) {
@@ -289,7 +293,7 @@ abstract class SparkNotification extends Notification implements ShouldQueue
             $notifiable,
             $this,
             $this->deliveryChannel,
-            Str::limit($this->sanitiseTechnicalDetail(class_basename($exception) . ': ' . $exception->getMessage()), 300),
+            Str::limit($this->sanitiseTechnicalDetail(class_basename($exception).': '.$exception->getMessage()), 300),
         );
     }
 

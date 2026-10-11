@@ -50,7 +50,22 @@ class GoCardlessConsentExpiring extends SparkNotification
 
     public function getActionUrl(): ?string
     {
-        return route('integrations.details', $this->integration->id);
+        return route('integrations.reconnect', ['service' => 'gocardless', 'group' => $this->group->id]);
+    }
+
+    public function getEntityType(): ?string
+    {
+        return 'integration';
+    }
+
+    public function getEntityId(): ?string
+    {
+        return (string) $this->integration->id;
+    }
+
+    public function getDeepLink(): ?string
+    {
+        return 'integration-reauth:'.$this->integration->id;
     }
 
     public function getGroupKey(): ?string

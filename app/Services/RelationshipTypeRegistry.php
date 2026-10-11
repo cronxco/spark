@@ -12,6 +12,9 @@ class RelationshipTypeRegistry
     public static function getTypes(): array
     {
         return [
+            'task_project' => ['display_name' => 'Project', 'icon' => 'fas.folder', 'is_directional' => true, 'description' => 'Task belongs to project', 'supports_value' => false, 'user_creatable' => false],
+            'task_thread' => ['display_name' => 'Thread', 'icon' => 'fas.link', 'is_directional' => true, 'description' => 'Task relates to thread', 'supports_value' => false, 'user_creatable' => false],
+            'task_context' => ['display_name' => 'Task context', 'icon' => 'fas.link', 'is_directional' => true, 'description' => 'Task source context', 'supports_value' => false, 'user_creatable' => false],
             'linked_to' => [
                 'display_name' => 'Linked To',
                 'icon' => 'fas.link',
