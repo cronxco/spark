@@ -10,6 +10,7 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -41,17 +42,17 @@ class KnowledgeTasksTool extends Tool
                 'edit' => $tasks->update($user, $request->get('id'), $fields, $request->get('version')),
                 'action' => $tasks->act($user, $request->get('id'), $request->get('action'), $request->get('version'), $fields),
                 'propose' => app(TaskProposalService::class)->propose($user, $fields),
-                default => throw new \InvalidArgumentException('Unknown operation.'),
+                default => throw new InvalidArgumentException('Unknown operation.'),
             };
 
             return Response::json(['data' => $result]);
         } catch (ValidationException $e) {
             return Response::error($e->getMessage());
         } catch (HttpResponseException $e) {
-            return Response::error('Task conflict: '.$e->getResponse()->getContent());
+            return Response::error('Task conflict: ' . $e->getResponse()->getContent());
         } catch (ModelNotFoundException $e) {
             return Response::error('Task or linked entity not found.');
-        } catch (HttpException|\InvalidArgumentException $e) {
+        } catch (HttpException|InvalidArgumentException $e) {
             return Response::error($e->getMessage());
         }
     }

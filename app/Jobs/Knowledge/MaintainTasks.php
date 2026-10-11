@@ -51,7 +51,7 @@ class MaintainTasks implements ShouldQueue
                     if (! KnowledgeFeature::enabled($user, 'reminders') || ($task['status'] ?? '') !== 'open' || empty($task['remind_at']) || CarbonImmutable::parse($task['remind_at'])->isFuture()) {
                         return;
                     }
-                    $source = 'task_reminder:'.$block->id.':'.hash('sha256', $task['remind_at']);
+                    $source = 'task_reminder:' . $block->id . ':' . hash('sha256', $task['remind_at']);
                     $receipt = Event::firstOrCreate(['integration_id' => $block->event->integration_id, 'source_id' => $source],
                         ['actor_id' => $block->event->actor_id, 'target_id' => $block->event->target_id, 'service' => 'flint', 'domain' => 'knowledge',
                             'action' => 'task_reminder', 'time' => now(), 'event_metadata' => ['internal' => true, 'task_id' => (string) $block->id, 'remind_at' => $task['remind_at'], 'status' => 'pending']]);

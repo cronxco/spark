@@ -403,7 +403,7 @@ class EventObject extends Model implements HasMedia
      */
     public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
     {
-        $embeddingString = '['.implode(',', $embedding).']';
+        $embeddingString = '[' . implode(',', $embedding) . ']';
 
         if ($temporalWeight > 0) {
             // Apply temporal weighting: recent objects get a small boost
@@ -550,7 +550,7 @@ class EventObject extends Model implements HasMedia
 
         // If it's an array, convert to vector format without quotes
         if (is_array($value)) {
-            $this->attributes['embeddings'] = '['.implode(',', $value).']';
+            $this->attributes['embeddings'] = '[' . implode(',', $value) . ']';
 
             return;
         }

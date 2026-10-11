@@ -144,7 +144,7 @@ class TaskService
         return DB::transaction(function () use ($user, $data, $hash) {
             // The owner row serializes creation even before the assistant exists.
             User::whereKey($user->id)->lockForUpdate()->firstOrFail();
-            $source = 'knowledge_task:'.$data['client_mutation_id'];
+            $source = 'knowledge_task:' . $data['client_mutation_id'];
             $integration = $this->digests->resolveIntegration($user);
             $existing = Event::where('integration_id', $integration->id)->where('source_id', $source)->first();
             if ($existing) {
@@ -316,11 +316,29 @@ class TaskService
             return;
         }
         $parent = $block->event;
-        $carrier = Event::create(['integration_id' => $parent->integration_id, 'source_id' => 'outline_task:'.Str::uuid(),
+        $carrier = Event::create(['integration_id' => $parent->integration_id, 'source_id' => 'outline_task:' . Str::uuid(),
             'actor_id' => $parent->actor_id, 'target_id' => $parent->target_id, 'service' => $parent->service, 'domain' => 'knowledge',
             'action' => 'had_task', 'time' => $parent->time, 'event_metadata' => ['internal' => true, 'outline_parent_event_id' => (string) $parent->id]]);
         $block->event_id = $carrier->id;
         $block->setRelation('event', $carrier);
+    }
+
+    public function record(Block $block, User $user, string $action, ?array $before, array $after): void
+    {
+        $after = $this->state($block);
+        Event::create([
+            'integration_id' => $block->event->integration_id, 'source_id' => 'task_history:' . Str::uuid(),
+            'actor_id' => $block->event->actor_id, 'target_id' => $block->event->target_id,
+            'service' => 'flint', 'domain' => 'knowledge', 'action' => 'task_' . $action, 'time' => now(),
+            'event_metadata' => ['internal' => true, 'task_id' => (string) $block->id, 'actor_id' => $user->id, 'sequence' => $after['revision'] ?? 0, 'before' => $before, 'after' => $after, 'title' => $block->title],
+        ]);
+    }
+
+    public function history(User $user, string $id): Builder
+    {
+        $block = $this->find($user, $id, true);
+
+        return Event::where('integration_id', $block->event->integration_id)->where('event_metadata->task_id', $id)->orderByDesc('time')->orderByDesc('id');
     }
 
     private function pendingOutline(Block $block, array $task, string $title, ?string $action = null): array
@@ -380,30 +398,12 @@ class TaskService
         }
     }
 
-    public function record(Block $block, User $user, string $action, ?array $before, array $after): void
-    {
-        $after = $this->state($block);
-        Event::create([
-            'integration_id' => $block->event->integration_id, 'source_id' => 'task_history:'.Str::uuid(),
-            'actor_id' => $block->event->actor_id, 'target_id' => $block->event->target_id,
-            'service' => 'flint', 'domain' => 'knowledge', 'action' => 'task_'.$action, 'time' => now(),
-            'event_metadata' => ['internal' => true, 'task_id' => (string) $block->id, 'actor_id' => $user->id, 'sequence' => $after['revision'] ?? 0, 'before' => $before, 'after' => $after, 'title' => $block->title],
-        ]);
-    }
-
-    public function history(User $user, string $id): Builder
-    {
-        $block = $this->find($user, $id, true);
-
-        return Event::where('integration_id', $block->event->integration_id)->where('event_metadata->task_id', $id)->orderByDesc('time')->orderByDesc('id');
-    }
-
     private function replay(Block $block, ?string $mutation, array $request): ?array
     {
         if (! $mutation) {
             return null;
         }
-        $receipt = Event::whereHas('integration', fn ($q) => $q->where('user_id', $block->event->integration->user_id))->where('source_id', 'knowledge_mutation:'.$mutation)->first();
+        $receipt = Event::whereHas('integration', fn ($q) => $q->where('user_id', $block->event->integration->user_id))->where('source_id', 'knowledge_mutation:' . $mutation)->first();
         if (! $receipt) {
             return null;
         }
@@ -417,7 +417,7 @@ class TaskService
         if (! $mutation) {
             return;
         }
-        Event::create(['integration_id' => $block->event->integration_id, 'source_id' => 'knowledge_mutation:'.$mutation,
+        Event::create(['integration_id' => $block->event->integration_id, 'source_id' => 'knowledge_mutation:' . $mutation,
             'actor_id' => $block->event->actor_id, 'target_id' => $block->event->target_id, 'service' => 'flint', 'domain' => 'knowledge',
             'action' => 'task_mutation', 'time' => now(), 'event_metadata' => ['internal' => true, 'task_id' => (string) $block->id,
                 'hash' => PayloadHash::of($request), 'result' => $this->payload($block)]]);

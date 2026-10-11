@@ -50,7 +50,7 @@ class FlintTopicTaskService
         }
 
         $integration = $this->digests->resolveIntegration($user);
-        $sourceId = 'flint_topic_task:'.($data['client_mutation_id'] ?? Str::uuid());
+        $sourceId = 'flint_topic_task:' . ($data['client_mutation_id'] ?? Str::uuid());
         $requestHash = hash('sha256', json_encode([
             'title' => $data['title'],
             'content' => $data['content'] ?? null,

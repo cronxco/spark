@@ -108,7 +108,7 @@
                 <x-card title="" subtitle="" class="pt-0 pl-0 pr-0 pb-0 bg-base-200 shadow">
                     <div class="space-y-3">
                         <x-markdown wire:model.live.debounce.800ms="dayNoteText" label="" :config="['maxHeight' => '200px', 'status' => 'false', 'sideBySideFullscreen' => 'false']" />
-                        @if($dayNoteError)<p role="alert" class="text-error">{{ $dayNoteError }}</p>@endif
+                        @if ($dayNoteError)<p role="alert" class="text-error">{{ $dayNoteError }}</p>@endif
                     </div>
                 </x-card>
                 @else

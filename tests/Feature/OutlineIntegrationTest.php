@@ -271,7 +271,7 @@ class OutlineIntegrationTest extends TestCase
         $blocks = Block::where('metadata->outline_document_id', 'duplicate-doc')->get();
         $this->assertCount(2, $blocks);
         $first = $blocks->first();
-        $doc['text'] = '- [ ] Renamed [Open in Spark]('.route('knowledge.task', $first->id).")\n- [ ] Same title";
+        $doc['text'] = '- [ ] Renamed [Open in Spark](' . route('knowledge.task', $first->id) . ")\n- [ ] Same title";
         (new OutlineData($integration, ['documents' => [$doc]]))->handle();
         $this->assertSame('Renamed', $first->fresh()->title);
         $this->assertSame(2, Block::where('metadata->outline_document_id', 'duplicate-doc')->count());

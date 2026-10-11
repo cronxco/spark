@@ -30,7 +30,7 @@ class KnowledgeTasksController extends Controller
             $query->where('blocks.id', '>', $data['cursor']);
         }
         if (! empty($data['q'])) {
-            $query->where(fn ($q) => $q->where('title', 'ilike', '%'.$data['q'].'%')->orWhere('metadata->task->content', 'ilike', '%'.$data['q'].'%'));
+            $query->where(fn ($q) => $q->where('title', 'ilike', '%' . $data['q'] . '%')->orWhere('metadata->task->content', 'ilike', '%' . $data['q'] . '%'));
         }
         $limit = $data['limit'] ?? 50;
         // Bounded scan: a filtered empty page may still have a continuation.

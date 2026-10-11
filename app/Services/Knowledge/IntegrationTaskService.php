@@ -19,7 +19,7 @@ class IntegrationTaskService
         }
 
         return ['kind' => $reauth ? 'integration_reauth' : 'integration_details', 'integration_id' => (string) $integration->id,
-            'url' => $url, 'deep_link' => ($reauth ? 'integration-reauth:' : 'integration:').$integration->id];
+            'url' => $url, 'deep_link' => ($reauth ? 'integration-reauth:' : 'integration:') . $integration->id];
     }
 
     public function report(User $user, Integration $integration, bool $reauth, bool $consent = false): void
@@ -31,10 +31,10 @@ class IntegrationTaskService
         DB::transaction(function () use ($user, $integration, $reauth, $consent) {
             User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             Integration::whereKey($integration->id)->lockForUpdate()->firstOrFail();
-            $key = $integration->id.':'.($reauth ? 'reauth' : 'failure');
+            $key = $integration->id . ':' . ($reauth ? 'reauth' : 'failure');
             $block = $this->tasks->query($user)->where('metadata->task->incident->key', $key)->where('metadata->task->status', 'open')->first();
             if (! $block) {
-                $p = $this->tasks->create($user, ['title' => ($reauth ? 'Reconnect ' : 'Review ').($integration->name ?: ucfirst($integration->service)),
+                $p = $this->tasks->create($user, ['title' => ($reauth ? 'Reconnect ' : 'Review ') . ($integration->name ?: ucfirst($integration->service)),
                     'client_mutation_id' => (string) Str::uuid(), 'availability_on' => now($user->getTimezone())->toDateString(), 'priority' => 'important']);
                 $block = $this->tasks->find($user, $p['id']);
             }

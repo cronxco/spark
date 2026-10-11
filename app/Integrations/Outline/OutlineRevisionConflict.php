@@ -2,4 +2,6 @@
 
 namespace App\Integrations\Outline;
 
-class OutlineRevisionConflict extends \RuntimeException {}
+use RuntimeException;
+
+class OutlineRevisionConflict extends RuntimeException {}

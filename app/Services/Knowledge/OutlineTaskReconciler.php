@@ -59,7 +59,7 @@ class OutlineTaskReconciler
                     // Independent carriers avoid the parent event/title uniqueness constraint.
                     $carrier = $event;
                     if ($event->blocks()->where('block_type', $data['block_type'])->where('title', $data['title'])->exists()) {
-                        $carrier = Event::create(['integration_id' => $event->integration_id, 'source_id' => 'outline_task:'.Str::uuid(),
+                        $carrier = Event::create(['integration_id' => $event->integration_id, 'source_id' => 'outline_task:' . Str::uuid(),
                             'actor_id' => $event->actor_id, 'target_id' => $event->target_id, 'service' => 'outline', 'domain' => 'knowledge',
                             'action' => 'had_task', 'time' => $event->time, 'event_metadata' => ['internal' => true, 'outline_parent_event_id' => (string) $event->id]]);
                     }

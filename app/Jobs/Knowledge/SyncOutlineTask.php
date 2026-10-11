@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class SyncOutlineTask implements ShouldQueue
 {
@@ -32,7 +33,7 @@ class SyncOutlineTask implements ShouldQueue
             return;
         }
         $docId = data_get($initial->metadata, 'outline_document_id');
-        Cache::lock('outline-task-document:'.$initial->event->integration_id.':'.$docId, 120)->block(5, function () use ($tasks, $docId) {
+        Cache::lock('outline-task-document:' . $initial->event->integration_id . ':' . $docId, 120)->block(5, function () use ($tasks, $docId) {
             DB::transaction(function () use ($tasks, $docId) {
                 $block = Block::withTrashed()->whereKey($this->blockId)->lockForUpdate()->firstOrFail();
                 $task = $tasks->state($block);
@@ -54,12 +55,12 @@ class SyncOutlineTask implements ShouldQueue
                     return;
                 }
                 $lines = preg_split('/\r\n|\r|\n/', $doc['text']);
-                $marker = '[Open in Spark]('.route('knowledge.task', $block->id).')';
+                $marker = '[Open in Spark](' . route('knowledge.task', $block->id) . ')';
                 $expected = $m['outline_source_line'] ?? null;
                 preg_match('/^(\s*)-/', $expected ?? '', $indent);
-                $replacement = ($indent[1] ?? '').'- ['.($task['sync']['desired_checked'] ? 'x' : ' ').'] '.$task['sync']['desired_title'].' '.$marker;
-                $prefix = ($indent[1] ?? '').'  > ';
-                $details = empty($task['sync']['desired_content']) ? [] : array_map(fn ($line) => $prefix.$line, preg_split('/\r\n|\r|\n/', $task['sync']['desired_content']));
+                $replacement = ($indent[1] ?? '') . '- [' . ($task['sync']['desired_checked'] ? 'x' : ' ') . '] ' . $task['sync']['desired_title'] . ' ' . $marker;
+                $prefix = ($indent[1] ?? '') . '  > ';
+                $details = empty($task['sync']['desired_content']) ? [] : array_map(fn ($line) => $prefix . $line, preg_split('/\r\n|\r|\n/', $task['sync']['desired_content']));
                 $desired = implode("\n", array_merge([$replacement], $details));
                 $deleting = $task['sync']['desired_deleted'];
                 // A prior attempt may have committed remotely before its response was lost.
@@ -111,13 +112,24 @@ class SyncOutlineTask implements ShouldQueue
         });
     }
 
+    public function failed(Throwable $exception): void
+    {
+        $block = Block::withTrashed()->find($this->blockId);
+        if ($block && data_get($block->metadata, 'task.sync.status') === 'pending') {
+            $m = $block->metadata;
+            $m['task']['sync']['status'] = 'error';
+            $m['task']['sync']['reason'] = 'write_failed';
+            $block->update(['metadata' => $m]);
+        }
+    }
+
     private function stop(Block $block, TaskService $tasks, array $task, string $status, string $reason): void
     {
         $before = $tasks->state($block);
         $task['sync']['status'] = $status;
         $task['sync']['reason'] = $reason;
         $tasks->save($block, $task, $block->title);
-        $tasks->record($block, $block->event->integration->user, 'sync_'.$status, $before, $task);
+        $tasks->record($block, $block->event->integration->user, 'sync_' . $status, $before, $task);
     }
 
     private function acknowledge(Block $block, array $task, string $line, array $details, bool $deleted = false): void
@@ -135,16 +147,5 @@ class SyncOutlineTask implements ShouldQueue
         $block->update(['metadata' => $m]);
         $tasks->save($block, $task, $block->title);
         $tasks->record($block, $block->event->integration->user, 'source_synced', $before, $task);
-    }
-
-    public function failed(\Throwable $exception): void
-    {
-        $block = Block::withTrashed()->find($this->blockId);
-        if ($block && data_get($block->metadata, 'task.sync.status') === 'pending') {
-            $m = $block->metadata;
-            $m['task']['sync']['status'] = 'error';
-            $m['task']['sync']['reason'] = 'write_failed';
-            $block->update(['metadata' => $m]);
-        }
     }
 }

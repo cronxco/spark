@@ -213,7 +213,7 @@ class KnowledgeTasks extends Component
     {
         $s = app(TaskService::class);
         $today = app(EffectiveTimezoneResolver::class)->today(Auth::user())->toDateString();
-        $rows = $s->query(Auth::user(), $this->filter === 'bin')->when($this->search !== '', fn ($q) => $q->where('title', 'ilike', '%'.$this->search.'%'))->orderBy('blocks.id')->paginate(100);
+        $rows = $s->query(Auth::user(), $this->filter === 'bin')->when($this->search !== '', fn ($q) => $q->where('title', 'ilike', '%' . $this->search . '%'))->orderBy('blocks.id')->paginate(100);
         $tasks = $rows->getCollection()->map(fn ($b) => $s->payload($b, $today))->filter(fn ($p) => match ($this->filter) {
             'today' => $p['visible_on_date'], 'inbox' => $p['availability_on'] === null && $p['status'] === 'open',
             'history' => $p['status'] !== 'open' && $p['status'] !== 'deleted', 'bin' => $p['status'] === 'deleted', default => $p['status'] !== 'deleted',

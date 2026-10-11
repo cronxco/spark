@@ -26,11 +26,6 @@ class KnowledgeTasksControllerTest extends TestCase
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
     }
 
-    private function create(array $data = []): array
-    {
-        return $this->postJson('/api/v1/mobile/tasks', $data + ['title' => 'Book a table', 'client_mutation_id' => (string) Str::uuid()])->assertCreated()->json('data');
-    }
-
     #[Test]
     public function day_week_and_persistent_have_calendar_windows(): void
     {
@@ -51,12 +46,12 @@ class KnowledgeTasksControllerTest extends TestCase
         $task = $this->create($input);
         $this->postJson('/api/v1/mobile/tasks', $input)->assertCreated()->assertJsonPath('data.id', $task['id']);
         $this->postJson('/api/v1/mobile/tasks', array_merge($input, ['title' => 'Different']))->assertConflict();
-        $this->patchJson('/api/v1/mobile/tasks/'.$task['id'], ['title' => 'Edit'])->assertStatus(428);
+        $this->patchJson('/api/v1/mobile/tasks/' . $task['id'], ['title' => 'Edit'])->assertStatus(428);
         $mutation = (string) Str::uuid();
         $edit = ['title' => 'Edit', 'client_mutation_id' => $mutation];
-        $first = $this->withHeader('If-Match', $task['version'])->patchJson('/api/v1/mobile/tasks/'.$task['id'], $edit)->assertOk();
-        $this->withHeader('If-Match', $task['version'])->patchJson('/api/v1/mobile/tasks/'.$task['id'], $edit)->assertOk()->assertJsonPath('data.version', $first->json('data.version'));
-        $this->withHeader('If-Match', $task['version'])->patchJson('/api/v1/mobile/tasks/'.$task['id'], ['title' => 'Stale'])->assertStatus(412);
+        $first = $this->withHeader('If-Match', $task['version'])->patchJson('/api/v1/mobile/tasks/' . $task['id'], $edit)->assertOk();
+        $this->withHeader('If-Match', $task['version'])->patchJson('/api/v1/mobile/tasks/' . $task['id'], $edit)->assertOk()->assertJsonPath('data.version', $first->json('data.version'));
+        $this->withHeader('If-Match', $task['version'])->patchJson('/api/v1/mobile/tasks/' . $task['id'], ['title' => 'Stale'])->assertStatus(412);
         $this->getJson('/api/v1/mobile/tasks?inbox=1')->assertOk()->assertJsonCount(1, 'data');
     }
 
@@ -64,10 +59,10 @@ class KnowledgeTasksControllerTest extends TestCase
     public function deferring_week_does_not_extend_expiry_and_reactivation_does(): void
     {
         $task = $this->create(['lifecycle' => 'week', 'availability_on' => '2026-10-11']);
-        $updated = $this->withHeader('If-Match', $task['version'])->patchJson('/api/v1/mobile/tasks/'.$task['id'], ['availability_on' => '2026-10-16'])->assertOk()->json('data');
+        $updated = $this->withHeader('If-Match', $task['version'])->patchJson('/api/v1/mobile/tasks/' . $task['id'], ['availability_on' => '2026-10-16'])->assertOk()->json('data');
         $this->assertSame('2026-10-18', $updated['expires_on']);
-        $this->withHeader('If-Match', $updated['version'])->patchJson('/api/v1/mobile/tasks/'.$task['id'], ['availability_on' => '2026-10-18'])->assertUnprocessable();
-        $this->withHeader('If-Match', $updated['version'])->postJson('/api/v1/mobile/tasks/'.$task['id'].'/actions', ['action' => 'reactivate', 'availability_on' => '2026-10-20'])->assertOk()->assertJsonPath('data.expires_on', '2026-10-27');
+        $this->withHeader('If-Match', $updated['version'])->patchJson('/api/v1/mobile/tasks/' . $task['id'], ['availability_on' => '2026-10-18'])->assertUnprocessable();
+        $this->withHeader('If-Match', $updated['version'])->postJson('/api/v1/mobile/tasks/' . $task['id'] . '/actions', ['action' => 'reactivate', 'availability_on' => '2026-10-20'])->assertOk()->assertJsonPath('data.expires_on', '2026-10-27');
     }
 
     #[Test]
@@ -77,11 +72,11 @@ class KnowledgeTasksControllerTest extends TestCase
         $topic = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'flint', 'type' => 'topic']);
         $task = $this->create(['availability_on' => '2026-10-11', 'project_id' => $project['id'], 'thread_ids' => [$topic->id]]);
         $this->assertSame([$topic->id], $task['thread_ids']);
-        $this->withHeader('If-Match', $project['version'])->patchJson('/api/v1/mobile/projects/'.$project['id'], ['status' => 'paused'])->assertOk();
+        $this->withHeader('If-Match', $project['version'])->patchJson('/api/v1/mobile/projects/' . $project['id'], ['status' => 'paused'])->assertOk();
         $this->getJson('/api/v1/mobile/tasks?date=2026-10-11')->assertOk()->assertJsonCount(0, 'data');
         $other = User::factory()->create();
         Sanctum::actingAs($other, SparkAbility::MOBILE_SESSION);
-        $this->getJson('/api/v1/mobile/tasks/'.$task['id'])->assertNotFound();
+        $this->getJson('/api/v1/mobile/tasks/' . $task['id'])->assertNotFound();
         $this->postJson('/api/v1/mobile/tasks', ['title' => 'Foreign', 'client_mutation_id' => (string) Str::uuid(), 'project_id' => $project['id']])->assertNotFound();
     }
 
@@ -90,11 +85,11 @@ class KnowledgeTasksControllerTest extends TestCase
     {
         $task = $this->create();
         $command = ['action' => 'complete', 'client_mutation_id' => (string) Str::uuid()];
-        $done = $this->withHeader('If-Match', $task['version'])->postJson('/api/v1/mobile/tasks/'.$task['id'].'/actions', $command)->assertOk()->assertJsonPath('data.status', 'completed')->json('data');
-        $this->withHeader('If-Match', $task['version'])->postJson('/api/v1/mobile/tasks/'.$task['id'].'/actions', $command)->assertOk()->assertJsonPath('data.version', $done['version']);
-        $deleted = $this->withHeader('If-Match', $done['version'])->postJson('/api/v1/mobile/tasks/'.$task['id'].'/actions', ['action' => 'delete'])->assertOk()->assertJsonPath('data.status', 'deleted')->json('data');
-        $this->withHeader('If-Match', $deleted['version'])->postJson('/api/v1/mobile/tasks/'.$task['id'].'/actions', ['action' => 'restore'])->assertOk()->assertJsonPath('data.status', 'completed');
-        $this->getJson('/api/v1/mobile/tasks/'.$task['id'].'/history')->assertOk();
+        $done = $this->withHeader('If-Match', $task['version'])->postJson('/api/v1/mobile/tasks/' . $task['id'] . '/actions', $command)->assertOk()->assertJsonPath('data.status', 'completed')->json('data');
+        $this->withHeader('If-Match', $task['version'])->postJson('/api/v1/mobile/tasks/' . $task['id'] . '/actions', $command)->assertOk()->assertJsonPath('data.version', $done['version']);
+        $deleted = $this->withHeader('If-Match', $done['version'])->postJson('/api/v1/mobile/tasks/' . $task['id'] . '/actions', ['action' => 'delete'])->assertOk()->assertJsonPath('data.status', 'deleted')->json('data');
+        $this->withHeader('If-Match', $deleted['version'])->postJson('/api/v1/mobile/tasks/' . $task['id'] . '/actions', ['action' => 'restore'])->assertOk()->assertJsonPath('data.status', 'completed');
+        $this->getJson('/api/v1/mobile/tasks/' . $task['id'] . '/history')->assertOk();
     }
 
     #[Test]
@@ -108,7 +103,7 @@ class KnowledgeTasksControllerTest extends TestCase
         $task = app(TaskService::class)->payload($block);
         $this->assertSame('integration_reauth', $task['action']['kind']);
         $this->assertSame(1, app(TaskService::class)->query($this->user)->count());
-        $this->withHeader('If-Match', $task['version'])->postJson('/api/v1/mobile/tasks/'.$task['id'].'/actions', ['action' => 'complete'])->assertConflict();
+        $this->withHeader('If-Match', $task['version'])->postJson('/api/v1/mobile/tasks/' . $task['id'] . '/actions', ['action' => 'complete'])->assertConflict();
         $integration->last_successful_update_at = now()->subHour();
         $service->reconcile($integration);
         $this->assertSame('open', app(TaskService::class)->state($block->fresh())['status']);
@@ -145,5 +140,10 @@ class KnowledgeTasksControllerTest extends TestCase
         $this->user->update(['settings' => ['knowledge_features' => ['writes' => false]]]);
         $this->getJson('/api/v1/mobile/tasks')->assertOk()->assertJsonCount(1, 'data');
         $this->postJson('/api/v1/mobile/tasks', ['title' => 'Disabled', 'client_mutation_id' => (string) Str::uuid()])->assertNotFound();
+    }
+
+    private function create(array $data = []): array
+    {
+        return $this->postJson('/api/v1/mobile/tasks', $data + ['title' => 'Book a table', 'client_mutation_id' => (string) Str::uuid()])->assertCreated()->json('data');
     }
 }

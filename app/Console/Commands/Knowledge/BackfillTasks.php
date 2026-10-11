@@ -39,13 +39,13 @@ class BackfillTasks extends Command
                     $before = $block->metadata;
                     $tasks->save($block, $tasks->state($block), $block->title);
                     Event::create(['integration_id' => $block->event->integration_id, 'actor_id' => $block->event->actor_id, 'target_id' => $block->event->target_id,
-                        'source_id' => 'task_backfill:'.$batch.':'.$block->id, 'service' => 'flint', 'domain' => 'knowledge', 'action' => 'task_backfilled', 'time' => now(),
+                        'source_id' => 'task_backfill:' . $batch . ':' . $block->id, 'service' => 'flint', 'domain' => 'knowledge', 'action' => 'task_backfilled', 'time' => now(),
                         'event_metadata' => ['internal' => true, 'migration_id' => $batch, 'task_id' => (string) $block->id, 'before_metadata' => $before,
                             'after_hash' => PayloadHash::of($block->metadata), 'after' => $tasks->state($block), 'title' => $block->title]]);
                 });
             }
         });
-        $this->info(($this->option('apply') ? 'Applied' : 'Dry run').": {$count} tasks; batch {$batch}");
+        $this->info(($this->option('apply') ? 'Applied' : 'Dry run') . ": {$count} tasks; batch {$batch}");
 
         return self::SUCCESS;
     }

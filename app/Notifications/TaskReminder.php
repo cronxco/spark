@@ -44,12 +44,12 @@ class TaskReminder extends SparkNotification
 
     public function getDeepLink(): ?string
     {
-        return 'task:'.$this->taskId;
+        return 'task:' . $this->taskId;
     }
 
     public function getGroupKey(): ?string
     {
-        return 'task_reminder:'.$this->taskId.':'.$this->remindAt;
+        return 'task_reminder:' . $this->taskId . ':' . $this->remindAt;
     }
 
     public function shouldSend(User $notifiable, string $channel): bool

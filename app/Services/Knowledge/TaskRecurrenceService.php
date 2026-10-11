@@ -85,8 +85,8 @@ class TaskRecurrenceService
                 if ($date > CarbonImmutable::parse($today)->addDay()->toDateString()) {
                     continue;
                 }
-                $mutation = (string) Uuid::uuid5(Uuid::NAMESPACE_URL, 'spark:series:'.$series->id.':'.$date);
-                $existing = Event::whereHas('integration', fn ($q) => $q->where('user_id', $user->id))->where('source_id', 'knowledge_task:'.$mutation)->exists();
+                $mutation = (string) Uuid::uuid5(Uuid::NAMESPACE_URL, 'spark:series:' . $series->id . ':' . $date);
+                $existing = Event::whereHas('integration', fn ($q) => $q->where('user_id', $user->id))->where('source_id', 'knowledge_task:' . $mutation)->exists();
                 if ($existing) {
                     continue;
                 }

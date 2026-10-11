@@ -39,7 +39,7 @@ class OutlineData extends BaseProcessingJob
                 'time' => $collection['createdAt'] ?? now()->toISOString(),
                 'content' => $collection['description'] ?? null,
                 'metadata' => $collection,
-                'url' => rtrim((string) ($this->integration->configuration['api_url'] ?? config('services.outline.url')), '/').($collection['url'] ?? ''),
+                'url' => rtrim((string) ($this->integration->configuration['api_url'] ?? config('services.outline.url')), '/') . ($collection['url'] ?? ''),
                 'image_url' => null,
             ];
 
@@ -61,7 +61,7 @@ class OutlineData extends BaseProcessingJob
                 'time' => $doc['createdAt'] ?? now()->toISOString(),
                 'content' => $doc['text'] ?? null,
                 'metadata' => $doc,
-                'url' => rtrim((string) ($this->integration->configuration['api_url'] ?? config('services.outline.url')), '/').($doc['url'] ?? ''),
+                'url' => rtrim((string) ($this->integration->configuration['api_url'] ?? config('services.outline.url')), '/') . ($doc['url'] ?? ''),
                 'image_url' => null,
             ]);
 
@@ -82,7 +82,7 @@ class OutlineData extends BaseProcessingJob
             ]);
 
             // Event
-            $sourceId = 'outline_doc_'.($doc['id'] ?? 'unknown');
+            $sourceId = 'outline_doc_' . ($doc['id'] ?? 'unknown');
             $time = $isDayNote
                 ? CarbonImmutable::createFromFormat('Y-m-d: l', (string) $doc['title'], 'UTC')->startOfDay()->toIso8601String()
                 : ($doc['createdAt'] ?? now()->toISOString());
@@ -178,12 +178,12 @@ class OutlineData extends BaseProcessingJob
                 $taskText = trim(preg_replace('~\s*\[Open in Spark\]\(https?://[^)]+/tasks/[a-f0-9-]{36}\)~', '', $taskText));
                 $occurrences[$taskText] = ($occurrences[$taskText] ?? 0) + 1;
                 preg_match('/^(\s*)-/', $line, $indent);
-                $detailPrefix = ($indent[1] ?? '').'  > ';
+                $detailPrefix = ($indent[1] ?? '') . '  > ';
                 $details = [];
                 for ($next = $index + 1; isset($lines[$next]) && str_starts_with($lines[$next], $detailPrefix); $next++) {
                     $details[] = $lines[$next];
                 }
-                $hash = hash('sha256', ($doc['id'] ?? '').'|'.($index + 1).'|'.strtolower($taskText));
+                $hash = hash('sha256', ($doc['id'] ?? '') . '|' . ($index + 1) . '|' . strtolower($taskText));
 
                 $blocks[] = [
                     'block_type' => $isDayNote ? 'day_task' : 'doc_task',
@@ -197,7 +197,7 @@ class OutlineData extends BaseProcessingJob
                         'outline_source_details' => $details,
                         'content' => $details ? implode("\n", array_map(fn ($line) => substr($line, strlen($detailPrefix)), $details)) : null,
                         'outline_task_id' => $marker[1] ?? null,
-                        'outline_task_key' => hash('sha256', ($doc['id'] ?? '').'|'.$taskText.'|'.$occurrences[$taskText]),
+                        'outline_task_key' => hash('sha256', ($doc['id'] ?? '') . '|' . $taskText . '|' . $occurrences[$taskText]),
                         'checked' => $checked,
                         'hash' => $hash,
                     ],

@@ -293,7 +293,7 @@ abstract class SparkNotification extends Notification implements ShouldQueue
             $notifiable,
             $this,
             $this->deliveryChannel,
-            Str::limit($this->sanitiseTechnicalDetail(class_basename($exception).': '.$exception->getMessage()), 300),
+            Str::limit($this->sanitiseTechnicalDetail(class_basename($exception) . ': ' . $exception->getMessage()), 300),
         );
     }
 

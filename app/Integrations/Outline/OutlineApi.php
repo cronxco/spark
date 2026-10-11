@@ -8,6 +8,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use LogicException;
 use Throwable;
 
 class OutlineApi
@@ -16,7 +17,7 @@ class OutlineApi
 
     public function listCollections(int $limit = 100): array
     {
-        $endpoint = '/api/collections.list?limit='.$limit;
+        $endpoint = '/api/collections.list?limit=' . $limit;
         $data = $this->post($endpoint);
         $collections = $data['data'] ?? [];
 
@@ -41,7 +42,7 @@ class OutlineApi
             'limit' => 100,
         ], $params);
 
-        $endpoint = '/api/documents.list?limit='.(int) $query['limit'];
+        $endpoint = '/api/documents.list?limit=' . (int) $query['limit'];
         unset($query['limit']);
 
         $data = $this->post($endpoint, $query);
@@ -73,11 +74,11 @@ class OutlineApi
         ], $params);
 
         // Build endpoint with limit parameter
-        $endpoint = '/api/documents.list?limit='.(int) $query['limit'];
+        $endpoint = '/api/documents.list?limit=' . (int) $query['limit'];
 
         // Add offset parameter if provided
         if (isset($query['offset'])) {
-            $endpoint .= '&offset='.(int) $query['offset'];
+            $endpoint .= '&offset=' . (int) $query['offset'];
         }
 
         // Remove limit and offset from query body since they're in the endpoint
@@ -98,7 +99,7 @@ class OutlineApi
             'limit' => 100,
         ], $params);
 
-        $endpoint = '/api/documents.search?limit='.(int) $query['limit'];
+        $endpoint = '/api/documents.search?limit=' . (int) $query['limit'];
         unset($query['limit']);
 
         $data = $this->post($endpoint, $query);
@@ -122,7 +123,7 @@ class OutlineApi
             'limit' => 100,
         ], $params);
 
-        $endpoint = '/api/documents.search?limit='.(int) $query['limit'];
+        $endpoint = '/api/documents.search?limit=' . (int) $query['limit'];
         unset($query['limit']);
 
         $data = $this->post($endpoint, $query);
@@ -164,7 +165,7 @@ class OutlineApi
             'limit' => 100,
         ], $params);
 
-        $endpoint = '/api/documents.search?limit='.(int) $query['limit'];
+        $endpoint = '/api/documents.search?limit=' . (int) $query['limit'];
         unset($query['limit']);
 
         $data = $this->post($endpoint, $query);
@@ -211,7 +212,7 @@ class OutlineApi
 
     public function listPins(int $limit = 100): array
     {
-        $endpoint = '/api/pins.list?limit='.$limit;
+        $endpoint = '/api/pins.list?limit=' . $limit;
         $data = $this->post($endpoint);
 
         // Pins API returns top-level keys like 'pins' and included 'documents'
@@ -254,7 +255,7 @@ class OutlineApi
     public function updateDocumentAtRevision(string $documentId, string $text, int $revision): array
     {
         if (! config('knowledge.outline_revision_writes_verified')) {
-            throw new \LogicException('Outline conditional writes have not been verified.');
+            throw new LogicException('Outline conditional writes have not been verified.');
         }
 
         return $this->post('/api/documents.update', ['id' => $documentId, 'text' => $text, 'lastRevision' => $revision]);
@@ -263,7 +264,7 @@ class OutlineApi
     public function patchDocumentAtRevision(string $documentId, string $findText, string $text, int $revision): array
     {
         if (! config('knowledge.outline_revision_writes_verified')) {
-            throw new \LogicException('Outline conditional patches have not been verified.');
+            throw new LogicException('Outline conditional patches have not been verified.');
         }
 
         return $this->post('/api/documents.update', ['id' => $documentId, 'editMode' => 'patch', 'findText' => $findText, 'text' => $text, 'lastRevision' => $revision]);
@@ -288,7 +289,7 @@ class OutlineApi
 
         // Ensure scheme is present; default to https
         if (! preg_match('/^https?:\/\//i', $url)) {
-            $url = 'https://'.$url;
+            $url = 'https://' . $url;
         }
 
         return $url;
@@ -329,7 +330,7 @@ class OutlineApi
 
     protected function post(string $endpoint, array $json = []): array
     {
-        $url = rtrim($this->baseUrl(), '/').$endpoint;
+        $url = rtrim($this->baseUrl(), '/') . $endpoint;
 
         $payload = empty($json) ? (object) [] : $json;
 
@@ -351,7 +352,7 @@ class OutlineApi
 
             $startedAt = microtime(true);
             $response = Http::withHeaders([
-                'Authorization' => 'Bearer '.$this->token(),
+                'Authorization' => 'Bearer ' . $this->token(),
                 'Content-Type' => 'application/json',
             ])
                 ->acceptJson()
@@ -385,7 +386,7 @@ class OutlineApi
                     'body' => in_array($endpoint, ['/api/documents.update', '/api/documents.info']) ? '[REDACTED DOCUMENT CONTENT]' : $response->body(),
                     'duration_ms' => $durationMs,
                 ]);
-                throw new Exception('Outline API error: '.$response->status());
+                throw new Exception('Outline API error: ' . $response->status());
             }
 
             $jsonResponse = $response->json();
@@ -407,7 +408,7 @@ class OutlineApi
                 'endpoint' => $endpoint,
                 'error' => $e->getMessage(),
             ]);
-            throw new Exception('Outline API request failed: '.$e->getMessage(), previous: $e);
+            throw new Exception('Outline API request failed: ' . $e->getMessage(), previous: $e);
         }
     }
 

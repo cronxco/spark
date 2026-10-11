@@ -65,7 +65,7 @@ class GoCardlessConsentExpiring extends SparkNotification
 
     public function getDeepLink(): ?string
     {
-        return 'integration-reauth:'.$this->integration->id;
+        return 'integration-reauth:' . $this->integration->id;
     }
 
     public function getGroupKey(): ?string
