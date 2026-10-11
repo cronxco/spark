@@ -51,8 +51,9 @@ class AccountCleanupTest extends TestCase
     #[Test]
     public function renewed_consent_duplicates_with_a_new_resource_id_are_merged_with_their_history(): void
     {
-        $older = $this->bankAccount('Premium Plus', 'acc-1', ['raw' => ['resourceId' => 'resource-b']], '2025-10-17');
-        $newer = $this->bankAccount('American Express P', 'acc-1', ['raw' => ['resourceId' => 'resource-a']], '2026-01-12');
+        $identity = ['integration_id' => $this->gocardless->id, 'provider' => 'American Express', 'currency' => 'GBP', 'account_number' => '1002'];
+        $older = $this->bankAccount('Premium Plus', 'acc-1', $identity + ['raw' => ['resourceId' => 'resource-b']], '2025-10-17');
+        $newer = $this->bankAccount('American Express P', 'acc-1', $identity + ['raw' => ['resourceId' => 'resource-a']], '2026-01-12');
         $event = $this->event($newer, 'payment_to', 1200);
 
         $plan = $this->cleanup()->plan($this->user->id, AccountCleanup::GOCARDLESS_KINDS);
@@ -68,6 +69,17 @@ class AccountCleanupTest extends TestCase
         $this->assertTrue($newer->fresh()->trashed());
         $this->assertFalse($older->fresh()->trashed());
         $this->assertSame($older->id, EventObject::withTrashed()->find($newer->id)->metadata['merged_into']);
+    }
+
+    #[Test]
+    public function a_new_resource_id_without_a_verified_provider_identity_blocks_the_merge(): void
+    {
+        $this->bankAccount('Premium Plus', 'acc-1', ['raw' => ['resourceId' => 'resource-b']], '2025-10-17');
+        $this->bankAccount('American Express P', 'acc-1', ['raw' => ['resourceId' => 'resource-a']], '2026-01-12');
+
+        $plan = $this->cleanup()->plan($this->user->id, AccountCleanup::GOCARDLESS_KINDS);
+
+        $this->assertStringContainsString('Conflicting bank identity', $plan['steps'][0]['blocked']);
     }
 
     #[Test]
@@ -282,7 +294,7 @@ class AccountCleanupTest extends TestCase
     {
         return EventObject::create([
             'user_id' => $this->user->id, 'concept' => 'account', 'type' => $type, 'title' => $title,
-            'metadata' => ['name' => $title, 'pot_id' => 'pot_' . $title],
+            'metadata' => ['name' => $title, 'pot_id' => 'pot_'.$title],
         ]);
     }
 
@@ -295,13 +307,13 @@ class AccountCleanupTest extends TestCase
         $integration = $actor->type === 'bank_account' ? $this->gocardless : $this->monzo;
         $target = EventObject::firstOrCreate(
             ['user_id' => $this->user->id, 'concept' => 'day', 'type' => 'day', 'title' => $day],
-            ['time' => $day . ' 00:00:00', 'metadata' => []],
+            ['time' => $day.' 00:00:00', 'metadata' => []],
         );
 
         return Event::create([
-            'integration_id' => $integration->id, 'source_id' => 'evt-' . (++$counter), 'actor_id' => $actor->id,
+            'integration_id' => $integration->id, 'source_id' => 'evt-'.(++$counter), 'actor_id' => $actor->id,
             'target_id' => $target->id, 'service' => $integration->service, 'domain' => 'money', 'action' => $action,
-            'time' => $day . ' 23:59:59', 'value' => $value, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+            'time' => $day.' 23:59:59', 'value' => $value, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => $metadata,
         ]);
     }
