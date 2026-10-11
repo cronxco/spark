@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
 use App\Services\Flint\FlintRunToken;
+use App\Services\Flint\FlintScheduleService;
 use App\Services\Flint\RoutineConfig;
 use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\FlintDigestService;
@@ -25,7 +26,7 @@ use Throwable;
 
 /**
  * Fires the outbound webhook for a once-daily Flint routine that isn't the
- * digest — topic review, reading-list curation, or the news roundup.
+ * digest — topic review, reading-list curation, the news roundup, or the money check-ins.
  *
  * Same division of labour as {@see TriggerFlintDigestRoutineJob}: Spark owns
  * the timing (resolved in the user's effective timezone), the routine owns the
@@ -66,6 +67,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
         public ?int $progressId = null,
         public ?string $requestedPeriod = null,
         public ?string $driverOverride = null,
+        public ?string $occurrence = null,
     ) {
         $this->runUuid = $runUuid ?? (string) Str::uuid();
         $this->runToken = app(FlintRunToken::class)->issue([
@@ -76,21 +78,30 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'local_date' => $this->localDate,
             'period' => $this->period(),
             'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
-        ]);
+        ] + $this->occurrenceClaim());
     }
 
     /**
      * Cache key marking that this routine has already been triggered for this
      * user's local date.
      */
-    public static function markerKey(int|string $userId, string $localDate, string $routine): string
+    public static function markerKey(int|string $userId, string $localDate, string $routine, ?string $occurrence = null): string
     {
-        return "flint:routine-triggered:{$routine}:{$userId}:{$localDate}";
+        return "flint:routine-triggered:{$routine}:{$userId}:{$localDate}" . self::occurrenceSuffix($occurrence);
     }
 
-    public static function attemptsKey(int|string $userId, string $localDate, string $routine): string
+    public static function attemptsKey(int|string $userId, string $localDate, string $routine, ?string $occurrence = null): string
     {
-        return "flint:routine-attempts:{$routine}:{$userId}:{$localDate}";
+        return "flint:routine-attempts:{$routine}:{$userId}:{$localDate}" . self::occurrenceSuffix($occurrence);
+    }
+
+    /**
+     * A schedule with one daily time has no occurrence, so its keys stay exactly as they were; a
+     * schedule with several times or a cron gets one key per slot (`:0930`).
+     */
+    private static function occurrenceSuffix(?string $occurrence): string
+    {
+        return $occurrence === null ? '' : ':' . str_replace(':', '', $occurrence);
     }
 
     public function handle(FlintDigestService $digests, TaskExecutionStore $store): void
@@ -108,7 +119,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
         $task = $this->taskDefinition();
         $driver = app(RoutineDriverManager::class);
         $selectedDriver = $driver->driverName($this->routine, $this->driverOverride, $this->user);
-        $markerKey = self::markerKey($this->user->id, $this->localDate, $this->routine);
+        $markerKey = self::markerKey($this->user->id, $this->localDate, $this->routine, $this->occurrence);
 
         if ($this->isScheduled()
             && ! Cache::add($markerKey, $this->runUuid, $this->markerTtlSeconds())
@@ -122,11 +133,25 @@ class TriggerFlintRoutineJob implements ShouldQueue
             return;
         }
 
+        // A routine that is still running is not started again: hand the slot back so the next
+        // tick can take it (or a later slot replaces it).
+        if ($this->isScheduled() && $this->occurrence !== null
+            && app(FlintScheduleService::class)->isRunning($this->user, $this->routine)) {
+            Cache::forget($markerKey);
+            Log::info('Flint routine trigger skipped (previous run still in flight)', [
+                'user_id' => $this->user->id,
+                'routine' => $this->routine,
+                'occurrence' => $this->occurrence,
+            ]);
+
+            return;
+        }
+
         // Second-line guard. The Redis marker is cleared when a run fails, so a
         // retry after a run that already did its work — wrote a digest, touched
         // topics — would otherwise repeat it. The recorded success carries the
         // local date it was for.
-        if ($this->isScheduled() && $this->routine !== 'topics' && $this->successfulScheduledEventExists()) {
+        if ($this->isScheduled() && $this->occurrence === null && $this->routine !== 'topics' && $this->successfulScheduledEventExists()) {
             Log::info('Flint routine trigger skipped (scheduled event already exists)', [
                 'user_id' => $this->user->id,
                 'routine' => $this->routine,
@@ -137,7 +162,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
         }
 
         if ($this->isScheduled()) {
-            $attemptsKey = self::attemptsKey($this->user->id, $this->localDate, $this->routine);
+            $attemptsKey = self::attemptsKey($this->user->id, $this->localDate, $this->routine, $this->occurrence);
             Cache::add($attemptsKey, 0, $this->markerTtlSeconds());
             if ((int) Cache::get($attemptsKey, 0) >= self::MAX_SCHEDULED_ATTEMPTS) {
                 Cache::put($markerKey, 'terminal-failure', $this->markerTtlSeconds());
@@ -152,6 +177,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
         if ($this->isScheduled()
             && is_array($lastSuccess)
             && ($lastSuccess['local_date'] ?? null) === $this->localDate
+            && ($lastSuccess['occurrence'] ?? null) === $this->occurrence
             && ($lastSuccess['trigger_source'] ?? null) === 'scheduled') {
             Log::info('Flint routine trigger skipped (already succeeded for this local date)', [
                 'user_id' => $this->user->id,
@@ -166,6 +192,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'local_date' => $this->localDate,
             'period' => $this->period(),
             'run_uuid' => $this->runUuid,
+            'occurrence' => $this->occurrence,
             'triggered_by' => $this->isScheduled() ? 'scheduled' : 'manual',
             'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
             'driver' => $selectedDriver,
@@ -180,12 +207,12 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'idempotency_key' => $markerKey,
             'period' => $this->period(),
             'run_token' => $this->runToken,
-        ];
+        ] + $this->modePayload() + $this->occurrenceClaim();
 
         $progress = $this->progress();
 
         if ($this->isScheduled()) {
-            Cache::increment(self::attemptsKey($this->user->id, $this->localDate, $this->routine));
+            Cache::increment(self::attemptsKey($this->user->id, $this->localDate, $this->routine, $this->occurrence));
         }
 
         try {
@@ -195,6 +222,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
                 'local_date' => $this->localDate,
                 'period' => $this->period(),
                 'run_uuid' => $this->runUuid,
+                'occurrence' => $this->occurrence,
                 'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
                 'driver' => $selectedDriver,
                 'attempts' => $this->attempts(),
@@ -213,6 +241,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
                 'local_date' => $this->localDate,
                 'period' => $this->period(),
                 'run_uuid' => $this->runUuid,
+                'occurrence' => $this->occurrence,
                 'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
                 'driver' => $selectedDriver,
                 'error' => null,
@@ -248,9 +277,9 @@ class TriggerFlintRoutineJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        $markerKey = self::markerKey($this->user->id, $this->localDate, $this->routine);
+        $markerKey = self::markerKey($this->user->id, $this->localDate, $this->routine, $this->occurrence);
         if ($this->isScheduled()) {
-            $attempts = (int) Cache::get(self::attemptsKey($this->user->id, $this->localDate, $this->routine), 0);
+            $attempts = (int) Cache::get(self::attemptsKey($this->user->id, $this->localDate, $this->routine, $this->occurrence), 0);
             $attempts >= self::MAX_SCHEDULED_ATTEMPTS
                 ? Cache::put($markerKey, 'terminal-failure', $this->markerTtlSeconds())
                 : Cache::forget($markerKey);
@@ -261,6 +290,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'local_date' => $this->localDate,
             'period' => $this->period(),
             'run_uuid' => $this->runUuid,
+            'occurrence' => $this->occurrence,
             'triggered_by' => $this->isScheduled() ? 'scheduled' : 'manual',
             'trigger_source' => $this->isScheduled() ? 'scheduled' : 'manual',
             'driver' => app(RoutineDriverManager::class)->driverName($this->routine, $this->driverOverride, $this->user),
@@ -321,6 +351,28 @@ class TriggerFlintRoutineJob implements ShouldQueue
         };
     }
 
+    /**
+     * Routines that share a skill tell it which job it is doing.
+     *
+     * @return array<string, string>
+     */
+    private function modePayload(): array
+    {
+        return match ($this->routine) {
+            'money_weekly' => ['mode' => 'weekly'],
+            'money_close' => ['mode' => 'close'],
+            default => [],
+        };
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function occurrenceClaim(): array
+    {
+        return $this->occurrence === null ? [] : ['occurrence' => $this->occurrence];
+    }
+
     private function progress(): ?ActionProgress
     {
         return $this->progressId ? ActionProgress::find($this->progressId) : null;
@@ -345,6 +397,7 @@ class TriggerFlintRoutineJob implements ShouldQueue
             'local_date' => $this->localDate,
             'period' => $this->period(),
             'run_uuid' => $this->runUuid,
+            'occurrence' => $this->occurrence,
             'triggered_by' => 'scheduled',
             'trigger_source' => 'scheduled',
             'driver' => app(RoutineDriverManager::class)->driverName($this->routine, $this->driverOverride, $this->user),

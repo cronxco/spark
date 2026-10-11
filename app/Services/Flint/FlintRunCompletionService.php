@@ -56,6 +56,7 @@ class FlintRunCompletionService
                 'run_uuid' => $runUuid,
                 'local_date' => $claims['local_date'] ?? null,
                 'period' => $claims['period'] ?? null,
+                'occurrence' => $claims['occurrence'] ?? null,
                 'triggered_by' => $current['triggered_by'] ?? $claims['trigger_source'] ?? null,
                 'trigger_source' => $claims['trigger_source'] ?? null,
                 'driver' => $current['driver'] ?? null,

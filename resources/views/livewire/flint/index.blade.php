@@ -1079,42 +1079,7 @@ new class extends Component
                             </div>
                         </div>
                     </div>
-                <div class="card bg-base-200 shadow">
-                    <div class="card-body">
-                        <h3 class="text-lg font-semibold mb-1">{{ __('Other Flint routines') }}</h3>
-                        <p class="text-sm text-base-content/70 mb-4">
-                            {{ __('Each of these runs once a day on its own slot. A routine stays idle until its webhook is configured on the server.') }}
-                        </p>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">{{ __('Topic review') }}</span></label>
-                                <select wire:model="topicsTime" class="select select-bordered">
-                                    @foreach ($timeOptions as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                <label class="label"><span class="label-text-alt">{{ __('After the evening digest') }}</span></label>
-                            </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">{{ __('Reading list') }}</span></label>
-                                <select wire:model="readingListTime" class="select select-bordered">
-                                    @foreach ($timeOptions as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="form-control">
-                                <label class="label"><span class="label-text">{{ __('News roundup') }}</span></label>
-                                <select wire:model="newsRoundupTime" class="select select-bordered">
-                                    @foreach ($timeOptions as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <livewire:flint.schedule-editor />
 
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">

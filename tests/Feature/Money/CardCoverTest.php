@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Money;
 
+use App\Livewire\Money\BufferPot;
 use App\Livewire\Money\CardCover as CardCoverComponent;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -117,10 +118,13 @@ class CardCoverTest extends TestCase
     }
 
     #[Test]
-    public function the_component_shows_the_status_and_sets_the_pot(): void
+    public function the_cover_shows_the_status_and_the_pots_view_sets_the_pot(): void
     {
         Livewire::actingAs($this->user)->test(CardCoverComponent::class)
             ->assertSee('No buffer pot is set')
+            ->assertSee('Pots view');
+
+        Livewire::actingAs($this->user)->test(BufferPot::class)
             ->call('useAsBuffer', (string) $this->pot->id);
 
         $this->assertSame('card_buffer', $this->pot->refresh()->metadata['money']['role']);

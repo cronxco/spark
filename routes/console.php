@@ -149,6 +149,7 @@ Schedule::call(function () {
         // Evening digest: pure time gate at the configured evening slot.
         $eveningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'evening');
         if (FlintScheduleSettings::enabled($settings, 'evening_digest_enabled')
+            && $flintSchedule->occursOn($user, 'evening_digest', $now)
             && $now->gte(Carbon::parse($eveningTime, $tz)) && ! Cache::has($eveningMarker)) {
             dispatch(new TriggerFlintDigestRoutineJob($user, 'evening', $today, $tz, 'scheduled'))
                 ->onQueue('flint');
@@ -160,6 +161,7 @@ Schedule::call(function () {
         // DispatchMorningDigestOnSleepScoreTask; this is the backstop.)
         $morningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'morning');
         if (FlintScheduleSettings::enabled($settings, 'morning_digest_enabled')
+            && $flintSchedule->occursOn($user, 'morning_digest', $now)
             && $now->gte(Carbon::parse($morningTime, $tz)) && ! Cache::has($morningMarker)) {
             $sleepEventId = $sleepScoreEventIdFor($user, $today);
 
@@ -199,15 +201,18 @@ Schedule::call(function () {
         $now = $resolver->now($user);
         $today = $resolver->today($user)->toDateString();
 
-        foreach (['topics', 'reading_list', 'news_roundup'] as $routine) {
+        foreach (['topics', 'reading_list', 'news_roundup', 'money_weekly', 'money_close'] as $routine) {
             if (! FlintScheduleSettings::enabled($settings, "{$routine}_enabled")) {
                 continue;
             }
-            $slot = $flintSchedule->slot($user, $routine, $now);
-            $marker = TriggerFlintRoutineJob::markerKey($user->id, $today, $routine);
+            $due = $flintSchedule->dueOccurrence($user, $routine, $now);
+            if ($due === null) {
+                continue;
+            }
+            $marker = TriggerFlintRoutineJob::markerKey($user->id, $today, $routine, $due['key']);
 
-            if ($now->gte(Carbon::parse($slot, $tz)) && ! Cache::has($marker)) {
-                dispatch(new TriggerFlintRoutineJob($user, $routine, $today, $tz))->onQueue('flint');
+            if (! Cache::has($marker) && ! $flintSchedule->isRunning($user, $routine)) {
+                dispatch(new TriggerFlintRoutineJob($user, $routine, $today, $tz, occurrence: $due['key']))->onQueue('flint');
             }
         }
     }

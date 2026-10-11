@@ -21,6 +21,8 @@ class OpenAiRoutineDriver implements RoutineDriver
         'topics' => 'flint-topics',
         'reading_list' => 'flint-reading-list',
         'news_roundup' => 'flint-news-roundup',
+        'money_weekly' => 'flint-money',
+        'money_close' => 'flint-money',
     ];
 
     public function __construct(

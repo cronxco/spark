@@ -7,7 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
-use App\Services\Money\SafeToSpend;
+use App\Services\Money\PlanSnapshot;
 use App\Services\Money\UpcomingBills;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,7 +52,7 @@ class SafeToSpendTest extends TestCase
         $this->debit('Council tax', 15000, '2026-09-20');
         $this->debit('Gym', 3000, '2026-09-29');
 
-        $plan = app(SafeToSpend::class)->build((string) $this->user->id, 0);
+        $plan = app(PlanSnapshot::class)->build((string) $this->user->id)['safe_to_spend'];
 
         $this->assertSame(15000, $plan['upcoming_bills']);
         $this->assertSame('2026-10-28', $plan['payday']);
@@ -77,7 +77,7 @@ class SafeToSpendTest extends TestCase
         $this->account('Current', 60000, '2026-10-11');
         $this->account('Joint', 40000, '2026-10-10');
 
-        $plan = app(SafeToSpend::class)->build((string) $this->user->id, 0);
+        $plan = app(PlanSnapshot::class)->build((string) $this->user->id)['safe_to_spend'];
 
         $this->assertSame(100000, $plan['available']);
         $this->assertSame([], $plan['stale_accounts']);
@@ -90,7 +90,7 @@ class SafeToSpendTest extends TestCase
         $this->account('Joint', 40000, '2026-10-01');
         $this->account('Never synced', null, null);
 
-        $plan = app(SafeToSpend::class)->build((string) $this->user->id, 0);
+        $plan = app(PlanSnapshot::class)->build((string) $this->user->id)['safe_to_spend'];
 
         $this->assertSame(60000, $plan['available']);
         $this->assertEqualsCanonicalizing(['Joint', 'Never synced'], $plan['stale_accounts']);

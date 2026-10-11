@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\Mobile\FlintNotesController;
 use App\Http\Controllers\Api\V1\Mobile\FlintQuestionsController;
 use App\Http\Controllers\Api\V1\Mobile\FlintReviewController;
 use App\Http\Controllers\Api\V1\Mobile\FlintRoutineHealthController;
+use App\Http\Controllers\Api\V1\Mobile\FlintSchedulesController;
 use App\Http\Controllers\Api\V1\Mobile\FlintTopicsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\InsightDiscoveryController;
@@ -366,6 +367,14 @@ Route::post('up-to-speed/unmark', UpToSpeedUnmarkController::class)
 | Flint digest endpoints
 |--------------------------------------------------------------------------
 */
+
+Route::get('flint/schedules', [FlintSchedulesController::class, 'index'])
+    ->middleware('spark.ability:flint:read')
+    ->name('flint.schedules.index');
+
+Route::put('flint/schedules/{routine}', [FlintSchedulesController::class, 'update'])
+    ->middleware('spark.ability:flint:write')
+    ->name('flint.schedules.update');
 
 Route::get('flint/digests', [FlintDigestsController::class, 'index'])
     ->middleware('spark.ability:flint:read')

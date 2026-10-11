@@ -20,6 +20,7 @@ use App\Mcp\Tools\GetEventTool;
 use App\Mcp\Tools\GetFlintNotesTool;
 use App\Mcp\Tools\GetLatestFlintDigestTool;
 use App\Mcp\Tools\GetMetricTrendTool;
+use App\Mcp\Tools\GetMoneyPlanTool;
 use App\Mcp\Tools\GetObjectTool;
 use App\Mcp\Tools\GetSavedBookmarksTool;
 use App\Mcp\Tools\GetServiceStatusTool;
@@ -104,6 +105,9 @@ class SparkServer extends Server
         - `update-entity`: Safely make non-destructive edits to an owned event, object, or block.
         - `manage-relationship`: List, create, or delete an owned relationship.
 
+        ### Money
+        - `get-money-plan`: The Money Plan as shown on the Plan tab (safe to spend, card cover, budget progress, pots, interest). Integer pence. Requires `finance:read`.
+
         ### Flint
         - `create-flint-digest`: Create a Flint digest event with an optional array of blocks. Requires `flint:write`. Supports `flint_user_question` (questions for the user with optional multiple-choice), `flint_editorial_note` (AI commentary), and any other `flint_*` block type. Returns event_id and block_ids.
         - `get-latest-flint-digest`: Retrieve the latest Flint digest for a date (default: today). Returns all blocks with full metadata — for `flint_user_question` blocks, includes the user's answer, answer_note, and answered_at.
@@ -111,7 +115,7 @@ class SparkServer extends Server
         - `answer-flint-question`: Record the user's answer to a Flint question.
         - `manage-flint-topic`: Create, update, or list persistent Flint Topics. Topics track strategic, thematic, and tactical threads, and may link digest events or blocks that discussed them.
         - `complete-flint-run`: Confirm that a topic routine produced its expected persisted output using its verified run token.
-        - `run-flint-skill`: Run a Flint routine now rather than waiting for its daily slot (digest, topics, reading_list, news_roundup). Queued; results are written back the usual way. Requires `flint:run`.
+        - `run-flint-skill`: Run a Flint routine now rather than waiting for its daily slot (digest, topics, reading_list, news_roundup, money_weekly, money_close). Queued; results are written back the usual way. Requires `flint:run`.
 
         ### Web Fetching
         - `fetch-webpage-html`: Render a URL with Playwright and return its raw HTML. Uses saved Fetch cookies for the target domain when available and persists refreshed cookies. HTML is capped at 1 MB.
@@ -156,6 +160,7 @@ class SparkServer extends Server
         TriggerIntegrationUpdateTool::class,
         ListIntegrationsTool::class,
         GetSavedBookmarksTool::class,
+        GetMoneyPlanTool::class,
         CreateFlintDigestTool::class,
         CompleteFlintRunTool::class,
         GetLatestFlintDigestTool::class,
