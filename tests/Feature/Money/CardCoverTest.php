@@ -137,7 +137,7 @@ class CardCoverTest extends TestCase
         );
 
         return Event::create([
-            'integration_id' => $this->integration->id, 'source_id' => 'c-'.(++$this->counter), 'actor_id' => $this->card->id,
+            'integration_id' => $this->integration->id, 'source_id' => 'c-' . (++$this->counter), 'actor_id' => $this->card->id,
             'target_id' => $target->id, 'service' => 'gocardless', 'domain' => 'money', 'action' => $action, 'time' => $time,
             'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => ['description' => $description ?? $merchant, 'transaction_status' => 'booked'] + $extra,
@@ -151,7 +151,7 @@ class CardCoverTest extends TestCase
             ['time' => '2026-10-09 00:00:00', 'metadata' => []],
         );
         Event::create([
-            'integration_id' => $this->integration->id, 'source_id' => 'bal-'.(++$this->counter), 'actor_id' => $this->pot->id,
+            'integration_id' => $this->integration->id, 'source_id' => 'bal-' . (++$this->counter), 'actor_id' => $this->pot->id,
             'target_id' => $day->id, 'service' => 'monzo', 'domain' => 'money', 'action' => 'had_balance',
             'time' => '2026-10-09 23:59:59', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
         ]);
