@@ -51,4 +51,20 @@ return [
         'PAYMENT RECEIVED - THANK YOU',
         'OUTSTANDING AUTHORISATION',
     ],
+    /*
+    |--------------------------------------------------------------------------
+    | Add to buffer
+    |--------------------------------------------------------------------------
+    |
+    | Moving money from a Monzo account into the card buffer pot. Off until Monzo
+    | has been re-authorised for writes. Always needs an explicit confirmation,
+    | never runs on a schedule, and is capped per action.
+    |
+    */
+
+    'buffer' => [
+        'enabled' => env('MONEY_BUFFER_ENABLED', false),
+        'cap_pence' => (int) env('MONEY_BUFFER_CAP_PENCE', 500_000),
+        'link_window_hours' => 48,
+    ],
 ];

@@ -4,6 +4,7 @@ namespace App\Services\TransactionLinking;
 
 use App\Models\Event;
 use App\Models\Relationship;
+use App\Services\Money\BufferDepositLinker;
 use App\Services\TransactionLinking\Contracts\LinkingStrategy;
 use App\Services\TransactionLinking\Strategies\BacsRecordStrategy;
 use App\Services\TransactionLinking\Strategies\CrossProviderStrategy;
@@ -70,6 +71,10 @@ class TransactionLinkingService
         }
 
         $userId = $event->integration->user_id;
+
+        if ($event->action === 'pot_transfer_to') {
+            $stats['created'] += app(BufferDepositLinker::class)->link($event);
+        }
 
         foreach ($this->strategies as $strategy) {
             if (! $strategy->canProcess($event)) {

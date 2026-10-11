@@ -31,6 +31,27 @@
             <span class="ml-auto text-sm">{{ $count }} transactions, <strong>{{ $money($total) }}</strong></span>
         </div>
 
+        @if ($bufferNotice)<div class="alert alert-success"><span>{{ $bufferNotice }}</span></div>@endif
+        @if ($bufferError)<div class="alert alert-error"><span>{{ $bufferError }}</span></div>@endif
+
+        @if ($review)
+            <div class="alert alert-warning flex-col items-start gap-2">
+                <span class="font-medium">Move £{{ number_format($review['total'] / 100, 2) }} into {{ $review['pot']['name'] }}?</span>
+                <span class="text-sm">Monzo will transfer this from your current account into the pot. It cannot be undone from Spark.</span>
+                <ul class="text-sm">
+                    @foreach ($review['transactions'] as $tx)
+                        <li>{{ $tx['time']->format('j M') }} {{ $tx['merchant'] }} {{ $money($tx['amount']) }}</li>
+                    @endforeach
+                </ul>
+                <div class="flex gap-2">
+                    <button type="button" class="btn btn-primary btn-sm" wire:click="confirmBuffer" wire:loading.attr="disabled">Move the money</button>
+                    <button type="button" class="btn btn-ghost btn-sm" wire:click="cancelBuffer">Cancel</button>
+                </div>
+            </div>
+        @elseif ($bufferEnabled && count($selected) > 0)
+            <button type="button" class="btn btn-outline btn-sm self-start" wire:click="reviewBuffer">Add {{ count($selected) }} to buffer</button>
+        @endif
+
         @if ($entries->isEmpty())
             <p class="text-sm text-base-content/70">No spending this month.</p>
         @else
@@ -39,10 +60,18 @@
                     <tbody>
                         @foreach ($entries as $entry)
                             <tr wire:key="spend-{{ $entry['id'] }}">
+                                <td>
+                                    @if ($bufferEnabled && $entry['source'] === 'gocardless' && $entry['amount'] > 0 && ! in_array($entry['buffer'], ['requested', 'linked'], true))
+                                        <input type="checkbox" class="checkbox checkbox-sm" value="{{ $entry['id'] }}" wire:model.live="selected" aria-label="Select {{ $entry['merchant'] }}" />
+                                    @endif
+                                </td>
                                 <td class="whitespace-nowrap text-base-content/60">{{ $entry['time']->format('j M') }}</td>
                                 <td>
                                     {{ $entry['merchant'] }}
                                     @if ($entry['pending'])<span class="badge badge-ghost badge-sm">Pending</span>@endif
+                                    @if ($entry['buffer'] === 'linked')<span class="badge badge-success badge-sm">Buffered</span>
+                                    @elseif ($entry['buffer'] === 'requested')<span class="badge badge-info badge-sm">Buffer requested</span>
+                                    @elseif ($entry['buffer'] === 'failed')<span class="badge badge-error badge-sm">Buffer failed</span>@endif
                                 </td>
                                 <td class="text-base-content/60">{{ str_replace('_', ' ', $entry['category']) }}</td>
                                 <td class="text-base-content/60">{{ $entry['account'] }}</td>
