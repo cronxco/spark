@@ -4,17 +4,15 @@ namespace App\Http\Controllers\Api\V1\Mobile;
 
 use App\Http\Controllers\Api\V1\Mobile\Concerns\HandlesIdempotency;
 use App\Http\Controllers\Controller;
-use App\Integrations\Financial\FinancialPlugin;
-use App\Models\EventObject;
 use App\Services\Money\BudgetService;
 use App\Services\Money\BufferDeposit;
 use App\Services\Money\CardCover;
 use App\Services\Money\PlanOverview;
+use App\Services\Money\SafeToSpend;
 use App\Services\Money\SpendingScope;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -32,6 +30,7 @@ class MoneyPlanController extends Controller
         private BudgetService $budgets,
         private SpendingScope $scope,
         private BufferDeposit $buffer,
+        private SafeToSpend $safeToSpend,
     ) {}
 
     /**
@@ -42,14 +41,9 @@ class MoneyPlanController extends Controller
         $userId = (string) $request->user()->id;
         $cover = $this->cover->build($userId);
         $overview = $this->overview->build($userId);
-        $available = $this->currentAccountBalance($request);
 
         return response()->json(['data' => [
-            'safe_to_spend' => [
-                'available' => $available,
-                'owed_on_cards' => $cover['owed'],
-                'amount' => $available - $cover['owed'],
-            ],
+            'safe_to_spend' => $this->safeToSpend->build($userId, $cover['owed']),
             'cover' => $cover,
             'budgets' => $this->budgets->progress($userId),
             'strip' => $overview['strip'],
@@ -72,7 +66,7 @@ class MoneyPlanController extends Controller
             'budget' => ['nullable', 'string', 'max:64'],
         ]);
 
-        $month = CarbonImmutable::createFromFormat('Y-m-d', ($validated['month'] ?? now()->format('Y-m')) . '-01')->startOfMonth();
+        $month = CarbonImmutable::createFromFormat('Y-m-d', ($validated['month'] ?? now()->format('Y-m')).'-01')->startOfMonth();
         $entries = $this->scope->entries((string) $request->user()->id, $month, $month->endOfMonth(), array_filter([
             'category' => $validated['category'] ?? null,
             'account' => $validated['account'] ?? null,
@@ -225,18 +219,5 @@ class MoneyPlanController extends Controller
         $plan['transactions'] = array_map(fn (array $entry): array => ['time' => $entry['time']->toIso8601String()] + $entry, $plan['transactions']);
 
         return $plan;
-    }
-
-    private function currentAccountBalance(Request $request): int
-    {
-        $accounts = EventObject::where('user_id', $request->user()->id)->where('concept', 'account')
-            ->whereIn('type', ['monzo_account', 'bank_account'])->get()
-            ->reject(fn (EventObject $account): bool => in_array($account->metadata['account_type'] ?? null, ['credit_card', 'loan', 'savings'], true)
-                || (bool) ($account->metadata['deleted'] ?? false));
-
-        /** @var Collection<string, mixed> $balances */
-        $balances = app(FinancialPlugin::class)->getLatestBalancesForAccounts($accounts);
-
-        return (int) $accounts->sum(fn (EventObject $account): int => (int) ($balances->get($account->id)?->value ?? 0));
     }
 }
