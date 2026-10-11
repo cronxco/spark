@@ -121,13 +121,91 @@ class CardCoverTest extends TestCase
     public function the_cover_shows_the_status_and_the_pots_view_sets_the_pot(): void
     {
         Livewire::actingAs($this->user)->test(CardCoverComponent::class)
-            ->assertSee('No buffer pot is set')
+            ->assertSee('No buffer pot set')
             ->assertSee('Pots view');
 
         Livewire::actingAs($this->user)->test(BufferPot::class)
             ->call('useAsBuffer', (string) $this->pot->id);
 
         $this->assertSame('card_buffer', $this->pot->refresh()->metadata['money']['role']);
+    }
+
+    #[Test]
+    public function billing_days_count_the_unpaid_statement_and_what_came_after_it(): void
+    {
+        $service = app(CardCover::class);
+        $service->setBilling($this->user->id, (string) $this->card->id, 7, 19);
+        $this->cardEvent('payment_to', 70_000, '2026-09-05 10:00:00', 'Paid statement');
+        $this->cardEvent('payment_from', 70_000, '2026-09-19 09:00:00', 'Payment', 'DIRECT DEBIT PAYMENT - THANK YOU');
+        $this->cardEvent('payment_to', 10_000, '2026-09-10 10:00:00', 'Before the repayment');
+        $this->cardEvent('payment_to', 5_000, '2026-10-03 10:00:00', 'In the statement');
+        $this->cardEvent('payment_to', 600, '2026-10-09 10:00:00', 'After the statement');
+
+        $card = $service->build($this->user->id, CarbonImmutable::parse('2026-10-11'))['cards'][0];
+
+        $this->assertSame(15_600, $card['owed']);
+        $this->assertSame(15_000, $card['statement_owed']);
+        $this->assertSame('2026-10-07', $card['statement_closed']);
+        $this->assertSame('2026-10-19', $card['statement_due']);
+        $this->assertSame('2026-09-08', $card['since']);
+    }
+
+    #[Test]
+    public function a_repayment_after_the_close_settles_the_statement(): void
+    {
+        $service = app(CardCover::class);
+        $service->setBilling($this->user->id, (string) $this->card->id, 7, 19);
+        $this->cardEvent('payment_to', 5_000, '2026-10-03 10:00:00', 'In the statement');
+        $this->cardEvent('payment_from', 5_000, '2026-10-19 09:00:00', 'Payment', 'DIRECT DEBIT PAYMENT - THANK YOU');
+        $this->cardEvent('payment_to', 600, '2026-10-20 10:00:00', 'After the statement');
+
+        $card = $service->build($this->user->id, CarbonImmutable::parse('2026-10-21'))['cards'][0];
+
+        $this->assertSame(600, $card['owed']);
+        $this->assertSame(0, $card['statement_owed']);
+        $this->assertNull($card['statement_due']);
+        $this->assertSame('2026-10-08', $card['since']);
+    }
+
+    #[Test]
+    public function billing_days_clamp_to_short_months_and_can_be_cleared(): void
+    {
+        $service = app(CardCover::class);
+        $service->setBilling($this->user->id, (string) $this->card->id, 31, null);
+
+        $this->assertSame('2026-02-28', $service->build($this->user->id, CarbonImmutable::parse('2026-03-02'))['cards'][0]['statement_closed']);
+
+        $service->setBilling($this->user->id, (string) $this->card->id, null, null);
+
+        $this->assertSame(['account_type' => 'credit_card'], $this->card->refresh()->metadata);
+    }
+
+    #[Test]
+    public function billing_days_are_validated_and_scoped_to_the_users_cards(): void
+    {
+        $service = app(CardCover::class);
+
+        try {
+            $service->setBilling($this->user->id, (string) $this->card->id, 32, null);
+            $this->fail('Day 32 should be refused.');
+        } catch (InvalidArgumentException) {
+            $this->assertTrue(true);
+        }
+
+        $this->expectException(InvalidArgumentException::class);
+        $service->setBilling(User::factory()->create()->id, (string) $this->card->id, 7, 19);
+    }
+
+    #[Test]
+    public function the_cover_component_saves_billing_days(): void
+    {
+        Livewire::actingAs($this->user)->test(CardCoverComponent::class)
+            ->call('saveBilling', (string) $this->card->id, '7', '19')
+            ->assertHasNoErrors()
+            ->call('saveBilling', (string) $this->card->id, '40', '')
+            ->assertHasErrors('billing');
+
+        $this->assertSame(['statement_day' => 7, 'payment_day' => 19], $this->card->refresh()->metadata['money']['billing']);
     }
 
     /**

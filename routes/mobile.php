@@ -493,3 +493,4 @@ Route::delete('money/budgets/{id}', [MoneyPlanController::class, 'budgetsDestroy
 Route::post('money/buffer/preview', [MoneyPlanController::class, 'bufferPreview'])->middleware('spark.ability:finance:write')->name('money.buffer.preview');
 Route::post('money/buffer', [MoneyPlanController::class, 'bufferStore'])->middleware('spark.ability:finance:write')->name('money.buffer.store');
 Route::patch('money/pots/{id}', [MoneyPlanController::class, 'potUpdate'])->middleware('spark.ability:finance:write')->name('money.pots.update');
+Route::patch('money/cards/{id}', [MoneyPlanController::class, 'cardUpdate'])->middleware('spark.ability:finance:write')->name('money.cards.update');

@@ -4,10 +4,7 @@
 <div class="card bg-base-200 shadow">
     <div class="card-body gap-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
-            <div>
-                <h2 class="card-title">Spending</h2>
-                <p class="text-sm text-base-content/70">Card spending only. No pot moves, direct debits, transfers or card repayments.</p>
-            </div>
+            <h2 class="card-title">Spending</h2>
             <div class="flex items-center gap-2">
                 <button type="button" class="btn btn-ghost btn-sm" wire:click="previousMonth" aria-label="Previous month">&lsaquo;</button>
                 <span class="font-medium">{{ $month->format('F Y') }}</span>

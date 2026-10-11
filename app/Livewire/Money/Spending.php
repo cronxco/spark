@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Money;
 
+use App\Livewire\Concerns\ToleratesRepeatedLazyLoad;
 use App\Services\Money\BufferDeposit;
 use App\Services\Money\SpendingScope;
 use Carbon\CarbonImmutable;
@@ -14,6 +15,8 @@ use RuntimeException;
 #[Lazy]
 class Spending extends Component
 {
+    use ToleratesRepeatedLazyLoad;
+
     public int $monthOffset = 0;
 
     public string $category = '';

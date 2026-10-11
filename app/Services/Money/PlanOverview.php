@@ -42,7 +42,7 @@ class PlanOverview
      */
     private function ledger($interest): array
     {
-        return $interest->groupBy(fn ($event) => substr($event->time->toDateString(), 0, 7))
+        return $interest->groupBy(fn ($event) => $event->time->subMonthNoOverflow()->format('Y-m'))
             ->map(function ($events, $month) {
                 return [
                     'month' => $month,
@@ -69,7 +69,7 @@ class PlanOverview
         $pots = EventObject::where('user_id', $userId)->where('concept', 'account')->where('type', 'monzo_pot')->get();
         $balances = (new FinancialPlugin)->getLatestBalancesForAccounts($pots);
         $latestInterest = $latestMonth === null ? collect() : $interest
-            ->filter(fn ($event) => substr($event->time->toDateString(), 0, 7) === $latestMonth)
+            ->filter(fn ($event) => $event->time->subMonthNoOverflow()->format('Y-m') === $latestMonth)
             ->keyBy('actor_id');
 
         $rows = $pots->map(function ($pot) use ($balances, $latestInterest) {

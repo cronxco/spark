@@ -18,12 +18,15 @@ use Illuminate\Support\Collection;
  *
  * Nothing is written unless `apply` is true; the default is a read-only plan.
  *
- * @phpstan-type Row array{pot_id: string, pot: string, month: string, paid_on: string, amount: int, method: string, estimated: bool, opening: int, closing: int, transfers: int, implied_aer: float, state: string}
+ * @phpstan-type Row array{pot_id: string, pot: string, month: string, paid_on: string, amount: int, method: string, estimated: bool, opening: int, closing: int, transfers: int, first_day_transfers: int, implied_aer: float, state: string}
  */
 class PotInterestInference
 {
     /** Anything above this annualised rate is treated as missing transfers, not interest. */
     public const MAX_ANNUAL_RATE = 0.08;
+
+    /** Used to pick between two readings of a 1st-of-month top-up when nothing better is known. */
+    public const FALLBACK_ANNUAL_RATE = 0.035;
 
     /**
      * @return array{rows: list<array<string, mixed>>, flagged: list<array<string, mixed>>}
@@ -32,13 +35,27 @@ class PotInterestInference
     {
         $rows = [];
         $flagged = [];
+        $pending = [];
         $pots = EventObject::where('user_id', $userId)->where('concept', 'account')
             ->whereIn('type', ['monzo_pot', 'monzo_archived_pot'])->get();
 
         foreach ($pots as $pot) {
-            [$potRows, $potFlagged] = $this->inferPot($userId, $pot, $since);
+            [$potRows, $potFlagged, $potPending] = $this->inferPot($pot, $since);
             array_push($rows, ...$potRows);
             array_push($flagged, ...$potFlagged);
+            array_push($pending, ...$potPending);
+        }
+
+        $global = $this->median(array_column(array_filter($rows, fn ($row) => ! $row['estimated']), 'implied_aer')) ?? self::FALLBACK_ANNUAL_RATE;
+        $potRates = collect($rows)->where('estimated', false)->groupBy('pot_id')
+            ->map(fn ($potRows) => $this->median($potRows->pluck('implied_aer')->all()));
+
+        foreach ($pending as $item) {
+            $result = $this->resolve($item, $potRates->get($item['pot']->id) ?? $global);
+            array_push($rows, ...($result['rows'] ?? []));
+            if (isset($result['flag'])) {
+                $flagged[] = $result['flag'];
+            }
         }
 
         usort($rows, fn ($a, $b) => [$a['paid_on'], $a['pot']] <=> [$b['paid_on'], $b['pot']]);
@@ -72,9 +89,9 @@ class PotInterestInference
     }
 
     /**
-     * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>}
+     * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>, 2: list<array<string, mixed>>}
      */
-    private function inferPot(string $userId, EventObject $pot, ?CarbonImmutable $since): array
+    private function inferPot(EventObject $pot, ?CarbonImmutable $since): array
     {
         $snapshots = Event::where('actor_id', $pot->id)->where('action', 'had_balance')
             ->orderBy('time')->get(['id', 'time', 'value'])
@@ -83,14 +100,15 @@ class PotInterestInference
             ->values();
 
         if ($snapshots->count() < 2) {
-            return [[], []];
+            return [[], [], []];
         }
 
         $transfers = $this->transfers($pot);
-        $existing = Event::where('action', 'interest_earned')->where('actor_id', $pot->id)->pluck('value', 'source_id');
+        $existing = Event::where('action', 'interest_earned')->where('actor_id', $pot->id)->pluck('value', 'source_id')->all();
 
         $rows = [];
         $flagged = [];
+        $pending = [];
         for ($i = 1; $i < $snapshots->count(); $i++) {
             $prev = $snapshots[$i - 1];
             $cur = $snapshots[$i];
@@ -99,48 +117,149 @@ class PotInterestInference
                 continue;
             }
 
-            $opening = (int) $prev->value;
-            $closing = (int) $cur->value;
-            $net = $this->netTransfers($transfers, $prev->time, $cur->time);
-            $residual = $closing - $opening - $net;
-            $label = $pot->title . ' (' . $prev->time->toDateString() . ' to ' . $cur->time->toDateString() . ')';
+            $window = [
+                'pot' => $pot,
+                'existing' => $existing,
+                'boundaries' => $boundaries,
+                'opening' => (int) $prev->value,
+                'closing' => (int) $cur->value,
+                'net' => $this->netTransfers($transfers, $prev->time, $cur->time),
+                'label' => $pot->title . ' (' . $prev->time->toDateString() . ' to ' . $cur->time->toDateString() . ')',
+                'first_day' => 0,
+            ];
 
-            if ($residual <= 0 || $opening <= 0) {
-                if ($residual < 0 || ($residual > 0 && $opening <= 0)) {
-                    $flagged[] = ['pot' => $pot->title, 'window' => $label, 'residual' => $residual, 'reason' => $residual < 0 ? 'Balance fell by more than the transfers explain' : 'Balance appeared with no opening balance'];
-                }
-
-                continue;
-            }
-            $months = count($boundaries);
-            if ($residual > $opening * self::MAX_ANNUAL_RATE * $months / 12) {
-                $flagged[] = ['pot' => $pot->title, 'window' => $label, 'residual' => $residual, 'reason' => 'Rise is too large to be interest; a transfer is probably missing'];
+            $firstDay = $this->firstDayTransfers($transfers, $cur->time);
+            if (count($boundaries) === 1 && $boundaries[0]->toDateString() === $cur->time->toDateString() && $firstDay !== 0) {
+                $pending[] = $window + ['first_day_net' => $firstDay];
 
                 continue;
             }
 
-            foreach ($this->split($residual, $boundaries) as $paidOn => $amount) {
-                $month = substr($paidOn, 0, 7);
-                $sourceId = $this->sourceId($pot, $month);
-                $rows[] = [
-                    'pot_id' => (string) $pot->id,
-                    'pot' => $pot->title,
-                    'month' => $month,
-                    'paid_on' => $paidOn,
-                    'amount' => $amount,
-                    'method' => $months === 1 ? 'balance_delta' : 'gap_prorata',
-                    'estimated' => $months > 1,
-                    'opening' => $opening,
-                    'closing' => $closing,
-                    'transfers' => $net,
-                    'implied_aer' => round($amount / $opening * 12, 4),
-                    'source_id' => $sourceId,
-                    'state' => ($existing[$sourceId] ?? null) === $amount ? 'unchanged' : (isset($existing[$sourceId]) ? 'changed' : 'new'),
-                ];
+            $result = $this->evaluate($window);
+            array_push($rows, ...($result['rows'] ?? []));
+            if (isset($result['flag'])) {
+                $flagged[] = $result['flag'];
             }
         }
 
-        return [$rows, $flagged];
+        return [$rows, $flagged, $pending];
+    }
+
+    /**
+     * Turns one snapshot window into a row, a flag, or nothing (no interest to record).
+     *
+     * @param  array<string, mixed>  $window
+     * @return array{rows?: list<array<string, mixed>>, flag?: array<string, mixed>}
+     */
+    private function evaluate(array $window): array
+    {
+        $pot = $window['pot'];
+        $opening = $window['opening'];
+        $closing = $window['closing'];
+        $net = $window['net'];
+        $boundaries = $window['boundaries'];
+        $label = $window['label'];
+        $residual = $closing - $opening - $net;
+
+        if ($residual <= 0 || $opening <= 0) {
+            if ($residual < 0 || ($residual > 0 && $opening <= 0)) {
+                return ['flag' => ['pot' => $pot->title, 'window' => $label, 'residual' => $residual, 'reason' => $residual < 0 ? 'Balance fell by more than the transfers explain' : 'Balance appeared with no opening balance']];
+            }
+
+            return [];
+        }
+        $months = count($boundaries);
+        if ($residual > $opening * self::MAX_ANNUAL_RATE * $months / 12) {
+            return ['flag' => ['pot' => $pot->title, 'window' => $label, 'residual' => $residual, 'reason' => 'Rise is too large to be interest; a transfer is probably missing']];
+        }
+
+        $rows = [];
+        foreach ($this->split($residual, $boundaries) as $paidOn => $amount) {
+            $month = $this->interestFor($paidOn);
+            $sourceId = $this->sourceId($pot, $month);
+            $rows[] = [
+                'pot_id' => (string) $pot->id,
+                'pot' => $pot->title,
+                'month' => $month,
+                'paid_on' => $paidOn,
+                'amount' => $amount,
+                'method' => $window['first_day'] !== 0 ? 'balance_delta_first_day' : ($months === 1 ? 'balance_delta' : 'gap_prorata'),
+                'estimated' => $months > 1,
+                'opening' => $opening,
+                'closing' => $closing,
+                'transfers' => $net,
+                'first_day_transfers' => $window['first_day'],
+                'implied_aer' => round($amount / $opening * 12, 4),
+                'source_id' => $sourceId,
+                'state' => ($window['existing'][$sourceId] ?? null) === $amount ? 'unchanged' : (isset($window['existing'][$sourceId]) ? 'changed' : 'new'),
+            ];
+        }
+
+        return ['rows' => $rows];
+    }
+
+    /**
+     * A top-up dated on the 1st may or may not already be in that morning's snapshot: the sync runs just
+     * after midnight, so a standing order that lands at 00:00 is in it, one that lands later is not. Both
+     * readings are tried and the one that leaves a plausible interest figure closest to the pot's usual
+     * rate wins. If neither is plausible the original (top-up not in the snapshot) reading is flagged.
+     *
+     * @param  array<string, mixed>  $item
+     * @return array{rows?: list<array<string, mixed>>, flag?: array<string, mixed>}
+     */
+    private function resolve(array $item, float $reference): array
+    {
+        $later = $item;
+        $included = $item;
+        $included['net'] += $item['first_day_net'];
+        $included['first_day'] = $item['first_day_net'];
+
+        $candidates = array_values(array_filter([$later, $included], fn ($window) => $this->plausible($window)));
+        if ($candidates === []) {
+            return $this->evaluate($later);
+        }
+
+        usort($candidates, fn ($a, $b) => abs($this->aer($a) - $reference) <=> abs($this->aer($b) - $reference));
+
+        return $this->evaluate($candidates[0]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $window
+     */
+    private function plausible(array $window): bool
+    {
+        $residual = $window['closing'] - $window['opening'] - $window['net'];
+
+        return $window['opening'] > 0 && $residual >= 0 && $residual <= $window['opening'] * self::MAX_ANNUAL_RATE / 12;
+    }
+
+    /**
+     * @param  array<string, mixed>  $window
+     */
+    private function aer(array $window): float
+    {
+        return ($window['closing'] - $window['opening'] - $window['net']) / $window['opening'] * 12;
+    }
+
+    /**
+     * @param  list<float|int>  $values
+     */
+    private function median(array $values): ?float
+    {
+        if ($values === []) {
+            return null;
+        }
+        sort($values);
+        $middle = intdiv(count($values), 2);
+
+        return count($values) % 2 ? (float) $values[$middle] : ($values[$middle - 1] + $values[$middle]) / 2;
+    }
+
+    /** Monzo names a payment on the 1st after the month it is for: 1 October pays for September. */
+    private function interestFor(string $paidOn): string
+    {
+        return CarbonImmutable::parse($paidOn)->subMonthNoOverflow()->format('Y-m');
     }
 
     /**
@@ -228,6 +347,18 @@ class PotInterestInference
     }
 
     /**
+     * Net pot movements dated on the later snapshot's own day: not in the window, but possibly in the balance.
+     *
+     * @param  list<array{0: DateTimeInterface, 1: int}>  $transfers
+     */
+    private function firstDayTransfers(array $transfers, DateTimeInterface $to): int
+    {
+        $day = $to->format('Y-m-d');
+
+        return array_sum(array_map(fn ($transfer) => $transfer[0]->format('Y-m-d') === $day ? $transfer[1] : 0, $transfers));
+    }
+
+    /**
      * @param  array<string, mixed>  $row
      */
     private function write(Integration $integration, array $row): void
@@ -254,6 +385,8 @@ class PotInterestInference
                     'method' => $row['method'],
                     'estimated' => $row['estimated'],
                     'month' => $row['month'],
+                    'paid_on' => $row['paid_on'],
+                    'first_day_transfers' => $row['first_day_transfers'],
                     'opening_balance' => $row['opening'],
                     'closing_balance' => $row['closing'],
                     'net_transfers' => $row['transfers'],
