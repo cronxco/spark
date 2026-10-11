@@ -20,7 +20,8 @@ class ConfigurationAuditTest extends TestCase
         $this->assertArrayHasKey('variables', $report);
         $this->assertArrayHasKey('findings', $report);
         $this->assertStringNotContainsString('extremely-secret-test-value', json_encode($report));
-        $this->assertContains('APP_DEBUG', array_column($report['findings'], 'key'));
+        $this->assertContains('TYPESAFE_API_KEY', array_column($report['variables'], 'name'));
+        $this->assertNotContains('extremely-secret-test-value', array_column($report['variables'], 'name'));
     }
 
     public function test_disabled_jev_with_enabled_list_detection_generates_warning(): void
