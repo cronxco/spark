@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\RequiresSparkAbility;
+use App\Services\Knowledge\KnowledgeFeature;
 use App\Services\Knowledge\ProjectService;
 use App\Services\Knowledge\TaskProposalService;
 use App\Services\Knowledge\TaskService;
@@ -34,6 +35,12 @@ class KnowledgeTasksTool extends Tool
         $tasks = app(TaskService::class);
         $fields = $request->get('fields', []);
         try {
+            if (in_array($operation, ['list', 'projects', 'show'])) {
+                KnowledgeFeature::ensure($user, 'reads');
+            }
+            if ($operation === 'projects') {
+                KnowledgeFeature::ensure($user, 'projects');
+            }
             $result = match ($operation) {
                 'list' => $tasks->query($user)->orderBy('id')->when($request->get('cursor'), fn ($q, $cursor) => $q->where('id', '>', $cursor))->limit(50)->get()->map(fn ($b) => $tasks->payload($b, $request->get('date')))->all(),
                 'projects' => app(ProjectService::class)->query($user)->orderBy('id')->limit(50)->get()->map(fn ($p) => app(ProjectService::class)->payload($p))->all(),
@@ -53,7 +60,7 @@ class KnowledgeTasksTool extends Tool
         } catch (ModelNotFoundException $e) {
             return Response::error('Task or linked entity not found.');
         } catch (HttpException|InvalidArgumentException $e) {
-            return Response::error($e->getMessage());
+            return Response::error($e->getMessage() ?: 'Knowledge tasks are unavailable for this account.');
         }
     }
 

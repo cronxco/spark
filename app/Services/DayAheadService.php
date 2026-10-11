@@ -276,7 +276,7 @@ class DayAheadService
     private function plan(User $user, ?Event $dayNote, string $date): array
     {
         $tasks = app(TaskService::class);
-        $planned = $tasks->query($user)->with('event.target')->get()
+        $planned = $tasks->plannedQuery($user, $date)->with('event.target')->get()
             ->sortBy(fn (Block $block) => [$block->block_type === 'day_task' ? 0 : 1, $block->metadata['line_number'] ?? 0, $block->metadata['task']['position'] ?? 0, $block->title])
             ->map(function (Block $block) use ($tasks, $date): ?array {
                 $p = $tasks->payload($block, $date);

@@ -8,7 +8,7 @@ Tasks are existing owned Blocks on internal Events. Projects, recurrence series 
 
 A day task expires at the next midnight in its captured schedule timezone. A week task lasts through original day + 6 and expires on day + 7; deferral preserves that original window. Persistent tasks do not expire. Unscheduled persistent tasks live in Inbox. Explicit reactivation starts a new window. Deadline, review date and exact reminder are separate fields. Read-time expiry remains correct when workers are delayed.
 
-Web management lives at `/knowledge/tasks`. Task/project destinations are `/tasks/{id}` and `/projects/{id}`. Equivalent APIs are under both `/api/v1` and `/api/v1/mobile`: tasks, task detail/history/actions/bulk-actions, and projects. Existing thread-task routes include native tasks linked to that thread. MCP `knowledge_tasks` supports explicit capture and reviewed proposals.
+Web management lives at `/knowledge/tasks`. Task/project destinations are `/tasks/{id}` and `/projects/{id}`. Equivalent APIs are under both `/api/v1` and `/api/v1/mobile`: tasks, task detail/history/actions/bulk-actions, and projects. Existing thread-task routes include native tasks linked to that thread. MCP `knowledge-tasks` supports explicit capture and reviewed proposals.
 
 Mutations require owned targets and strong `If-Match` versions. Task creation requires `client_mutation_id`; edits/actions may supply one for durable replay. Reusing an ID with different contents is rejected. Bulk commands return individual results. Delete is reversible; deleting a project preserves its tasks and removes the project links. History is retained as internal Events.
 

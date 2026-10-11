@@ -122,7 +122,8 @@ class KnowledgeTasks extends Component
             } else {
                 $s->create(Auth::user(), $data + ['client_mutation_id' => $this->captureID]);
             }
-            $this->reset('editing', 'version', 'title', 'content', 'message');
+            $this->reset('editing', 'version', 'title', 'content', 'message', 'lifecycle', 'due', 'project', 'threads', 'priority', 'recurrence', 'position', 'review', 'reminder');
+            $this->availability = app(EffectiveTimezoneResolver::class)->today(Auth::user())->toDateString();
             $this->captureID = (string) Str::uuid();
         } catch (HttpResponseException $e) {
             $this->message = 'This task changed. Open it again before saving.';

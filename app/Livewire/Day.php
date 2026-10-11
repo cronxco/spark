@@ -633,6 +633,7 @@ class Day extends Component
 
             $this->dayNoteSavedAt = now()->toIso8601String();
         } catch (Throwable $e) {
+            Log::warning('Outline day note save failed', ['exception_class' => $e::class, 'document_id' => $this->dayNoteDocId]);
             $this->dayNoteError = 'Could not save the note. Your draft is preserved. Refresh the source and retry; safe Outline revision checks must be enabled.';
         } finally {
             $this->dayNoteSaving = false;

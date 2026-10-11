@@ -95,7 +95,7 @@ class SyncOutlineTask implements ShouldQueue
                             return;
                         }
                         // Save the neighbor anchor before deletion, so Undo never guesses a location.
-                        $lineIndex = array_search($expected, $lines, true);
+                        $lineIndex = substr_count(substr($doc['text'], 0, strpos($doc['text'], $fragment)), "\n");
                         if ($deleting) {
                             $m['outline_deleted_neighbors'] = ['previous' => $lineIndex > 0 ? $lines[$lineIndex - 1] : null, 'next' => $lines[$lineIndex + 1 + count($oldDetails)] ?? null];
                             $block->update(['metadata' => $m]);

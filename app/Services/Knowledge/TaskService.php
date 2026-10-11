@@ -43,6 +43,42 @@ class TaskService
                 ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id)));
     }
 
+    public function plannedQuery(User $user, string $date): Builder
+    {
+        return $this->query($user)->where(function (Builder $query) use ($user, $date) {
+            $query->where(function (Builder $native) use ($date) {
+                $this->plannedState($native, 'metadata->task', $date);
+            })->orWhere(function (Builder $legacy) use ($date) {
+                $legacy->whereNull('metadata->task')
+                    ->whereRaw("COALESCE(metadata->>'removed', 'false') != 'true'")
+                    ->where(function (Builder $types) use ($date) {
+                        $types->where(fn (Builder $day) => $day->where('block_type', 'day_task')
+                            ->whereHas('event', fn (Builder $event) => $event->whereDate('time', $date)))
+                            ->orWhere(function (Builder $other) use ($date) {
+                                $other->where('block_type', '!=', 'day_task')
+                                    ->whereRaw("LEAST(metadata->>'due_on', metadata->>'review_on') <= ?", [$date])
+                                    ->where(fn (Builder $status) => $status
+                                        ->where(fn (Builder $open) => $open->whereNull('metadata->completed_at')->whereRaw("COALESCE(metadata->>'checked', 'false') != 'true'"))
+                                        ->orWhereRaw("LEFT(metadata->>'completed_at', 10) = ?", [$date])
+                                        ->orWhereRaw("LEAST(metadata->>'due_on', metadata->>'review_on') = ?", [$date]));
+                            });
+                    });
+            });
+            // Historical projections use snapshots, even if the current task was
+            // completed, expired, deferred or cancelled after the requested day.
+            if ($date < CarbonImmutable::now('UTC')->addHours(14)->toDateString()) {
+                $history = Event::query()->selectRaw("(event_metadata->>'task_id')::uuid")
+                    ->where('source_id', 'like', 'task_history:%')
+                    ->whereHas('integration', fn (Builder $integration) => $integration->where('user_id', $user->id))
+                    ->whereNotNull('event_metadata->after')
+                    ->whereRaw("? < (?::timestamptz AT TIME ZONE COALESCE(event_metadata->'after'->>'schedule_timezone', 'UTC'))::date", [$date, CarbonImmutable::now('UTC')->toIso8601String()])
+                    ->whereRaw("(time AT TIME ZONE COALESCE(event_metadata->'after'->>'schedule_timezone', 'UTC'))::date <= ?", [$date]);
+                $this->plannedState($history, 'event_metadata->after', $date);
+                $query->orWhereIn('id', $history);
+            }
+        });
+    }
+
     public function find(User $user, string $id, bool $deleted = false): Block
     {
         return $this->query($user, $deleted)->findOrFail($id);
@@ -179,8 +215,8 @@ class TaskService
             $this->links($user, $block, $data);
             if (! empty($task['recurrence'])) {
                 $task = app(TaskRecurrenceService::class)->configure($user, $block, $task);
-                $this->save($block, $task, $block->title);
             }
+            $this->save($block, $task, $block->title);
             $this->record($block, $user, 'created', null, $task);
 
             return $this->payload($block);
@@ -342,6 +378,16 @@ class TaskService
         $block = $this->find($user, $id, true);
 
         return Event::where('integration_id', $block->event->integration_id)->where('event_metadata->task_id', $id)->orderByDesc('time')->orderByDesc('id');
+    }
+
+    private function plannedState(Builder $query, string $path, string $date): void
+    {
+        $query->where(fn (Builder $state) => $state
+            ->where(fn (Builder $open) => $open->where($path . '->availability_on', '<=', $date)->where($path . '->status', 'open')
+                ->where(fn (Builder $expiry) => $expiry->whereNull($path . '->expires_on')->orWhere($path . '->expires_on', '>', $date)))
+            ->orWhere(fn (Builder $completed) => $completed->where($path . '->status', 'completed')
+                ->where(fn (Builder $day) => $day->where($path . '->availability_on', $date)
+                    ->orWhereRaw($query->getQuery()->getGrammar()->wrap($path . '->completed_at') . ' LIKE ?', [$date . '%']))));
     }
 
     private function pendingOutline(Block $block, array $task, string $title, ?string $action = null): array

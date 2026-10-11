@@ -21,6 +21,7 @@ class KnowledgeTasksControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->travelTo(now()->setDate(2026, 10, 11)->startOfDay());
         config(['ios.mobile_api_enabled' => true]);
         $this->user = User::factory()->create(['settings' => ['timezone' => 'Europe/London']]);
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);

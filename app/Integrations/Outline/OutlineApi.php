@@ -358,7 +358,7 @@ class OutlineApi
                 ->acceptJson()
                 ->connectTimeout(10)
                 ->timeout(25)
-                ->retry(2, 500, fn (Exception $error) => $error instanceof ConnectionException
+                ->retry($endpoint === '/api/documents.update' && isset($payload['lastRevision']) ? 1 : 2, 500, fn (Exception $error) => $error instanceof ConnectionException
                     || ($error instanceof RequestException && ($error->response->status() === 429 || $error->response->serverError())), throw: false)
                 ->post($url, $payload);
             $durationMs = (int) round((microtime(true) - $startedAt) * 1000);

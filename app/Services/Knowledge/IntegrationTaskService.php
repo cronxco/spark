@@ -31,7 +31,7 @@ class IntegrationTaskService
         DB::transaction(function () use ($user, $integration, $reauth, $consent) {
             User::whereKey($user->id)->lockForUpdate()->firstOrFail();
             Integration::whereKey($integration->id)->lockForUpdate()->firstOrFail();
-            $key = $integration->id . ':' . ($reauth ? 'reauth' : 'failure');
+            $key = $integration->id . ':' . ($consent ? 'consent' : ($reauth ? 'reauth' : 'failure'));
             $block = $this->tasks->query($user)->where('metadata->task->incident->key', $key)->where('metadata->task->status', 'open')->first();
             if (! $block) {
                 $p = $this->tasks->create($user, ['title' => ($reauth ? 'Reconnect ' : 'Review ') . ($integration->name ?: ucfirst($integration->service)),
@@ -39,6 +39,7 @@ class IntegrationTaskService
                 $block = $this->tasks->find($user, $p['id']);
             }
             $task = $this->tasks->state($block);
+            $before = $task;
             $task['origin'] = 'integration';
             $task['incident'] = ['key' => $key, 'integration_id' => (string) $integration->id, 'last_occurred_at' => now()->toIso8601String(),
                 'kind' => $consent ? 'consent' : ($reauth ? 'reauth' : 'failure'),
@@ -46,6 +47,7 @@ class IntegrationTaskService
                 'occurrences' => ($task['incident']['occurrences'] ?? 0) + 1];
             $task['action'] = $this->action($integration, $reauth);
             $this->tasks->save($block, $task, $block->title);
+            $this->tasks->record($block, $user, 'incident_reported', $before, $task);
         });
     }
 

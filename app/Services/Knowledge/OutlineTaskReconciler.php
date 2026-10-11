@@ -22,9 +22,7 @@ class OutlineTaskReconciler
             $markedIds = collect($incoming)->pluck('metadata.outline_task_id')->filter()->all();
             foreach ($existing->reject(fn ($b) => in_array((string) $b->id, $markedIds, true))->groupBy(fn ($b) => data_get($b->metadata, 'outline_source_title') ?? $b->title) as $title => $group) {
                 $unmarked = collect($incoming)->filter(fn ($data) => $data['title'] === $title && empty($data['metadata']['outline_task_id']));
-                if ($group->count() > 1 && $unmarked->isNotEmpty()
-                    && ($group->count() !== $unmarked->count()
-                        || $group->pluck('metadata.outline_source_line')->sort()->values()->all() !== $unmarked->pluck('metadata.outline_source_line')->sort()->values()->all())) {
+                if ($group->count() > 1 && $unmarked->isNotEmpty()) {
                     foreach ($group as $block) {
                         $seen[(string) $block->id] = true;
                         $this->conflict($block, 'ambiguous_source_identity');

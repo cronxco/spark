@@ -13,7 +13,7 @@ class TaskProposalService
     public function propose(User $user, array $input): array
     {
         $meta = Validator::make($input, ['reason' => ['required', 'string', 'max:2000'], 'source_key' => ['required', 'string', 'max:255']])->validate();
-        $data = app(TaskService::class)->validate($input + ['client_mutation_id' => (string) Uuid::uuid5(Uuid::NAMESPACE_URL, 'spark:proposal:' . $user->id . ':' . $meta['source_key'])], true);
+        $data = app(TaskService::class)->validate(array_merge($input, ['client_mutation_id' => (string) Uuid::uuid5(Uuid::NAMESPACE_URL, 'spark:proposal:' . $user->id . ':' . $meta['source_key'])]), true);
 
         return DB::transaction(function () use ($user, $data, $meta) {
             User::whereKey($user->id)->lockForUpdate()->firstOrFail();
