@@ -52,6 +52,11 @@ class ApplyAccountCleanup implements ShouldQueue
         ]);
     }
 
+    public function failed(Throwable $exception): void
+    {
+        ActionProgress::find($this->progressId)?->markFailed($exception->getMessage());
+    }
+
     /**
      * Keeps the last 20 applied clean-ups in the user's settings and in the log, so what changed and
      * when can be checked later. Nothing here needs a table.
@@ -76,10 +81,5 @@ class ApplyAccountCleanup implements ShouldQueue
         $settings = $user->settings ?? [];
         $settings['money']['cleanup_audit'] = array_slice(array_merge([$entry], $settings['money']['cleanup_audit'] ?? []), 0, 20);
         $user->update(['settings' => $settings]);
-    }
-
-    public function failed(Throwable $exception): void
-    {
-        ActionProgress::find($this->progressId)?->markFailed($exception->getMessage());
     }
 }

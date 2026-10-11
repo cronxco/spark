@@ -4,13 +4,16 @@ namespace Tests\Feature\Money;
 
 use App\Jobs\Money\ApplyAccountCleanup;
 use App\Livewire\Money\DataHealth;
+use App\Models\ActionProgress;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Services\Money\AccountCleanup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -78,15 +81,15 @@ class DataHealthTest extends TestCase
     public function applying_records_an_audit_entry_and_a_stale_plan_is_refused(): void
     {
         [, $second] = $this->duplicates();
-        $plan = app(\App\Services\Money\AccountCleanup::class)->plan((string) $this->user->id);
+        $plan = app(AccountCleanup::class)->plan((string) $this->user->id);
 
-        $stale = \App\Models\ActionProgress::createProgress(userId: (string) $this->user->id, actionType: ApplyAccountCleanup::ACTION_TYPE, actionId: (string) \Illuminate\Support\Str::uuid(), step: 'queued', message: 'q', progress: 0);
-        (new ApplyAccountCleanup((string) $this->user->id, 'not-the-reviewed-plan', (string) $stale->id))->handle(app(\App\Services\Money\AccountCleanup::class));
+        $stale = ActionProgress::createProgress(userId: (string) $this->user->id, actionType: ApplyAccountCleanup::ACTION_TYPE, actionId: (string) Str::uuid(), step: 'queued', message: 'q', progress: 0);
+        (new ApplyAccountCleanup((string) $this->user->id, 'not-the-reviewed-plan', (string) $stale->id))->handle(app(AccountCleanup::class));
         $this->assertFalse($second->fresh()->trashed());
         $this->assertArrayNotHasKey('money', $this->user->fresh()->settings ?? []);
 
-        $progress = \App\Models\ActionProgress::createProgress(userId: (string) $this->user->id, actionType: ApplyAccountCleanup::ACTION_TYPE, actionId: (string) \Illuminate\Support\Str::uuid(), step: 'queued', message: 'q', progress: 0);
-        (new ApplyAccountCleanup((string) $this->user->id, $plan['fingerprint'], (string) $progress->id))->handle(app(\App\Services\Money\AccountCleanup::class));
+        $progress = ActionProgress::createProgress(userId: (string) $this->user->id, actionType: ApplyAccountCleanup::ACTION_TYPE, actionId: (string) Str::uuid(), step: 'queued', message: 'q', progress: 0);
+        (new ApplyAccountCleanup((string) $this->user->id, $plan['fingerprint'], (string) $progress->id))->handle(app(AccountCleanup::class));
 
         $audit = $this->user->fresh()->settings['money']['cleanup_audit'];
         $this->assertCount(1, $audit);

@@ -10,6 +10,7 @@ use App\Models\Integration;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -221,7 +222,7 @@ class SenseCheckTenancyTest extends TestCase
 
         $this->get(route('admin.sense-check.index', ['section' => 'money_data_health']))->assertOk()->assertSee('Money data health');
 
-        \Livewire\Livewire::withQueryParams(['section' => 'money_data_health']);
+        Livewire::withQueryParams(['section' => 'money_data_health']);
         Volt::test('admin.sense-check')
             ->assertSet('collapse.money_data_health', true);
     }
