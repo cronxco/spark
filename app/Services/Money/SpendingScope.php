@@ -12,10 +12,14 @@ use Illuminate\Support\Collection;
 /**
  * The single definition of "spending" used by the Plan tab, budgets, Flint and the mobile API.
  *
- * Included: Monzo card payments (refunds as negatives, declined excluded) and open-banking
- * payments on credit cards (inbound lines only when they are refunds). Everything else is
- * movement of money, not spending: pot transfers, direct debits, transfers, salary, fees,
- * interest, Flex, and card repayments. Computed at query time; nothing is stored.
+ * Included: Monzo card payments, cash withdrawals included (refunds as negatives, declined
+ * excluded), and open-banking payments on credit cards and current accounts. An inbound
+ * open-banking line counts only as a refund on a credit card. Everything else is movement of
+ * money, not spending: pot transfers, direct debits, transfers, salary and other income, fees,
+ * interest, Flex, and card repayments. An open-banking line on either side of a payment_for
+ * (card repayment) or transferred_to (own-account transfer) link is always excluded; the
+ * repayment phrases in config are a fallback for lines nothing has linked yet. Computed at
+ * query time; nothing is stored.
  *
  * Amounts are signed integer pence: spending is positive, refunds negative.
  */
@@ -36,8 +40,9 @@ class SpendingScope
     public function entries(string $userId, CarbonInterface $from, CarbonInterface $to, array $filters = []): Collection
     {
         $creditCards = $this->creditCardIds($userId);
+        $spendingAccounts = $this->spendingAccountIds($userId);
 
-        $entries = $this->query($userId, $from, $to, $creditCards)
+        $entries = $this->query($userId, $from, $to, $spendingAccounts)
             ->with(['actor', 'target', 'tags'])
             ->orderByDesc('time')
             ->get()
@@ -53,24 +58,24 @@ class SpendingScope
     }
 
     /**
-     * @param  list<string>  $creditCards
+     * @param  list<string>  $spendingAccounts
      * @return Builder<Event>
      */
-    private function query(string $userId, CarbonInterface $from, CarbonInterface $to, array $creditCards): Builder
+    private function query(string $userId, CarbonInterface $from, CarbonInterface $to, array $spendingAccounts): Builder
     {
         return Event::forUser($userId)
             ->whereBetween('time', [$from, $to])
-            ->where(function (Builder $query) use ($creditCards): void {
+            ->where(function (Builder $query) use ($spendingAccounts): void {
                 $query->where(function (Builder $monzo): void {
                     $monzo->where('service', 'monzo')
                         ->whereIn('action', [self::MONZO_OUT, self::MONZO_REFUND]);
                 });
 
-                if ($creditCards !== []) {
-                    $query->orWhere(function (Builder $bank) use ($creditCards): void {
+                if ($spendingAccounts !== []) {
+                    $query->orWhere(function (Builder $bank) use ($spendingAccounts): void {
                         $bank->where('service', 'gocardless')
                             ->whereIn('action', [self::BANK_OUT, self::BANK_IN])
-                            ->whereIn('actor_id', $creditCards);
+                            ->whereIn('actor_id', $spendingAccounts);
                     });
                 }
             });
@@ -87,6 +92,14 @@ class SpendingScope
             return ($meta['include_in_spending'] ?? null) !== false;
         }
 
+        if ($event->action === self::BANK_IN && ! in_array((string) $event->actor_id, $creditCards, true)) {
+            return false;
+        }
+
+        if ($this->isLinkedMovement($event)) {
+            return false;
+        }
+
         $description = strtoupper((string) ($meta['description'] ?? ''));
         foreach ((array) config('money.repayment_phrases', []) as $phrase) {
             if ($description !== '' && str_contains($description, strtoupper((string) $phrase))) {
@@ -94,20 +107,37 @@ class SpendingScope
             }
         }
 
-        return $event->action === self::BANK_OUT || ! $this->isRepayment($event);
+        return true;
     }
 
     /**
-     * An inbound credit-card line is a refund unless it is linked to a payment from another account.
+     * True when the line is on either side of a card repayment or an own-account transfer.
      */
-    private function isRepayment(Event $event): bool
+    private function isLinkedMovement(Event $event): bool
     {
-        return Relationship::where('type', 'payment_for')
+        return Relationship::whereIn('type', ['payment_for', 'transferred_to'])
             ->where(function ($query) use ($event): void {
                 $query->where(fn ($q) => $q->where('from_type', Event::class)->where('from_id', $event->id))
                     ->orWhere(fn ($q) => $q->where('to_type', Event::class)->where('to_id', $event->id));
             })
             ->exists();
+    }
+
+    /**
+     * Open-banking accounts whose payments are spending: everything except savings, loans and investments.
+     *
+     * @return list<string>
+     */
+    private function spendingAccountIds(string $userId): array
+    {
+        return EventObject::where('user_id', $userId)
+            ->where('concept', 'account')
+            ->where('type', 'bank_account')
+            ->get()
+            ->reject(fn (EventObject $account): bool => in_array($account->metadata['account_type'] ?? null, ['savings_account', 'savings', 'loan', 'investment_account'], true))
+            ->pluck('id')
+            ->map(fn ($id): string => (string) $id)
+            ->all();
     }
 
     /**

@@ -72,7 +72,7 @@ class SpendingTest extends TestCase
     }
 
     #[Test]
-    public function it_counts_credit_card_lines_from_open_banking_but_not_repayments_or_current_accounts(): void
+    public function it_counts_open_banking_card_and_current_account_payments_but_not_repayments_or_income(): void
     {
         $this->bankEvent($this->amex, 'payment_to', 4000, 'Hotel', 'Hotel stay');
         $this->bankEvent($this->amex, 'payment_from', 1000, 'Hotel', 'Refund of deposit');
@@ -89,7 +89,37 @@ class SpendingTest extends TestCase
 
         $entries = app(SpendingScope::class)->entries($this->user->id, $this->start(), $this->end());
 
-        $this->assertSame([-1000, 4000], $entries->pluck('amount')->sort()->values()->all());
+        $this->assertSame([-1000, 4000, 60_000], $entries->pluck('amount')->sort()->values()->all());
+    }
+
+    #[Test]
+    public function current_account_payments_count_but_income_savings_and_own_transfers_do_not(): void
+    {
+        $savings = $this->account('bank_account', 'Savings', ['account_type' => 'savings_account']);
+        $this->bankEvent($this->barclays, 'payment_to', 3000, 'Cafe', 'Coffee');
+        $this->bankEvent($this->barclays, 'payment_from', 250_000, 'Employer', 'Salary');
+        $this->bankEvent($savings, 'payment_to', 5000, 'Somewhere', 'Savings out');
+        $transfer = $this->bankEvent($this->barclays, 'payment_to', 40_000, 'Own account', 'Move');
+        $arrival = $this->bankEvent($this->amex, 'payment_from', 40_000, 'Own account', 'Move in');
+        Relationship::createRelationship([
+            'user_id' => $this->user->id, 'from_type' => Event::class, 'from_id' => $transfer->id,
+            'to_type' => Event::class, 'to_id' => $arrival->id, 'type' => 'transferred_to',
+        ]);
+
+        $entries = app(SpendingScope::class)->entries($this->user->id, $this->start(), $this->end());
+
+        $this->assertSame([3000], $entries->pluck('amount')->all());
+    }
+
+    #[Test]
+    public function monzo_cash_withdrawals_count_as_spending(): void
+    {
+        $this->monzoEvent('card_payment_to', 6000, 'ATM', 'cash');
+
+        $entries = app(SpendingScope::class)->entries($this->user->id, $this->start(), $this->end());
+
+        $this->assertSame([6000], $entries->pluck('amount')->all());
+        $this->assertSame('cash', $entries->first()['category']);
     }
 
     #[Test]
@@ -241,7 +271,7 @@ class SpendingTest extends TestCase
         $this->assertFalse($assessment['category_confident']);
         $this->assertTrue($assessment['recurring_confident']);
         $this->assertCount(0, $assessor->candidates($this->user->id, 30, 50));
-        $this->assertCount(0, app(SpendingScope::class)->entries($this->user->id, $this->start(), $this->end()->addYear())->where('merchant', 'Landlord'));
+        $this->assertCount(1, app(SpendingScope::class)->entries($this->user->id, $this->start(), $this->end()->addYear())->where('merchant', 'Landlord'));
     }
 
     #[Test]
@@ -296,7 +326,7 @@ class SpendingTest extends TestCase
     private function monzoEvent(string $action, int $pence, string $merchant, string $category, array $extra = [], string $time = '2026-10-10 12:00:00'): Event
     {
         $event = Event::create([
-            'integration_id' => $this->monzo->id, 'source_id' => 'm-' . (++$this->counter), 'actor_id' => $this->current->id,
+            'integration_id' => $this->monzo->id, 'source_id' => 'm-'.(++$this->counter), 'actor_id' => $this->current->id,
             'target_id' => $this->merchant($merchant)->id, 'service' => 'monzo', 'domain' => 'money', 'action' => $action,
             'time' => $time, 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => ['category' => $category] + $extra,
@@ -309,7 +339,7 @@ class SpendingTest extends TestCase
     private function bankEvent(EventObject $account, string $action, int $pence, string $merchant, string $description): Event
     {
         return Event::create([
-            'integration_id' => $this->bank->id, 'source_id' => 'g-' . (++$this->counter), 'actor_id' => $account->id,
+            'integration_id' => $this->bank->id, 'source_id' => 'g-'.(++$this->counter), 'actor_id' => $account->id,
             'target_id' => $this->merchant($merchant)->id, 'service' => 'gocardless', 'domain' => 'money', 'action' => $action,
             'time' => '2026-10-10 12:00:00', 'value' => $pence, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => ['description' => $description, 'transaction_status' => 'booked'],

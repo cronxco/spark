@@ -26,7 +26,7 @@ class SpendingAssessor
     public function __construct(private JevClient $jev) {}
 
     /**
-     * Open-banking lines on non-credit-card accounts, which the rules deliberately leave out.
+     * Open-banking lines on non-credit-card accounts. The rules count the payments as spending; Jev gives a shadow second opinion on whether each is really a bill, transfer or income, and nothing acts on it yet.
      *
      * @return Collection<int, Event>
      */
@@ -88,7 +88,7 @@ class SpendingAssessor
             $questions["tx_{$event->id}_class"] = $this->classQuestion($event->id);
             $questions["tx_{$event->id}_category"] = $this->categoryQuestion($event->id);
             $questions["tx_{$event->id}_recurring"] = JevQuestion::noul(
-                "Does `transactions.{$event->id}` look like a payment that repeats on a regular schedule?" . self::UNTRUSTED,
+                "Does `transactions.{$event->id}` look like a payment that repeats on a regular schedule?".self::UNTRUSTED,
                 'Yes: a subscription, standing order, direct debit or regular transfer.',
                 'No: a one-off purchase or payment.',
             );
@@ -134,7 +134,7 @@ class SpendingAssessor
     private function classQuestion(string $id): JevQuestion
     {
         return JevQuestion::choice(
-            "What kind of money movement is `transactions.{$id}`?" . self::UNTRUSTED,
+            "What kind of money movement is `transactions.{$id}`?".self::UNTRUSTED,
             [
                 'spending' => 'A purchase of goods or services',
                 'transfer' => 'Moving money between accounts the person owns, or a payment to another person',
@@ -153,6 +153,6 @@ class SpendingAssessor
             $options[$category] = null;
         }
 
-        return JevQuestion::choice("Which category best fits `transactions.{$id}`?" . self::UNTRUSTED, $options);
+        return JevQuestion::choice("Which category best fits `transactions.{$id}`?".self::UNTRUSTED, $options);
     }
 }
