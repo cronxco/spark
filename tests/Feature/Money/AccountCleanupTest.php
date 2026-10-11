@@ -215,6 +215,50 @@ class AccountCleanupTest extends TestCase
     }
 
     #[Test]
+    public function renaming_a_category_leaves_other_users_tag_associations_alone(): void
+    {
+        $account = $this->pot('Current', 'monzo_account');
+        $mine = $this->event($account, 'card_payment_to', 900, '2026-02-01', ['category' => 'category_abc123', 'raw' => ['merchant' => ['name' => 'Leon']]]);
+        $mine->attachTag('category_abc123', 'transaction_category');
+
+        $other = User::factory()->create();
+        $otherIntegration = Integration::factory()->create([
+            'user_id' => $other->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $other->id, 'service' => 'monzo'])->id,
+            'service' => 'monzo',
+            'instance_type' => 'accounts',
+        ]);
+        $otherActor = EventObject::create(['user_id' => $other->id, 'concept' => 'account', 'type' => 'monzo_account', 'title' => 'Theirs', 'metadata' => []]);
+        $theirs = Event::create([
+            'integration_id' => $otherIntegration->id, 'source_id' => 'other-1', 'actor_id' => $otherActor->id,
+            'target_id' => $otherActor->id, 'service' => 'monzo', 'domain' => 'money', 'action' => 'card_payment_to',
+            'time' => '2026-02-01 12:00:00', 'value' => 100, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+        ]);
+        $theirs->attachTag('category_abc123', 'transaction_category');
+
+        $this->cleanup()->setCategoryName($this->user->id, 'category_abc123', 'Lunch');
+        $plan = $this->cleanup()->plan($this->user->id, [AccountCleanup::KIND_CATEGORY]);
+        $this->cleanup()->apply($this->user->id, $plan['fingerprint'], [AccountCleanup::KIND_CATEGORY]);
+
+        $this->assertSame(['Lunch'], $mine->fresh()->tagsWithType('transaction_category')->pluck('name')->all());
+        $this->assertSame(['category_abc123'], $theirs->fresh()->tagsWithType('transaction_category')->pluck('name')->all());
+        $this->assertNotNull(Tag::findFromString('category_abc123', 'transaction_category'));
+    }
+
+    #[Test]
+    public function two_placeholder_names_resolving_to_the_same_title_block_the_second_rename(): void
+    {
+        $this->bankAccount('Current [11111111-1111-1111-1111-111111111111]', 'acc-1', [], '2026-01-01');
+        $this->bankAccount('Current [22222222-2222-2222-2222-222222222222]', 'acc-2', [], '2026-01-02');
+
+        $plan = $this->cleanup()->plan($this->user->id, [AccountCleanup::KIND_RENAME]);
+
+        $this->assertCount(2, $plan['steps']);
+        $this->assertNull($plan['steps'][0]['blocked']);
+        $this->assertNotNull($plan['steps'][1]['blocked']);
+    }
+
+    #[Test]
     public function pots_missing_monzo_details_queue_a_read_only_refresh(): void
     {
         Queue::fake();

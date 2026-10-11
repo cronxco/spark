@@ -171,6 +171,9 @@ class AccountCleanup
                     ['object_id' => $object->id, 'title' => $clean],
                     $blocked,
                 );
+                if ($blocked === null) {
+                    $taken[] = $clean;
+                }
             }
         }
 
@@ -401,19 +404,27 @@ class AccountCleanup
             return;
         }
 
-        $table = DB::table('taggables');
-        $already = (clone $table)->where('tag_id', $new->id)->get(['taggable_id', 'taggable_type'])
-            ->map(fn ($row) => $row->taggable_type.'|'.$row->taggable_id)->all();
-        foreach ((clone $table)->where('tag_id', $old->id)->get() as $row) {
+        $morph = (new Event)->getMorphClass();
+        $owned = Event::withTrashed()
+            ->join('integrations', 'integrations.id', '=', 'events.integration_id')
+            ->where('integrations.user_id', $userId)
+            ->select('events.id');
+        $already = DB::table('taggables')->where('tag_id', $new->id)->where('taggable_type', $morph)
+            ->pluck('taggable_id')->map(fn ($id) => (string) $id)->all();
+        $rows = DB::table('taggables')->where('tag_id', $old->id)->where('taggable_type', $morph)
+            ->whereIn('taggable_id', $owned)->pluck('taggable_id');
+        foreach ($rows as $eventId) {
             $query = DB::table('taggables')->where('tag_id', $old->id)
-                ->where('taggable_id', $row->taggable_id)->where('taggable_type', $row->taggable_type);
-            if (in_array($row->taggable_type.'|'.$row->taggable_id, $already, true)) {
+                ->where('taggable_id', $eventId)->where('taggable_type', $morph);
+            if (in_array((string) $eventId, $already, true)) {
                 $query->delete();
             } else {
                 $query->update(['tag_id' => $new->id]);
             }
         }
-        $old->delete();
+        if (! DB::table('taggables')->where('tag_id', $old->id)->exists()) {
+            $old->delete();
+        }
     }
 
     private function monzoMaster(string $userId): ?Integration
