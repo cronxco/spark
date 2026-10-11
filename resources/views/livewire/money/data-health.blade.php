@@ -1,12 +1,7 @@
 <div @if ($progress && $progress->isInProgress()) wire:poll.2s @endif>
     <div class="card bg-base-200 shadow">
         <div class="card-body gap-4">
-            <div>
-                <h2 class="card-title">Data health</h2>
-                <p class="text-sm text-base-content/70">
-                    Spark checks your money data for duplicates and leftovers. Nothing changes until you press Apply.
-                </p>
-            </div>
+            <h2 class="card-title">Data health</h2>
 
             @if ($progress)
                 <div class="alert {{ $progress->isFailed() ? 'alert-error' : ($progress->isCompleted() ? 'alert-success' : 'alert-info') }}">
@@ -26,7 +21,7 @@
             @if (count($steps) === 0)
                 <div class="alert alert-success">
                     <x-icon name="fas.circle-check" class="w-5 h-5" />
-                    <span>Everything looks tidy. There is nothing to clean up.</span>
+                    <span>Nothing to clean up.</span>
                 </div>
             @else
                 <ul class="flex flex-col divide-y divide-base-300">

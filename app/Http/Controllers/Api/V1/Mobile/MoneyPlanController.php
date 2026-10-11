@@ -166,6 +166,25 @@ class MoneyPlanController extends Controller
     }
 
     /**
+     * PATCH /api/v1/mobile/money/cards/{id}  {statement_day: 7|null, payment_day: 19|null}
+     */
+    public function cardUpdate(Request $request, string $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'statement_day' => ['present', 'nullable', 'integer', 'between:1,31'],
+            'payment_day' => ['nullable', 'integer', 'between:1,31'],
+        ]);
+
+        try {
+            $this->cover->setBilling((string) $request->user()->id, $id, $validated['statement_day'], $validated['payment_day'] ?? null);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        }
+
+        return response()->json(['data' => ['statement_day' => $validated['statement_day'], 'payment_day' => $validated['payment_day'] ?? null]]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function validateBudget(Request $request, bool $creating): array
