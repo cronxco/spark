@@ -1,0 +1,17 @@
+name: Config Audit PHPCS Diagnostic
+on:
+  push:
+    branches:
+      - feat/config-audit-sense-check
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer
+      - run: composer global require tightenco/duster:^3.4 --no-interaction --no-progress
+      - name: Show specific PHP_CodeSniffer failures
+        run: ~/.config/composer/vendor/bin/duster lint --using=phpcs
