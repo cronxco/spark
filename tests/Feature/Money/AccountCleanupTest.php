@@ -187,6 +187,24 @@ class AccountCleanupTest extends TestCase
     }
 
     #[Test]
+    public function snapshot_cleanup_never_removes_non_zero_or_negative_balances(): void
+    {
+        $pot = $this->pot('Old pot', 'monzo_archived_pot');
+        foreach ([100, 0, 0, 50, 0, 0, 0, -20, 0, 0] as $day => $value) {
+            $this->event($pot, 'had_balance', $value, sprintf('2026-01-%02d', $day + 1));
+        }
+
+        $plan = $this->cleanup()->plan($this->user->id, [AccountCleanup::KIND_SNAPSHOTS]);
+        $this->assertSame(1, $plan['steps'][0]['payload']['rows']);
+
+        $this->cleanup()->apply($this->user->id, $plan['fingerprint'], [AccountCleanup::KIND_SNAPSHOTS]);
+
+        $this->assertSame(9, Event::where('actor_id', $pot->id)->count());
+        $this->assertSame(1, Event::where('actor_id', $pot->id)->where('value', -20)->count());
+        $this->assertSame(1, Event::onlyTrashed()->where('actor_id', $pot->id)->count());
+    }
+
+    #[Test]
     public function monzo_custom_categories_need_a_name_and_are_then_renamed_into_the_existing_tag(): void
     {
         $account = $this->pot('Current', 'monzo_account');
@@ -338,7 +356,7 @@ class AccountCleanupTest extends TestCase
     {
         return EventObject::create([
             'user_id' => $this->user->id, 'concept' => 'account', 'type' => $type, 'title' => $title,
-            'metadata' => ['name' => $title, 'pot_id' => 'pot_' . $title],
+            'metadata' => ['name' => $title, 'pot_id' => 'pot_'.$title],
         ]);
     }
 
@@ -351,13 +369,13 @@ class AccountCleanupTest extends TestCase
         $integration = $actor->type === 'bank_account' ? $this->gocardless : $this->monzo;
         $target = EventObject::firstOrCreate(
             ['user_id' => $this->user->id, 'concept' => 'day', 'type' => 'day', 'title' => $day],
-            ['time' => $day . ' 00:00:00', 'metadata' => []],
+            ['time' => $day.' 00:00:00', 'metadata' => []],
         );
 
         return Event::create([
-            'integration_id' => $integration->id, 'source_id' => 'evt-' . (++$counter), 'actor_id' => $actor->id,
+            'integration_id' => $integration->id, 'source_id' => 'evt-'.(++$counter), 'actor_id' => $actor->id,
             'target_id' => $target->id, 'service' => $integration->service, 'domain' => 'money', 'action' => $action,
-            'time' => $day . ' 23:59:59', 'value' => $value, 'value_multiplier' => 100, 'value_unit' => 'GBP',
+            'time' => $day.' 23:59:59', 'value' => $value, 'value_multiplier' => 100, 'value_unit' => 'GBP',
             'event_metadata' => $metadata,
         ]);
     }
