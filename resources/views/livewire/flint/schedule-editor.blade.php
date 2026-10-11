@@ -63,7 +63,7 @@
                     @foreach ($forms[$routine]['times'] as $index => $time)
                         <div class="flex items-center gap-2" wire:key="time-{{ $routine }}-{{ $index }}">
                             <input type="time" class="input input-bordered input-sm" wire:model="forms.{{ $routine }}.times.{{ $index }}" aria-label="{{ $label }} time {{ $index + 1 }}" />
-                            @if (count($forms[$routine]['times']) > 1)
+                            @if (count($forms[$routine]['times']) > 1 || ($forms[$routine]['cron'] ?? '') !== '')
                                 <button type="button" class="btn btn-ghost btn-xs" wire:click="removeTime('{{ $routine }}', {{ $index }})" aria-label="Remove time {{ $index + 1 }}">Remove</button>
                             @endif
                         </div>
