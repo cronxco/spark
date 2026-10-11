@@ -209,7 +209,7 @@ class EventObject extends Model implements HasMedia
 
     /**
      * Objects nothing points at. An object is in use when it is an event's
-     * actor, target or source (soft-deleted events included), or when a live
+     * actor or target (soft-deleted events included), or when a live
      * relationship row names it on either side — places, linked URLs, Flint
      * notes and merged places hang off relationships alone. Relationship
      * endpoints match on id because the stored type is sometimes EventObject
@@ -220,9 +220,6 @@ class EventObject extends Model implements HasMedia
         return $query
             ->whereDoesntHave('actorEvents')
             ->whereDoesntHave('targetEvents')
-            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
-                ->from('events')
-                ->whereColumn('events.source_id', 'objects.id'))
             ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
                 ->from('relationships')
                 ->whereNull('relationships.deleted_at')

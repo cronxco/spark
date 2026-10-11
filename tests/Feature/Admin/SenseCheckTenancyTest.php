@@ -236,15 +236,14 @@ class SenseCheckTenancyTest extends TestCase
     }
 
     #[Test]
-    public function orphaned_objects_ignore_objects_referenced_by_relationships_or_event_source(): void
+    public function orphaned_objects_ignore_objects_referenced_by_relationships(): void
     {
         $linked = EventObject::factory()->create(['user_id' => $this->admin->id]);
         $linkedFrom = EventObject::factory()->create(['user_id' => $this->admin->id]);
-        $sourceObject = EventObject::factory()->create(['user_id' => $this->admin->id]);
         $deletedLink = EventObject::factory()->create(['user_id' => $this->admin->id]);
         $truly = EventObject::factory()->create(['user_id' => $this->admin->id]);
 
-        $event = $this->eventFor($this->admin, ['source_id' => $sourceObject->id]);
+        $event = $this->eventFor($this->admin);
 
         // Place-style: an event occurred_at an object.
         Relationship::createRelationship([
