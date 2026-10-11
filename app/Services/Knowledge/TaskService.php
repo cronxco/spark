@@ -22,6 +22,12 @@ class TaskService
 {
     public const TYPES = ['knowledge_task', 'day_task', 'doc_task', 'flint_topic_task'];
 
+    /**
+     * Outline checklists in ordinary documents stay out of task lists; only day-page
+     * tasks, thread tasks and tasks captured in Spark are shown.
+     */
+    public const LISTED_TYPES = ['knowledge_task', 'day_task', 'flint_topic_task'];
+
     public function __construct(
         private TaskLifecycle $lifecycle,
         private ResourceVersion $versions,
@@ -38,7 +44,7 @@ class TaskService
         return $query->when($deleted, fn ($q) => $q->withTrashed())
             ->selectRaw($table . '.*')->selectRaw($table . '.xmin AS xmin')
             ->with(['event.integration.user', 'relationshipsFrom' => fn ($q) => $q->where('user_id', $user->id)->whereNull('deleted_at')->whereIn('type', ['task_project', 'task_thread', 'task_context']), 'relationshipsFrom.to'])
-            ->whereIn('block_type', self::TYPES)
+            ->whereIn('block_type', self::LISTED_TYPES)
             ->whereHas('event', fn ($q) => $q->whereNull('deleted_at')
                 ->whereHas('integration', fn ($q) => $q->where('user_id', $user->id)));
     }
@@ -53,7 +59,12 @@ class TaskService
                     ->whereRaw("COALESCE(metadata->>'removed', 'false') != 'true'")
                     ->where(function (Builder $types) use ($date) {
                         $types->where(fn (Builder $day) => $day->where('block_type', 'day_task')
-                            ->whereHas('event', fn (Builder $event) => $event->whereDate('time', $date)))
+                            ->where(fn (Builder $window) => $window
+                                ->whereHas('event', fn (Builder $event) => $event->whereDate('time', $date))
+                                ->orWhere(fn (Builder $carried) => $carried->whereNull('metadata->completed_at')
+                                    ->whereRaw("COALESCE(metadata->>'checked', 'false') != 'true'")
+                                    ->whereHas('event', fn (Builder $event) => $event->whereDate('time', '<', $date)
+                                        ->whereDate('time', '>=', CarbonImmutable::parse($date)->subDays(6)->toDateString())))))
                             ->orWhere(function (Builder $other) use ($date) {
                                 $other->where('block_type', '!=', 'day_task')
                                     ->whereRaw("LEAST(metadata->>'due_on', metadata->>'review_on') <= ?", [$date])
@@ -120,7 +131,7 @@ class TaskService
         $start = $day ? ($block->event?->time ?? $block->time)?->toDateString() : ($dates ? min($dates) : null);
 
         return $this->lifecycle->schedule([
-            'schema_version' => 1, 'lifecycle' => $day ? 'day' : 'persistent',
+            'schema_version' => 1, 'lifecycle' => $day ? 'week' : 'persistent',
             'status' => ($m['removed'] ?? false) ? 'deleted' : (($m['checked'] ?? false) || ! empty($m['completed_at']) ? 'completed' : 'open'),
             'availability_on' => $start, 'original_assigned_on' => $start, 'window_start_on' => $start,
             'schedule_timezone' => $this->timezones->timezoneFor($block->event?->integration?->user), 'due_on' => $m['due_on'] ?? null, 'review_on' => $m['review_on'] ?? null,
