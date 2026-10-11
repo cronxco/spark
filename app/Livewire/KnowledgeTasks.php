@@ -50,6 +50,12 @@ class KnowledgeTasks extends Component
 
     public string $projectState = 'active';
 
+    public string $section = 'tasks';
+
+    public bool $showTaskForm = false;
+
+    public bool $showProjectForm = false;
+
     public string $filter = 'today';
 
     public string $search = '';
@@ -92,9 +98,22 @@ class KnowledgeTasks extends Component
         }
     }
 
+    public function newTask(): void
+    {
+        $this->resetTaskForm();
+        $this->showTaskForm = true;
+    }
+
+    public function newProject(): void
+    {
+        $this->resetProjectForm();
+        $this->showProjectForm = true;
+    }
+
     public function edit(string $id): void
     {
         $p = app(TaskService::class)->payload(app(TaskService::class)->find(Auth::user(), $id));
+        $this->showTaskForm = true;
         $this->editing = $id;
         $this->version = $p['version'];
         $this->title = $p['title'];
@@ -122,12 +141,24 @@ class KnowledgeTasks extends Component
             } else {
                 $s->create(Auth::user(), $data + ['client_mutation_id' => $this->captureID]);
             }
-            $this->reset('editing', 'version', 'title', 'content', 'message', 'lifecycle', 'due', 'project', 'threads', 'priority', 'recurrence', 'position', 'review', 'reminder');
-            $this->availability = app(EffectiveTimezoneResolver::class)->today(Auth::user())->toDateString();
-            $this->captureID = (string) Str::uuid();
+            $this->resetTaskForm();
         } catch (HttpResponseException $e) {
             $this->message = 'This task changed. Open it again before saving.';
         }
+    }
+
+    private function resetTaskForm(): void
+    {
+        $this->reset('editing', 'version', 'title', 'content', 'message', 'lifecycle', 'due', 'project', 'threads', 'priority', 'recurrence', 'position', 'review', 'reminder', 'showTaskForm');
+        $this->resetErrorBag();
+        $this->availability = app(EffectiveTimezoneResolver::class)->today(Auth::user())->toDateString();
+        $this->captureID = (string) Str::uuid();
+    }
+
+    private function resetProjectForm(): void
+    {
+        $this->reset('projectTitle', 'projectContent', 'projectTarget', 'projectNext', 'projectState', 'projectHideTasks', 'editingProject', 'projectVersion', 'showProjectForm');
+        $this->resetErrorBag();
     }
 
     public function act(string $id, string $action, string $version): void
@@ -147,7 +178,7 @@ class KnowledgeTasks extends Component
             app(ProjectService::class)->save(Auth::user(), ['title' => $this->projectTitle, 'content' => $this->projectContent,
                 'target_on' => $this->projectTarget ?: null, 'next_action_task_id' => $this->projectNext ?: null, 'status' => $this->projectState,
                 'hide_tasks' => $this->projectHideTasks], $this->editingProject, $this->projectVersion);
-            $this->reset('projectTitle', 'projectContent', 'projectTarget', 'projectNext', 'editingProject', 'projectVersion');
+            $this->resetProjectForm();
         } catch (HttpResponseException $e) {
             $this->message = 'This project changed. Open it again before saving.';
         }
@@ -161,6 +192,8 @@ class KnowledgeTasks extends Component
     public function editProject(string $id): void
     {
         $p = app(ProjectService::class)->payload(app(ProjectService::class)->query(Auth::user())->findOrFail($id));
+        $this->section = 'projects';
+        $this->showProjectForm = true;
         $this->editingProject = $id;
         $this->projectVersion = $p['version'];
         $this->projectTitle = $p['title'];
@@ -197,7 +230,7 @@ class KnowledgeTasks extends Component
                 $this->act($id, $action, $version);
             }
         }
-        $this->selected = [];
+        $this->reset('selected', 'bulkDate', 'bulkProject');
     }
 
     public function updatedFilter(): void
