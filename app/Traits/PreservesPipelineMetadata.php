@@ -39,16 +39,12 @@ trait PreservesPipelineMetadata
             return;
         }
 
-        if (PipelineMetadata::areEquivalent($original, $current)) {
-            $this->setAttribute($field, $original);
-
-            return;
-        }
-
         $missing = array_diff_key(Arr::only($original, PipelineMetadata::KEYS), $current);
+        $merged = $current + $missing;
 
-        if ($missing !== []) {
-            $this->setAttribute($field, $current + $missing);
-        }
+        $this->setAttribute(
+            $field,
+            PipelineMetadata::normalize($merged) === PipelineMetadata::normalize($original) ? $original : $merged,
+        );
     }
 }

@@ -14,6 +14,7 @@ class PreservesPipelineMetadataTest extends TestCase
     public function a_sync_rewrite_keeps_pipeline_keys_on_blocks(): void
     {
         $block = Block::factory()->create([
+            'event_id' => Event::factory()->create()->id,
             'metadata' => ['status' => 'confirmed', 'description' => 'Old'] + $this->pipelineKeys(),
         ]);
         $block = Block::query()->findOrFail($block->id);
@@ -45,6 +46,22 @@ class PreservesPipelineMetadataTest extends TestCase
         $this->assertFalse($object->wasChanged('metadata'));
         $this->assertSame('text-embedding-3-small', $event->fresh()->event_metadata['embedding_model']);
         $this->assertSame('text-embedding-3-small', $object->fresh()->metadata['embedding_model']);
+    }
+
+    #[Test]
+    public function an_explicit_change_to_pipeline_keys_is_saved(): void
+    {
+        $event = Event::factory()->create([
+            'event_metadata' => ['status' => 'confirmed'] + $this->pipelineKeys(),
+        ]);
+        $event = Event::query()->findOrFail($event->id);
+
+        $event->update(['event_metadata' => ['task_executions' => ['other' => ['last_attempt' => ['status' => 'failed']]]]]);
+
+        $this->assertSame(
+            ['other'],
+            array_keys($event->fresh()->event_metadata['task_executions'])
+        );
     }
 
     #[Test]

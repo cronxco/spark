@@ -129,7 +129,7 @@ class BlockObserver
         }
 
         $before = $this->decodeMetadata($previous['metadata']);
-        $after = $this->decodeMetadata($block->getRawOriginal('metadata'));
+        $after = $this->decodeMetadata($block->getAttributes()['metadata'] ?? null);
 
         return $before !== null
             && $after !== null
