@@ -106,15 +106,31 @@ class AdminPageSafetyTest extends TestCase
     }
 
     #[Test]
-    public function block_view_only_shows_the_viewed_tenants_blocks(): void
+    public function blocks_gallery_only_shows_the_viewed_tenants_blocks(): void
     {
         $own = Block::factory()->create(['event_id' => $this->eventFor($this->admin)->id, 'block_type' => 'own_block_type']);
-        Block::factory()->create(['event_id' => $this->eventFor($this->other)->id, 'block_type' => 'foreign_block_type']);
+        $foreign = Block::factory()->create(['event_id' => $this->eventFor($this->other)->id, 'block_type' => 'foreign_block_type']);
 
+        $this->actingAs($this->admin);
+
+        $ids = Volt::test('admin.blocks')
+            ->set('view', 'gallery')
+            ->assertOk()
+            ->instance()
+            ->getGalleryBlocks()
+            ->pluck('id')
+            ->all();
+
+        $this->assertSame([$own->id], $ids);
+        $this->assertNotContains($foreign->id, $ids);
+    }
+
+    #[Test]
+    public function old_block_view_url_redirects_to_the_gallery(): void
+    {
         $this->actingAs($this->admin)
             ->get(route('admin.block-view.index'))
-            ->assertOk()
-            ->assertViewHas('blocks', fn ($blocks) => $blocks->pluck('id')->all() === [$own->id]);
+            ->assertRedirect('/admin/blocks?view=gallery');
     }
 
     #[Test]

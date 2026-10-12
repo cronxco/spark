@@ -32,7 +32,7 @@ $domainColor = $domainColors[$domain] ?? 'primary';
 
 // Load relationships if needed
 $event->loadMissing(['actor', 'target', 'integration']);
-$blocksCount = $event->blocks()->count();
+$blocksCount = $event->blocks_count ?? ($event->relationLoaded('blocks') ? $event->blocks->count() : $event->blocks()->count());
 
 // Base ID for this popover (unique suffix added via JavaScript)
 $popoverBaseId = 'event-ref-' . $event->id;
@@ -90,7 +90,7 @@ $popoverBaseId = 'event-ref-' . $event->id;
                border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$icon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
+        <span class="max-w-[200px] truncate">{!! $text ?? e($actionDisplay) !!}</span>
         @if ($showService)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
         @endif
@@ -106,7 +106,7 @@ $popoverBaseId = 'event-ref-' . $event->id;
                border border-{{ $domainColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$icon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{!! $text ?? $actionDisplay !!}</span>
+        <span class="max-w-[200px] truncate">{!! $text ?? e($actionDisplay) !!}</span>
         @if ($showService)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $serviceName }}</span>
         @endif

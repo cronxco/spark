@@ -4,6 +4,7 @@ use App\Models\EventObject;
 use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Livewire\Concerns\HasAdminListControls;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -14,7 +15,7 @@ layout('components.layouts.app');
 
 new class extends Component
 {
-    use Toast, WithPagination;
+    use HasAdminListControls, Toast, WithPagination;
 
     public string $search = '';
     public string $conceptFilter = '';
@@ -125,11 +126,10 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        [$sortColumn, $sortDirection] = $this->resolvedSort('created_at');
         $query->orderBy($sortColumn, $sortDirection);
 
-        return $query->paginate($this->perPage);
+        return $query->paginate($this->resolvedPerPage());
     }
 
     public function getUniqueConcepts()
@@ -171,12 +171,12 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Objects Admin" subtitle="Manage and monitor your objects data" separator>
+    <x-header title="Data" subtitle="Browse and manage objects" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedObjects) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                    onclick="return confirm('Are you sure you want to delete {{ count($selectedObjects) }} object(s)? This action cannot be undone.')">
+                    wire:confirm="Are you sure you want to delete {{ count($selectedObjects) }} object(s)? This action cannot be undone.">
                     <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedObjects) }})
                 </button>
@@ -184,6 +184,8 @@ new class extends Component
             </div>
         </x-slot:actions>
     </x-header>
+
+    <x-admin.data-tabs active="objects" />
 
     <!-- Desktop Filters -->
     <div class="hidden lg:block card bg-base-200 shadow mb-6">

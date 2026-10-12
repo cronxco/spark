@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AasaController;
-use App\Http\Controllers\Admin\BlockViewController;
 use App\Http\Controllers\Admin\GoCardlessAdminController;
 use App\Http\Controllers\Admin\MigrationsController;
 use App\Http\Controllers\Api\PushSubscriptionController;
@@ -367,7 +366,7 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
     Volt::route('search', 'admin.search')->name('search.index');
     Volt::route('duplicates', 'admin.duplicates.index')->name('duplicates.index');
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
-    Route::get('block-view', [BlockViewController::class, 'index'])->name('block-view.index');
+    Route::redirect('block-view', '/admin/blocks?view=gallery')->name('block-view.index');
     Route::post('bin/delete', function () {
         $userId = AdminTenant::id();
         AdminTenant::recordAction('bin_purge', [], $userId === null);

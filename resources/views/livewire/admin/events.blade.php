@@ -5,6 +5,7 @@ use App\Models\Event;
 use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Livewire\Concerns\HasAdminListControls;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -15,7 +16,7 @@ layout('components.layouts.app');
 
 new class extends Component
 {
-    use Toast, WithPagination;
+    use HasAdminListControls, Toast, WithPagination;
 
     public string $search = '';
     public string $serviceFilter = '';
@@ -153,11 +154,10 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'time';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        [$sortColumn, $sortDirection] = $this->resolvedSort('time');
         $query->orderBy($sortColumn, $sortDirection);
 
-        return $query->paginate($this->perPage);
+        return $query->paginate($this->resolvedPerPage());
     }
 
     public function getUniqueServices()
@@ -214,12 +214,12 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Events Admin" subtitle="Manage and monitor your events data" separator>
+    <x-header title="Data" subtitle="Browse and manage events" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedEvents) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                    onclick="return confirm('Are you sure you want to delete {{ count($selectedEvents) }} event(s) and their associated blocks? This action cannot be undone.')">
+                    wire:confirm="Are you sure you want to delete {{ count($selectedEvents) }} event(s) and their associated blocks? This action cannot be undone.">
                     <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedEvents) }})
                 </button>
@@ -227,6 +227,8 @@ new class extends Component
             </div>
         </x-slot:actions>
     </x-header>
+
+    <x-admin.data-tabs active="events" />
 
     <div class="space-y-4 lg:space-y-6">
         <!-- Desktop Filters -->
