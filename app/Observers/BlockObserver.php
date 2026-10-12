@@ -4,7 +4,7 @@ namespace App\Observers;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Block;
-use Illuminate\Support\Arr;
+use App\Support\PipelineMetadata;
 
 class BlockObserver
 {
@@ -18,17 +18,6 @@ class BlockObserver
         'value',
         'value_multiplier',
         'value_unit',
-    ];
-
-    /**
-     * Metadata keys written by the pipeline itself. A sync that rewrites a
-     * block's metadata drops them, which is not a change to the block's data.
-     */
-    private const PIPELINE_METADATA_KEYS = [
-        'task_executions',
-        'embedding_model',
-        'embedding_dimensions',
-        'embedding_generated_at',
     ];
 
     /**
@@ -128,9 +117,8 @@ class BlockObserver
 
     /**
      * A re-synced block with identical data still looks dirty to Eloquent: Postgres
-     * jsonb reorders object keys, and the sync's fresh metadata lacks the keys the
-     * pipeline mirrored into it. Compare the previous and current metadata ignoring
-     * key order and pipeline-owned keys.
+     * jsonb reorders object keys, and a sync's fresh metadata lacks the keys the
+     * pipeline mirrored into it.
      */
     private function metadataIsEquivalent(Block $block): bool
     {
@@ -145,8 +133,7 @@ class BlockObserver
 
         return $before !== null
             && $after !== null
-            && $this->normalizeMetadata(Arr::except($before, self::PIPELINE_METADATA_KEYS))
-                === $this->normalizeMetadata(Arr::except($after, self::PIPELINE_METADATA_KEYS));
+            && PipelineMetadata::areEquivalent($before, $after);
     }
 
     private function decodeMetadata(mixed $raw): ?array
@@ -158,24 +145,5 @@ class BlockObserver
         $decoded = is_string($raw) ? json_decode($raw, true) : $raw;
 
         return is_array($decoded) ? $decoded : null;
-    }
-
-    /**
-     * @param  array<int|string, mixed>  $value
-     * @return array<int|string, mixed>
-     */
-    private function normalizeMetadata(array $value): array
-    {
-        foreach ($value as $key => $item) {
-            if (is_array($item)) {
-                $value[$key] = $this->normalizeMetadata($item);
-            }
-        }
-
-        if (! array_is_list($value)) {
-            ksort($value);
-        }
-
-        return $value;
     }
 }
