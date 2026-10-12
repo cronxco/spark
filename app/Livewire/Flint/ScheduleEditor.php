@@ -7,12 +7,15 @@ use App\Services\Flint\FlintScheduleSettings;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
  * Edits when each repeating Flint routine runs: one or more local times, which days, and an optional
  * advanced cron expression. Everything is checked by {@see FlintScheduleSettings::validateSchedule()}
  * before it is stored, so a bad value is rejected here instead of silently falling back to a default.
+ * The Flint settings page renders one editor per routine and saves them all with its own Save button;
+ * the on/off switch belongs to the page, not to this editor.
  */
 class ScheduleEditor extends Component
 {
@@ -21,15 +24,20 @@ class ScheduleEditor extends Component
 
     public ?string $saved = null;
 
-    public function mount(): void
+    /** The one routine this editor shows and saves, or null for every editable routine. */
+    public ?string $routine = null;
+
+    public function mount(?string $routine = null): void
     {
+        abort_if($routine !== null && ! in_array($routine, FlintScheduleSettings::EDITABLE_ROUTINES, true), 404);
+        $this->routine = $routine;
+
         $settings = Auth::user()->settings['flint'] ?? [];
         $service = app(FlintScheduleService::class);
 
         foreach (FlintScheduleSettings::EDITABLE_ROUTINES as $routine) {
             $cadence = $service->cadence(Auth::user(), $routine) ?? [];
             $this->forms[$routine] = [
-                'enabled' => FlintScheduleSettings::enabled($settings, "{$routine}_enabled"),
                 'frequency' => $cadence['frequency'] ?? 'daily',
                 'days' => $cadence['days'] ?? [],
                 'day_of_month' => (string) ($cadence['day_of_month'] ?? '1'),
@@ -79,9 +87,6 @@ class ScheduleEditor extends Component
 
         $user = Auth::user();
         $settings = $user->settings;
-        if ($this->ownsSwitch($routine)) {
-            $settings['flint']["{$routine}_enabled"] = (bool) $form['enabled'];
-        }
         $settings['flint']['schedules'][$routine] = $schedule;
         $user->settings = $settings;
         $user->save();
@@ -89,35 +94,44 @@ class ScheduleEditor extends Component
         $this->saved = $routine;
     }
 
+    /**
+     * Saves every routine this editor shows when the page's Save button is pressed.
+     */
+    #[On('save-flint-schedules')]
+    public function saveAll(): void
+    {
+        foreach ($this->visibleRoutines() as $routine) {
+            $this->save($routine);
+        }
+    }
+
     public function render(): View
     {
         $user = Auth::user();
         $service = app(FlintScheduleService::class);
         $next = [];
-        foreach (FlintScheduleSettings::EDITABLE_ROUTINES as $routine) {
+        foreach ($this->visibleRoutines() as $routine) {
             $next[$routine] = $service->enabled($user, $routine)
                 ? $service->nextEligibleRun($user, $routine)->format('D j M, H:i')
                 : null;
         }
 
         return view('livewire.flint.schedule-editor', [
-            'routines' => [
+            'routines' => collect([
                 'topics' => 'Topic review',
                 'reading_list' => 'Reading list',
                 'news_roundup' => 'News roundup',
                 'money_weekly' => 'Money weekly check',
                 'money_close' => 'Money monthly close',
-            ],
+            ])->only($this->visibleRoutines())->all(),
             'next' => $next,
         ]);
     }
 
-    /**
-     * The money routines have no switch elsewhere on the Flint page, so this editor owns theirs.
-     */
-    public function ownsSwitch(string $routine): bool
+    /** @return list<string> */
+    private function visibleRoutines(): array
     {
-        return str_starts_with($routine, 'money_');
+        return $this->routine !== null ? [$this->routine] : FlintScheduleSettings::EDITABLE_ROUTINES;
     }
 
     private function guard(string $routine): void
