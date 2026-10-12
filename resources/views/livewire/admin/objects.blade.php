@@ -4,6 +4,7 @@ use App\Models\EventObject;
 use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Livewire\Concerns\HasAdminListControls;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -14,7 +15,7 @@ layout('components.layouts.app');
 
 new class extends Component
 {
-    use Toast, WithPagination;
+    use HasAdminListControls, Toast, WithPagination;
 
     public string $search = '';
     public string $conceptFilter = '';
@@ -125,11 +126,10 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        [$sortColumn, $sortDirection] = $this->resolvedSort('created_at');
         $query->orderBy($sortColumn, $sortDirection);
 
-        return $query->paginate($this->perPage);
+        return $query->paginate($this->resolvedPerPage());
     }
 
     public function getUniqueConcepts()
@@ -171,12 +171,12 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Objects Admin" subtitle="Manage and monitor your objects data" separator>
+    <x-header title="Data" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedObjects) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                    onclick="return confirm('Are you sure you want to delete {{ count($selectedObjects) }} object(s)? This action cannot be undone.')">
+                    wire:confirm="Are you sure you want to delete {{ count($selectedObjects) }} object(s)? This action cannot be undone.">
                     <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedObjects) }})
                 </button>
@@ -185,127 +185,15 @@ new class extends Component
         </x-slot:actions>
     </x-header>
 
-    <!-- Desktop Filters -->
-    <div class="hidden lg:block card bg-base-200 shadow mb-6">
-        <div class="card-body">
-            <div class="flex flex-row gap-4">
-                <!-- Search -->
-                <div class="form-control flex-1">
-                    <label class="label">
-                        <span class="label-text">Search</span>
-                    </label>
-                    <input
-                        type="text"
-                        class="input input-bordered w-full"
-                        placeholder="Search objects..."
-                        wire:model.live.debounce.300ms="search" />
-                </div>
+    <x-admin.data-tabs active="objects" />
 
-                <!-- Concept Filter -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Concept</span>
-                    </label>
-                    <select class="select select-bordered w-full" wire:model.live="conceptFilter">
-                        <option value="">All Concepts</option>
-                        @foreach ($this->getUniqueConcepts() as $concept)
-                        <option value="{{ $concept }}">{{ $this->formatConcept($concept) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Type Filter -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Type</span>
-                    </label>
-                    <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                        <option value="">All Types</option>
-                        @foreach ($this->getUniqueTypes() as $type)
-                        <option value="{{ $type }}">{{ $this->formatType($type) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Clear Filters Button -->
-                @if ($search || $conceptFilter || $typeFilter)
-                <div class="form-control content-end">
-                    <label class="label">
-                        <span class="label-text">&nbsp;</span>
-                    </label>
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear
-                    </button>
-                </div>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <!-- Mobile Filters -->
-    <div class="lg:hidden mb-4">
-        <x-collapse separator class="bg-base-200">
-            <x-slot:heading>
-                <div class="flex items-center gap-2">
-                    <x-icon name="fas.filter" class="w-5 h-5" />
-                    Filters
-                    @if ($search || $conceptFilter || $typeFilter)
-                    <x-badge value="Active" class="badge-success badge-xs" />
-                    @endif
-                </div>
-            </x-slot:heading>
-            <x-slot:content>
-                <div class="flex flex-col gap-4">
-                    <!-- Search -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Search</span>
-                        </label>
-                        <input
-                            type="text"
-                            class="input input-bordered w-full"
-                            placeholder="Search objects..."
-                            wire:model.live.debounce.300ms="search" />
-                    </div>
-
-                    <!-- Concept Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Concept</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="conceptFilter">
-                            <option value="">All Concepts</option>
-                            @foreach ($this->getUniqueConcepts() as $concept)
-                            <option value="{{ $concept }}">{{ $this->formatConcept($concept) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Type Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Type</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueTypes() as $type)
-                            <option value="{{ $type }}">{{ $this->formatType($type) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Clear Filters Button -->
-                    @if ($search || $conceptFilter || $typeFilter)
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear Filters
-                    </button>
-                    @endif
-                </div>
-            </x-slot:content>
-        </x-collapse>
-    </div>
+    <x-admin.filter-bar
+        search-placeholder="Search objects..."
+        :active="$search || $conceptFilter || $typeFilter"
+        :filters="[
+            ['model' => 'conceptFilter', 'label' => 'Concept', 'placeholder' => 'All concepts', 'options' => $this->getUniqueConcepts()->mapWithKeys(fn ($v) => [$v => $this->formatConcept($v)])],
+            ['model' => 'typeFilter', 'label' => 'Type', 'placeholder' => 'All types', 'options' => $this->getUniqueTypes()->mapWithKeys(fn ($v) => [$v => $this->formatType($v)])],
+        ]" />
 
     <!-- Objects Table -->
     <div class="card bg-base-200 shadow">
@@ -361,7 +249,6 @@ new class extends Component
                         <x-icon name="o-cube-transparent" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
                         <p class="font-medium text-base-content mb-2">No objects found</p>
                         @if ($search || $conceptFilter || $typeFilter)
-                        <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>
                         @endif
                     </div>
                 </x-slot:empty>

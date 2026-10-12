@@ -42,18 +42,38 @@ new class extends Component
 
     public function updatedSearch(): void
     {
+        $this->selectedItems = [];
         $this->resetPage();
     }
 
     public function updatedTypeFilter(): void
     {
+        $this->selectedItems = [];
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = min(max($this->perPage, 10), 100);
         $this->resetPage();
     }
 
     public function clearFilters(): void
     {
         $this->reset(['search', 'typeFilter']);
+        $this->selectedItems = [];
         $this->resetPage();
+    }
+
+    /**
+     * The item ids an action applies to: the single row it was clicked on, or
+     * the current selection when called from the bulk buttons.
+     *
+     * @return array<int, string>
+     */
+    private function targetIds(?string $itemId): array
+    {
+        return $itemId !== null ? [$itemId] : array_values($this->selectedItems);
     }
 
     public function headers(): array
@@ -68,9 +88,11 @@ new class extends Component
         ];
     }
 
-    public function bulkRestore(): void
+    public function bulkRestore(?string $itemId = null): void
     {
-        if (empty($this->selectedItems)) {
+        $ids = $this->targetIds($itemId);
+
+        if (empty($ids)) {
             $this->error('No items selected for restoration.');
 
             return;
@@ -80,8 +102,8 @@ new class extends Component
 
         // Group items by type for proper restore handling
         $itemsByType = [];
-        foreach ($this->selectedItems as $itemId) {
-            $item = $this->findDeletedItem($itemId);
+        foreach ($ids as $id) {
+            $item = $this->findDeletedItem($id);
             if ($item) {
                 $type = $this->getItemType($item);
                 $itemsByType[$type][] = $item;
@@ -129,26 +151,29 @@ new class extends Component
             }
         }
 
-        $this->selectedItems = [];
+        $this->selectedItems = array_values(array_diff($this->selectedItems, $ids));
 
         $this->success("Restored {$restoredCount} item(s).");
         $this->resetPage();
     }
 
-    public function bulkDelete(): void
+    public function bulkDelete(?string $itemId = null): void
     {
-        if (empty($this->selectedItems)) {
+        $ids = $this->targetIds($itemId);
+
+        if (empty($ids)) {
             $this->error('No items selected for deletion.');
 
             return;
         }
 
         $deletedCount = 0;
+        $skippedCount = 0;
 
         // Group items by type for proper cascade handling
         $itemsByType = [];
-        foreach ($this->selectedItems as $itemId) {
-            $item = $this->findDeletedItem($itemId);
+        foreach ($ids as $id) {
+            $item = $this->findDeletedItem($id);
             if ($item) {
                 $type = $this->getItemType($item);
                 $itemsByType[$type][] = $item;
@@ -168,7 +193,7 @@ new class extends Component
         if (isset($itemsByType['event'])) {
             foreach ($itemsByType['event'] as $event) {
                 // First delete all blocks for this event
-                Block::where('event_id', $event->id)->forceDelete();
+                Block::withTrashed()->where('event_id', $event->id)->forceDelete();
                 $event->forceDelete();
                 $deletedCount++;
             }
@@ -178,9 +203,9 @@ new class extends Component
         if (isset($itemsByType['integration'])) {
             foreach ($itemsByType['integration'] as $integration) {
                 // First delete all events and their blocks for this integration
-                $eventIds = Event::where('integration_id', $integration->id)->pluck('id');
-                Block::whereIn('event_id', $eventIds)->forceDelete();
-                Event::where('integration_id', $integration->id)->forceDelete();
+                $eventIds = Event::withTrashed()->where('integration_id', $integration->id)->pluck('id');
+                Block::withTrashed()->whereIn('event_id', $eventIds)->forceDelete();
+                Event::withTrashed()->where('integration_id', $integration->id)->forceDelete();
                 $integration->forceDelete();
                 $deletedCount++;
             }
@@ -190,11 +215,11 @@ new class extends Component
         if (isset($itemsByType['integration_group'])) {
             foreach ($itemsByType['integration_group'] as $group) {
                 // First delete all integrations, events, and blocks for this group
-                $integrationIds = Integration::where('integration_group_id', $group->id)->pluck('id');
-                $eventIds = Event::whereIn('integration_id', $integrationIds)->pluck('id');
-                Block::whereIn('event_id', $eventIds)->forceDelete();
-                Event::whereIn('integration_id', $integrationIds)->forceDelete();
-                Integration::where('integration_group_id', $group->id)->forceDelete();
+                $integrationIds = Integration::withTrashed()->where('integration_group_id', $group->id)->pluck('id');
+                $eventIds = Event::withTrashed()->whereIn('integration_id', $integrationIds)->pluck('id');
+                Block::withTrashed()->whereIn('event_id', $eventIds)->forceDelete();
+                Event::withTrashed()->whereIn('integration_id', $integrationIds)->forceDelete();
+                Integration::withTrashed()->where('integration_group_id', $group->id)->forceDelete();
                 $group->forceDelete();
                 $deletedCount++;
             }
@@ -212,13 +237,15 @@ new class extends Component
                 if (! $isReferenced) {
                     $object->forceDelete();
                     $deletedCount++;
+                } else {
+                    $skippedCount++;
                 }
             }
         }
 
-        $this->selectedItems = [];
+        $this->selectedItems = array_values(array_diff($this->selectedItems, $ids));
 
-        $this->success("Permanently deleted {$deletedCount} item(s).");
+        $this->success("Permanently deleted {$deletedCount} item(s)." . ($skippedCount > 0 ? " Skipped {$skippedCount} object(s) still referenced by events." : ''));
         $this->resetPage();
     }
 
@@ -582,7 +609,7 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Bin" subtitle="Manage soft-deleted items" separator>
+    <x-header title="Bin" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedItems) > 0)
@@ -591,7 +618,7 @@ new class extends Component
                     Restore Selected ({{ count($selectedItems) }})
                 </button>
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                    onclick="return confirm('Are you sure you want to permanently delete {{ count($selectedItems) }} item(s)? This action cannot be undone.')">
+                    wire:confirm="Are you sure you want to permanently delete {{ count($selectedItems) }} item(s)? This action cannot be undone.">
                     <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedItems) }})
                 </button>
@@ -599,7 +626,7 @@ new class extends Component
 
                 <!-- Delete All Button -->
                 <button class="btn btn-error btn-sm" wire:click="deleteAll"
-                    onclick="return confirm('Are you sure you want to permanently delete ALL items in the bin? This action cannot be undone.')">
+                    wire:confirm="Are you sure you want to permanently delete ALL items in the bin? This action cannot be undone.">
                     <x-icon name="fas.fire" class="w-4 h-4 mr-1" />
                     Delete All
                 </button>
@@ -607,101 +634,12 @@ new class extends Component
         </x-slot:actions>
     </x-header>
 
-    <!-- Desktop Filters -->
-    <div class="hidden lg:block card bg-base-200 shadow mb-6">
-        <div class="card-body">
-            <div class="flex flex-row gap-4">
-                <!-- Search -->
-                <div class="form-control flex-1">
-                    <label class="label">
-                        <span class="label-text">Search</span>
-                    </label>
-                    <input
-                        type="text"
-                        wire:model.live.debounce.300ms="search"
-                        placeholder="Search deleted items..."
-                        class="input input-bordered w-full" />
-                </div>
-
-                <!-- Type Filter -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Type</span>
-                    </label>
-                    <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                        <option value="">All Types</option>
-                        @foreach ($this->getUniqueTypes() as $type)
-                        <option value="{{ $type }}">{{ ucfirst(str_replace('_', ' ', $type)) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Clear Filters Button -->
-                @if ($search || $typeFilter)
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">&nbsp;</span>
-                    </label>
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear
-                    </button>
-                </div>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <!-- Mobile Filters -->
-    <div class="lg:hidden mb-4">
-        <x-collapse separator class="bg-base-200">
-            <x-slot:heading>
-                <div class="flex items-center gap-2">
-                    <x-icon name="fas.filter" class="w-5 h-5" />
-                    Filters
-                    @if ($search || $typeFilter)
-                    <x-badge value="Active" class="badge-success badge-xs" />
-                    @endif
-                </div>
-            </x-slot:heading>
-            <x-slot:content>
-                <div class="flex flex-col gap-4">
-                    <!-- Search -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Search</span>
-                        </label>
-                        <input
-                            type="text"
-                            wire:model.live.debounce.300ms="search"
-                            placeholder="Search deleted items..."
-                            class="input input-bordered w-full" />
-                    </div>
-
-                    <!-- Type Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Type</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueTypes() as $type)
-                            <option value="{{ $type }}">{{ ucfirst(str_replace('_', ' ', $type)) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Clear Filters Button -->
-                    @if ($search || $typeFilter)
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear Filters
-                    </button>
-                    @endif
-                </div>
-            </x-slot:content>
-        </x-collapse>
-    </div>
+    <x-admin.filter-bar
+        search-placeholder="Search deleted items..."
+        :active="$search || $typeFilter"
+        :filters="[
+            ['model' => 'typeFilter', 'label' => 'Type', 'placeholder' => 'All types', 'options' => collect($this->getUniqueTypes())->mapWithKeys(fn ($v) => [$v => ucfirst(str_replace('_', ' ', $v))])],
+        ]" />
 
     <!-- Bin Items Table -->
     <div class="card bg-base-200 shadow card-xs sm:card-md">
@@ -749,13 +687,13 @@ new class extends Component
                 @scope('actions', $item)
                 <div class="flex gap-2 hidden sm:inline-flex">
                     <button
-                        wire:click="bulkRestore"
+                        wire:click="bulkRestore(@js($item->id))"
                         class="btn btn-success btn-xs"
                         title="Restore">
                         <x-icon name="o-arrow-uturn-left" class="w-3 h-3" />
                     </button>
                     <button
-                        wire:click="bulkDelete"
+                        wire:click="bulkDelete(@js($item->id))"
                         wire:confirm="Are you sure you want to permanently delete this item? This action cannot be undone."
                         class="btn btn-error btn-xs"
                         title="Delete Permanently">
@@ -769,7 +707,6 @@ new class extends Component
                         <x-icon name="fas.trash" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
                         <p class="font-medium text-base-content mb-2">No deleted items found</p>
                         @if ($search || $typeFilter)
-                        <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>
                         @endif
                     </div>
                 </x-slot:empty>

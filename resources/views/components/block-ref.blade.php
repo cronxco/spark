@@ -102,7 +102,7 @@ $block->value_multiplier
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer">
         <x-icon :name="$blockIcon" class="w-3 h-3 opacity-70" />
         <span class="max-w-[180px] truncate">
-            {!! $text ?? ($block->title ?? $blockDisplayName) !!}
+            {!! $text ?? e($block->title ?? $blockDisplayName) !!}
             @if ($valueDisplay)
             <span class="font-semibold ml-1">{{ $valueDisplay }}</span>
             @endif
@@ -122,7 +122,7 @@ $block->value_multiplier
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer">
         <x-icon :name="$blockIcon" class="w-3 h-3 opacity-70" />
         <span class="max-w-[180px] truncate">
-            {!! $text ?? ($block->title ?? $blockDisplayName) !!}
+            {!! $text ?? e($block->title ?? $blockDisplayName) !!}
             @if ($valueDisplay)
             <span class="font-semibold ml-1">{{ $valueDisplay }}</span>
             @endif

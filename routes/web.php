@@ -1,9 +1,7 @@
 <?php
 
 use App\Http\Controllers\AasaController;
-use App\Http\Controllers\Admin\BlockViewController;
 use App\Http\Controllers\Admin\GoCardlessAdminController;
-use App\Http\Controllers\Admin\MigrationsController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\GoCardlessRenewalController;
@@ -26,6 +24,7 @@ use App\Livewire\Receipts;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Support\AdminTenant;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -349,25 +348,27 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
         return redirect()->route('admin.god-mode.index');
     })->name('god-mode.disable');
 
-    Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
-    Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
-    Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+    Route::middleware('admin.god-mode.required')->group(function () {
+        Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
+        Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
+        Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+    });
 
-    Route::get('migrations', [MigrationsController::class, 'index'])->name('migrations.index');
-    Route::post('migrations/oura', [MigrationsController::class, 'migrateOuraValues'])->name('migrations.oura');
+    Route::redirect('migrations', '/admin/pulse?section=data_fixes')->name('migrations.index');
 
     Volt::route('daynotes', 'admin.daynotes')->name('daynotes.index');
     Volt::route('events', 'admin.events')->name('events.index');
     Volt::route('objects', 'admin.objects')->name('objects.index');
     Volt::route('blocks', 'admin.blocks')->name('blocks.index');
     Volt::route('relationships', 'admin.relationships')->name('relationships.index');
-    Volt::route('pending-links', 'admin.pending-links')->name('pending-links.index');
+    Route::redirect('pending-links', '/flint')->name('pending-links.index');
     Volt::route('bin', 'admin.bin')->name('bin.index');
-    Volt::route('sense-check', 'admin.sense-check')->name('sense-check.index');
+    Volt::route('pulse', 'admin.sense-check')->name('pulse.index');
+    Route::get('sense-check', fn (Request $request) => redirect()->route('admin.pulse.index', $request->query()))->name('sense-check.index');
     Volt::route('search', 'admin.search')->name('search.index');
     Volt::route('duplicates', 'admin.duplicates.index')->name('duplicates.index');
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
-    Route::get('block-view', [BlockViewController::class, 'index'])->name('block-view.index');
+    Route::redirect('block-view', '/admin/blocks?view=gallery')->name('block-view.index');
     Route::post('bin/delete', function () {
         $userId = AdminTenant::id();
         AdminTenant::recordAction('bin_purge', [], $userId === null);
@@ -379,5 +380,6 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
     })->name('bin.delete');
     Volt::route('activity', 'admin.activity')->name('activity.index');
     Volt::route('push-notifications', 'admin.push-notifications')->name('push-notifications.index');
-    Volt::route('task-pipeline', 'admin.task-pipeline-overview')->name('task-pipeline.index');
+    Volt::route('pipeline', 'admin.task-pipeline-overview')->name('pipeline.index');
+    Route::redirect('task-pipeline', '/admin/pipeline')->name('task-pipeline.index');
 });

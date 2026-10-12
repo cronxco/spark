@@ -6,7 +6,9 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Support\AdminTenant;
+use App\Support\PulseCommands;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
@@ -66,6 +68,7 @@ new class extends Component
         'configuration_audit' => false,
         'embedding_health' => false,
         'money_data_health' => false,
+        'data_fixes' => false,
         'block_types_custom_layouts' => false,
     ];
 
@@ -695,8 +698,16 @@ new class extends Component
                 'title' => 'Money data health',
                 'description' => 'Duplicate bank accounts, archived pot snapshots, missing pot details and unnamed categories, with a preview before anything is applied.',
                 'icon' => 'fas.sterling-sign',
-                'issue_count' => count(app(\App\Services\Money\AccountCleanup::class)->plan((string) auth()->id())['steps']),
+                'issue_count' => count(app(\App\Services\Money\AccountCleanup::class)->plan((string) (AdminTenant::id() ?? Auth::id()))['steps']),
                 'badge_value' => null,
+            ],
+            [
+                'key' => 'data_fixes',
+                'title' => 'Data fixes',
+                'description' => 'One-off data migrations and backfills. Preview, then run.',
+                'icon' => 'fas.wrench',
+                'issue_count' => 0,
+                'badge_value' => (string) count(PulseCommands::all()),
             ],
             [
                 'key' => 'embedding_health',
@@ -833,7 +844,7 @@ new class extends Component
 }; ?>
 
 <div>
-    <x-header title="Sense Check" subtitle="Find functional inconsistencies across data and plugins" separator>
+    <x-header title="Pulse" separator>
         <x-slot:actions>
             <button
                 x-data
@@ -1101,6 +1112,9 @@ new class extends Component
 
                 @elseif ($section['key'] === 'money_data_health')
                 <livewire:money.data-health />
+
+                @elseif ($section['key'] === 'data_fixes')
+                <livewire:admin.pulse-commands />
 
                 @elseif ($section['key'] === 'embedding_health')
                 @php($health = $this->embeddingHealth)

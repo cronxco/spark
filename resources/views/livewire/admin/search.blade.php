@@ -103,8 +103,9 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        $sortableColumns = collect($this->headers())->where('sortable', true)->pluck('key')->all();
+        $sortColumn = in_array($this->sortBy['column'] ?? null, $sortableColumns, true) ? $this->sortBy['column'] : 'created_at';
+        $sortDirection = ($this->sortBy['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortColumn, $sortDirection);
 
         return $query->paginate($this->perPage);
@@ -271,11 +272,10 @@ new class extends Component
                 '--type' => $type,
                 '--batch' => 50,
                 '--limit' => $limit,
+                '--user' => AdminTenant::id(),
             ]);
 
-            $output = Artisan::output();
-
-            $this->success("Started generating {$type} embeddings. Check queue for progress.");
+            $this->success("Started generating {$type} embeddings.");
         } catch (Exception $e) {
             $this->error('Failed to start embedding generation: ' . $e->getMessage());
         }
@@ -285,7 +285,7 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Search Analytics" subtitle="Monitor semantic search performance and usage" separator>
+    <x-header title="Search Analytics" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 <div class="dropdown dropdown-end">
@@ -334,7 +334,7 @@ new class extends Component
             <div class="stat bg-base-200 rounded-lg shadow">
                 <div class="stat-title">Avg Match Quality</div>
                 <div class="stat-value text-success">{{ $this->stats['avg_similarity_percent'] }}%</div>
-                <div class="stat-desc">Average similarity score</div>
+
             </div>
             <div class="stat bg-base-200 rounded-lg shadow">
                 <div class="stat-title">Missing Embeddings</div>
@@ -569,7 +569,7 @@ new class extends Component
                     <div class="stat bg-base-200 rounded-lg">
                         <div class="stat-title">Estimated Cost</div>
                         <div class="stat-value text-success text-2xl">${{ $this->performanceMetrics['estimated_cost'] }}</div>
-                        <div class="stat-desc">Based on usage</div>
+
                     </div>
                     <div class="stat bg-base-200 rounded-lg">
                         <div class="stat-title">Avg Response Time</div>

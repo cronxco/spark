@@ -112,7 +112,7 @@ class AccountCleanup
     }
 
     /**
-     * How serious a step's finding is and what it changes in plain words, for Sense Check.
+     * How serious a step's finding is and what it changes in plain words, for Pulse.
      *
      * @param  array<string, mixed>  $step
      * @return array{severity: string, impact: string}

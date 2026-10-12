@@ -8,6 +8,7 @@ use App\Services\RelationshipTypeRegistry;
 use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Livewire\Concerns\HasAdminListControls;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -18,7 +19,7 @@ layout('components.layouts.app');
 
 new class extends Component
 {
-    use Toast, WithPagination;
+    use HasAdminListControls, Toast, WithPagination;
 
     public string $search = '';
     public string $typeFilter = '';
@@ -118,7 +119,7 @@ new class extends Component
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('type', 'ilike', '%' . $this->search . '%')
-                    ->orWhere('metadata', 'ilike', '%' . $this->search . '%')
+                    ->orWhereRaw('metadata::text ilike ?', ['%' . $this->search . '%'])
                     ->orWhereHasMorph('from', [Event::class, EventObject::class, Block::class], function ($morphQuery) {
                         $morphQuery->where(function ($titleQuery) {
                             // For Event and EventObject which have title/action
@@ -157,11 +158,10 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        [$sortColumn, $sortDirection] = $this->resolvedSort('created_at');
         $query->orderBy($sortColumn, $sortDirection);
 
-        return $query->paginate($this->perPage);
+        return $query->paginate($this->resolvedPerPage());
     }
 
     public function getUniqueTypes()
@@ -278,12 +278,12 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Relationships Admin" subtitle="Manage connections between events, objects, and blocks" separator>
+    <x-header title="Data" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedRelationships) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                    onclick="return confirm('Are you sure you want to delete {{ count($selectedRelationships) }} relationship(s)? This action cannot be undone.')">
+                    wire:confirm="Are you sure you want to delete {{ count($selectedRelationships) }} relationship(s)? This action cannot be undone.">
                     <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedRelationships) }})
                 </button>
@@ -292,110 +292,17 @@ new class extends Component
         </x-slot:actions>
     </x-header>
 
-    <div class="space-y-4 lg:space-y-6">
-        <!-- Desktop Filters -->
-        <div class="hidden lg:block card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="flex flex-row gap-4">
-                    <div class="form-control flex-1">
-                        <label class="label"><span class="label-text">Search</span></label>
-                        <input type="text" class="input input-bordered w-full" placeholder="Search relationships..." wire:model.live.debounce.300ms="search" />
-                    </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Type</span></label>
-                        <select class="select select-bordered" wire:model.live="typeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueTypes() as $type)
-                            <option value="{{ $type['key'] }}">{{ $type['display_name'] }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">From Type</span></label>
-                        <select class="select select-bordered" wire:model.live="fromTypeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueFromTypes() as $fromType)
-                            <option value="{{ $this->getModelTypeFromFormatted($fromType) }}">{{ $fromType }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">To Type</span></label>
-                        <select class="select select-bordered" wire:model.live="toTypeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueToTypes() as $toType)
-                            <option value="{{ $this->getModelTypeFromFormatted($toType) }}">{{ $toType }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @if ($search || $typeFilter || $fromTypeFilter || $toTypeFilter)
-                    <div class="form-control content-end">
-                        <label class="label"><span class="label-text">&nbsp;</span></label>
-                        <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="fas.xmark" class="w-4 h-4" />
-                            Clear
-                        </button>
-                    </div>
-                    @endif
-                </div>
-            </div>
-        </div>
+    <x-admin.data-tabs active="relationships" />
 
-        <!-- Mobile Filters -->
-        <div class="lg:hidden">
-            <x-collapse separator class="bg-base-200">
-                <x-slot:heading>
-                    <div class="flex items-center gap-2">
-                        <x-icon name="fas.filter" class="w-5 h-5" />
-                        Filters
-                        @if ($search || $typeFilter || $fromTypeFilter || $toTypeFilter)
-                        <x-badge value="Active" class="badge-success badge-xs" />
-                        @endif
-                    </div>
-                </x-slot:heading>
-                <x-slot:content>
-                    <div class="flex flex-col gap-4">
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Search</span></label>
-                            <input type="text" class="input input-bordered w-full" placeholder="Search relationships..." wire:model.live.debounce.300ms="search" />
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Type</span></label>
-                            <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                                <option value="">All Types</option>
-                                @foreach ($this->getUniqueTypes() as $type)
-                                <option value="{{ $type['key'] }}">{{ $type['display_name'] }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">From Type</span></label>
-                            <select class="select select-bordered w-full" wire:model.live="fromTypeFilter">
-                                <option value="">All Types</option>
-                                @foreach ($this->getUniqueFromTypes() as $fromType)
-                                <option value="{{ $this->getModelTypeFromFormatted($fromType) }}">{{ $fromType }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">To Type</span></label>
-                            <select class="select select-bordered w-full" wire:model.live="toTypeFilter">
-                                <option value="">All Types</option>
-                                @foreach ($this->getUniqueToTypes() as $toType)
-                                <option value="{{ $this->getModelTypeFromFormatted($toType) }}">{{ $toType }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        @if ($search || $typeFilter || $fromTypeFilter || $toTypeFilter)
-                        <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="fas.xmark" class="w-4 h-4" />
-                            Clear Filters
-                        </button>
-                        @endif
-                    </div>
-                </x-slot:content>
-            </x-collapse>
-        </div>
+    <div class="space-y-4 lg:space-y-6">
+        <x-admin.filter-bar
+            search-placeholder="Search relationships..."
+            :active="$search || $typeFilter || $fromTypeFilter || $toTypeFilter"
+            :filters="[
+                ['model' => 'typeFilter', 'label' => 'Type', 'placeholder' => 'All types', 'options' => $this->getUniqueTypes()->mapWithKeys(fn ($v) => [$v['key'] => $v['display_name']])],
+                ['model' => 'fromTypeFilter', 'label' => 'From', 'placeholder' => 'Any source', 'options' => $this->getUniqueFromTypes()->mapWithKeys(fn ($v) => [$this->getModelTypeFromFormatted($v) => $v])],
+                ['model' => 'toTypeFilter', 'label' => 'To', 'placeholder' => 'Any target', 'options' => $this->getUniqueToTypes()->mapWithKeys(fn ($v) => [$this->getModelTypeFromFormatted($v) => $v])],
+            ]" />
 
         <!-- Relationships Table -->
         <div class="card bg-base-200 shadow card-xs sm:card-md">
@@ -450,9 +357,9 @@ new class extends Component
                         <div class="flex flex-col">
                             <span class="text-sm">{{ $this->getTypeDisplayName($relationship->type) }}
                                 @if ($this->isDirectional($relationship->type))
-                                →
+                                <x-icon name="fas.arrow-right" class="w-3 h-3 inline" />
                                 @else
-                                ↔
+                                <x-icon name="fas.arrows-left-right" class="w-3 h-3 inline" />
                                 @endif
                             </span>
                         </div>

@@ -5,6 +5,7 @@ use App\Models\Event;
 use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Livewire\Concerns\HasAdminListControls;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -15,7 +16,7 @@ layout('components.layouts.app');
 
 new class extends Component
 {
-    use Toast, WithPagination;
+    use HasAdminListControls, Toast, WithPagination;
 
     public string $search = '';
     public string $serviceFilter = '';
@@ -153,11 +154,10 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'time';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        [$sortColumn, $sortDirection] = $this->resolvedSort('time');
         $query->orderBy($sortColumn, $sortDirection);
 
-        return $query->paginate($this->perPage);
+        return $query->paginate($this->resolvedPerPage());
     }
 
     public function getUniqueServices()
@@ -214,12 +214,12 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Events Admin" subtitle="Manage and monitor your events data" separator>
+    <x-header title="Data" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedEvents) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                    onclick="return confirm('Are you sure you want to delete {{ count($selectedEvents) }} event(s) and their associated blocks? This action cannot be undone.')">
+                    wire:confirm="Are you sure you want to delete {{ count($selectedEvents) }} event(s) and their associated blocks? This action cannot be undone.">
                     <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedEvents) }})
                 </button>
@@ -228,110 +228,17 @@ new class extends Component
         </x-slot:actions>
     </x-header>
 
-    <div class="space-y-4 lg:space-y-6">
-        <!-- Desktop Filters -->
-        <div class="hidden lg:block card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="flex flex-row gap-4">
-                    <div class="form-control flex-1">
-                        <label class="label"><span class="label-text">Search</span></label>
-                        <input type="text" class="input input-bordered w-full" placeholder="Search events..." wire:model.live.debounce.300ms="search" />
-                    </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Service</span></label>
-                        <select class="select select-bordered" wire:model.live="serviceFilter">
-                            <option value="">All Services</option>
-                            @foreach ($this->getUniqueServices() as $service)
-                            <option value="{{ $service }}">{{ $service }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Domain</span></label>
-                        <select class="select select-bordered" wire:model.live="domainFilter">
-                            <option value="">All Domains</option>
-                            @foreach ($this->getUniqueDomains() as $domain)
-                            <option value="{{ $domain }}">{{ $domain }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Action</span></label>
-                        <select class="select select-bordered" wire:model.live="actionFilter">
-                            <option value="">All Actions</option>
-                            @foreach ($this->getUniqueActions() as $action)
-                            <option value="{{ $action }}">{{ $this->prettifyAction($action) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @if ($search || $serviceFilter || $domainFilter || $actionFilter)
-                    <div class="form-control content-end">
-                        <label class="label"><span class="label-text">&nbsp;</span></label>
-                        <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="fas.xmark" class="w-4 h-4" />
-                            Clear
-                        </button>
-                    </div>
-                    @endif
-                </div>
-            </div>
-        </div>
+    <x-admin.data-tabs active="events" />
 
-        <!-- Mobile Filters -->
-        <div class="lg:hidden">
-            <x-collapse separator class="bg-base-200">
-                <x-slot:heading>
-                    <div class="flex items-center gap-2">
-                        <x-icon name="fas.filter" class="w-5 h-5" />
-                        Filters
-                        @if ($search || $serviceFilter || $domainFilter || $actionFilter)
-                        <x-badge value="Active" class="badge-success badge-xs" />
-                        @endif
-                    </div>
-                </x-slot:heading>
-                <x-slot:content>
-                    <div class="flex flex-col gap-4">
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Search</span></label>
-                            <input type="text" class="input input-bordered w-full" placeholder="Search events..." wire:model.live.debounce.300ms="search" />
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Service</span></label>
-                            <select class="select select-bordered w-full" wire:model.live="serviceFilter">
-                                <option value="">All Services</option>
-                                @foreach ($this->getUniqueServices() as $service)
-                                <option value="{{ $service }}">{{ $service }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Domain</span></label>
-                            <select class="select select-bordered w-full" wire:model.live="domainFilter">
-                                <option value="">All Domains</option>
-                                @foreach ($this->getUniqueDomains() as $domain)
-                                <option value="{{ $domain }}">{{ $domain }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Action</span></label>
-                            <select class="select select-bordered w-full" wire:model.live="actionFilter">
-                                <option value="">All Actions</option>
-                                @foreach ($this->getUniqueActions() as $action)
-                                <option value="{{ $action }}">{{ $this->prettifyAction($action) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        @if ($search || $serviceFilter || $domainFilter || $actionFilter)
-                        <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="fas.xmark" class="w-4 h-4" />
-                            Clear Filters
-                        </button>
-                        @endif
-                    </div>
-                </x-slot:content>
-            </x-collapse>
-        </div>
+    <div class="space-y-4 lg:space-y-6">
+        <x-admin.filter-bar
+            search-placeholder="Search events..."
+            :active="$search || $serviceFilter || $domainFilter || $actionFilter"
+            :filters="[
+                ['model' => 'serviceFilter', 'label' => 'Service', 'placeholder' => 'All services', 'options' => $this->getUniqueServices()->mapWithKeys(fn ($v) => [$v => $v])],
+                ['model' => 'domainFilter', 'label' => 'Domain', 'placeholder' => 'All domains', 'options' => $this->getUniqueDomains()->mapWithKeys(fn ($v) => [$v => $v])],
+                ['model' => 'actionFilter', 'label' => 'Action', 'placeholder' => 'All actions', 'options' => $this->getUniqueActions()->mapWithKeys(fn ($v) => [$v => $this->prettifyAction($v)])],
+            ]" />
 
         <!-- Events Table -->
         <div class="card bg-base-200 shadow card-xs sm:card-md">

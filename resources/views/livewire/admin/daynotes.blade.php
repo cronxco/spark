@@ -41,8 +41,26 @@ new class extends Component
         }
     }
 
+    /**
+     * Years that can be generated: this year and the next two.
+     *
+     * @return array<int, int>
+     */
+    public function years(): array
+    {
+        $current = (int) now()->year;
+
+        return [$current, $current + 1, $current + 2];
+    }
+
     public function generateYear(int $year): void
     {
+        if (! in_array($year, $this->years(), true)) {
+            $this->error('That year cannot be generated.');
+
+            return;
+        }
+
         if (! $this->taskIntegration) {
             $this->error('No task integration found. Please configure Outline integration.');
 
@@ -84,7 +102,7 @@ new class extends Component
 
     protected function loadYearStatuses(): void
     {
-        $years = [2026, 2027, 2028];
+        $years = $this->years();
 
         foreach ($years as $year) {
             $progress = ActionProgress::where('user_id', Auth::id())
@@ -118,7 +136,7 @@ new class extends Component
 }; ?>
 
 <div>
-    <x-header title="Outline Day Notes" subtitle="Generate and manage day note documents" separator>
+    <x-header title="Outline Day Notes" separator>
         <x-slot:actions>
             @if ($group)
                 <a href="{{ $group->auth_metadata['api_url'] ?? config('services.outline.url') }}"
@@ -140,7 +158,7 @@ new class extends Component
             <x-icon name="o-exclamation-triangle" class="w-6 h-6" />
             <div>
                 <h3 class="font-bold">Outline integration not configured</h3>
-                <p class="text-sm">Please configure your Outline integration first.</p>
+
             </div>
             <a href="{{ route('integrations.index') }}" class="btn btn-sm">
                 Go to Integrations
@@ -148,7 +166,7 @@ new class extends Component
         </div>
     @else
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            @foreach ([2026, 2027, 2028] as $year)
+            @foreach ($this->years() as $year)
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
                         <h3 class="card-title">{{ $year }}</h3>
@@ -202,6 +220,7 @@ new class extends Component
 
                         <button
                             wire:click="generateYear({{ $year }})"
+                            @if ($status === 'completed') wire:confirm="Regenerate {{ $year }}? This creates a second copy of the year, month and day notes in Outline." @endif
                             wire:loading.attr="disabled"
                             class="btn btn-primary btn-sm mt-2"
                             @if ($status === 'in_progress') disabled @endif>
@@ -227,7 +246,7 @@ new class extends Component
                 <x-icon name="o-exclamation-triangle" class="w-6 h-6" />
                 <div>
                     <h3 class="font-bold">No task integration found</h3>
-                    <p class="text-sm">You must create an Outline task integration before you can generate day notes. Please configure your Outline integration with instance type "task".</p>
+                    <p class="text-sm">Add an Outline integration with instance type "task".</p>
                 </div>
                 <a href="{{ route('integrations.index') }}" class="btn btn-sm">
                     Configure Integration
