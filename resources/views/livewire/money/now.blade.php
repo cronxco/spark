@@ -6,7 +6,7 @@
         <div class="alert alert-warning">
             <x-icon name="fas.triangle-exclamation" class="w-5 h-5" />
             <span>{{ $dataIssues }} data {{ $dataIssues === 1 ? 'issue' : 'issues' }} to review.</span>
-            <a class="btn btn-sm" href="{{ route('admin.sense-check.index', ['section' => 'money_data_health']) }}" wire:navigate>Review in Sense Check</a>
+            <a class="btn btn-sm" href="{{ route('admin.pulse.index', ['section' => 'money_data_health']) }}" wire:navigate>Review in Pulse</a>
         </div>
     @endif
 

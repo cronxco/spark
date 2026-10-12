@@ -68,9 +68,9 @@ class MoneyViewsTest extends TestCase
         }
 
         Livewire::actingAs($admin)->test(Now::class)
-            ->assertSee('Review in Sense Check')
+            ->assertSee('Review in Pulse')
             ->assertSee('section=money_data_health', false);
-        Livewire::actingAs($member)->test(Now::class)->assertDontSee('Sense Check');
+        Livewire::actingAs($member)->test(Now::class)->assertDontSee('Review in Pulse');
     }
 
     #[Test]

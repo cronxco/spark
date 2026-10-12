@@ -68,7 +68,7 @@ class RecalculatePlaceVisitCounts extends Command
             })
             ->where('o.concept', '=', 'place')
             ->whereNull('o.deleted_at')
-            ->groupBy('o.id', 'o.title', 'o.metadata')
+            ->groupBy('o.id')
             ->get();
 
         $totalPlaces = $calculatedData->count();

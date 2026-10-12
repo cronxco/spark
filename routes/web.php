@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\AasaController;
 use App\Http\Controllers\Admin\GoCardlessAdminController;
-use App\Http\Controllers\Admin\MigrationsController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\GoCardlessRenewalController;
@@ -25,6 +24,7 @@ use App\Livewire\Receipts;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Support\AdminTenant;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -352,8 +352,7 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
     Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
     Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
 
-    Route::get('migrations', [MigrationsController::class, 'index'])->name('migrations.index');
-    Route::post('migrations/oura', [MigrationsController::class, 'migrateOuraValues'])->name('migrations.oura');
+    Route::redirect('migrations', '/admin/pulse?section=data_fixes')->name('migrations.index');
 
     Volt::route('daynotes', 'admin.daynotes')->name('daynotes.index');
     Volt::route('events', 'admin.events')->name('events.index');
@@ -362,7 +361,8 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
     Volt::route('relationships', 'admin.relationships')->name('relationships.index');
     Volt::route('pending-links', 'admin.pending-links')->name('pending-links.index');
     Volt::route('bin', 'admin.bin')->name('bin.index');
-    Volt::route('sense-check', 'admin.sense-check')->name('sense-check.index');
+    Volt::route('pulse', 'admin.sense-check')->name('pulse.index');
+    Route::get('sense-check', fn (Request $request) => redirect()->route('admin.pulse.index', $request->query()))->name('sense-check.index');
     Volt::route('search', 'admin.search')->name('search.index');
     Volt::route('duplicates', 'admin.duplicates.index')->name('duplicates.index');
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');

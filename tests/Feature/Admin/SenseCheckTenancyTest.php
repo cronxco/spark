@@ -204,7 +204,7 @@ class SenseCheckTenancyTest extends TestCase
                 'title' => $title, 'metadata' => ['account_id' => 'acc-1', 'currency' => 'GBP']]);
         }
 
-        $this->get(route('admin.sense-check.index', ['section' => 'money_data_health']))->assertOk()->assertSee('Money data health');
+        $this->get(route('admin.pulse.index', ['section' => 'money_data_health']))->assertOk()->assertSee('Money data health');
 
         Livewire::withQueryParams(['section' => 'money_data_health']);
         Volt::test('admin.sense-check')
@@ -215,7 +215,7 @@ class SenseCheckTenancyTest extends TestCase
     public function a_non_admin_cannot_reach_sense_check(): void
     {
         $this->withoutVite();
-        $this->actingAs(User::factory()->create())->get(route('admin.sense-check.index'))->assertForbidden();
+        $this->actingAs(User::factory()->create())->get(route('admin.pulse.index'))->assertForbidden();
     }
 
     #[Test]
