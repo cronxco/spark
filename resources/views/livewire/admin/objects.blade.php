@@ -187,127 +187,13 @@ new class extends Component
 
     <x-admin.data-tabs active="objects" />
 
-    <!-- Desktop Filters -->
-    <div class="hidden lg:block card bg-base-200 shadow mb-6">
-        <div class="card-body">
-            <div class="flex flex-row gap-4">
-                <!-- Search -->
-                <div class="form-control flex-1">
-                    <label class="label">
-                        <span class="label-text">Search</span>
-                    </label>
-                    <input
-                        type="text"
-                        class="input input-bordered w-full"
-                        placeholder="Search objects..."
-                        wire:model.live.debounce.300ms="search" />
-                </div>
-
-                <!-- Concept Filter -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Concept</span>
-                    </label>
-                    <select class="select select-bordered w-full" wire:model.live="conceptFilter">
-                        <option value="">All Concepts</option>
-                        @foreach ($this->getUniqueConcepts() as $concept)
-                        <option value="{{ $concept }}">{{ $this->formatConcept($concept) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Type Filter -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Type</span>
-                    </label>
-                    <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                        <option value="">All Types</option>
-                        @foreach ($this->getUniqueTypes() as $type)
-                        <option value="{{ $type }}">{{ $this->formatType($type) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Clear Filters Button -->
-                @if ($search || $conceptFilter || $typeFilter)
-                <div class="form-control content-end">
-                    <label class="label">
-                        <span class="label-text">&nbsp;</span>
-                    </label>
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear
-                    </button>
-                </div>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <!-- Mobile Filters -->
-    <div class="lg:hidden mb-4">
-        <x-collapse separator class="bg-base-200">
-            <x-slot:heading>
-                <div class="flex items-center gap-2">
-                    <x-icon name="fas.filter" class="w-5 h-5" />
-                    Filters
-                    @if ($search || $conceptFilter || $typeFilter)
-                    <x-badge value="Active" class="badge-success badge-xs" />
-                    @endif
-                </div>
-            </x-slot:heading>
-            <x-slot:content>
-                <div class="flex flex-col gap-4">
-                    <!-- Search -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Search</span>
-                        </label>
-                        <input
-                            type="text"
-                            class="input input-bordered w-full"
-                            placeholder="Search objects..."
-                            wire:model.live.debounce.300ms="search" />
-                    </div>
-
-                    <!-- Concept Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Concept</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="conceptFilter">
-                            <option value="">All Concepts</option>
-                            @foreach ($this->getUniqueConcepts() as $concept)
-                            <option value="{{ $concept }}">{{ $this->formatConcept($concept) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Type Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Type</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueTypes() as $type)
-                            <option value="{{ $type }}">{{ $this->formatType($type) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Clear Filters Button -->
-                    @if ($search || $conceptFilter || $typeFilter)
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear Filters
-                    </button>
-                    @endif
-                </div>
-            </x-slot:content>
-        </x-collapse>
-    </div>
+    <x-admin.filter-bar
+        search-placeholder="Search objects..."
+        :active="$search || $conceptFilter || $typeFilter"
+        :filters="[
+            ['model' => 'conceptFilter', 'label' => 'Concept', 'placeholder' => 'All concepts', 'options' => $this->getUniqueConcepts()->mapWithKeys(fn ($v) => [$v => $this->formatConcept($v)])],
+            ['model' => 'typeFilter', 'label' => 'Type', 'placeholder' => 'All types', 'options' => $this->getUniqueTypes()->mapWithKeys(fn ($v) => [$v => $this->formatType($v)])],
+        ]" />
 
     <!-- Objects Table -->
     <div class="card bg-base-200 shadow">

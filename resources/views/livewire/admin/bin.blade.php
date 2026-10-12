@@ -634,101 +634,12 @@ new class extends Component
         </x-slot:actions>
     </x-header>
 
-    <!-- Desktop Filters -->
-    <div class="hidden lg:block card bg-base-200 shadow mb-6">
-        <div class="card-body">
-            <div class="flex flex-row gap-4">
-                <!-- Search -->
-                <div class="form-control flex-1">
-                    <label class="label">
-                        <span class="label-text">Search</span>
-                    </label>
-                    <input
-                        type="text"
-                        wire:model.live.debounce.300ms="search"
-                        placeholder="Search deleted items..."
-                        class="input input-bordered w-full" />
-                </div>
-
-                <!-- Type Filter -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Type</span>
-                    </label>
-                    <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                        <option value="">All Types</option>
-                        @foreach ($this->getUniqueTypes() as $type)
-                        <option value="{{ $type }}">{{ ucfirst(str_replace('_', ' ', $type)) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Clear Filters Button -->
-                @if ($search || $typeFilter)
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">&nbsp;</span>
-                    </label>
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear
-                    </button>
-                </div>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <!-- Mobile Filters -->
-    <div class="lg:hidden mb-4">
-        <x-collapse separator class="bg-base-200">
-            <x-slot:heading>
-                <div class="flex items-center gap-2">
-                    <x-icon name="fas.filter" class="w-5 h-5" />
-                    Filters
-                    @if ($search || $typeFilter)
-                    <x-badge value="Active" class="badge-success badge-xs" />
-                    @endif
-                </div>
-            </x-slot:heading>
-            <x-slot:content>
-                <div class="flex flex-col gap-4">
-                    <!-- Search -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Search</span>
-                        </label>
-                        <input
-                            type="text"
-                            wire:model.live.debounce.300ms="search"
-                            placeholder="Search deleted items..."
-                            class="input input-bordered w-full" />
-                    </div>
-
-                    <!-- Type Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Type</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueTypes() as $type)
-                            <option value="{{ $type }}">{{ ucfirst(str_replace('_', ' ', $type)) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Clear Filters Button -->
-                    @if ($search || $typeFilter)
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear Filters
-                    </button>
-                    @endif
-                </div>
-            </x-slot:content>
-        </x-collapse>
-    </div>
+    <x-admin.filter-bar
+        search-placeholder="Search deleted items..."
+        :active="$search || $typeFilter"
+        :filters="[
+            ['model' => 'typeFilter', 'label' => 'Type', 'placeholder' => 'All types', 'options' => collect($this->getUniqueTypes())->mapWithKeys(fn ($v) => [$v => ucfirst(str_replace('_', ' ', $v))])],
+        ]" />
 
     <!-- Bin Items Table -->
     <div class="card bg-base-200 shadow card-xs sm:card-md">

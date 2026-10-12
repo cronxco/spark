@@ -55,6 +55,33 @@ class AdminDataPagesTest extends TestCase
 
     #[Test]
     #[DataProvider('dataTabs')]
+    public function filter_bars_use_mary_controls_and_clear(string $tab): void
+    {
+        $this->get(route("admin.{$tab}.index"))
+            ->assertOk()
+            ->assertSee('wire:model.live.debounce.300ms="search"', false)
+            ->assertDontSee('select select-bordered', false)
+            ->assertDontSee('Mobile Filters');
+    }
+
+    #[Test]
+    public function event_service_filter_narrows_results_and_clears(): void
+    {
+        $integration = Integration::factory()->create(['user_id' => $this->admin->id]);
+        $keep = Event::factory()->create(['integration_id' => $integration->id, 'service' => 'monzo']);
+        $drop = Event::factory()->create(['integration_id' => $integration->id, 'service' => 'oura']);
+
+        Volt::test('admin.events')
+            ->assertSee($keep->id)->assertSee($drop->id)
+            ->set('serviceFilter', 'monzo')
+            ->assertSee($keep->id)->assertDontSee($drop->id)
+            ->call('clearFilters')
+            ->assertSet('serviceFilter', '')
+            ->assertSee($drop->id);
+    }
+
+    #[Test]
+    #[DataProvider('dataTabs')]
     public function unknown_sort_columns_and_huge_page_sizes_are_ignored(string $tab): void
     {
         Volt::test("admin.{$tab}")

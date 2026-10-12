@@ -261,127 +261,13 @@ new class extends Component
 
     <x-admin.data-tabs active="blocks" />
 
-    <!-- Desktop Filters -->
-    <div class="hidden lg:block card bg-base-200 shadow mb-6">
-        <div class="card-body">
-            <div class="flex flex-row gap-4">
-                <!-- Search -->
-                <div class="form-control flex-1">
-                    <label class="label">
-                        <span class="label-text">Search</span>
-                    </label>
-                    <input
-                        type="text"
-                        class="input input-bordered w-full"
-                        placeholder="Search blocks..."
-                        wire:model.live.debounce.300ms="search" />
-                </div>
-
-                <!-- Block Type Filter -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Block Type</span>
-                    </label>
-                    <select class="select select-bordered w-full" wire:model.live="blockTypeFilter">
-                        <option value="">All Block Types</option>
-                        @foreach ($this->getUniqueBlockTypes() as $type)
-                        <option value="{{ $type }}">{{ $this->prettifyBlockType($type) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Service Filter -->
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Service</span>
-                    </label>
-                    <select class="select select-bordered w-full" wire:model.live="serviceFilter">
-                        <option value="">All Services</option>
-                        @foreach ($this->getUniqueServices() as $service)
-                        <option value="{{ $service }}">{{ ucfirst($service) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Clear Filters Button -->
-                @if ($search || $blockTypeFilter || $serviceFilter)
-                <div class="form-control content-end">
-                    <label class="label">
-                        <span class="label-text">&nbsp;</span>
-                    </label>
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear
-                    </button>
-                </div>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <!-- Mobile Filters -->
-    <div class="lg:hidden mb-4">
-        <x-collapse separator class="bg-base-200">
-            <x-slot:heading>
-                <div class="flex items-center gap-2">
-                    <x-icon name="fas.filter" class="w-5 h-5" />
-                    Filters
-                    @if ($search || $blockTypeFilter || $serviceFilter)
-                    <x-badge value="Active" class="badge-success badge-xs" />
-                    @endif
-                </div>
-            </x-slot:heading>
-            <x-slot:content>
-                <div class="flex flex-col gap-4">
-                    <!-- Search -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Search</span>
-                        </label>
-                        <input
-                            type="text"
-                            class="input input-bordered w-full"
-                            placeholder="Search blocks..."
-                            wire:model.live.debounce.300ms="search" />
-                    </div>
-
-                    <!-- Block Type Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Block Type</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="blockTypeFilter">
-                            <option value="">All Block Types</option>
-                            @foreach ($this->getUniqueBlockTypes() as $type)
-                            <option value="{{ $type }}">{{ $this->prettifyBlockType($type) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Service Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Service</span>
-                        </label>
-                        <select class="select select-bordered w-full" wire:model.live="serviceFilter">
-                            <option value="">All Services</option>
-                            @foreach ($this->getUniqueServices() as $service)
-                            <option value="{{ $service }}">{{ ucfirst($service) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Clear Filters Button -->
-                    @if ($search || $blockTypeFilter || $serviceFilter)
-                    <button class="btn btn-outline" wire:click="clearFilters">
-                        <x-icon name="fas.xmark" class="w-4 h-4" />
-                        Clear Filters
-                    </button>
-                    @endif
-                </div>
-            </x-slot:content>
-        </x-collapse>
-    </div>
+    <x-admin.filter-bar
+        search-placeholder="Search blocks..."
+        :active="$search || $blockTypeFilter || $serviceFilter"
+        :filters="[
+            ['model' => 'blockTypeFilter', 'label' => 'Block type', 'placeholder' => 'All block types', 'options' => $this->getUniqueBlockTypes()->mapWithKeys(fn ($v) => [$v => $this->prettifyBlockType($v)])],
+            ['model' => 'serviceFilter', 'label' => 'Service', 'placeholder' => 'All services', 'options' => $this->getUniqueServices()->mapWithKeys(fn ($v) => [$v => ucfirst($v)])],
+        ]" />
 
     @if ($view === 'gallery')
     @php($galleryBlocks = $this->getGalleryBlocks())
