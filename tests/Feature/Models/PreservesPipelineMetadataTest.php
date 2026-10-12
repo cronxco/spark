@@ -10,14 +10,6 @@ use Tests\TestCase;
 
 class PreservesPipelineMetadataTest extends TestCase
 {
-    private function pipelineKeys(): array
-    {
-        return [
-            'embedding_model' => 'text-embedding-3-small',
-            'task_executions' => ['generate_embedding' => ['last_attempt' => ['status' => 'success']]],
-        ];
-    }
-
     #[Test]
     public function a_sync_rewrite_keeps_pipeline_keys_on_blocks(): void
     {
@@ -67,5 +59,13 @@ class PreservesPipelineMetadataTest extends TestCase
 
         $this->assertTrue($object->wasChanged('metadata'));
         $this->assertSame('note', $object->fresh()->metadata['kind']);
+    }
+
+    private function pipelineKeys(): array
+    {
+        return [
+            'embedding_model' => 'text-embedding-3-small',
+            'task_executions' => ['generate_embedding' => ['last_attempt' => ['status' => 'success']]],
+        ];
     }
 }
