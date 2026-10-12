@@ -3,8 +3,8 @@
 namespace App\Jobs\Outline;
 
 use App\Jobs\Base\BaseProcessingJob;
-use App\Models\Block;
 use App\Models\Event;
+use App\Services\Knowledge\OutlineTaskReconciler;
 use Carbon\CarbonImmutable;
 use DateTime;
 use Illuminate\Support\Facades\Log;
@@ -114,7 +114,7 @@ class OutlineData extends BaseProcessingJob
                     'metadata' => $targetObject->metadata ?? [],
                     'url' => $targetObject->url,
                 ],
-                'blocks' => $this->extractTaskBlocks($doc, $isDayNote, $targetObject->url, $time),
+                'blocks' => [],
             ]];
 
             // If event exists, reconcile task blocks; else create event (with blocks)
@@ -138,6 +138,8 @@ class OutlineData extends BaseProcessingJob
                 );
             } else {
                 $this->createEvents($eventData);
+                $createdEvent = Event::where('integration_id', $this->integration->id)->where('source_id', $sourceId)->firstOrFail();
+                $this->reconcileTaskBlocks($createdEvent, $this->extractTaskBlocks($doc, $isDayNote, $targetObject->url, $time), $isDayNote, (string) ($doc['id'] ?? ''));
             }
         }
 
@@ -163,10 +165,24 @@ class OutlineData extends BaseProcessingJob
 
         $lines = preg_split('/\r\n|\r|\n/', $text) ?: [];
         $blocks = [];
+        $occurrences = [];
         foreach ($lines as $index => $line) {
             if (preg_match('/^\s*- \[( |x|X)\] (.*)$/', $line, $m)) {
                 $checked = strtolower(trim($m[1])) === 'x';
-                $taskText = trim($m[2]);
+                $rawTitle = trim($m[2]);
+                preg_match('/<!-- spark-task:([a-f0-9-]{36}) -->/', $rawTitle, $marker);
+                if (! $marker) {
+                    preg_match('~\[Open in Spark\]\(https?://[^)]+/tasks/([a-f0-9-]{36})\)~', $rawTitle, $marker);
+                }
+                $taskText = trim(preg_replace('/\s*<!-- spark-task:[a-f0-9-]{36} -->/', '', $rawTitle));
+                $taskText = trim(preg_replace('~\s*\[Open in Spark\]\(https?://[^)]+/tasks/[a-f0-9-]{36}\)~', '', $taskText));
+                $occurrences[$taskText] = ($occurrences[$taskText] ?? 0) + 1;
+                preg_match('/^(\s*)-/', $line, $indent);
+                $detailPrefix = ($indent[1] ?? '') . '  > ';
+                $details = [];
+                for ($next = $index + 1; isset($lines[$next]) && str_starts_with($lines[$next], $detailPrefix); $next++) {
+                    $details[] = $lines[$next];
+                }
                 $hash = hash('sha256', ($doc['id'] ?? '') . '|' . ($index + 1) . '|' . strtolower($taskText));
 
                 $blocks[] = [
@@ -176,6 +192,12 @@ class OutlineData extends BaseProcessingJob
                     'metadata' => [
                         'outline_document_id' => $doc['id'] ?? null,
                         'line_number' => $index + 1,
+                        'outline_source_line' => $line,
+                        'outline_source_title' => $taskText,
+                        'outline_source_details' => $details,
+                        'content' => $details ? implode("\n", array_map(fn ($line) => substr($line, strlen($detailPrefix)), $details)) : null,
+                        'outline_task_id' => $marker[1] ?? null,
+                        'outline_task_key' => hash('sha256', ($doc['id'] ?? '') . '|' . $taskText . '|' . $occurrences[$taskText]),
                         'checked' => $checked,
                         'hash' => $hash,
                     ],
@@ -189,94 +211,6 @@ class OutlineData extends BaseProcessingJob
 
     private function reconcileTaskBlocks(Event $event, array $currentBlocks, bool $isDayNote, string $docId): void
     {
-        // Build map of current by hash
-        $currentByHash = [];
-        foreach ($currentBlocks as $b) {
-            $hash = $b['metadata']['hash'] ?? null;
-            if ($hash) {
-                $currentByHash[$hash] = $b;
-            }
-        }
-
-        // Load existing task blocks for this event (both types)
-        $existing = $event->blocks
-            ->whereIn('block_type', [$isDayNote ? 'day_task' : 'doc_task', $isDayNote ? 'doc_task' : 'day_task'])
-            ->filter(function ($block) use ($docId) {
-                $meta = $block->metadata ?? [];
-
-                return ($meta['outline_document_id'] ?? null) === $docId;
-            });
-
-        $seen = [];
-
-        foreach ($existing as $block) {
-            $hash = $block->metadata['hash'] ?? null;
-            if (! $hash || ! isset($currentByHash[$hash])) {
-                // Task removed -> mark metadata and soft delete
-                $meta = $block->metadata ?? [];
-                $meta['removed'] = true;
-                $meta['removed_at'] = now('UTC')->toIso8601String();
-                $block->update([
-                    'metadata' => $meta,
-                ]);
-                $block->delete();
-
-                continue;
-            }
-
-            // Update changed fields (title/checked/type/time/url)
-            $new = $currentByHash[$hash];
-            $newMeta = $block->metadata;
-            $newMeta['checked'] = $new['metadata']['checked'] ?? ($newMeta['checked'] ?? false);
-
-            $block->update([
-                'block_type' => $new['block_type'] ?? $block->block_type,
-                'time' => $new['time'] ?? $block->time,
-                'title' => $new['title'] ?? $block->title,
-                'metadata' => $newMeta,
-                'url' => $new['url'] ?? $block->url,
-            ]);
-
-            $seen[$hash] = true;
-        }
-
-        // Create new tasks not present before
-        foreach ($currentByHash as $hash => $b) {
-            if (! isset($seen[$hash])) {
-                $activeBlock = $event->blocks()
-                    ->where('title', $b['title'] ?? '')
-                    ->where('block_type', $b['block_type'] ?? '')
-                    ->whereNull('deleted_at')
-                    ->first();
-
-                if ($activeBlock) {
-                    $activeBlock->update(Block::withoutNullEmbeddings([
-                        'time' => $b['time'] ?? $event->time,
-                        'metadata' => $b['metadata'] ?? [],
-                        'url' => $b['url'] ?? null,
-                        'media_url' => $b['media_url'] ?? null,
-                        'value' => $b['value'] ?? null,
-                        'value_multiplier' => $b['value_multiplier'] ?? 1,
-                        'value_unit' => $b['value_unit'] ?? null,
-                        'embeddings' => $b['embeddings'] ?? null,
-                    ]));
-
-                    continue;
-                }
-
-                $event->createBlock([
-                    'time' => $b['time'] ?? $event->time,
-                    'block_type' => $b['block_type'] ?? '',
-                    'title' => $b['title'] ?? '',
-                    'metadata' => $b['metadata'] ?? [],
-                    'url' => $b['url'] ?? null,
-                    'media_url' => $b['media_url'] ?? null,
-                    'value' => $b['value'] ?? null,
-                    'value_multiplier' => $b['value_multiplier'] ?? 1,
-                    'value_unit' => $b['value_unit'] ?? null,
-                    'embeddings' => $b['embeddings'] ?? null,
-                ]);
-            }
-        }
+        app(OutlineTaskReconciler::class)->reconcile($event, $currentBlocks, $docId);
     }
 }

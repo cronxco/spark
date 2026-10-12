@@ -24,6 +24,11 @@ class NotificationCatalogue
 {
     /** @var array<string, array{label: string, description: string, apns_category: ?string, configurable: bool, stream: string, severity: string, active_hours: ?int, forced_delivery: bool}> */
     private const TYPES = [
+        'task_reminder' => [
+            'label' => 'Task Reminders', 'description' => 'Reminders you set for tasks',
+            'apns_category' => 'SYSTEM', 'configurable' => true, 'stream' => 'attention',
+            'severity' => 'info', 'active_hours' => 24, 'forced_delivery' => false,
+        ],
         'integration_completed' => [
             'label' => 'Integration Completed',
             'description' => 'Notify when an integration finishes syncing successfully',

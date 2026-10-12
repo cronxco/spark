@@ -68,6 +68,7 @@ Route::prefix('v1')
     ->middleware(['auth:sanctum', 'etag'])
     ->name('api.v1.')
     ->group(function (): void {
+        require __DIR__ . '/knowledge.php';
         Route::middleware('spark.ability:data:read')->group(function (): void {
             Route::get('events', [V1FeedController::class, 'index'])->name('events.index');
             Route::get('events/{id}', [V1EventsController::class, 'show'])->name('events.show');

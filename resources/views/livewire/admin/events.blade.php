@@ -93,9 +93,11 @@ new class extends Component
                 // Re-resolve the client-supplied selection through the same
                 // ownership predicate the listing uses. $selectedEvents is a
                 // public Livewire property and cannot be trusted as an authority.
-                $ownedIds = Event::forUser(AdminTenant::id())
+                $ownedIds = AdminTenant::scopeForUser(Event::query())
                     ->whereIn('id', $this->selectedEvents)
                     ->pluck('id');
+
+                AdminTenant::recordAction('events_bulk_delete', ['ids' => $ownedIds->all()]);
 
                 // Delete blocks first (cascade)
                 Block::whereIn('event_id', $ownedIds)->delete();
@@ -117,7 +119,7 @@ new class extends Component
     {
         $query = Event::with(['actor', 'target', 'integration', 'blocks'])
             ->whereHas('integration', function ($q) {
-                $q->where('user_id', AdminTenant::id());
+                AdminTenant::scope($q);
             });
 
         // Apply search filter
@@ -161,21 +163,21 @@ new class extends Component
     public function getUniqueServices()
     {
         return Event::whereHas('integration', function ($q) {
-            $q->where('user_id', AdminTenant::id());
+            AdminTenant::scope($q);
         })->distinct()->pluck('service')->filter()->sort()->values();
     }
 
     public function getUniqueDomains()
     {
         return Event::whereHas('integration', function ($q) {
-            $q->where('user_id', AdminTenant::id());
+            AdminTenant::scope($q);
         })->distinct()->pluck('domain')->filter()->sort()->values();
     }
 
     public function getUniqueActions()
     {
         return Event::whereHas('integration', function ($q) {
-            $q->where('user_id', AdminTenant::id());
+            AdminTenant::scope($q);
         })->distinct()->pluck('action')->filter()->sort()->values();
     }
 

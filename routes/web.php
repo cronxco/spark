@@ -16,6 +16,7 @@ use App\Livewire\Day;
 use App\Livewire\FinancialAccounts;
 use App\Livewire\FinancialAccountShow;
 use App\Livewire\IntegrationDetails;
+use App\Livewire\KnowledgeTasks;
 use App\Livewire\Media\Index;
 use App\Livewire\Media\Show;
 use App\Livewire\MetricDetail;
@@ -68,6 +69,9 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     // Day-based timeline routes
+    Route::get('knowledge/tasks', KnowledgeTasks::class)->name('knowledge.tasks');
+    Route::get('tasks/{id}', KnowledgeTasks::class)->whereUuid('id')->name('knowledge.task');
+    Route::get('projects/{projectId}', KnowledgeTasks::class)->whereUuid('projectId')->name('knowledge.project');
     Route::get('day/today', Day::class)->name('today.day');
     Route::get('today', Day::class)->name('today.main');
     Route::get('day/tomorrow', Day::class)->name('tomorrow');
@@ -321,17 +325,29 @@ Route::get('auth/authelia/callback', function () {
     );
     Auth::login($authUser);
 
+    if (AdminTenant::pullReauthenticationRequest($authUser) && AdminTenant::isGlobalOperator($authUser)) {
+        AdminTenant::start($authUser);
+
+        return redirect()->route('admin.god-mode.index');
+    }
+
     return redirect('/today');
 });
 
 // Admin routes
-Route::middleware(['auth', 'verified', 'admin', 'admin.operator.audit'])->prefix('admin')->name('admin.')->group(function () {
-    Volt::route('operator', 'admin.operator')->middleware('password.confirm:password.confirm,900')->name('operator.index');
-    Route::post('operator/stop', function () {
+Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix('admin')->name('admin.')->group(function () {
+    Volt::route('god-mode', 'admin.god-mode')->name('god-mode.index');
+    Route::post('god-mode/enable', function () {
+        abort_unless(AdminTenant::isGlobalOperator(Auth::user()), 403);
+        AdminTenant::requestReauthentication(Auth::user());
+
+        return Socialite::driver('authelia')->with(['prompt' => 'login', 'max_age' => 0])->redirect();
+    })->name('god-mode.enable');
+    Route::post('god-mode/disable', function () {
         AdminTenant::end();
 
-        return redirect()->route('admin.operator.index');
-    })->name('operator.stop');
+        return redirect()->route('admin.god-mode.index');
+    })->name('god-mode.disable');
 
     Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
     Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
@@ -353,7 +369,9 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.operator.audit'])->prefix
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
     Route::get('block-view', [BlockViewController::class, 'index'])->name('block-view.index');
     Route::post('bin/delete', function () {
-        DeleteBinItemsBatch::dispatch(AdminTenant::id());
+        $userId = AdminTenant::id();
+        AdminTenant::recordAction('bin_purge', [], $userId === null);
+        DeleteBinItemsBatch::dispatch($userId === null ? null : (string) $userId);
 
         return response()->json([
             'message' => 'Deletion process started. All items will be permanently deleted.',

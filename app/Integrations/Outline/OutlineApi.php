@@ -4,8 +4,11 @@ namespace App\Integrations\Outline;
 
 use App\Models\Integration;
 use Exception;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use LogicException;
 use Throwable;
 
 class OutlineApi
@@ -249,6 +252,24 @@ class OutlineApi
         return $this->post($endpoint, $payload);
     }
 
+    public function updateDocumentAtRevision(string $documentId, string $text, int $revision): array
+    {
+        if (! config('knowledge.outline_revision_writes_verified')) {
+            throw new LogicException('Outline conditional writes have not been verified.');
+        }
+
+        return $this->post('/api/documents.update', ['id' => $documentId, 'text' => $text, 'lastRevision' => $revision]);
+    }
+
+    public function patchDocumentAtRevision(string $documentId, string $findText, string $text, int $revision): array
+    {
+        if (! config('knowledge.outline_revision_writes_verified')) {
+            throw new LogicException('Outline conditional patches have not been verified.');
+        }
+
+        return $this->post('/api/documents.update', ['id' => $documentId, 'editMode' => 'patch', 'findText' => $findText, 'text' => $text, 'lastRevision' => $revision]);
+    }
+
     public function baseUrl(): string
     {
         // First try to get from IntegrationGroup (preferred)
@@ -324,7 +345,7 @@ class OutlineApi
                     'Authorization' => '[REDACTED]',
                     'Content-Type' => 'application/json',
                 ],
-                is_array($payload) ? $payload : (array) $payload,
+                in_array($endpoint, ['/api/documents.update', '/api/documents.info']) ? ['id' => $json['id'] ?? null, 'content' => '[REDACTED]'] : (is_array($payload) ? $payload : (array) $payload),
                 $integrationId,
                 true
             );
@@ -337,7 +358,8 @@ class OutlineApi
                 ->acceptJson()
                 ->connectTimeout(10)
                 ->timeout(25)
-                ->retry(2, 500, throw: false)
+                ->retry($endpoint === '/api/documents.update' && isset($payload['lastRevision']) ? 1 : 2, 500, fn (Exception $error) => $error instanceof ConnectionException
+                    || ($error instanceof RequestException && ($error->response->status() === 429 || $error->response->serverError())), throw: false)
                 ->post($url, $payload);
             $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
 
@@ -347,18 +369,21 @@ class OutlineApi
                 'POST',
                 $endpoint,
                 $response->status(),
-                $response->body(),
+                in_array($endpoint, ['/api/documents.update', '/api/documents.info']) ? '[REDACTED DOCUMENT CONTENT]' : $response->body(),
                 $response->headers(),
                 $integrationId,
                 true
             );
 
+            if ($response->status() === 409 || $response->json('error') === 'edit_conflict') {
+                throw new OutlineRevisionConflict('Outline changed before the edit could be saved.');
+            }
             if (! $response->successful()) {
                 Log::warning('Outline API request failed', [
                     'url' => $url,
                     'endpoint' => $endpoint,
                     'status' => $response->status(),
-                    'body' => $response->body(),
+                    'body' => in_array($endpoint, ['/api/documents.update', '/api/documents.info']) ? '[REDACTED DOCUMENT CONTENT]' : $response->body(),
                     'duration_ms' => $durationMs,
                 ]);
                 throw new Exception('Outline API error: ' . $response->status());
@@ -375,6 +400,8 @@ class OutlineApi
 
             return $jsonResponse;
 
+        } catch (OutlineRevisionConflict $e) {
+            throw $e;
         } catch (Throwable $e) {
             Log::error('Outline API request exception', [
                 'url' => $url,

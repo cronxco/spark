@@ -184,7 +184,7 @@ class Block extends Model implements HasMedia
 
         static::created(function ($model): void {
             // Dispatch Task Pipeline to run applicable tasks
-            if (config('app.enable_task_pipeline', true)) {
+            if (config('app.enable_task_pipeline', true) && ! $model->event?->isInternal()) {
                 ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
             }
         });

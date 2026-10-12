@@ -138,9 +138,10 @@ class TransactionLinkingService
     /**
      * Get statistics about pending links for a user.
      */
-    public function getPendingStats(string $userId): array
+    public function getPendingStats(?string $userId): array
     {
-        $baseQuery = Relationship::where('user_id', $userId)
+        $baseQuery = Relationship::query()
+            ->when($userId !== null, fn ($query) => $query->where('user_id', $userId))
             ->where('from_type', Event::class)
             ->where('to_type', Event::class)
             ->pending();

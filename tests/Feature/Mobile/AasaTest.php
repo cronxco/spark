@@ -22,6 +22,8 @@ class AasaTest extends TestCase
             ->assertJsonPath('applinks.details.0.paths.0', '/events/*')
             ->assertJsonPath('applinks.details.0.paths.1', '/objects/*')
             ->assertJsonPath('applinks.details.0.paths.2', '/places/*')
+            ->assertJsonPath('applinks.details.0.paths.3', '/tasks/*')
+            ->assertJsonPath('applinks.details.0.paths.4', '/projects/*')
             ->assertJsonPath('webcredentials.apps.0', 'ABCDE12345.co.cronx.spark');
     }
 

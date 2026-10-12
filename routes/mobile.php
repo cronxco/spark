@@ -483,6 +483,7 @@ Route::get('money/net-worth', [NetWorthController::class, 'index'])
     ->middleware('spark.ability:finance:read')
     ->name('money.net-worth');
 
+require __DIR__ . '/knowledge.php';
 Route::get('money/plan', [MoneyPlanController::class, 'plan'])->middleware('spark.ability:finance:read')->name('money.plan');
 Route::get('money/spending', [MoneyPlanController::class, 'spending'])->middleware('spark.ability:finance:read')->name('money.spending');
 Route::get('money/budgets', [MoneyPlanController::class, 'budgetsIndex'])->middleware('spark.ability:finance:read')->name('money.budgets.index');

@@ -17,20 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Admin operator access
+    | Admin God Mode
     |--------------------------------------------------------------------------
     |
     | Admin pages are scoped to the signed-in admin. A global operator (an
-    | admin whose user id is listed here) can view one other user's data for
-    | a limited time, with a reason and a fresh password confirmation, and
-    | every step is written to the security activity log (decision D-API-2).
+    | admin whose user id is listed here) can switch on God Mode, which shows
+    | everything across all users for a limited time after a fresh Authelia
+    | sign-in. Every step is written to the security activity log.
     |
     */
 
     'admin' => [
         'global_operators' => array_values(array_filter(array_map('trim', explode(',', (string) env('SPARK_GLOBAL_OPERATORS', ''))))),
-        'operator_context_minutes' => (int) env('SPARK_OPERATOR_CONTEXT_MINUTES', 30),
-        'operator_reauth_minutes' => 15,
+        'god_mode_minutes' => (int) env('SPARK_GOD_MODE_MINUTES', 30),
     ],
 
     /*
