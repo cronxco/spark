@@ -473,6 +473,17 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         ];
     }
 
+    /**
+     * Turn a salary detection back into a normal credit. Sticks across re-syncs.
+     */
+    public static function rejectSalary(Event $event): void
+    {
+        $event->update([
+            'action' => 'direct_credit_from',
+            'event_metadata' => array_merge($event->event_metadata ?? [], ['salary_rejected' => true]),
+        ]);
+    }
+
     public function getBaseUrl(): string
     {
         return $this->apiBase;
@@ -720,7 +731,13 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
             }
         }
 
-        $action = $this->setAction($tx);
+        // A rejected salary detection stays a normal transaction on every re-sync
+        $salaryRejected = Event::where('integration_id', $integration->id)
+            ->where('source_id', (string) ($tx['id'] ?? ''))
+            ->where('event_metadata->salary_rejected', true)
+            ->exists();
+
+        $action = $this->setAction($tx, ! $salaryRejected);
 
         $event = Event::updateOrCreate(
             [
@@ -747,7 +764,7 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
                     'local_amount' => $tx['local_amount'] ?? null,
                     'local_currency' => $tx['local_currency'] ?? null,
                     'raw' => $tx,
-                ],
+                ] + ($salaryRejected ? ['salary_rejected' => true] : []),
                 'target_id' => $target->id,
             ]
         );
@@ -1847,7 +1864,7 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         }
     }
 
-    private function setAction(array $tx): string
+    private function setAction(array $tx, bool $detectSalary = true): string
     {
         $amount = (int) ($tx['amount'] ?? 0);
         $scheme = $tx['scheme'] ?? null;
@@ -1858,7 +1875,7 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         }
 
         // Salary detection (BACS, amount > £1500 and merchant name matches configured salary name)
-        if ($scheme === 'bacs' && $amount > 150000) {
+        if ($detectSalary && $scheme === 'bacs' && $amount > 150000) {
             $salaryName = (string) (config('services.monzo.salary_name') ?? '');
             if ($salaryName !== '' && isset($tx['merchant']['name']) && $tx['merchant']['name'] === $salaryName) {
                 return 'salary_received_from';
