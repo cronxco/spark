@@ -197,6 +197,34 @@ class TaskPipelineAdminTest extends TestCase
     }
 
     #[Test]
+    public function integration_executions_render_a_ref_card_instead_of_gone(): void
+    {
+        $user = $this->admin();
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'name' => 'Ref Card Integration']);
+        $execution = TaskExecution::factory()->create([
+            'user_id' => $user->id,
+            'entity_type' => 'integration',
+            'entity_id' => $integration->id,
+            'task_key' => 'run_integration_update',
+            'status' => 'success',
+        ]);
+        $missing = TaskExecution::factory()->create([
+            'user_id' => $user->id,
+            'entity_type' => 'integration',
+            'entity_id' => (string) Str::uuid(),
+            'task_key' => 'run_integration_update',
+            'status' => 'success',
+        ]);
+
+        $this->actingAs($user);
+
+        $component = Volt::test('admin.task-pipeline-overview');
+        $component->assertSee('Ref Card Integration')->assertSee('(gone)');
+        $this->assertInstanceOf(Integration::class, $component->instance()->entityFor($execution));
+        $this->assertNull($component->instance()->entityFor($missing));
+    }
+
+    #[Test]
     public function active_executions_only_includes_non_terminal_statuses(): void
     {
         $this->actingAs($this->admin());
