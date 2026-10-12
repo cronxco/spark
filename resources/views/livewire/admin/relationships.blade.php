@@ -295,109 +295,14 @@ new class extends Component
     <x-admin.data-tabs active="relationships" />
 
     <div class="space-y-4 lg:space-y-6">
-        <!-- Desktop Filters -->
-        <div class="hidden lg:block card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="flex flex-row gap-4">
-                    <div class="form-control flex-1">
-                        <label class="label"><span class="label-text">Search</span></label>
-                        <input type="text" class="input input-bordered w-full" placeholder="Search relationships..." wire:model.live.debounce.300ms="search" />
-                    </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">Type</span></label>
-                        <select class="select select-bordered" wire:model.live="typeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueTypes() as $type)
-                            <option value="{{ $type['key'] }}">{{ $type['display_name'] }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">From Type</span></label>
-                        <select class="select select-bordered" wire:model.live="fromTypeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueFromTypes() as $fromType)
-                            <option value="{{ $this->getModelTypeFromFormatted($fromType) }}">{{ $fromType }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="form-control">
-                        <label class="label"><span class="label-text">To Type</span></label>
-                        <select class="select select-bordered" wire:model.live="toTypeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueToTypes() as $toType)
-                            <option value="{{ $this->getModelTypeFromFormatted($toType) }}">{{ $toType }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @if ($search || $typeFilter || $fromTypeFilter || $toTypeFilter)
-                    <div class="form-control content-end">
-                        <label class="label"><span class="label-text">&nbsp;</span></label>
-                        <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="fas.xmark" class="w-4 h-4" />
-                            Clear
-                        </button>
-                    </div>
-                    @endif
-                </div>
-            </div>
-        </div>
-
-        <!-- Mobile Filters -->
-        <div class="lg:hidden">
-            <x-collapse separator class="bg-base-200">
-                <x-slot:heading>
-                    <div class="flex items-center gap-2">
-                        <x-icon name="fas.filter" class="w-5 h-5" />
-                        Filters
-                        @if ($search || $typeFilter || $fromTypeFilter || $toTypeFilter)
-                        <x-badge value="Active" class="badge-success badge-xs" />
-                        @endif
-                    </div>
-                </x-slot:heading>
-                <x-slot:content>
-                    <div class="flex flex-col gap-4">
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Search</span></label>
-                            <input type="text" class="input input-bordered w-full" placeholder="Search relationships..." wire:model.live.debounce.300ms="search" />
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Type</span></label>
-                            <select class="select select-bordered w-full" wire:model.live="typeFilter">
-                                <option value="">All Types</option>
-                                @foreach ($this->getUniqueTypes() as $type)
-                                <option value="{{ $type['key'] }}">{{ $type['display_name'] }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">From Type</span></label>
-                            <select class="select select-bordered w-full" wire:model.live="fromTypeFilter">
-                                <option value="">All Types</option>
-                                @foreach ($this->getUniqueFromTypes() as $fromType)
-                                <option value="{{ $this->getModelTypeFromFormatted($fromType) }}">{{ $fromType }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">To Type</span></label>
-                            <select class="select select-bordered w-full" wire:model.live="toTypeFilter">
-                                <option value="">All Types</option>
-                                @foreach ($this->getUniqueToTypes() as $toType)
-                                <option value="{{ $this->getModelTypeFromFormatted($toType) }}">{{ $toType }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        @if ($search || $typeFilter || $fromTypeFilter || $toTypeFilter)
-                        <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="fas.xmark" class="w-4 h-4" />
-                            Clear Filters
-                        </button>
-                        @endif
-                    </div>
-                </x-slot:content>
-            </x-collapse>
-        </div>
+        <x-admin.filter-bar
+            search-placeholder="Search relationships..."
+            :active="$search || $typeFilter || $fromTypeFilter || $toTypeFilter"
+            :filters="[
+                ['model' => 'typeFilter', 'label' => 'Type', 'placeholder' => 'All types', 'options' => $this->getUniqueTypes()->mapWithKeys(fn ($v) => [$v['key'] => $v['display_name']])],
+                ['model' => 'fromTypeFilter', 'label' => 'From', 'placeholder' => 'Any source', 'options' => $this->getUniqueFromTypes()->mapWithKeys(fn ($v) => [$this->getModelTypeFromFormatted($v) => $v])],
+                ['model' => 'toTypeFilter', 'label' => 'To', 'placeholder' => 'Any target', 'options' => $this->getUniqueToTypes()->mapWithKeys(fn ($v) => [$this->getModelTypeFromFormatted($v) => $v])],
+            ]" />
 
         <!-- Relationships Table -->
         <div class="card bg-base-200 shadow card-xs sm:card-md">
