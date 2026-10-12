@@ -16,6 +16,8 @@ class RepairOysterBstTimesCommandTest extends TestCase
 
     private Integration $integration;
 
+    private string $cutoff = '2026-10-12 18:00:00';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -30,18 +32,6 @@ class RepairOysterBstTimesCommandTest extends TestCase
             'instance_type' => 'journeys',
         ]);
     }
-
-    private function makeEvent(string $storedUtc, string $updatedAt = '2026-10-12 17:14:00'): Event
-    {
-        return Event::factory()->create([
-            'integration_id' => $this->integration->id,
-            'service' => 'oyster',
-            'time' => $storedUtc,
-            'updated_at' => $updatedAt,
-        ]);
-    }
-
-    private string $cutoff = '2026-10-12 18:00:00';
 
     #[Test]
     public function it_requires_a_cutoff(): void
@@ -89,5 +79,15 @@ class RepairOysterBstTimesCommandTest extends TestCase
 
         $this->assertSame('2026-10-10T13:13:00Z', $reimported->fresh()->time->utc()->toIso8601ZuluString());
         $this->assertSame('2026-10-10T13:13:00Z', $legacy->fresh()->time->utc()->toIso8601ZuluString());
+    }
+
+    private function makeEvent(string $storedUtc, string $updatedAt = '2026-10-12 17:14:00'): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'oyster',
+            'time' => $storedUtc,
+            'updated_at' => $updatedAt,
+        ]);
     }
 }
