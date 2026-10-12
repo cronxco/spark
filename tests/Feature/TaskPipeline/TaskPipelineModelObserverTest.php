@@ -155,6 +155,29 @@ class TaskPipelineModelObserverTest extends TestCase
     }
 
     #[Test]
+    public function block_update_ignores_metadata_that_only_lacks_pipeline_keys(): void
+    {
+        $event = Event::factory()->create();
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'event_details',
+            'metadata' => [
+                'status' => 'confirmed',
+                'embedding_model' => 'text-embedding-3-small',
+                'task_executions' => ['generate_embedding' => ['last_attempt' => ['status' => 'success']]],
+            ],
+        ]);
+        $block = Block::query()->findOrFail($block->id);
+
+        config(['app.enable_task_pipeline' => true]);
+        Queue::fake([ProcessTaskPipelineJob::class]);
+
+        $block->update(['metadata' => ['status' => 'confirmed']]);
+
+        Queue::assertNothingPushed();
+    }
+
+    #[Test]
     public function block_update_dispatches_when_metadata_values_change(): void
     {
         $event = Event::factory()->create();

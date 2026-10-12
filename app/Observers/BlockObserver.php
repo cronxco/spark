@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Block;
+use Illuminate\Support\Arr;
 
 class BlockObserver
 {
@@ -17,6 +18,17 @@ class BlockObserver
         'value',
         'value_multiplier',
         'value_unit',
+    ];
+
+    /**
+     * Metadata keys written by the pipeline itself. A sync that rewrites a
+     * block's metadata drops them, which is not a change to the block's data.
+     */
+    private const PIPELINE_METADATA_KEYS = [
+        'task_executions',
+        'embedding_model',
+        'embedding_dimensions',
+        'embedding_generated_at',
     ];
 
     /**
@@ -115,9 +127,10 @@ class BlockObserver
     }
 
     /**
-     * Postgres jsonb returns object keys in its own order, so a re-synced block
-     * with identical metadata still looks dirty to Eloquent's strict array
-     * comparison. Compare the previous and current metadata ignoring key order.
+     * A re-synced block with identical data still looks dirty to Eloquent: Postgres
+     * jsonb reorders object keys, and the sync's fresh metadata lacks the keys the
+     * pipeline mirrored into it. Compare the previous and current metadata ignoring
+     * key order and pipeline-owned keys.
      */
     private function metadataIsEquivalent(Block $block): bool
     {
@@ -132,7 +145,8 @@ class BlockObserver
 
         return $before !== null
             && $after !== null
-            && $this->normalizeMetadata($before) === $this->normalizeMetadata($after);
+            && $this->normalizeMetadata(Arr::except($before, self::PIPELINE_METADATA_KEYS))
+                === $this->normalizeMetadata(Arr::except($after, self::PIPELINE_METADATA_KEYS));
     }
 
     private function decodeMetadata(mixed $raw): ?array
