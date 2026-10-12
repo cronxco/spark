@@ -197,7 +197,7 @@
                     <x-menu-item title="Search Analytics" icon="fas.magnifying-glass-chart" link="{{ route('admin.search.index') }}" :active="request()->routeIs('admin.search.*')" />
                     <x-menu-item title="Duplicates" icon="fas.copy" link="{{ route('admin.duplicates.index') }}" :active="request()->routeIs('admin.duplicates.*')" />
                     <x-menu-item title="Activity" icon="fas.history" link="{{ route('admin.activity.index') }}" :active="request()->routeIs('admin.activity.*')" />
-                    <x-menu-item title="Task Pipeline" icon="fas.diagram-project" link="{{ route('admin.task-pipeline.index') }}" :active="request()->routeIs('admin.task-pipeline.*')" />
+                    <x-menu-item title="Pipeline" icon="fas.diagram-project" link="{{ route('admin.pipeline.index') }}" :active="request()->routeIs('admin.pipeline.*')" />
                     <x-menu-item title="Data" icon="fas.database" link="{{ route('admin.events.index') }}" :active="request()->routeIs(['admin.events.*', 'admin.objects.*', 'admin.blocks.*', 'admin.relationships.*'])" />
                     <x-menu-item title="GoCardless" icon="fas.credit-card" link="{{ route('admin.gocardless.index') }}" :active="request()->routeIs('admin.gocardless.*')" />
                     <x-menu-item title="Migrations" icon="fas.cog" link="{{ route('admin.migrations.index') }}" :active="request()->routeIs('admin.migrations.*')" />
