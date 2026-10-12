@@ -10,6 +10,7 @@ use App\Livewire\LogViewer;
 use App\Models\ActionProgress;
 use App\Models\Block;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\TaskExecution;
@@ -364,6 +365,48 @@ class AdminPageSafetyTest extends TestCase
             ->call('retryFailure', $unregistered->id);
 
         Queue::assertNotPushed(ProcessTaskPipelineJob::class);
+    }
+
+    #[Test]
+    public function pipeline_shows_ref_cards_and_retries_object_backed_failures(): void
+    {
+        Queue::fake();
+
+        $own = EventObject::factory()->create(['user_id' => $this->admin->id, 'title' => 'Own <b>object</b>']);
+        $foreign = EventObject::factory()->create(['user_id' => $this->other->id, 'title' => 'Foreign object']);
+        $ownFailure = TaskExecution::factory()->create([
+            'user_id' => $this->admin->id,
+            'entity_type' => 'object',
+            'entity_id' => $own->id,
+            'task_key' => 'generate_embedding',
+            'status' => 'failed',
+        ]);
+        $foreignFailure = TaskExecution::factory()->create([
+            'user_id' => $this->admin->id,
+            'entity_type' => 'object',
+            'entity_id' => $foreign->id,
+            'task_key' => 'generate_embedding',
+            'status' => 'failed',
+        ]);
+
+        $this->actingAs($this->admin);
+
+        Volt::test('admin.task-pipeline-overview')
+            ->assertSee('Own &lt;b&gt;object&lt;/b&gt;', false)
+            ->assertDontSee('Foreign object')
+            ->call('retryFailure', $foreignFailure->id)
+            ->call('retryFailure', $ownFailure->id);
+
+        Queue::assertPushed(ProcessTaskPipelineJob::class, 1);
+        Queue::assertPushed(ProcessTaskPipelineJob::class, fn ($job) => $job->model->is($own));
+    }
+
+    #[Test]
+    public function old_task_pipeline_url_redirects_to_pipeline(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('admin.task-pipeline.index'))
+            ->assertRedirect('/admin/pipeline');
     }
 
     private function eventFor(User $user): Event

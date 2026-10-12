@@ -24,10 +24,10 @@ class TaskPipelineAdminTest extends TestCase
     public function admin_task_pipeline_page_loads_for_admin_user(): void
     {
         $response = $this->actingAs($this->admin())
-            ->get(route('admin.task-pipeline.index'));
+            ->get(route('admin.pipeline.index'));
 
         $response->assertSuccessful();
-        $response->assertSee('Task Pipeline');
+        $response->assertSee('Pipeline');
         $response->assertSee('Generate Embedding');
     }
 
@@ -37,14 +37,14 @@ class TaskPipelineAdminTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->get(route('admin.task-pipeline.index'))
+            ->get(route('admin.pipeline.index'))
             ->assertForbidden();
     }
 
     #[Test]
     public function admin_task_pipeline_page_requires_authentication(): void
     {
-        $response = $this->get(route('admin.task-pipeline.index'));
+        $response = $this->get(route('admin.pipeline.index'));
 
         $response->assertRedirect(route('login'));
     }

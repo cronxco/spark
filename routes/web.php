@@ -378,5 +378,6 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
     })->name('bin.delete');
     Volt::route('activity', 'admin.activity')->name('activity.index');
     Volt::route('push-notifications', 'admin.push-notifications')->name('push-notifications.index');
-    Volt::route('task-pipeline', 'admin.task-pipeline-overview')->name('task-pipeline.index');
+    Volt::route('pipeline', 'admin.task-pipeline-overview')->name('pipeline.index');
+    Route::redirect('task-pipeline', '/admin/pipeline')->name('task-pipeline.index');
 });
