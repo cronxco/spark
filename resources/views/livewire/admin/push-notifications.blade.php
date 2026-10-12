@@ -2,7 +2,7 @@
 
 use App\Models\User;
 use App\Notifications\AdminPushNotification;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 use NotificationChannels\WebPush\PushSubscription;
@@ -64,25 +64,20 @@ new class extends Component
             $this->url ?: null
         );
 
-        $successCount = 0;
-        $failCount = 0;
-
         foreach ($users as $user) {
-            try {
-                $user->notifyNow($notification);
-                $successCount++;
-            } catch (\Exception $e) {
-                $failCount++;
-                Log::error("Failed to send push to {$user->email}: " . $e->getMessage());
-            }
+            $user->notify($notification);
         }
 
+        $count = $users->count();
         $this->reset(['title', 'message', 'url', 'confirmSend']);
 
-        if ($failCount > 0) {
-            $this->warning("Sent to {$successCount} users, {$failCount} failed.");
-        } else {
-            $this->success("Notification sent to {$successCount} users!");
+        $this->success("Notification queued for {$count} " . Str::plural('user', $count) . '.');
+    }
+
+    public function updated(string $property): void
+    {
+        if (in_array($property, ['title', 'message', 'url'], true)) {
+            $this->confirmSend = false;
         }
     }
 

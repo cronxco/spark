@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Block;
+use App\Support\AdminTenant;
 
 class BlockViewController extends Controller
 {
@@ -12,29 +13,21 @@ class BlockViewController extends Controller
      */
     public function index()
     {
-        // Get distinct block types
-        $blockTypes = Block::select('block_type')
+        $tenantId = AdminTenant::id();
+
+        // Latest block of each type for the viewed tenant, in one query
+        $latestIds = Block::query()
             ->whereNotNull('block_type')
-            ->whereNull('deleted_at')
-            ->distinct()
-            ->pluck('block_type');
+            ->whereHas('event.integration', fn ($q) => $q->where('user_id', $tenantId))
+            ->selectRaw('DISTINCT ON (blocks.block_type) blocks.id')
+            ->orderBy('blocks.block_type')
+            ->orderByDesc('blocks.created_at')
+            ->pluck('id');
 
-        // Get the latest block for each type
-        $blocks = collect();
-        foreach ($blockTypes as $blockType) {
-            $latestBlock = Block::where('block_type', $blockType)
-                ->whereNull('deleted_at')
-                ->with(['event.integration'])
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            if ($latestBlock) {
-                $blocks->push($latestBlock);
-            }
-        }
-
-        // Sort by block_type for consistent display
-        $blocks = $blocks->sortBy('block_type')->values();
+        $blocks = Block::with(['event.integration'])
+            ->whereIn('id', $latestIds)
+            ->orderBy('block_type')
+            ->get();
 
         return view('admin.block-view.index', [
             'blocks' => $blocks,

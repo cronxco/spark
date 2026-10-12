@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Event;
 use App\Services\DuplicateDetectionService;
 use App\Support\AdminTenant;
 
@@ -14,9 +15,13 @@ state([
     'limit' => 50,
     'duplicates' => [],
     'loading' => false,
+    'searched' => false,
 ]);
 
 $search = function () {
+    $this->threshold = min(max((float) $this->threshold, 0.80), 1.00);
+    $this->limit = min(max((int) $this->limit, 10), 500);
+    $this->modelType = in_array($this->modelType, ['Event', 'Block', 'EventObject'], true) ? $this->modelType : 'Event';
     $this->loading = true;
     $this->duplicates = [];
 
@@ -29,7 +34,19 @@ $search = function () {
         'EventObject' => $service->findDuplicateObjects($userId, $this->threshold, $this->limit),
     };
 
-    $this->duplicates = $results->toArray();
+    $this->duplicates = $results->map(function (array $pair) {
+        foreach (['model1', 'model2'] as $side) {
+            $model = $pair[$side];
+            $pair[$side] = $model->toArray();
+
+            if ($model instanceof Event) {
+                $pair[$side]['formatted_value'] = $model->formatted_value;
+            }
+        }
+
+        return $pair;
+    })->all();
+    $this->searched = true;
     $this->loading = false;
 };
 
@@ -76,7 +93,7 @@ $search = function () {
                     label="Find Duplicates"
                     wire:click="search"
                     class="btn-primary w-full"
-                    :loading="$loading"
+                    spinner="search"
                     icon="fas.magnifying-glass" />
             </div>
         </div>
@@ -254,8 +271,7 @@ $search = function () {
     <x-card>
         <div class="text-center py-12">
             <x-icon name="fas.magnifying-glass" class="w-16 h-16 text-base-content/40 mx-auto mb-4" />
-            <h3 class="text-lg font-medium text-base-content/70 mb-2">No duplicates found</h3>
-            <p class="text-base-content/60">Click "Find Duplicates" to search for similar records</p>
+            <h3 class="text-lg font-medium text-base-content/70 mb-2">{{ $searched ? 'No duplicates found' : 'Find duplicates' }}</h3>
         </div>
     </x-card>
     @endif

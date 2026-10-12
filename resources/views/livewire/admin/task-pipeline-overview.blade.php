@@ -63,6 +63,18 @@ new class extends Component
         $this->resetPage('failuresPage');
     }
 
+    public function updatedExecSearch(): void
+    {
+        $this->resetPage('executionsPage');
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = in_array($this->perPage, [10, 25, 50, 100], true) ? $this->perPage : 25;
+        $this->resetPage('executionsPage');
+        $this->resetPage('failuresPage');
+    }
+
     public function updatedExecStatusFilter(): void
     {
         $this->resetPage('executionsPage');
@@ -357,8 +369,20 @@ new class extends Component
             return;
         }
 
+        if ($execution->status !== 'failed') {
+            $this->error('Only failed task executions can be retried.');
+
+            return;
+        }
+
         if ($execution->entity_type !== 'event') {
             $this->error('Only event-backed tasks can be retried from here.');
+
+            return;
+        }
+
+        if (! TaskRegistry::getTask($execution->task_key)) {
+            $this->error('That task is no longer registered, so it cannot be retried.');
 
             return;
         }
@@ -786,6 +810,7 @@ new class extends Component
                                         class="btn btn-ghost btn-sm">
                                         View
                                     </button>
+                                    @if ($failure->entity_type === 'event')
                                     <button
                                         wire:click="retryFailure('{{ $failure->id }}')"
                                         wire:loading.attr="disabled"
@@ -794,6 +819,7 @@ new class extends Component
                                         <span wire:loading wire:target="retryFailure('{{ $failure->id }}')" class="loading loading-spinner loading-xs"></span>
                                         Retry
                                     </button>
+                                    @endif
                                 </div>
                             @endscope
                         </x-table>
