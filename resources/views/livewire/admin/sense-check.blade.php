@@ -695,7 +695,7 @@ new class extends Component
                 'title' => 'Money data health',
                 'description' => 'Duplicate bank accounts, archived pot snapshots, missing pot details and unnamed categories, with a preview before anything is applied.',
                 'icon' => 'fas.sterling-sign',
-                'issue_count' => count(app(\App\Services\Money\AccountCleanup::class)->plan((string) auth()->id())['steps']),
+                'issue_count' => count(app(\App\Services\Money\AccountCleanup::class)->plan((string) AdminTenant::id())['steps']),
                 'badge_value' => null,
             ],
             [

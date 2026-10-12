@@ -76,12 +76,21 @@ class DuplicateDetectionService
                     ->whereNotNull('t2.embeddings');
             });
 
+        $query->whereNull('t1.deleted_at')->whereNull('t2.deleted_at');
+
         // Apply user filter based on model type
         if ($modelClass === EventObject::class) {
             $query->whereColumn('t1.user_id', 't2.user_id')
                 ->when($userId !== null, fn ($q) => $q->where('t1.user_id', $userId));
+        } elseif ($modelClass === Block::class) {
+            // Blocks belong to an integration through their event
+            $query->join('events as e1', 't1.event_id', '=', 'e1.id')
+                ->join('events as e2', 't2.event_id', '=', 'e2.id')
+                ->join('integrations as i1', 'e1.integration_id', '=', 'i1.id')
+                ->join('integrations as i2', 'e2.integration_id', '=', 'i2.id')
+                ->whereColumn('i1.user_id', 'i2.user_id')
+                ->when($userId !== null, fn ($q) => $q->where('i1.user_id', $userId));
         } else {
-            // For Event and Block, filter by integration user_id
             $query->join('integrations as i1', 't1.integration_id', '=', 'i1.id')
                 ->join('integrations as i2', 't2.integration_id', '=', 'i2.id')
                 ->whereColumn('i1.user_id', 'i2.user_id')
@@ -104,20 +113,20 @@ class DuplicateDetectionService
 
         $pairs = $query->get();
 
-        // Load the actual models with relationships
-        $pairs = $pairs->map(function ($pair) use ($modelClass) {
-            $model1 = $modelClass::with($this->getRelationships($modelClass))->find($pair->id1);
-            $model2 = $modelClass::with($this->getRelationships($modelClass))->find($pair->id2);
+        // Load both sides of every pair in one query
+        $models = $modelClass::with($this->getRelationships($modelClass))
+            ->whereIn('id', $pairs->pluck('id1')->merge($pairs->pluck('id2'))->unique()->all())
+            ->get()
+            ->keyBy('id');
 
-            return [
-                'model1' => $model1,
-                'model2' => $model2,
-                'similarity' => round($pair->similarity, 4),
-            ];
-        })->filter(function ($pair) {
+        $pairs = $pairs->map(fn ($pair) => [
+            'model1' => $models->get($pair->id1),
+            'model2' => $models->get($pair->id2),
+            'similarity' => round($pair->similarity, 4),
+        ])->filter(function ($pair) {
             // Filter out any null models (deleted during query)
             return $pair['model1'] !== null && $pair['model2'] !== null;
-        });
+        })->values();
 
         return $pairs;
     }

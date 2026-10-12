@@ -1,5 +1,14 @@
 <?php
 
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Models\IntegrationGroup;
+use App\Models\Place;
+use App\Models\Relationship;
+use App\Models\User;
+use App\Support\AdminTenant;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
@@ -80,9 +89,41 @@ new class extends Component
         ];
     }
 
+    /**
+     * Activity rows belonging to the tenant the admin pages are scoped to:
+     * things the tenant did, or changes to records the tenant owns.
+     */
+    private function tenantActivities()
+    {
+        $tenantId = AdminTenant::id();
+
+        if ($tenantId === null) {
+            return Activity::query();
+        }
+
+        return Activity::query()->where(function ($q) use ($tenantId) {
+            $q->where(fn ($c) => $c->where('causer_type', User::class)->where('causer_id', $tenantId))
+                ->orWhere(fn ($c) => $c->where('subject_type', User::class)->where('subject_id', $tenantId))
+                ->orWhere(fn ($c) => $c->where('subject_type', Event::class)
+                    ->whereIn('subject_id', Event::withTrashed()->forUser($tenantId)->select('events.id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', Block::class)
+                    ->whereIn('subject_id', Block::withTrashed()->whereHas('event.integration', fn ($i) => $i->where('user_id', $tenantId))->select('blocks.id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', EventObject::class)
+                    ->whereIn('subject_id', EventObject::withTrashed()->where('user_id', $tenantId)->select('id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', Integration::class)
+                    ->whereIn('subject_id', Integration::withTrashed()->where('user_id', $tenantId)->select('id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', IntegrationGroup::class)
+                    ->whereIn('subject_id', IntegrationGroup::withTrashed()->where('user_id', $tenantId)->select('id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', Relationship::class)
+                    ->whereIn('subject_id', Relationship::where('user_id', $tenantId)->select('id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', Place::class)
+                    ->whereIn('subject_id', Place::where('user_id', $tenantId)->select('id')));
+        });
+    }
+
     public function getActivities()
     {
-        $query = Activity::with(['subject', 'causer']);
+        $query = $this->tenantActivities()->with(['subject', 'causer']);
 
         // Apply search filter - optimized for better index usage
         if ($this->search) {
@@ -112,31 +153,34 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        $sortableColumns = collect($this->headers())->where('sortable', true)->pluck('key')->all();
+        $sortColumn = in_array($this->sortBy['column'] ?? null, $sortableColumns, true) ? $this->sortBy['column'] : 'created_at';
+        $sortDirection = ($this->sortBy['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortColumn, $sortDirection);
 
-        return $query->paginate($this->perPage);
+        $perPage = in_array($this->perPage, [10, 25, 50, 100], true) ? $this->perPage : 25;
+
+        return $query->paginate($perPage);
     }
 
     public function getUniqueLogNames()
     {
-        return Cache::remember('activity_log_unique_log_names', 3600, function () {
-            return Activity::distinct()->pluck('log_name')->filter()->sort()->values()->toArray();
+        return Cache::remember('activity_log_unique_log_names_' . AdminTenant::id(), 3600, function () {
+            return $this->tenantActivities()->distinct()->pluck('log_name')->filter()->sort()->values()->toArray();
         });
     }
 
     public function getUniqueEvents()
     {
-        return Cache::remember('activity_log_unique_events', 3600, function () {
-            return Activity::distinct()->pluck('event')->filter()->sort()->values()->toArray();
+        return Cache::remember('activity_log_unique_events_' . AdminTenant::id(), 3600, function () {
+            return $this->tenantActivities()->distinct()->pluck('event')->filter()->sort()->values()->toArray();
         });
     }
 
     public function getUniqueSubjectTypes()
     {
-        return Cache::remember('activity_log_unique_subject_types', 3600, function () {
-            return Activity::distinct()->pluck('subject_type')->filter()->sort()->values()->toArray();
+        return Cache::remember('activity_log_unique_subject_types_' . AdminTenant::id(), 3600, function () {
+            return $this->tenantActivities()->distinct()->pluck('subject_type')->filter()->sort()->values()->toArray();
         });
     }
 
@@ -234,7 +278,7 @@ new class extends Component
 
     public function showActivityDetails(string $activityId): void
     {
-        $this->selectedActivity = Activity::with(['subject', 'causer'])->find($activityId);
+        $this->selectedActivity = $this->tenantActivities()->with(['subject', 'causer'])->find($activityId);
         $this->showModal = true;
     }
 

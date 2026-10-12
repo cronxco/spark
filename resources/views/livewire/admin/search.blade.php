@@ -103,8 +103,9 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        $sortableColumns = collect($this->headers())->where('sortable', true)->pluck('key')->all();
+        $sortColumn = in_array($this->sortBy['column'] ?? null, $sortableColumns, true) ? $this->sortBy['column'] : 'created_at';
+        $sortDirection = ($this->sortBy['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortColumn, $sortDirection);
 
         return $query->paginate($this->perPage);
@@ -271,9 +272,8 @@ new class extends Component
                 '--type' => $type,
                 '--batch' => 50,
                 '--limit' => $limit,
+                '--user' => AdminTenant::id(),
             ]);
-
-            $output = Artisan::output();
 
             $this->success("Started generating {$type} embeddings. Check queue for progress.");
         } catch (Exception $e) {

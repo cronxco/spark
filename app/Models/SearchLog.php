@@ -42,7 +42,7 @@ class SearchLog extends Model
     /**
      * Get popular queries for a user or all users
      */
-    public static function getPopularQueries(?int $userId = null, int $limit = 10, int $days = 30)
+    public static function getPopularQueries(?string $userId = null, int $limit = 10, int $days = 30)
     {
         $query = static::query()
             ->selectRaw('query, COUNT(*) as count, AVG(avg_similarity) as avg_similarity, AVG(results_count) as avg_results')
@@ -61,7 +61,7 @@ class SearchLog extends Model
     /**
      * Get queries with zero results
      */
-    public static function getZeroResultQueries(?int $userId = null, int $limit = 10, int $days = 30)
+    public static function getZeroResultQueries(?string $userId = null, int $limit = 10, int $days = 30)
     {
         $query = static::query()
             ->selectRaw('query, COUNT(*) as count')
