@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Services\Media\MediaDeduplicationService;
+use App\Traits\PreservesPipelineMetadata;
 use App\Traits\TracksViews;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,7 +22,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Block extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia, LogsActivity, SoftDeletes, TracksViews;
+    use HasFactory, InteractsWithMedia, LogsActivity, PreservesPipelineMetadata, SoftDeletes, TracksViews;
 
     /**
      * Only record update events via LogsActivity trait.

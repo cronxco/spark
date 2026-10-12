@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Block;
+use App\Support\PipelineMetadata;
 
 class BlockObserver
 {
@@ -109,7 +110,40 @@ class BlockObserver
     {
         return array_values(array_filter(
             self::DERIVED_DATA_FIELDS,
-            fn (string $field) => $block->wasChanged($field),
+            fn (string $field) => $block->wasChanged($field)
+                && ! ($field === 'metadata' && $this->metadataIsEquivalent($block)),
         ));
+    }
+
+    /**
+     * A re-synced block with identical data still looks dirty to Eloquent: Postgres
+     * jsonb reorders object keys, and a sync's fresh metadata lacks the keys the
+     * pipeline mirrored into it.
+     */
+    private function metadataIsEquivalent(Block $block): bool
+    {
+        $previous = $block->getPrevious();
+
+        if (! array_key_exists('metadata', $previous)) {
+            return false;
+        }
+
+        $before = $this->decodeMetadata($previous['metadata']);
+        $after = $this->decodeMetadata($block->getAttributes()['metadata'] ?? null);
+
+        return $before !== null
+            && $after !== null
+            && PipelineMetadata::areEquivalent($before, $after);
+    }
+
+    private function decodeMetadata(mixed $raw): ?array
+    {
+        if ($raw === null) {
+            return [];
+        }
+
+        $decoded = is_string($raw) ? json_decode($raw, true) : $raw;
+
+        return is_array($decoded) ? $decoded : null;
     }
 }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Services\Media\MediaDeduplicationService;
+use App\Traits\PreservesPipelineMetadata;
 use App\Traits\TracksViews;
 use ArrayAccess;
 use Clickbar\Magellan\Data\Geometries\Point;
@@ -23,7 +24,7 @@ use Spatie\Tags\Tag;
 
 class EventObject extends Model implements HasMedia
 {
-    use HasFactory, HasTags, InteractsWithMedia, LogsActivity, SoftDeletes, TracksViews;
+    use HasFactory, HasTags, InteractsWithMedia, LogsActivity, PreservesPipelineMetadata, SoftDeletes, TracksViews;
 
     /**
      * Only record update events via LogsActivity trait.

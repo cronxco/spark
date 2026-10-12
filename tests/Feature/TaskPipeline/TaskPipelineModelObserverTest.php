@@ -128,6 +128,79 @@ class TaskPipelineModelObserverTest extends TestCase
     }
 
     #[Test]
+    public function block_update_ignores_metadata_that_only_differs_in_key_order(): void
+    {
+        $event = Event::factory()->create();
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'event_details',
+            'metadata' => [
+                'status' => 'confirmed',
+                'creator' => ['email' => 'a@example.com', 'self' => true],
+            ],
+        ]);
+        $block = Block::query()->findOrFail($block->id);
+
+        config(['app.enable_task_pipeline' => true]);
+        Queue::fake([ProcessTaskPipelineJob::class]);
+
+        $block->update([
+            'metadata' => [
+                'creator' => ['self' => true, 'email' => 'a@example.com'],
+                'status' => 'confirmed',
+            ],
+        ]);
+
+        Queue::assertNothingPushed();
+    }
+
+    #[Test]
+    public function block_update_ignores_metadata_that_only_lacks_pipeline_keys(): void
+    {
+        $event = Event::factory()->create();
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'event_details',
+            'metadata' => [
+                'status' => 'confirmed',
+                'embedding_model' => 'text-embedding-3-small',
+                'task_executions' => ['generate_embedding' => ['last_attempt' => ['status' => 'success']]],
+            ],
+        ]);
+        $block = Block::query()->findOrFail($block->id);
+
+        config(['app.enable_task_pipeline' => true]);
+        Queue::fake([ProcessTaskPipelineJob::class]);
+
+        $block->update(['metadata' => ['status' => 'confirmed']]);
+
+        Queue::assertNothingPushed();
+    }
+
+    #[Test]
+    public function block_update_dispatches_when_metadata_values_change(): void
+    {
+        $event = Event::factory()->create();
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'event_details',
+            'metadata' => ['status' => 'confirmed', 'description' => 'Old'],
+        ]);
+        $block = Block::query()->findOrFail($block->id);
+
+        config(['app.enable_task_pipeline' => true]);
+        Queue::fake([ProcessTaskPipelineJob::class]);
+
+        $block->update(['metadata' => ['description' => 'New', 'status' => 'confirmed']]);
+
+        Queue::assertPushed(
+            ProcessTaskPipelineJob::class,
+            fn (ProcessTaskPipelineJob $job) => $job->model->is($block)
+                && $job->changedFields === ['metadata']
+        );
+    }
+
+    #[Test]
     public function object_update_dispatches_for_changed_derived_data_fields(): void
     {
         $object = EventObject::factory()->create(['title' => 'Original title']);
