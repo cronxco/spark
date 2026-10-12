@@ -192,7 +192,7 @@
 
                 @if (auth()->user()?->is_admin)
                 <x-menu-sub title="Admin" icon="fas.shield-halved" :active="request()->routeIs('admin.*')" data-hotkey="g a">
-                    <x-menu-item title="Sense Check" icon="fas.brain" link="{{ route('admin.sense-check.index') }}" :active="request()->routeIs('admin.sense-check.*')" />
+                    <x-menu-item title="Pulse" icon="fas.heart-pulse" link="{{ route('admin.pulse.index') }}" :active="request()->routeIs('admin.pulse.*')" />
                     <x-menu-item title="Day Notes" icon="fas.calendar-day" link="{{ route('admin.daynotes.index') }}" :active="request()->routeIs('admin.daynotes.*')" />
                     <x-menu-item title="Search Analytics" icon="fas.magnifying-glass-chart" link="{{ route('admin.search.index') }}" :active="request()->routeIs('admin.search.*')" />
                     <x-menu-item title="Duplicates" icon="fas.copy" link="{{ route('admin.duplicates.index') }}" :active="request()->routeIs('admin.duplicates.*')" />
@@ -200,7 +200,6 @@
                     <x-menu-item title="Pipeline" icon="fas.diagram-project" link="{{ route('admin.pipeline.index') }}" :active="request()->routeIs('admin.pipeline.*')" />
                     <x-menu-item title="Data" icon="fas.database" link="{{ route('admin.events.index') }}" :active="request()->routeIs(['admin.events.*', 'admin.objects.*', 'admin.blocks.*', 'admin.relationships.*'])" />
                     <x-menu-item title="GoCardless" icon="fas.credit-card" link="{{ route('admin.gocardless.index') }}" :active="request()->routeIs('admin.gocardless.*')" />
-                    <x-menu-item title="Migrations" icon="fas.cog" link="{{ route('admin.migrations.index') }}" :active="request()->routeIs('admin.migrations.*')" />
                     <x-menu-item title="Logs" icon="fas.file-lines" link="{{ route('admin.logs.index') }}" :active="request()->routeIs('admin.logs.*')" />
                     <x-menu-item title="Bin" icon="fas.trash" link="{{ route('admin.bin.index') }}" :active="request()->routeIs('admin.bin.*')" />
                     <x-menu-item title="God Mode" icon="fas.user-shield" link="{{ route('admin.god-mode.index') }}" :active="request()->routeIs('admin.god-mode.*')" />

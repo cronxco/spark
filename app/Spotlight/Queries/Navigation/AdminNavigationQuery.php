@@ -19,10 +19,10 @@ class AdminNavigationQuery
             // Admin routes
             $adminRoutes = [
                 [
-                    'title' => 'Sense Check',
-                    'subtitle' => 'Review data integrity and consistency',
-                    'icon' => 'beaker',
-                    'route' => 'admin.sense-check.index',
+                    'title' => 'Pulse',
+                    'subtitle' => 'Data checks and one-off fixes',
+                    'icon' => 'heart',
+                    'route' => 'admin.pulse.index',
                 ],
                 [
                     'title' => 'Search Analytics',
@@ -47,12 +47,6 @@ class AdminNavigationQuery
                     'subtitle' => 'Manage GoCardless connections',
                     'icon' => 'credit-card',
                     'route' => 'admin.gocardless.index',
-                ],
-                [
-                    'title' => 'Migrations',
-                    'subtitle' => 'Run data migrations',
-                    'icon' => 'arrow-path',
-                    'route' => 'admin.migrations.index',
                 ],
                 [
                     'title' => 'Logs',
