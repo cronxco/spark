@@ -214,7 +214,7 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Data" subtitle="Browse and manage events" separator>
+    <x-header title="Data" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedEvents) > 0)

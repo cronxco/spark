@@ -278,7 +278,7 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Data" subtitle="Browse and manage relationships" separator>
+    <x-header title="Data" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedRelationships) > 0)
@@ -452,9 +452,9 @@ new class extends Component
                         <div class="flex flex-col">
                             <span class="text-sm">{{ $this->getTypeDisplayName($relationship->type) }}
                                 @if ($this->isDirectional($relationship->type))
-                                →
+                                <x-icon name="fas.arrow-right" class="w-3 h-3 inline" />
                                 @else
-                                ↔
+                                <x-icon name="fas.arrows-left-right" class="w-3 h-3 inline" />
                                 @endif
                             </span>
                         </div>

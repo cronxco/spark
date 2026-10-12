@@ -844,7 +844,7 @@ new class extends Component
 }; ?>
 
 <div>
-    <x-header title="Pulse" subtitle="Data consistency checks and one-off fixes" separator>
+    <x-header title="Pulse" separator>
         <x-slot:actions>
             <button
                 x-data

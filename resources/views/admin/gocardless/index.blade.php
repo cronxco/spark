@@ -1,6 +1,6 @@
 <x-layouts.app :title="__('GoCardless Admin')">
     <div>
-        <x-header title="GoCardless Admin" subtitle="Manage GoCardless agreements and requisitions" separator>
+        <x-header title="GoCardless Admin" separator>
             <x-slot:actions>
 
             </x-slot:actions>
@@ -192,40 +192,6 @@
                             </table>
                         </div>
                     @endif
-                </div>
-            </div>
-
-            <!-- Help Section -->
-            <div class="card bg-base-100 shadow-sm">
-                <div class="card-body">
-                    <h3 class="card-title">Help & Information</h3>
-                    <div class="prose max-w-none">
-                        <p class="mb-4">
-                            This admin interface allows you to manage GoCardless agreements and requisitions.
-                            Use this to clean up any existing data that might be interfering with the OAuth flow.
-                        </p>
-
-                        <h4 class="text-lg font-semibold mt-6 mb-2">Status Meanings:</h4>
-                        <ul class="list-disc pl-6 space-y-1">
-                            <li><strong>CR (Created):</strong> Requisition has been created but not yet linked</li>
-                            <li><strong>LN (Linking):</strong> Requisition is currently being linked to accounts</li>
-                            <li><strong>EX (Expired):</strong> Requisition has expired and can be safely deleted</li>
-                            <li><strong>RJ (Rejected):</strong> Requisition was rejected and can be deleted</li>
-                        </ul>
-
-                        <h4 class="text-lg font-semibold mt-6 mb-2">When to Delete:</h4>
-                        <ul class="list-disc pl-6 space-y-1">
-                            <li>Delete expired (EX) requisitions to clean up old data</li>
-                            <li>Delete rejected (RJ) requisitions that failed</li>
-                            <li>Delete agreements that are no longer needed</li>
-                            <li>Be cautious with active (LN) requisitions as they may be in use</li>
-                        </ul>
-
-                        <div class="alert alert-info mt-6">
-                            <strong>Note:</strong> Deleting agreements and requisitions is irreversible.
-                            Only delete items you're sure are no longer needed.
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

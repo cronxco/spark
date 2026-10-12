@@ -464,7 +464,7 @@ new class extends Component
 }; ?>
 
 <div @if ($this->stats['activeCount'] > 0) wire:poll.5s @endif>
-    <x-header title="Pipeline" subtitle="Registered tasks, live status, and execution history" separator>
+    <x-header title="Pipeline" separator>
         <x-slot:actions>
             <button class="btn btn-ghost btn-sm gap-2" wire:click="$refresh">
                 <x-icon name="fas.rotate" class="w-4 h-4" />
