@@ -52,6 +52,7 @@ class PulseCommands
             'notifications:backfill-metadata' => $def('Backfill notification metadata', 'Add missing metadata to stored notifications.', ['--dry-run' => true], []),
             'places:recalculate-visit-counts' => $def('Recalculate place visit counts', 'Recompute visit counts for all places.', ['--dry-run' => true], ['--force' => true]),
             'oyster:backfill-transport-tags' => $def('Backfill Oyster transport tags', 'Tag existing Oyster journeys by transport mode.', null, []),
+            'oyster:repair-bst-times' => $def('Repair Oyster BST times', 'Needs the deploy time of the parser fix, so it stays in the console.', null, null, 'all users', false, 'php artisan oyster:repair-bst-times --before="<UTC deploy time>" [--apply]'),
             'receipt-matching:backfill' => $def('Backfill receipt matches', 'Queue review-only matching attempts for unmatched receipts.', [], ['--dispatch' => true]),
             'gocardless:reconcile-accounts' => $def('Reconcile GoCardless accounts', 'Merge duplicate bank accounts and fix names.', ['--user' => '{user}'], ['--user' => '{user}', '--apply' => true], 'you'),
             'monzo:infer-interest' => $def('Infer Monzo pot interest', 'Plan of interest_earned events inferred from pot snapshots. Applying waits for Will\'s go.', ['--user' => '{user}', '--detail' => true], null, 'you', false, 'Apply from the console once the plan is approved.'),

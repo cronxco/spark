@@ -229,6 +229,24 @@ CSV;
     }
 
     #[Test]
+    public function it_converts_british_summer_time_to_utc()
+    {
+        $csv = <<<'CSV'
+
+Date,Start Time,End Time,Journey/Action,Charge,Credit,Balance,Note
+10-Oct-2026,14:13,14:20,"Wimbledon [National Rail] to Earlsfield [National Rail]",.00,,8.41,""
+10-Oct-2026,12:17,,"Entered Wandle Park tram stop",.00,,8.41,""
+CSV;
+
+        $result = $this->parser->parse($csv);
+
+        $this->assertSame('2026-10-10T13:13:00Z', $result['journeys'][0]['start_datetime']->toIso8601ZuluString());
+        $this->assertSame('2026-10-10T13:20:00Z', $result['journeys'][0]['end_datetime']->toIso8601ZuluString());
+        $this->assertSame('2026-10-10T11:17:00Z', $result['journeys'][1]['start_datetime']->toIso8601ZuluString());
+        $this->assertSame('2026-10-10 11:17:00', $result['journeys'][1]['start_datetime']->format('Y-m-d H:i:s'));
+    }
+
+    #[Test]
     public function it_handles_empty_csv()
     {
         $csv = '';
