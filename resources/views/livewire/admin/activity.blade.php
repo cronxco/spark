@@ -327,7 +327,7 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Activity Log" subtitle="View and monitor system activity" separator>
+    <x-header title="Activity Log" separator>
     </x-header>
 
     <div class="space-y-4 lg:space-y-6">

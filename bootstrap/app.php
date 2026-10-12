@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureIosMobileApiEnabled;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\ETag;
 use App\Http\Middleware\RecordGodModeAccess;
+use App\Http\Middleware\RequireGodMode;
 use App\Http\Middleware\RequireIfMatch;
 use App\Http\Middleware\RequireMobileSession;
 use App\Http\Middleware\RequireSparkAbility;
@@ -52,6 +53,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'spark.ability' => RequireSparkAbility::class,
             'mobile.session' => RequireMobileSession::class,
             'admin.god-mode.audit' => RecordGodModeAccess::class,
+            'admin.god-mode.required' => RequireGodMode::class,
             'if-match' => RequireIfMatch::class,
         ]);
 

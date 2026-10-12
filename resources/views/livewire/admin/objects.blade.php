@@ -171,7 +171,7 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Data" subtitle="Browse and manage objects" separator>
+    <x-header title="Data" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedObjects) > 0)
@@ -363,7 +363,6 @@ new class extends Component
                         <x-icon name="o-cube-transparent" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
                         <p class="font-medium text-base-content mb-2">No objects found</p>
                         @if ($search || $conceptFilter || $typeFilter)
-                        <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>
                         @endif
                     </div>
                 </x-slot:empty>

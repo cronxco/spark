@@ -609,7 +609,7 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Bin" subtitle="Manage soft-deleted items" separator>
+    <x-header title="Bin" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedItems) > 0)
@@ -796,7 +796,6 @@ new class extends Component
                         <x-icon name="fas.trash" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
                         <p class="font-medium text-base-content mb-2">No deleted items found</p>
                         @if ($search || $typeFilter)
-                        <p class="text-sm text-base-content/70">Try adjusting your search or filters</p>
                         @endif
                     </div>
                 </x-slot:empty>

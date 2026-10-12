@@ -113,7 +113,7 @@ new class extends Component
 }; ?>
 
 <div>
-    <x-header title="Push Notifications" subtitle="Send push notifications to users" separator />
+    <x-header title="Push Notifications" separator />
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {{-- Compose Notification --}}

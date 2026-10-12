@@ -53,7 +53,7 @@ $search = function () {
 ?>
 
 <div>
-    <x-header title="Duplicate Detection" subtitle="Find potential duplicates using semantic similarity" separator />
+    <x-header title="Duplicate Detection" separator />
 
     <!-- Controls -->
     <x-card class="mb-6">

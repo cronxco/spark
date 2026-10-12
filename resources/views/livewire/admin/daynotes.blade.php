@@ -136,7 +136,7 @@ new class extends Component
 }; ?>
 
 <div>
-    <x-header title="Outline Day Notes" subtitle="Generate and manage day note documents" separator>
+    <x-header title="Outline Day Notes" separator>
         <x-slot:actions>
             @if ($group)
                 <a href="{{ $group->auth_metadata['api_url'] ?? config('services.outline.url') }}"
@@ -158,7 +158,7 @@ new class extends Component
             <x-icon name="o-exclamation-triangle" class="w-6 h-6" />
             <div>
                 <h3 class="font-bold">Outline integration not configured</h3>
-                <p class="text-sm">Please configure your Outline integration first.</p>
+
             </div>
             <a href="{{ route('integrations.index') }}" class="btn btn-sm">
                 Go to Integrations
@@ -246,7 +246,7 @@ new class extends Component
                 <x-icon name="o-exclamation-triangle" class="w-6 h-6" />
                 <div>
                     <h3 class="font-bold">No task integration found</h3>
-                    <p class="text-sm">You must create an Outline task integration before you can generate day notes. Please configure your Outline integration with instance type "task".</p>
+                    <p class="text-sm">Add an Outline integration with instance type "task".</p>
                 </div>
                 <a href="{{ route('integrations.index') }}" class="btn btn-sm">
                     Configure Integration

@@ -348,9 +348,11 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
         return redirect()->route('admin.god-mode.index');
     })->name('god-mode.disable');
 
-    Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
-    Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
-    Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+    Route::middleware('admin.god-mode.required')->group(function () {
+        Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
+        Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
+        Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+    });
 
     Route::redirect('migrations', '/admin/pulse?section=data_fixes')->name('migrations.index');
 
@@ -359,7 +361,7 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
     Volt::route('objects', 'admin.objects')->name('objects.index');
     Volt::route('blocks', 'admin.blocks')->name('blocks.index');
     Volt::route('relationships', 'admin.relationships')->name('relationships.index');
-    Volt::route('pending-links', 'admin.pending-links')->name('pending-links.index');
+    Route::redirect('pending-links', '/flint')->name('pending-links.index');
     Volt::route('bin', 'admin.bin')->name('bin.index');
     Volt::route('pulse', 'admin.sense-check')->name('pulse.index');
     Route::get('sense-check', fn (Request $request) => redirect()->route('admin.pulse.index', $request->query()))->name('sense-check.index');
