@@ -187,6 +187,9 @@ class OysterCsvParser
      *
      * Date format: DD-MMM-YYYY (e.g., "28-Nov-2025")
      * Time format: HH:MM (e.g., "17:47")
+     *
+     * The CSV carries Europe/London wall-clock times. They are converted to UTC so the
+     * stored instant is correct during British Summer Time.
      */
     private function parseDateTime(string $date, string $time): ?Carbon
     {
@@ -198,7 +201,7 @@ class OysterCsvParser
             // Parse date (DD-MMM-YYYY)
             $dateStr = "{$date} {$time}";
 
-            return Carbon::createFromFormat('d-M-Y H:i', $dateStr, 'Europe/London');
+            return Carbon::createFromFormat('d-M-Y H:i', $dateStr, 'Europe/London')->utc();
         } catch (Exception $e) {
             Log::warning('Oyster CSV: Failed to parse datetime', [
                 'date' => $date,

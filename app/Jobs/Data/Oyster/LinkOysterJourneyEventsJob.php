@@ -49,13 +49,13 @@ class LinkOysterJourneyEventsJob implements ShouldQueue
                 $start = $this->statementPeriod['start'] instanceof Carbon
                     ? $this->statementPeriod['start']
                     : Carbon::parse($this->statementPeriod['start']);
-                $query->where('time', '>=', $start);
+                $query->where('time', '>=', $start->copy()->utc());
             }
             if (isset($this->statementPeriod['end'])) {
                 $end = $this->statementPeriod['end'] instanceof Carbon
                     ? $this->statementPeriod['end']
                     : Carbon::parse($this->statementPeriod['end']);
-                $query->where('time', '<=', $end);
+                $query->where('time', '<=', $end->copy()->utc());
             }
         }
 
