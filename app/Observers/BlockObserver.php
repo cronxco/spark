@@ -109,7 +109,59 @@ class BlockObserver
     {
         return array_values(array_filter(
             self::DERIVED_DATA_FIELDS,
-            fn (string $field) => $block->wasChanged($field),
+            fn (string $field) => $block->wasChanged($field)
+                && ! ($field === 'metadata' && $this->metadataIsEquivalent($block)),
         ));
+    }
+
+    /**
+     * Postgres jsonb returns object keys in its own order, so a re-synced block
+     * with identical metadata still looks dirty to Eloquent's strict array
+     * comparison. Compare the previous and current metadata ignoring key order.
+     */
+    private function metadataIsEquivalent(Block $block): bool
+    {
+        $previous = $block->getPrevious();
+
+        if (! array_key_exists('metadata', $previous)) {
+            return false;
+        }
+
+        $before = $this->decodeMetadata($previous['metadata']);
+        $after = $this->decodeMetadata($block->getRawOriginal('metadata'));
+
+        return $before !== null
+            && $after !== null
+            && $this->normalizeMetadata($before) === $this->normalizeMetadata($after);
+    }
+
+    private function decodeMetadata(mixed $raw): ?array
+    {
+        if ($raw === null) {
+            return [];
+        }
+
+        $decoded = is_string($raw) ? json_decode($raw, true) : $raw;
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $value
+     * @return array<int|string, mixed>
+     */
+    private function normalizeMetadata(array $value): array
+    {
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $value[$key] = $this->normalizeMetadata($item);
+            }
+        }
+
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
     }
 }
