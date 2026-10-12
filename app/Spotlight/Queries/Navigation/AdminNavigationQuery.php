@@ -37,22 +37,10 @@ class AdminNavigationQuery
                     'route' => 'admin.activity.index',
                 ],
                 [
-                    'title' => 'Events',
-                    'subtitle' => 'Browse all events',
+                    'title' => 'Data',
+                    'subtitle' => 'Events, objects, blocks and relationships',
                     'icon' => 'list-bullet',
                     'route' => 'admin.events.index',
-                ],
-                [
-                    'title' => 'Objects',
-                    'subtitle' => 'Browse all event objects',
-                    'icon' => 'cube',
-                    'route' => 'admin.objects.index',
-                ],
-                [
-                    'title' => 'Blocks',
-                    'subtitle' => 'Browse all data blocks',
-                    'icon' => 'squares-2x2',
-                    'route' => 'admin.blocks.index',
                 ],
                 [
                     'title' => 'GoCardless Admin',

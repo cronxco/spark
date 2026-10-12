@@ -1,9 +1,11 @@
 <?php
 
 use App\Models\Block;
+use App\Models\Event;
 use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Livewire\Concerns\HasAdminListControls;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -14,13 +16,14 @@ layout('components.layouts.app');
 
 new class extends Component
 {
-    use Toast, WithPagination;
+    use HasAdminListControls, Toast, WithPagination;
 
     public string $search = '';
     public string $blockTypeFilter = '';
     public string $serviceFilter = '';
     public array $selectedBlocks = [];
     public int $perPage = 25;
+    public string $view = 'table';
     public array $sortBy = ['column' => 'time', 'direction' => 'desc'];
 
     protected $queryString = [
@@ -29,6 +32,7 @@ new class extends Component
         'serviceFilter' => ['except' => '', 'as' => 'service'],
         'sortBy' => ['except' => ['column' => 'time', 'direction' => 'desc']],
         'perPage' => ['except' => 25],
+        'view' => ['except' => 'table'],
         'page' => ['except' => 1],
     ];
 
@@ -50,6 +54,36 @@ new class extends Component
     public function updatedServiceFilter(): void
     {
         $this->resetPage();
+    }
+
+    public function updatedView(): void
+    {
+        if (! in_array($this->view, ['table', 'gallery'], true)) {
+            $this->view = 'table';
+        }
+        $this->selectedBlocks = [];
+        $this->resetPage();
+    }
+
+    /**
+     * Latest block of each type for the viewed tenant, rendered with the real block cards.
+     */
+    public function getGalleryBlocks()
+    {
+        $latestIds = Block::query()
+            ->whereNotNull('block_type')
+            ->whereHas('event.integration', fn ($q) => AdminTenant::scope($q))
+            ->when($this->blockTypeFilter, fn ($q) => $q->where('block_type', $this->blockTypeFilter))
+            ->when($this->serviceFilter, fn ($q) => $q->whereHas('event', fn ($e) => $e->where('service', $this->serviceFilter)))
+            ->selectRaw('DISTINCT ON (blocks.block_type) blocks.id')
+            ->orderBy('blocks.block_type')
+            ->orderByDesc('blocks.created_at')
+            ->pluck('id');
+
+        return Block::with(['event.integration'])
+            ->whereIn('id', $latestIds)
+            ->orderBy('block_type')
+            ->get();
     }
 
     public function clearFilters(): void
@@ -132,11 +166,17 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'time';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
-        $query->orderBy($sortColumn, $sortDirection);
+        [$sortColumn, $sortDirection] = $this->resolvedSort('time');
+        if ($sortColumn === 'service') {
+            $query->orderBy(
+                Event::query()->select('service')->whereColumn('events.id', 'blocks.event_id')->limit(1),
+                $sortDirection
+            );
+        } else {
+            $query->orderBy($sortColumn, $sortDirection);
+        }
 
-        return $query->paginate($this->perPage);
+        return $query->paginate($this->resolvedPerPage());
     }
 
     public function getUniqueBlockTypes()
@@ -195,12 +235,22 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Blocks Admin" subtitle="Manage and monitor your block data" separator>
+    <x-header title="Data" subtitle="Browse and manage blocks" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
-                @if (count($selectedBlocks) > 0)
+                <div class="join">
+                    <button class="btn btn-sm join-item {{ $view === 'table' ? 'btn-active' : '' }}" wire:click="$set('view', 'table')">
+                        <x-icon name="fas.table-list" class="w-4 h-4" />
+                        Table
+                    </button>
+                    <button class="btn btn-sm join-item {{ $view === 'gallery' ? 'btn-active' : '' }}" wire:click="$set('view', 'gallery')">
+                        <x-icon name="fas.table-cells-large" class="w-4 h-4" />
+                        Gallery
+                    </button>
+                </div>
+                @if ($view === 'table' && count($selectedBlocks) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                    onclick="return confirm('Are you sure you want to delete {{ count($selectedBlocks) }} block(s)? This action cannot be undone.')">
+                    wire:confirm="Are you sure you want to delete {{ count($selectedBlocks) }} block(s)? This action cannot be undone.">
                     <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedBlocks) }})
                 </button>
@@ -208,6 +258,8 @@ new class extends Component
             </div>
         </x-slot:actions>
     </x-header>
+
+    <x-admin.data-tabs active="blocks" />
 
     <!-- Desktop Filters -->
     <div class="hidden lg:block card bg-base-200 shadow mb-6">
@@ -331,6 +383,24 @@ new class extends Component
         </x-collapse>
     </div>
 
+    @if ($view === 'gallery')
+    @php($galleryBlocks = $this->getGalleryBlocks())
+    @if ($galleryBlocks->isEmpty())
+    <div class="alert alert-info">
+        <x-icon name="fas.circle-info" class="w-5 h-5" />
+        <span>No blocks found.</span>
+    </div>
+    @else
+    <p class="text-sm text-base-content/70 mb-4">Latest block of each type ({{ $galleryBlocks->count() }})</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        @foreach ($galleryBlocks as $galleryBlock)
+        <div wire:key="gallery-{{ $galleryBlock->id }}">
+            <x-block-card :block="$galleryBlock" />
+        </div>
+        @endforeach
+    </div>
+    @endif
+    @else
     <!-- Blocks Table -->
     <div class="card bg-base-200 shadow">
         <div class="card-body">
@@ -339,7 +409,7 @@ new class extends Component
                 :rows="$this->getBlocks()"
                 :sort-by="$sortBy"
                 with-pagination
-                per-page=" perPage"
+                per-page="perPage"
                 :per-page-values="[10, 25, 50, 100]"
                 selectable
                 selectable-key="id"
@@ -400,4 +470,5 @@ new class extends Component
             </x-table>
         </div>
     </div>
+    @endif
 </div>

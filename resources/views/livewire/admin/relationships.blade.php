@@ -8,6 +8,7 @@ use App\Services\RelationshipTypeRegistry;
 use App\Support\AdminTenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Livewire\Concerns\HasAdminListControls;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Mary\Traits\Toast;
@@ -18,7 +19,7 @@ layout('components.layouts.app');
 
 new class extends Component
 {
-    use Toast, WithPagination;
+    use HasAdminListControls, Toast, WithPagination;
 
     public string $search = '';
     public string $typeFilter = '';
@@ -118,7 +119,7 @@ new class extends Component
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('type', 'ilike', '%' . $this->search . '%')
-                    ->orWhere('metadata', 'ilike', '%' . $this->search . '%')
+                    ->orWhereRaw('metadata::text ilike ?', ['%' . $this->search . '%'])
                     ->orWhereHasMorph('from', [Event::class, EventObject::class, Block::class], function ($morphQuery) {
                         $morphQuery->where(function ($titleQuery) {
                             // For Event and EventObject which have title/action
@@ -157,11 +158,10 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        [$sortColumn, $sortDirection] = $this->resolvedSort('created_at');
         $query->orderBy($sortColumn, $sortDirection);
 
-        return $query->paginate($this->perPage);
+        return $query->paginate($this->resolvedPerPage());
     }
 
     public function getUniqueTypes()
@@ -278,12 +278,12 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Relationships Admin" subtitle="Manage connections between events, objects, and blocks" separator>
+    <x-header title="Data" subtitle="Browse and manage relationships" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 @if (count($selectedRelationships) > 0)
                 <button class="btn btn-error btn-sm" wire:click="bulkDelete"
-                    onclick="return confirm('Are you sure you want to delete {{ count($selectedRelationships) }} relationship(s)? This action cannot be undone.')">
+                    wire:confirm="Are you sure you want to delete {{ count($selectedRelationships) }} relationship(s)? This action cannot be undone.">
                     <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
                     Delete Selected ({{ count($selectedRelationships) }})
                 </button>
@@ -291,6 +291,8 @@ new class extends Component
             </div>
         </x-slot:actions>
     </x-header>
+
+    <x-admin.data-tabs active="relationships" />
 
     <div class="space-y-4 lg:space-y-6">
         <!-- Desktop Filters -->
