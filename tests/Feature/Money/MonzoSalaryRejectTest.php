@@ -38,19 +38,6 @@ class MonzoSalaryRejectTest extends TestCase
         ]);
     }
 
-    private function salaryTx(): array
-    {
-        return [
-            'id' => 'tx_salary',
-            'created' => '2026-10-12T18:25:00Z',
-            'amount' => 749623,
-            'currency' => 'GBP',
-            'scheme' => 'bacs',
-            'settled' => '2026-10-12T18:25:00Z',
-            'merchant' => ['id' => 'm_1', 'name' => 'Smb1'],
-        ];
-    }
-
     #[Test]
     public function rejected_salary_stays_a_normal_credit_on_resync(): void
     {
@@ -78,5 +65,18 @@ class MonzoSalaryRejectTest extends TestCase
         Volt::test('events.show', ['event' => $event])->call('rejectSalary');
 
         $this->assertSame('direct_credit_from', $event->fresh()->action);
+    }
+
+    private function salaryTx(): array
+    {
+        return [
+            'id' => 'tx_salary',
+            'created' => '2026-10-12T18:25:00Z',
+            'amount' => 749623,
+            'currency' => 'GBP',
+            'scheme' => 'bacs',
+            'settled' => '2026-10-12T18:25:00Z',
+            'merchant' => ['id' => 'm_1', 'name' => 'Smb1'],
+        ];
     }
 }

@@ -473,6 +473,17 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         ];
     }
 
+    /**
+     * Turn a salary detection back into a normal credit. Sticks across re-syncs.
+     */
+    public static function rejectSalary(Event $event): void
+    {
+        $event->update([
+            'action' => 'direct_credit_from',
+            'event_metadata' => array_merge($event->event_metadata ?? [], ['salary_rejected' => true]),
+        ]);
+    }
+
     public function getBaseUrl(): string
     {
         return $this->apiBase;
@@ -761,17 +772,6 @@ class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
         $this->tagTransactionEvent($event, $tx, $master->configuration['category_names'] ?? []);
         $this->maybeAddTransactionBlocks($event, $tx);
         $this->setLocationFromTransaction($event, $target, $tx);
-    }
-
-    /**
-     * Turn a salary detection back into a normal credit. Sticks across re-syncs.
-     */
-    public static function rejectSalary(Event $event): void
-    {
-        $event->update([
-            'action' => 'direct_credit_from',
-            'event_metadata' => array_merge($event->event_metadata ?? [], ['salary_rejected' => true]),
-        ]);
     }
 
     /**
