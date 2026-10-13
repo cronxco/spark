@@ -2,6 +2,8 @@
 
 @if ($entity instanceof \App\Models\Event)
     <x-event-ref :event="$entity" />
+@elseif ($entity instanceof \App\Models\Integration)
+    <x-integration-ref :integration="$entity" :show-status="false" />
 @elseif ($entity instanceof \App\Models\EventObject)
     <x-object-ref :object="$entity" />
 @elseif ($entity instanceof \App\Models\Block)

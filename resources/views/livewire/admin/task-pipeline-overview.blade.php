@@ -4,6 +4,7 @@ use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Integration;
 use App\Models\TaskExecution;
 use App\Services\TaskPipeline\TaskRegistry;
 use App\Support\AdminTenant;
@@ -260,7 +261,7 @@ new class extends Component
 
     public function getRecentFailuresProperty(): LengthAwarePaginator
     {
-        return AdminTenant::scopeForUser(TaskExecution::query())
+        $page = AdminTenant::scopeForUser(TaskExecution::query())
             ->where('status', 'failed')
             ->where('updated_at', '>=', $this->windowStart())
             ->latest('updated_at')
@@ -272,7 +273,7 @@ new class extends Component
     }
 
     /**
-     * Load the events, objects and blocks the given executions point at in one
+     * Load the events, objects, blocks and integrations the given executions point at in one
      * query per type, scoped to the viewed tenant, so the ref cards do not query per row.
      *
      * @param  Collection<int, TaskExecution>  $executions
@@ -288,6 +289,7 @@ new class extends Component
             'block' => Block::query()->with('event.integration')
                 ->whereHas('event.integration', fn ($q) => AdminTenant::scope($q))
                 ->whereKey($idsFor('block'))->get()->keyBy('id'),
+            'integration' => AdminTenant::scope(Integration::query())->whereKey($idsFor('integration'))->get()->keyBy('id'),
         ];
 
         foreach ($loaded as $type => $models) {
@@ -299,7 +301,7 @@ new class extends Component
         return $executions;
     }
 
-    public function entityFor(TaskExecution $execution): Event|EventObject|Block|null
+    public function entityFor(TaskExecution $execution): Event|EventObject|Block|Integration|null
     {
         return $this->entityCache["{$execution->entity_type}:{$execution->entity_id}"] ?? null;
     }
@@ -680,38 +682,38 @@ new class extends Component
             <x-tab name="executions" label="Recent Executions" icon="fas.clock-rotate-left">
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                            <h3 class="card-title">Recent Executions</h3>
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+                            <h3 class="card-title shrink-0">Recent Executions</h3>
 
                             <div class="flex flex-wrap items-center gap-2">
                                 <input
                                     type="text"
-                                    class="input input-bordered input-sm"
+                                    class="input input-bordered input-sm w-44"
                                     placeholder="Search task..."
                                     wire:model.live.debounce.300ms="execSearch" />
 
-                                <select class="select select-bordered select-sm" wire:model.live="execStatusFilter">
+                                <select class="select select-bordered select-sm w-auto" wire:model.live="execStatusFilter">
                                     <option value="">All Statuses</option>
                                     @foreach ($this->statusOptions() as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
 
-                                <select class="select select-bordered select-sm" wire:model.live="execTaskFilter">
+                                <select class="select select-bordered select-sm w-auto" wire:model.live="execTaskFilter">
                                     <option value="">All Tasks</option>
                                     @foreach ($this->taskFilterOptions as $task)
                                         <option value="{{ $task['key'] }}">{{ $task['name'] }}</option>
                                     @endforeach
                                 </select>
 
-                                <select class="select select-bordered select-sm" wire:model.live="execEntityTypeFilter">
+                                <select class="select select-bordered select-sm w-auto" wire:model.live="execEntityTypeFilter">
                                     <option value="">All Types</option>
                                     @foreach ($this->entityTypeFilterOptions as $type)
                                         <option value="{{ $type }}">{{ ucfirst($type) }}</option>
                                     @endforeach
                                 </select>
 
-                                <select class="select select-bordered select-sm" wire:model.live="window">
+                                <select class="select select-bordered select-sm w-auto" wire:model.live="window">
                                     <option value="24h">Last 24 hours</option>
                                     <option value="7d">Last 7 days</option>
                                     <option value="30d">Last 30 days</option>
@@ -787,7 +789,7 @@ new class extends Component
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                             <h3 class="card-title">Recent Failures</h3>
 
-                            <select class="select select-bordered select-sm" wire:model.live="window">
+                            <select class="select select-bordered select-sm w-auto" wire:model.live="window">
                                 <option value="24h">Last 24 hours</option>
                                 <option value="7d">Last 7 days</option>
                                 <option value="30d">Last 30 days</option>
