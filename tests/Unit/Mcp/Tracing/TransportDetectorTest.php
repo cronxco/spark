@@ -14,10 +14,7 @@ class TransportDetectorTest extends TestCase
     #[Test]
     public function detects_http_transport(): void
     {
-        $transport = new HttpTransport(
-            request: new Request,
-            sessionId: 'test-session'
-        );
+        $transport = new HttpTransport(request: new Request);
 
         $result = TransportDetector::detect($transport);
 
@@ -27,7 +24,7 @@ class TransportDetectorTest extends TestCase
     #[Test]
     public function detects_stdio_transport(): void
     {
-        $transport = new StdioTransport(sessionId: 'test-session');
+        $transport = new StdioTransport;
 
         $result = TransportDetector::detect($transport);
 
