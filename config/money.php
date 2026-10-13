@@ -52,6 +52,12 @@ return [
         'OUTSTANDING AUTHORISATION',
     ],
     /*
+    | Days an open-banking authorisation that never settles keeps counting as spending.
+    */
+
+    'pending_expiry_days' => 30,
+
+    /*
     |--------------------------------------------------------------------------
     | Add to buffer
     |--------------------------------------------------------------------------

@@ -860,14 +860,43 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
             'proprietary_bank_transaction_code' => $tx['proprietaryBankTransactionCode'] ?? null,
         ]);
 
-        // Create consistent source ID based on transaction content
-        // This ensures pending and booked versions of the same transaction have the same ID
-        $sourceId = $this->generateConsistentTransactionId($tx);
+        // Create or update actor (bank account). When the account object is not ready yet, skip:
+        // the account data job will create it.
+        $actorObject = $this->upsertAccountObject($integration, $account);
+        if (! $actorObject) {
+            Log::info('GoCardless processTransactionItem: Skipping transaction - account object not ready yet', [
+                'integration_id' => $integration->id,
+                'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
+            ]);
 
-        // Check if this transaction already exists (for status transitions)
-        $existingEvent = Event::where('integration_id', $integration->id)
-            ->where('source_id', $sourceId)
-            ->first();
+            return;
+        }
+
+        // The bank's own transaction id outranks the content hash: the counterparty name the bank
+        // reports for a transaction can change between pulls, which changes the hash.
+        $existingEvent = $this->findByProviderId($integration, $actorObject, $tx);
+        if ($existingEvent) {
+            $sourceId = $existingEvent->source_id;
+            $integrationId = $existingEvent->integration_id;
+        } else {
+            // Create consistent source ID based on transaction content
+            // This ensures pending and booked versions of the same transaction have the same ID
+            $sourceId = $this->generateConsistentTransactionId($tx);
+            $integrationId = $integration->id;
+
+            // Check if this transaction already exists (for status transitions)
+            $existingEvent = Event::where('integration_id', $integration->id)
+                ->where('source_id', $sourceId)
+                ->first();
+
+            // Same day, shop and amount but a different bank id is a second purchase, not a repeat
+            if ($existingEvent && $status === 'booked' && $this->isDifferentBookedTransaction($existingEvent, $tx)) {
+                $sourceId .= '_' . substr(md5((string) ($tx['transactionId'] ?? $tx['internalTransactionId'])), 0, 12);
+                $existingEvent = Event::where('integration_id', $integration->id)
+                    ->where('source_id', $sourceId)
+                    ->first();
+            }
+        }
 
         // A pending transaction often books under a different date or counterparty name, which
         // changes the content hash. Reuse the pending event's ID so it settles instead of duplicating.
@@ -893,20 +922,6 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         // Preserve the best available timestamp
         $timestamp = $this->determineBestTimestamp($tx, $existingEvent, $status, $isStatusChange);
-
-        // Create or update actor (bank account)
-        $actorObject = $this->upsertAccountObject($integration, $account);
-
-        // If account object doesn't exist yet (minimal data and no existing object),
-        // skip transaction event creation - the account data job will create the object
-        if (! $actorObject) {
-            Log::info('GoCardless processTransactionItem: Skipping transaction - account object not ready yet', [
-                'integration_id' => $integration->id,
-                'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
-            ]);
-
-            return;
-        }
 
         // Create or update target (counterparty)
         $targetObject = $this->upsertCounterpartyObject($integration, $tx);
@@ -951,7 +966,7 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         $event = Event::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'integration_id' => $integrationId,
                 'source_id' => $sourceId,
             ],
             $eventData
@@ -1943,6 +1958,46 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
                 'requisition_id' => $requisitionId,
             ]);
         }
+    }
+
+    /**
+     * Find the event already stored for a transaction by the bank's own ids.
+     *
+     * Scoped to the same user and canonical account object, so account renewals that move events
+     * between integrations still match, and two accounts never share an event. The oldest match
+     * wins so existing links, buffers and budgets stay attached to the event they were made on.
+     *
+     * @param  array<string, mixed>  $tx
+     */
+    public function findByProviderId(Integration $integration, EventObject $account, array $tx): ?Event
+    {
+        $ids = array_values(array_filter(
+            [$tx['transactionId'] ?? null, $tx['internalTransactionId'] ?? null],
+            fn ($id): bool => is_string($id) && trim($id) !== '',
+        ));
+        if ($ids === []) {
+            return null;
+        }
+
+        $query = Event::forUser($integration->user_id)
+            ->where('service', 'gocardless')
+            ->where('actor_id', $account->id)
+            ->where(function ($match) use ($tx): void {
+                if (! empty($tx['transactionId'])) {
+                    $match->orWhere('event_metadata->raw->transactionId', $tx['transactionId']);
+                }
+                if (! empty($tx['internalTransactionId'])) {
+                    $match->orWhere('event_metadata->raw->internalTransactionId', $tx['internalTransactionId']);
+                }
+            });
+
+        $date = $tx['bookingDate'] ?? $tx['valueDate'] ?? null;
+        if ($date) {
+            $day = Carbon::parse($date)->utc();
+            $query->whereBetween('time', [$day->copy()->subDays(15)->startOfDay(), $day->copy()->addDays(15)->endOfDay()]);
+        }
+
+        return $query->orderBy('created_at')->orderBy('id')->first();
     }
 
     /**
@@ -3079,6 +3134,20 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
         ]);
 
         return $response->json();
+    }
+
+    /**
+     * @param  array<string, mixed>  $tx
+     */
+    private function isDifferentBookedTransaction(Event $existing, array $tx): bool
+    {
+        if (($existing->event_metadata['transaction_status'] ?? null) !== 'booked') {
+            return false;
+        }
+        $theirs = array_filter([$tx['transactionId'] ?? null, $tx['internalTransactionId'] ?? null]);
+        $ours = array_filter([$existing->event_metadata['raw']['transactionId'] ?? null, $existing->event_metadata['raw']['internalTransactionId'] ?? null]);
+
+        return $theirs !== [] && $ours !== [] && array_intersect($theirs, $ours) === [];
     }
 
     private function availableAccountTitle(string $userId, string $name, string $accountId, ?string $exceptId = null): string
