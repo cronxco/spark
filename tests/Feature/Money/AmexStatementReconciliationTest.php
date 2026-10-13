@@ -54,6 +54,35 @@ class AmexStatementReconciliationTest extends TestCase
     }
 
     #[Test]
+    public function a_booked_line_above_the_authorisation_settles_it_in_full(): void
+    {
+        $this->line('payment_to', 2_000, '2026-09-25 00:01:25', 'Restaurant', ['transaction_status' => 'pending', 'booking_date' => '2026-09-25']);
+        $this->line('payment_to', 2_400, '2026-09-26 00:00:00', 'Restaurant', ['booking_date' => '2026-09-26', 'value_date' => '2026-09-28']);
+
+        $this->assertSame(2_400, $this->spend()->sum('amount'));
+    }
+
+    #[Test]
+    public function merging_keeps_the_booked_copy_and_restores_a_trashed_equivalent_link(): void
+    {
+        $pending = $this->line('payment_to', 500, '2026-09-20 10:00:00', 'Shop', ['transaction_status' => 'pending'], ['transactionId' => 'DUP']);
+        $booked = $this->line('payment_to', 500, '2026-09-20 11:00:00', 'Shop', [], ['transactionId' => 'DUP']);
+        $make = fn (Event $event) => Relationship::create([
+            'user_id' => $this->user->id, 'from_type' => Event::class, 'from_id' => $event->id,
+            'to_type' => EventObject::class, 'to_id' => $this->card->id, 'type' => 'part_of',
+        ]);
+        $make($pending);
+        $make($booked)->delete();
+
+        $this->artisan('gocardless:reconcile-transactions', ['--user' => $this->user->id, '--apply' => true])->assertSuccessful();
+
+        $this->assertNotSoftDeleted($booked);
+        $this->assertSoftDeleted($pending);
+        $this->assertSame(1, Relationship::where('from_id', $booked->id)->count());
+        $this->assertSame(0, Relationship::where('from_id', $pending->id)->count());
+    }
+
+    #[Test]
     public function the_october_statement_is_the_issuers_9621_74_and_new_spending_is_321_26(): void
     {
         $this->seedStatement();

@@ -129,10 +129,11 @@ class SpendingScope
                 && $this->sameCounterparty($event, $line));
 
             foreach ($candidates as $line) {
-                if ((int) $line->value <= $remaining) {
-                    $remaining -= (int) $line->value;
-                    $claimed[(string) $line->id] = true;
+                if ($remaining <= 0) {
+                    break;
                 }
+                $remaining = max(0, $remaining - (int) $line->value);
+                $claimed[(string) $line->id] = true;
             }
             $amounts[(string) $event->id] = $remaining;
         }

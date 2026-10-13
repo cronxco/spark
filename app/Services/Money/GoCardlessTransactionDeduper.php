@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  * Two events are the same transaction when they sit on the same account object and share the
  * bank's `transactionId` or `internalTransactionId`. Merchant, date and amount alone never match,
  * so two genuine purchases of the same amount at the same shop are kept. The surviving event is the
- * one other records lean on most (links, then buffer state), then the oldest; everything on the
+ * booked one, then the one other records lean on most (links, then buffer state), then the oldest; everything on the
  * other copy is moved across and the copy is soft-deleted with a pointer to the survivor.
  *
  * @phpstan-type Group array{canonical_id: string, duplicate_ids: list<string>, account_id: string, provider_id: string, amount: int, date: string, merchant: string, conflict: ?string}
@@ -147,9 +147,9 @@ class GoCardlessTransactionDeduper
         $weight = fn ($row): int => $links->filter(fn ($link): bool => (string) $link->from_id === (string) $row->id || (string) $link->to_id === (string) $row->id)->count();
 
         $ranked = $members->sortBy(fn ($row): array => [
+            ($row->event_metadata['transaction_status'] ?? null) === 'booked' ? 0 : 1,
             -$weight($row),
             isset($row->event_metadata['buffer']) ? 0 : 1,
-            ($row->event_metadata['transaction_status'] ?? null) === 'booked' ? 0 : 1,
             $row->created_at?->getTimestamp() ?? 0,
             (string) $row->id,
         ])->values();
@@ -188,10 +188,15 @@ class GoCardlessTransactionDeduper
                 continue;
             }
 
-            $exists = Relationship::withTrashed()->where('user_id', $link->user_id)->where('type', $link->type)
+            $equivalent = Relationship::withTrashed()->where('user_id', $link->user_id)->where('type', $link->type)
                 ->where('from_type', $link->from_type)->where('from_id', $fromId)
-                ->where('to_type', $link->to_type)->where('to_id', $toId)->exists();
-            if ($exists) {
+                ->where('to_type', $link->to_type)->where('to_id', $toId)->first();
+            if ($equivalent) {
+                if ($equivalent->trashed()) {
+                    $equivalent->restore();
+                }
+                $link->delete();
+
                 continue;
             }
             $link->from_id = $fromId;
