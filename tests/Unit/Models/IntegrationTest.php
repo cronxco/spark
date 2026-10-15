@@ -381,8 +381,8 @@ class IntegrationTest extends TestCase
         $integration->refresh();
 
         $this->assertNull($integration->last_triggered_at);
-        $this->assertSame(1, $integration->consecutive_failures);
-        $this->assertNotNull($integration->last_failed_at);
+        $this->assertSame(1, $integration->configuration['failure_backoff']['count']);
+        $this->assertNotNull($integration->configuration['failure_backoff']['failed_at']);
     }
 
     #[Test]
@@ -406,19 +406,20 @@ class IntegrationTest extends TestCase
         $integration->markAsFailed();
         $integration->markAsFailed();
         $integration->refresh();
-        $this->assertSame(3, $integration->consecutive_failures);
+        $this->assertSame(3, $integration->configuration['failure_backoff']['count']);
+        $this->assertSame(60, $integration->configuration['update_frequency_minutes']);
         $this->assertFalse($integration->isDue(Carbon::now()->addMinutes(239)));
         $this->assertTrue($integration->isDue(Carbon::now()->addMinutes(240)));
         $this->assertEquals(Carbon::now()->addMinutes(240), $integration->getNextUpdateTime());
 
-        $integration->update(['consecutive_failures' => 30]);
+        $integration->update(['configuration' => ['failure_backoff' => ['count' => 30] + $integration->configuration['failure_backoff']] + $integration->configuration]);
         $this->assertFalse($integration->isDue(Carbon::now()->addMinutes(Integration::MAX_FAILURE_BACKOFF_MINUTES - 1)));
         $this->assertTrue($integration->isDue(Carbon::now()->addMinutes(Integration::MAX_FAILURE_BACKOFF_MINUTES)));
 
         $integration->markAsSuccessfullyUpdated();
         $integration->refresh();
-        $this->assertSame(0, $integration->consecutive_failures);
-        $this->assertNull($integration->last_failed_at);
+        $this->assertArrayNotHasKey('failure_backoff', $integration->configuration);
+        $this->assertSame(60, $integration->configuration['update_frequency_minutes']);
         $this->assertNull($integration->failureRetryAt());
         Carbon::setTestNow();
     }
