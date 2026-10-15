@@ -57,20 +57,6 @@ class IntegrationTaskService
         });
     }
 
-    private function changesIncident(array $before, array $after): bool
-    {
-        $identity = fn (array $task) => [
-            data_get($task, 'origin'),
-            data_get($task, 'incident.key'),
-            data_get($task, 'incident.kind'),
-            data_get($task, 'incident.consent_reference'),
-            data_get($task, 'action.kind'),
-            data_get($task, 'action.url'),
-        ];
-
-        return $identity($before) !== $identity($after);
-    }
-
     public function reconcile(Integration $integration): void
     {
         $user = $integration->user;
@@ -94,5 +80,19 @@ class IntegrationTaskService
                 $this->tasks->record($block, $user, 'incident_resolved', $before, $task);
             }
         });
+    }
+
+    private function changesIncident(array $before, array $after): bool
+    {
+        $identity = fn (array $task) => [
+            data_get($task, 'origin'),
+            data_get($task, 'incident.key'),
+            data_get($task, 'incident.kind'),
+            data_get($task, 'incident.consent_reference'),
+            data_get($task, 'action.kind'),
+            data_get($task, 'action.url'),
+        ];
+
+        return $identity($before) !== $identity($after);
     }
 }

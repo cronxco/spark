@@ -19,6 +19,9 @@ class Integration extends Model
 {
     use HasFactory, LogsActivity, RedactsLoggedProperties, SoftDeletes;
 
+    /** The longest a failing integration waits between attempts. */
+    public const MAX_FAILURE_BACKOFF_MINUTES = 1440;
+
     public $incrementing = false;
 
     protected $table = 'integrations';
@@ -515,9 +518,6 @@ class Integration extends Model
             'last_failed_at' => now(),
         ]);
     }
-
-    /** The longest a failing integration waits between attempts. */
-    public const MAX_FAILURE_BACKOFF_MINUTES = 1440;
 
     /**
      * When a failing integration may next be attempted, or null when it has
