@@ -7,7 +7,7 @@
         <h2 class="card-title">Card cover</h2>
 
         @if ($cover['status'] === 'no_buffer')
-            <div class="alert alert-warning"><span>No buffer pot set. Choose one on the Pots view.</span></div>
+            <div class="alert alert-warning"><span>No buffer configured. Choose one on the Pots view.</span></div>
         @elseif ($cover['status'] === 'covered')
             <div class="alert alert-success"><span>Covered. {{ $cover['pot']['name'] }} holds {{ $money($cover['pot']['balance']) }} against {{ $money($cover['owed']) }} owed.</span></div>
         @else
@@ -26,7 +26,7 @@
                                 <span class="text-sm text-base-content/60">
                                     @if ($card['statement_closed'])
                                         @if ($card['statement_owed'] > 0)
-                                            statement {{ $day($card['statement_closed']) }} {{ $money($card['statement_owed']) }}{{ $card['statement_due'] ? ', due '.$day($card['statement_due']) : '' }}, then {{ $money($card['owed'] - $card['statement_owed']) }}
+                                            {{ $card['statement_basis'] === 'confirmed' ? 'statement' : 'est. statement' }} {{ $day($card['statement_closed']) }} {{ $money($card['statement_owed']) }}{{ $card['direct_debit'] ? ', direct debit '.$day($card['direct_debit']) : '' }}, then {{ $money($card['spent_since_statement']) }} since
                                         @else
                                             statement paid, {{ $money($card['owed']) }} since {{ $day($card['statement_closed']) }}
                                         @endif

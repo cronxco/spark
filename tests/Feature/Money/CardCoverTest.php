@@ -121,7 +121,7 @@ class CardCoverTest extends TestCase
     public function the_cover_shows_the_status_and_the_pots_view_sets_the_pot(): void
     {
         Livewire::actingAs($this->user)->test(CardCoverComponent::class)
-            ->assertSee('No buffer pot set')
+            ->assertSee('No buffer configured')
             ->assertSee('Pots view');
 
         Livewire::actingAs($this->user)->test(BufferPot::class)
