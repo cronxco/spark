@@ -47,8 +47,28 @@ class IntegrationTaskService
                 'occurrences' => ($task['incident']['occurrences'] ?? 0) + 1];
             $task['action'] = $this->action($integration, $reauth);
             $this->tasks->save($block, $task, $block->title);
-            $this->tasks->record($block, $user, 'incident_reported', $before, $task);
+            // A repeat of the same incident only bumps its occurrence count and
+            // last_occurred_at. History records the first report and any report
+            // that changes what the incident is, so a failure retried every few
+            // minutes doesn't add a timeline event each time.
+            if ($this->changesIncident($before, $task)) {
+                $this->tasks->record($block, $user, 'incident_reported', $before, $task);
+            }
         });
+    }
+
+    private function changesIncident(array $before, array $after): bool
+    {
+        $identity = fn (array $task) => [
+            data_get($task, 'origin'),
+            data_get($task, 'incident.key'),
+            data_get($task, 'incident.kind'),
+            data_get($task, 'incident.consent_reference'),
+            data_get($task, 'action.kind'),
+            data_get($task, 'action.url'),
+        ];
+
+        return $identity($before) !== $identity($after);
     }
 
     public function reconcile(Integration $integration): void

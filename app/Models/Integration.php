@@ -35,6 +35,8 @@ class Integration extends Model
         'configuration',
         'last_triggered_at',
         'last_successful_update_at',
+        'consecutive_failures',
+        'last_failed_at',
         'migration_batch_id',
     ];
 
@@ -54,6 +56,8 @@ class Integration extends Model
         'configuration' => EncryptedJsonSecrets::class,
         'last_triggered_at' => 'datetime',
         'last_successful_update_at' => 'datetime',
+        'last_failed_at' => 'datetime',
+        'consecutive_failures' => 'integer',
     ];
 
     /**
@@ -308,6 +312,10 @@ class Integration extends Model
             return null;
         }
 
+        if ($retryAt = $this->failureRetryAt()) {
+            return $retryAt;
+        }
+
         if ($this->useSchedule()) {
             return $this->getNextScheduledRun();
         }
@@ -433,6 +441,11 @@ class Integration extends Model
 
         $nowUtc = $now ? (clone $now)->setTimezone('UTC') : Carbon::now('UTC');
 
+        $retryAt = $this->failureRetryAt();
+        if ($retryAt && $nowUtc->lessThan($retryAt)) {
+            return false;
+        }
+
         if ($this->useSchedule()) {
             if (! $this->last_successful_update_at) {
                 return true;
@@ -485,6 +498,8 @@ class Integration extends Model
         $this->update([
             'last_successful_update_at' => now(),
             'last_triggered_at' => now(),
+            'consecutive_failures' => 0,
+            'last_failed_at' => null,
         ]);
     }
 
@@ -493,9 +508,39 @@ class Integration extends Model
      */
     public function markAsFailed(): void
     {
-        // Clear the triggered state so it can be retried
-        // Don't update last_successful_update_at since the update failed
-        $this->update(['last_triggered_at' => null]);
+        // Clear the triggered state so it can be retried once its backoff
+        // passes. Don't update last_successful_update_at since the update failed.
+        $this->increment('consecutive_failures', 1, [
+            'last_triggered_at' => null,
+            'last_failed_at' => now(),
+        ]);
+    }
+
+    /** The longest a failing integration waits between attempts. */
+    public const MAX_FAILURE_BACKOFF_MINUTES = 1440;
+
+    /**
+     * When a failing integration may next be attempted, or null when it has
+     * not failed since its last success. Without this, a permanent failure
+     * (a revoked bank consent, a deleted account) made the integration due
+     * again on the next scheduler tick, so it was retried and re-reported
+     * every few minutes indefinitely. The wait doubles from the update
+     * interval with each consecutive failure, up to a day.
+     */
+    public function failureRetryAt(): ?Carbon
+    {
+        $failures = (int) ($this->consecutive_failures ?? 0);
+        if ($failures < 1 || ! $this->last_failed_at) {
+            return null;
+        }
+        if ($this->last_successful_update_at && $this->last_successful_update_at->gte($this->last_failed_at)) {
+            return null;
+        }
+
+        $base = max(15, $this->getUpdateFrequencyMinutes());
+        $minutes = min($base * (2 ** min($failures - 1, 10)), self::MAX_FAILURE_BACKOFF_MINUTES);
+
+        return $this->last_failed_at->copy()->setTimezone('UTC')->addMinutes($minutes);
     }
 
     /**
@@ -604,6 +649,11 @@ class Integration extends Model
             return ! $lastEventTime || $lastEventTime->lessThan(now()->subMinutes($staleAfterMinutes))
                 ? 'stale'
                 : 'up_to_date';
+        }
+
+        // Backing off after a failure is not "up to date".
+        if ($this->failureRetryAt() !== null) {
+            return 'needs_update';
         }
 
         if (! $this->isDue()) {

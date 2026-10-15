@@ -159,7 +159,7 @@ class KnowledgeTaskReviewRegressionTest extends TestCase
     }
 
     #[Test]
-    public function consent_incidents_keep_their_recovery_condition_and_every_report_has_history(): void
+    public function consent_incidents_keep_their_recovery_condition_and_repeats_only_count(): void
     {
         $user = User::factory()->create();
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'gocardless', 'auth_metadata' => ['gocardless_completed_reference' => 'old-consent']]);
@@ -173,13 +173,36 @@ class KnowledgeTaskReviewRegressionTest extends TestCase
         $this->assertCount(2, $blocks);
         $consent = $blocks->first(fn ($block) => data_get($block->metadata, 'task.incident.kind') === 'consent');
         $reports = $tasks->history($user, (string) $consent->id)->where('action', 'task_incident_reported')->get();
-        $this->assertCount(2, $reports);
+        $this->assertCount(1, $reports);
         $this->assertSame('integration', data_get($reports->first()->event_metadata, 'after.origin'));
         $this->assertSame(2, data_get($consent->metadata, 'task.incident.occurrences'));
         $integration->update(['last_successful_update_at' => now()->addMinute()]);
         $service->reconcile($integration->fresh());
         $this->assertSame('open', data_get($consent->fresh()->metadata, 'task.status'));
         $this->assertSame('completed', data_get($blocks->first(fn ($block) => $block->id !== $consent->id)->fresh()->metadata, 'task.status'));
+    }
+
+    #[Test]
+    public function a_repeating_failure_counts_occurrences_without_a_history_event_each_time(): void
+    {
+        $user = User::factory()->create();
+        $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'gocardless', 'auth_metadata' => ['gocardless_completed_reference' => 'consent-a']]);
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'gocardless', 'integration_group_id' => $group->id]);
+        $service = app(IntegrationTaskService::class);
+        foreach (range(1, 5) as $_) {
+            $service->report($user, $integration, false);
+        }
+        $tasks = app(TaskService::class);
+        $block = $tasks->query($user)->sole();
+        $history = fn () => $tasks->history($user, (string) $block->id)->where('action', 'task_incident_reported')->count();
+        $this->assertSame(5, data_get($block->metadata, 'task.incident.occurrences'));
+        $this->assertSame(1, $history());
+
+        // A change to the incident itself is recorded.
+        $group->update(['auth_metadata' => ['gocardless_completed_reference' => 'consent-b']]);
+        $service->report($user, $integration->fresh(), false);
+        $this->assertSame(6, data_get($block->fresh()->metadata, 'task.incident.occurrences'));
+        $this->assertSame(2, $history());
     }
 
     #[Test]
