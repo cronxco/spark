@@ -7,6 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
+use App\Notifications\IntegrationAuthenticationFailed;
 use App\Notifications\IntegrationFailed;
 use App\Services\Notifications\NotificationFeedService;
 use App\Services\Notifications\NotificationIncidentResolver;
@@ -247,7 +248,7 @@ class NotificationFeedLifecycleTest extends TestCase
     {
         $user = User::factory()->create();
         $integration = Integration::factory()->create(['user_id' => $user->id]);
-        $user->notifyNow(new \App\Notifications\IntegrationAuthenticationFailed($integration, 'expired'));
+        $user->notifyNow(new IntegrationAuthenticationFailed($integration, 'expired'));
 
         $item = app(NotificationFeedService::class)->feed($user)['data'][0];
 
