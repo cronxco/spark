@@ -223,6 +223,20 @@ class NotificationFeedLifecycleTest extends TestCase
         $this->assertTrue($progress->fresh()->isFailed());
     }
 
+    #[Test]
+    public function reauth_notifications_expose_a_web_url_and_reconnect_action(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+        $user->notifyNow(new IntegrationAuthenticationFailed($integration, 'expired'));
+
+        $item = app(NotificationFeedService::class)->feed($user)['data'][0];
+
+        $this->assertSame('integration-reauth:' . $integration->id, $item['destination']);
+        $this->assertStringStartsWith('http', $item['web_url']);
+        $this->assertSame(['id' => 'reconnect', 'label' => 'Reconnect'], $item['primary_action']);
+    }
+
     /** @param array<string, mixed> $data */
     private function notification(
         User $user,
@@ -241,19 +255,5 @@ class NotificationFeedLifecycleTest extends TestCase
             'created_at' => $createdAt,
             'updated_at' => $createdAt,
         ]);
-    }
-
-    #[Test]
-    public function reauth_notifications_expose_a_web_url_and_reconnect_action(): void
-    {
-        $user = User::factory()->create();
-        $integration = Integration::factory()->create(['user_id' => $user->id]);
-        $user->notifyNow(new IntegrationAuthenticationFailed($integration, 'expired'));
-
-        $item = app(NotificationFeedService::class)->feed($user)['data'][0];
-
-        $this->assertSame('integration-reauth:' . $integration->id, $item['destination']);
-        $this->assertStringStartsWith('http', $item['web_url']);
-        $this->assertSame(['id' => 'reconnect', 'label' => 'Reconnect'], $item['primary_action']);
     }
 }
