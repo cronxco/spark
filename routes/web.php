@@ -340,7 +340,8 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix
         abort_unless(AdminTenant::isGlobalOperator(Auth::user()), 403);
         AdminTenant::requestReauthentication(Auth::user());
 
-        return Socialite::driver('authelia')->with(['prompt' => 'login', 'max_age' => 0])->redirect();
+        // prompt=login alone: max_age=0 made Authelia keep asking for re-auth after a good password.
+        return Socialite::driver('authelia')->with(['prompt' => 'login'])->redirect();
     })->name('god-mode.enable');
     Route::post('god-mode/disable', function () {
         AdminTenant::end();
