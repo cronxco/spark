@@ -162,7 +162,13 @@ new class extends Component
                         <x-icon :name="$icon" class="mt-0.5 size-5 shrink-0 {{ $iconTone }} {{ $isActivity && $item['state'] === 'active' ? 'animate-spin' : '' }}" />
                         <div class="min-w-0 flex-1">
                             <div class="flex items-start justify-between gap-3">
-                                <h3 class="truncate text-sm font-semibold">{{ $item['title'] }}</h3>
+                                <h3 class="truncate text-sm font-semibold">
+                                    @if ($item['web_url'])
+                                        <a href="{{ $item['web_url'] }}" class="hover:underline">{{ $item['title'] }}</a>
+                                    @else
+                                        {{ $item['title'] }}
+                                    @endif
+                                </h3>
                                 <time class="shrink-0 text-[0.7rem] text-base-content/45">{{ \Carbon\Carbon::parse($item['updated_at'] ?? $item['occurred_at'])->diffForHumans(short: true) }}</time>
                             </div>
                             @if ($item['body'])
@@ -173,6 +179,9 @@ new class extends Component
                             @endif
                             @if (! $isActivity)
                                 <div class="mt-2 flex gap-1">
+                                    @if ($item['web_url'])
+                                        <a href="{{ $item['web_url'] }}" class="btn btn-primary btn-xs">{{ $item['primary_action']['label'] ?? 'View' }}</a>
+                                    @endif
                                     @if (! $item['is_read'])
                                         <button wire:click="markAsRead('{{ $item['id'] }}')" class="btn btn-ghost btn-xs">Mark read</button>
                                     @endif
