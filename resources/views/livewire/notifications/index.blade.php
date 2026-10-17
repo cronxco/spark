@@ -174,7 +174,6 @@ new class extends Component
                         'success' => 'text-success bg-success/10',
                         default => 'text-info bg-info/10',
                     };
-                    $destination = $item['destination'];
                 @endphp
 
                 <article @class([
@@ -214,8 +213,8 @@ new class extends Component
                         @endif
 
                         <div class="mt-3 flex flex-wrap items-center gap-1">
-                            @if (is_string($destination) && str_starts_with($destination, 'http'))
-                                <a href="{{ $destination }}" class="btn btn-primary btn-xs">{{ $item['primary_action']['label'] ?? 'View' }}</a>
+                            @if ($item['web_url'])
+                                <a href="{{ $item['web_url'] }}" class="btn btn-primary btn-xs">{{ $item['primary_action']['label'] ?? 'View' }}</a>
                             @endif
                             @if (! $isActivity && $scope === 'active')
                                 <button type="button" wire:click="{{ $item['is_read'] ? 'markAsUnread' : 'markAsRead' }}('{{ $item['id'] }}')" class="btn btn-ghost btn-xs">

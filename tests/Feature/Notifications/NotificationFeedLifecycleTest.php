@@ -241,4 +241,18 @@ class NotificationFeedLifecycleTest extends TestCase
             'updated_at' => $createdAt,
         ]);
     }
+
+    #[Test]
+    public function reauth_notifications_expose_a_web_url_and_reconnect_action(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+        $user->notifyNow(new \App\Notifications\IntegrationAuthenticationFailed($integration, 'expired'));
+
+        $item = app(NotificationFeedService::class)->feed($user)['data'][0];
+
+        $this->assertSame('integration-reauth:' . $integration->id, $item['destination']);
+        $this->assertStringStartsWith('http', $item['web_url']);
+        $this->assertSame(['id' => 'reconnect', 'label' => 'Reconnect'], $item['primary_action']);
+    }
 }
