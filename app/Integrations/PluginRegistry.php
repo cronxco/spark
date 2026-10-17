@@ -14,6 +14,7 @@ class PluginRegistry
     private static array $plugins = [];
 
     private static ?Collection $cachedSpotlightCommands = null;
+
     /**
      * Services that write events or integrations without a plugin. They have no
      * group and declare nothing, so integrity checks leave them out.
