@@ -737,20 +737,13 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'description' => 'Generic workout activity',
                 'hidden' => false,
             ],
-            // Oura sends most activity names in camelCase; these are the ones seen so far
-            'strengthTraining' => [
-                'icon' => 'fas.dumbbell',
-                'display_name' => 'Strength Training',
-                'description' => 'Strength Training workout activity',
-                'hidden' => false,
-            ],
-            'coreExercise' => [
+            'core_exercise' => [
                 'icon' => 'fas.dumbbell',
                 'display_name' => 'Core Exercise',
                 'description' => 'Core Exercise workout activity',
                 'hidden' => false,
             ],
-            'HIIT' => [
+            'hiit' => [
                 'icon' => 'fas.bolt',
                 'display_name' => 'HIIT',
                 'description' => 'HIIT workout activity',
@@ -768,13 +761,13 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'description' => 'Dance workout activity',
                 'hidden' => false,
             ],
-            'houseWork' => [
+            'house_work' => [
                 'icon' => 'fas.broom',
                 'display_name' => 'Housework',
                 'description' => 'Housework workout activity',
                 'hidden' => false,
             ],
-            'horsebackRiding' => [
+            'horseback_riding' => [
                 'icon' => 'fas.horse',
                 'display_name' => 'Horseback Riding',
                 'description' => 'Horseback Riding workout activity',
@@ -822,9 +815,16 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
      */
     public static function getLegacyTypes(): array
     {
+        $camelCase = 'Workout type as Oura sent it, before OuraWorkoutsData normalised it to snake_case';
+
         return [
             'object_types' => [
                 'oura_daily_spo2' => 'SpO2 object before the switch to daily_spo2',
+                'strengthTraining' => $camelCase,
+                'coreExercise' => $camelCase,
+                'HIIT' => $camelCase,
+                'houseWork' => $camelCase,
+                'horsebackRiding' => $camelCase,
             ],
         ];
     }

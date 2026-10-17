@@ -438,6 +438,12 @@ class FlintPlugin extends ManualPlugin
                 'description' => 'A long-lived thing Flint is tracking — strategic, thematic, or tactical',
                 'hidden' => false,
             ],
+            'user_profile' => [
+                'icon' => 'fas.user',
+                'display_name' => 'User',
+                'description' => 'The user, as actor of digests, tasks and AI usage',
+                'hidden' => true,
+            ],
             // FlintDigestService::resolveDigestObject() names digest objects
             // '<period>_digest' or, for a routine with its own object, '<routine>_digest'.
             'morning_digest' => [
