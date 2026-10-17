@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Integrations\GoogleCalendar\GoogleCalendarPlugin;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -114,7 +115,7 @@ class DayAheadService
     {
         return Event::query()
             ->withoutInternal()
-            ->where('service', 'google_calendar')
+            ->where('service', GoogleCalendarPlugin::getIdentifier())
             ->whereIn('action', ['had_event', 'had_all_day_event'])
             ->whereHas('integration', fn (Builder $integration) => $integration->where('user_id', $user->id))
             ->whereBetween('time', [$start, $end])

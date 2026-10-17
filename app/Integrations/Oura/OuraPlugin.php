@@ -737,6 +737,95 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'description' => 'Generic workout activity',
                 'hidden' => false,
             ],
+            // Oura sends most activity names in camelCase; these are the ones seen so far
+            'strengthTraining' => [
+                'icon' => 'fas.dumbbell',
+                'display_name' => 'Strength Training',
+                'description' => 'Strength Training workout activity',
+                'hidden' => false,
+            ],
+            'coreExercise' => [
+                'icon' => 'fas.dumbbell',
+                'display_name' => 'Core Exercise',
+                'description' => 'Core Exercise workout activity',
+                'hidden' => false,
+            ],
+            'HIIT' => [
+                'icon' => 'fas.bolt',
+                'display_name' => 'HIIT',
+                'description' => 'HIIT workout activity',
+                'hidden' => false,
+            ],
+            'stretching' => [
+                'icon' => 'fas.child-reaching',
+                'display_name' => 'Stretching',
+                'description' => 'Stretching workout activity',
+                'hidden' => false,
+            ],
+            'dance' => [
+                'icon' => 'fas.music',
+                'display_name' => 'Dance',
+                'description' => 'Dance workout activity',
+                'hidden' => false,
+            ],
+            'houseWork' => [
+                'icon' => 'fas.broom',
+                'display_name' => 'Housework',
+                'description' => 'Housework workout activity',
+                'hidden' => false,
+            ],
+            'horsebackRiding' => [
+                'icon' => 'fas.horse',
+                'display_name' => 'Horseback Riding',
+                'description' => 'Horseback Riding workout activity',
+                'hidden' => false,
+            ],
+
+            // Static per-day metric objects from OuraPlugin::getStaticMetricObject()
+            'daily_activity' => [
+                'icon' => 'fas.person-walking',
+                'display_name' => 'Daily Activity',
+                'description' => 'Daily Activity from Oura Ring',
+                'hidden' => false,
+            ],
+            'daily_sleep_summary' => [
+                'icon' => 'fas.moon',
+                'display_name' => 'Daily Sleep Summary',
+                'description' => 'Daily Sleep Summary from Oura Ring',
+                'hidden' => false,
+            ],
+            'daily_spo2' => [
+                'icon' => 'fas.lungs',
+                'display_name' => 'Daily SpO2',
+                'description' => 'Daily SpO2 from Oura Ring',
+                'hidden' => false,
+            ],
+            'oura_daily_stress' => [
+                'icon' => 'fas.gauge',
+                'display_name' => 'Daily Stress',
+                'description' => 'Daily Stress from Oura Ring',
+                'hidden' => false,
+            ],
+            'oura_daily_resilience' => [
+                'icon' => 'fas.shield-heart',
+                'display_name' => 'Daily Resilience',
+                'description' => 'Daily Resilience from Oura Ring',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Retired names still present on old rows, recognised by the sense check.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public static function getLegacyTypes(): array
+    {
+        return [
+            'object_types' => [
+                'oura_daily_spo2' => 'SpO2 object before the switch to daily_spo2',
+            ],
         ];
     }
 
