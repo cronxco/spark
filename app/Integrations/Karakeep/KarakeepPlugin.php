@@ -192,6 +192,26 @@ class KarakeepPlugin extends ManualPlugin
         ];
     }
 
+    /**
+     * Retired names still present on old rows, recognised by the sense check.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public static function getLegacyTypes(): array
+    {
+        $fetchSummary = 'Fetch summary written on one bookmark in Nov 2025';
+
+        return [
+            'block_types' => [
+                'fetch_summary_tweet' => $fetchSummary,
+                'fetch_summary_short' => $fetchSummary,
+                'fetch_summary_paragraph' => $fetchSummary,
+                'fetch_key_takeaways' => $fetchSummary,
+                'fetch_tldr' => $fetchSummary,
+            ],
+        ];
+    }
+
     public function initializeGroup(User $user): IntegrationGroup
     {
         return IntegrationGroup::create([
