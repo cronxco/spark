@@ -11,6 +11,9 @@ use InvalidArgumentException;
 
 class PluginRegistry
 {
+    private static array $plugins = [];
+
+    private static ?Collection $cachedSpotlightCommands = null;
     /**
      * Services that write events or integrations without a plugin. They have no
      * group and declare nothing, so integrity checks leave them out.
@@ -18,10 +21,6 @@ class PluginRegistry
      * openai: the per-day AI usage ledger written by AiUsageRecorder.
      */
     public const INTERNAL_SERVICES = ['openai'];
-
-    private static array $plugins = [];
-
-    private static ?Collection $cachedSpotlightCommands = null;
 
     /**
      * Get the list of valid domains that plugins can use
