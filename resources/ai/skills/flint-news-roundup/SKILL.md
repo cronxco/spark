@@ -386,6 +386,10 @@ out from these blocks, one card per story.
   facts inline. Cut restatements.
 - **Contested:** Include only a genuine difference between named accounts or
   an account and the record; explain what it turns on. Never invent balance.
+  When a key point you are drafting reports one named party disputing another
+  ("X denies…", "a US official denied that interpretation", "Y says Z controls
+  it", "the disputed issue is…"), that disagreement belongs here, not in key
+  points: move it, and use the freed key point for another specific.
 - **Why it matters:** Connect to Will's work, plans, London or real interests
   only when concrete. Omit generic relevance and Spark/Flint internals.
 - **What to watch:** Name the next event, dated where established. If timing is
@@ -500,6 +504,7 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 - [ ] Every citation grounded; research-only UK cards honestly labelled with empty event-ID arrays.
 - [ ] No unsupported UK angle, default US framing, invented facts or padding.
 - [ ] Structured cards, distinct titles, field limits and final summary order checked.
+- [ ] Every disagreement between named parties sits in `contested`, not in key points.
 - [ ] Styleguide fetched; Run notes last with selection, sweep and budget outcomes.
 - [ ] Trigger token preserved when supplied; relevant Topics maintained; no questions.
 - [ ] Topic `content` rewritten to 150 words or fewer, one story per topic, no caveat
