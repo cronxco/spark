@@ -268,7 +268,14 @@ new class extends Component
     {
         $results = [];
         foreach ($this->dbActionsByService as $service => $actions) {
-            $defined = array_keys($this->pluginActionTypes[$service] ?? []);
+            if (in_array($service, PluginRegistry::INTERNAL_SERVICES, true)) {
+                continue;
+            }
+            $pluginClass = PluginRegistry::getPlugin($service);
+            $defined = array_merge(
+                array_keys($this->pluginActionTypes[$service] ?? []),
+                $pluginClass ? PluginRegistry::getLegacyTypeNames($pluginClass, 'action_types') : [],
+            );
             $missing = array_values(array_diff($actions, $defined));
             if (! empty($missing)) {
                 $results[] = [
@@ -289,7 +296,7 @@ new class extends Component
         $servicesInDb = array_keys($this->dbActionsByService);
         $servicesInPlugins = PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()->all();
 
-        return array_values(array_diff($servicesInDb, $servicesInPlugins));
+        return array_values(array_diff($servicesInDb, $servicesInPlugins, PluginRegistry::INTERNAL_SERVICES));
     }
 
     /**
@@ -300,7 +307,9 @@ new class extends Component
         $results = [];
         foreach ($this->dbBlockTypesByService as $service => $blockTypes) {
             $pluginClass = PluginRegistry::getPlugin($service);
-            $defined = $pluginClass ? array_keys($pluginClass::getBlockTypes()) : [];
+            $defined = $pluginClass
+                ? array_merge(array_keys($pluginClass::getBlockTypes()), PluginRegistry::getLegacyTypeNames($pluginClass, 'block_types'))
+                : [];
             $missing = array_values(array_diff($blockTypes, $defined));
             if (! empty($missing)) {
                 $results[] = [
@@ -319,9 +328,11 @@ new class extends Component
     public function getUndefinedObjectTypesProperty(): array
     {
         $results = [];
+        $defined = PluginRegistry::getAllObjectTypeNames();
         foreach ($this->dbObjectTypesByService as $service => $objectTypes) {
-            $pluginClass = PluginRegistry::getPlugin($service);
-            $defined = $pluginClass ? array_keys($pluginClass::getObjectTypes()) : [];
+            if (in_array($service, PluginRegistry::INTERNAL_SERVICES, true)) {
+                continue;
+            }
             $missing = array_values(array_diff($objectTypes, $defined));
             if (! empty($missing)) {
                 $results[] = [
@@ -403,6 +414,7 @@ new class extends Component
             ->whereNotIn(
                 'service',
                 PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()
+                    ->merge(PluginRegistry::INTERNAL_SERVICES)
             )->get();
 
         if ($unknownServices->count() > 0) {
@@ -418,6 +430,7 @@ new class extends Component
         // orWhereDoesntHave() would escape it and match every user's rows.
         $noGroup = Integration::query()->tap(AdminTenant::scoped())
             ->where(fn ($q) => $q->whereNull('integration_group_id')->orWhereDoesntHave('group'))
+            ->whereNotIn('service', PluginRegistry::INTERNAL_SERVICES)
             ->get();
 
         if ($noGroup->count() > 0) {
@@ -443,7 +456,8 @@ new class extends Component
 
             try {
                 // Check required methods exist and return valid data
-                if (! method_exists($pluginClass, 'getActionTypes') || empty($pluginClass::getActionTypes())) {
+                $emitsEvents = ! method_exists($pluginClass, 'emitsEvents') || $pluginClass::emitsEvents();
+                if ($emitsEvents && (! method_exists($pluginClass, 'getActionTypes') || empty($pluginClass::getActionTypes()))) {
                     $pluginIssues[] = 'No action types defined';
                 }
 
@@ -656,7 +670,7 @@ new class extends Component
             [
                 'key' => 'undefined_object_types',
                 'title' => 'Object types present in events but not defined in plugin files',
-                'description' => 'Distinct `objects.type` used as actor/target per service with no corresponding entry in plugin `getObjectTypes()`.',
+                'description' => 'Distinct `objects.type` used as actor/target per service that no plugin declares in `getObjectTypes()`.',
                 'icon' => 'fas.tag',
                 'issue_count' => count($this->undefinedObjectTypes),
                 'badge_value' => null,

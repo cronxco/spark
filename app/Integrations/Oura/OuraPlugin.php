@@ -737,6 +737,100 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'description' => 'Generic workout activity',
                 'hidden' => false,
             ],
+            'core_exercise' => [
+                'icon' => 'fas.dumbbell',
+                'display_name' => 'Core Exercise',
+                'description' => 'Core Exercise workout activity',
+                'hidden' => false,
+            ],
+            'hiit' => [
+                'icon' => 'fas.bolt',
+                'display_name' => 'HIIT',
+                'description' => 'HIIT workout activity',
+                'hidden' => false,
+            ],
+            'stretching' => [
+                'icon' => 'fas.child-reaching',
+                'display_name' => 'Stretching',
+                'description' => 'Stretching workout activity',
+                'hidden' => false,
+            ],
+            'dance' => [
+                'icon' => 'fas.music',
+                'display_name' => 'Dance',
+                'description' => 'Dance workout activity',
+                'hidden' => false,
+            ],
+            'house_work' => [
+                'icon' => 'fas.broom',
+                'display_name' => 'Housework',
+                'description' => 'Housework workout activity',
+                'hidden' => false,
+            ],
+            'horseback_riding' => [
+                'icon' => 'fas.horse',
+                'display_name' => 'Horseback Riding',
+                'description' => 'Horseback Riding workout activity',
+                'hidden' => false,
+            ],
+
+            // Static per-day metric objects from OuraPlugin::getStaticMetricObject()
+            'daily_activity' => [
+                'icon' => 'fas.person-walking',
+                'display_name' => 'Daily Activity',
+                'description' => 'Daily Activity from Oura Ring',
+                'hidden' => false,
+            ],
+            'daily_sleep_summary' => [
+                'icon' => 'fas.moon',
+                'display_name' => 'Daily Sleep Summary',
+                'description' => 'Daily Sleep Summary from Oura Ring',
+                'hidden' => false,
+            ],
+            'daily_spo2' => [
+                'icon' => 'fas.lungs',
+                'display_name' => 'Daily SpO2',
+                'description' => 'Daily SpO2 from Oura Ring',
+                'hidden' => false,
+            ],
+            'oura_daily_stress' => [
+                'icon' => 'fas.gauge',
+                'display_name' => 'Daily Stress',
+                'description' => 'Daily Stress from Oura Ring',
+                'hidden' => false,
+            ],
+            'oura_daily_resilience' => [
+                'icon' => 'fas.shield-heart',
+                'display_name' => 'Daily Resilience',
+                'description' => 'Daily Resilience from Oura Ring',
+                'hidden' => false,
+            ],
+            'oura_daily_spo2' => [
+                'icon' => 'fas.lungs',
+                'display_name' => 'Daily SpO2',
+                'description' => 'Daily SpO2 record from Oura Ring',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Retired names still present on old rows, recognised by the sense check.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public static function getLegacyTypes(): array
+    {
+        $camelCase = 'Workout type as Oura sent it, before normaliseActivityType() converted it to snake_case';
+
+        return [
+            'object_types' => [
+                'strengthTraining' => $camelCase,
+                'coreExercise' => $camelCase,
+                'HIIT' => $camelCase,
+                'houseWork' => $camelCase,
+                'horsebackRiding' => $camelCase,
+            ],
         ];
     }
 
@@ -886,6 +980,14 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'schema' => self::getConfigurationSchema(),
             ],
         ];
+    }
+
+    /**
+     * Oura sends workout names in camelCase (strengthTraining, HIIT); object types are snake_case.
+     */
+    public static function normaliseActivityType(string $activity): string
+    {
+        return strtolower(preg_replace('/(?<=[a-z])(?=[A-Z])/', '_', $activity));
     }
 
     public function mapValueForStorage(string $mappingKey, mixed $value): ?float
@@ -1513,7 +1615,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
 
         $actor = $this->ensureUserProfile($integration);
         $workoutId = Arr::get($item, 'id', md5(json_encode($item)));
-        $activityType = Arr::get($item, 'activity', 'workout');
+        $activityType = self::normaliseActivityType((string) Arr::get($item, 'activity', 'workout'));
 
         // Create workout object once per workout instance
         $target = EventObject::firstOrCreate([
