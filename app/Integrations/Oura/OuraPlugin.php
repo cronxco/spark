@@ -982,6 +982,14 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         ];
     }
 
+    /**
+     * Oura sends workout names in camelCase (strengthTraining, HIIT); object types are snake_case.
+     */
+    public static function normaliseActivityType(string $activity): string
+    {
+        return strtolower(preg_replace('/(?<=[a-z])(?=[A-Z])/', '_', $activity));
+    }
+
     public function mapValueForStorage(string $mappingKey, mixed $value): ?float
     {
         $mappings = static::getValueMappings();
@@ -1592,14 +1600,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 ]);
             }
         }
-    }
-
-    /**
-     * Oura sends workout names in camelCase (strengthTraining, HIIT); object types are snake_case.
-     */
-    public static function normaliseActivityType(string $activity): string
-    {
-        return strtolower(preg_replace('/(?<=[a-z])(?=[A-Z])/', '_', $activity));
     }
 
     public function createWorkoutEvent(Integration $integration, array $item): void
