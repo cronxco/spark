@@ -116,6 +116,20 @@ class ReceiptPlugin extends WebhookPlugin
         ];
     }
 
+    /**
+     * Retired names still present on old rows, recognised by the sense check.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public static function getLegacyTypes(): array
+    {
+        return [
+            'action_types' => [
+                'receipt_received_from' => 'Receipt action before the rename to had_receipt_from',
+            ],
+        ];
+    }
+
     public function handleWebhook(Request $request, Integration $integration): void
     {
         // Log the webhook payload
