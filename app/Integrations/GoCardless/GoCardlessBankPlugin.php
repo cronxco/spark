@@ -853,135 +853,6 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
     }
 
     /**
-     * Request a brand new token pair (rate limited to 10/minute by GoCardless).
-     *
-     * @return array<string, mixed>
-     */
-    protected function requestNewToken(): array
-    {
-        Log::info('Getting GoCardless access token', [
-            'endpoint' => $this->tokenEndpoint,
-            'secret_id_length' => strlen($this->secretId),
-            'secret_key_length' => strlen($this->secretKey),
-        ]);
-
-        // Log the API request
-        $this->logApiRequest('POST', '/api/v2/token/new/', [
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ], [
-            'secret_id' => '[REDACTED]',
-            'secret_key' => '[REDACTED]',
-        ]);
-
-        // Send credentials in POST body as JSON
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ])->post($this->tokenEndpoint, [
-            'secret_id' => $this->secretId,
-            'secret_key' => $this->secretKey,
-        ]);
-
-        // Log the API response
-        $this->logApiResponse('POST', '/api/v2/token/new/', $response->status(), $response->body(), $response->headers());
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Failed to get access token: ' . $response->body());
-        }
-
-        return (array) $response->json();
-    }
-
-    /**
-     * Exchange the cached refresh token for a new access token.
-     * Returns null when there is no refresh token or GoCardless rejects it.
-     *
-     * @return array<string, mixed>|null
-     */
-    protected function refreshAccessToken(): ?array
-    {
-        $refresh = $this->readCachedToken('refresh');
-        if (! $refresh) {
-            return null;
-        }
-
-        $this->logApiRequest('POST', '/api/v2/token/refresh/', [
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ], [
-            'refresh' => '[REDACTED]',
-        ]);
-
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ])->post($this->getBaseUrl() . '/token/refresh/', [
-            'refresh' => $refresh,
-        ]);
-
-        $this->logApiResponse('POST', '/api/v2/token/refresh/', $response->status(), $response->body(), $response->headers());
-
-        if (! $response->successful() || empty($response->json('access'))) {
-            Log::warning('GoCardless token refresh failed, requesting a new token', [
-                'status' => $response->status(),
-            ]);
-            Cache::forget($this->tokenCacheKey('refresh'));
-
-            return null;
-        }
-
-        return (array) $response->json();
-    }
-
-    /**
-     * @param  array<string, mixed>  $tokenData
-     */
-    protected function storeTokens(array $tokenData): void
-    {
-        $this->cacheToken('access', $tokenData['access'] ?? null, $tokenData['access_expires'] ?? null);
-        $this->cacheToken('refresh', $tokenData['refresh'] ?? null, $tokenData['refresh_expires'] ?? null);
-    }
-
-    protected function cacheToken(string $type, mixed $token, mixed $expiresIn): void
-    {
-        if (! is_string($token) || $token === '' || ! is_numeric($expiresIn)) {
-            return;
-        }
-
-        $ttl = (int) $expiresIn - self::TOKEN_EXPIRY_BUFFER_SECONDS;
-        if ($ttl <= 0) {
-            return;
-        }
-
-        Cache::put($this->tokenCacheKey($type), Crypt::encryptString($token), $ttl);
-    }
-
-    protected function readCachedToken(string $type): ?string
-    {
-        $value = Cache::get($this->tokenCacheKey($type));
-        if (! is_string($value) || $value === '') {
-            return null;
-        }
-
-        try {
-            return Crypt::decryptString($value);
-        } catch (DecryptException) {
-            Cache::forget($this->tokenCacheKey($type));
-
-            return null;
-        }
-    }
-
-    /**
-     * Keyed by secret ID so rotating credentials never reuses an old token.
-     */
-    protected function tokenCacheKey(string $type): string
-    {
-        return self::TOKEN_CACHE_PREFIX . $type . '_' . sha1($this->secretId);
-    }
-
-    /**
      * Process a single transaction item
      */
     public function processTransactionItem(Integration $integration, array $account, array $tx, string $status = 'booked'): void
@@ -2183,6 +2054,135 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
             $counterparty !== '' && Str::lower((string) ($event->event_metadata['raw']['creditorName'] ?? $event->event_metadata['raw']['debtorName'] ?? '')) === $counterparty ? 0 : 1,
             abs($event->time->diffInSeconds($bookedAt)),
         ])->first();
+    }
+
+    /**
+     * Request a brand new token pair (rate limited to 10/minute by GoCardless).
+     *
+     * @return array<string, mixed>
+     */
+    protected function requestNewToken(): array
+    {
+        Log::info('Getting GoCardless access token', [
+            'endpoint' => $this->tokenEndpoint,
+            'secret_id_length' => strlen($this->secretId),
+            'secret_key_length' => strlen($this->secretKey),
+        ]);
+
+        // Log the API request
+        $this->logApiRequest('POST', '/api/v2/token/new/', [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ], [
+            'secret_id' => '[REDACTED]',
+            'secret_key' => '[REDACTED]',
+        ]);
+
+        // Send credentials in POST body as JSON
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ])->post($this->tokenEndpoint, [
+            'secret_id' => $this->secretId,
+            'secret_key' => $this->secretKey,
+        ]);
+
+        // Log the API response
+        $this->logApiResponse('POST', '/api/v2/token/new/', $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to get access token: ' . $response->body());
+        }
+
+        return (array) $response->json();
+    }
+
+    /**
+     * Exchange the cached refresh token for a new access token.
+     * Returns null when there is no refresh token or GoCardless rejects it.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function refreshAccessToken(): ?array
+    {
+        $refresh = $this->readCachedToken('refresh');
+        if (! $refresh) {
+            return null;
+        }
+
+        $this->logApiRequest('POST', '/api/v2/token/refresh/', [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ], [
+            'refresh' => '[REDACTED]',
+        ]);
+
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ])->post($this->getBaseUrl() . '/token/refresh/', [
+            'refresh' => $refresh,
+        ]);
+
+        $this->logApiResponse('POST', '/api/v2/token/refresh/', $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful() || empty($response->json('access'))) {
+            Log::warning('GoCardless token refresh failed, requesting a new token', [
+                'status' => $response->status(),
+            ]);
+            Cache::forget($this->tokenCacheKey('refresh'));
+
+            return null;
+        }
+
+        return (array) $response->json();
+    }
+
+    /**
+     * @param  array<string, mixed>  $tokenData
+     */
+    protected function storeTokens(array $tokenData): void
+    {
+        $this->cacheToken('access', $tokenData['access'] ?? null, $tokenData['access_expires'] ?? null);
+        $this->cacheToken('refresh', $tokenData['refresh'] ?? null, $tokenData['refresh_expires'] ?? null);
+    }
+
+    protected function cacheToken(string $type, mixed $token, mixed $expiresIn): void
+    {
+        if (! is_string($token) || $token === '' || ! is_numeric($expiresIn)) {
+            return;
+        }
+
+        $ttl = (int) $expiresIn - self::TOKEN_EXPIRY_BUFFER_SECONDS;
+        if ($ttl <= 0) {
+            return;
+        }
+
+        Cache::put($this->tokenCacheKey($type), Crypt::encryptString($token), $ttl);
+    }
+
+    protected function readCachedToken(string $type): ?string
+    {
+        $value = Cache::get($this->tokenCacheKey($type));
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (DecryptException) {
+            Cache::forget($this->tokenCacheKey($type));
+
+            return null;
+        }
+    }
+
+    /**
+     * Keyed by secret ID so rotating credentials never reuses an old token.
+     */
+    protected function tokenCacheKey(string $type): string
+    {
+        return self::TOKEN_CACHE_PREFIX . $type . '_' . sha1($this->secretId);
     }
 
     protected function getRequiredScopes(): string
