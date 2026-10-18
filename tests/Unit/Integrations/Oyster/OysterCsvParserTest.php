@@ -280,4 +280,22 @@ CSV;
         // Last entry should be tram at Wandle Park
         $this->assertEquals('Wandle Park', $result['journeys'][3]['origin']);
     }
+
+    #[Test]
+    public function it_handles_a_journey_with_an_empty_start_time()
+    {
+        $csv = <<<'CSV'
+
+Date,Start Time,End Time,Journey/Action,Charge,Credit,Balance,Note
+28-Nov-2025,,18:14,"Victoria to East Croydon",8.80,,8.41,"We are not able to show where you touched in"
+CSV;
+
+        $result = $this->parser->parse($csv);
+
+        $journey = $result['journeys'][0];
+
+        $this->assertNull($journey['start_datetime']);
+        $this->assertNotNull($journey['end_datetime']);
+        $this->assertEquals('18:14', $journey['end_datetime']->format('H:i'));
+    }
 }

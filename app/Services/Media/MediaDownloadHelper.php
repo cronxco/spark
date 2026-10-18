@@ -161,6 +161,19 @@ class MediaDownloadHelper
     }
 
     /**
+     * Attach media that already exists on another model, reusing the stored file.
+     *
+     * @param  Model&HasMedia  $model
+     */
+    public function attachExistingMedia(
+        Media $media,
+        Model $model,
+        string $collection = 'downloaded_images'
+    ): Media {
+        return $this->deduplicationService->attachMediaToModel($media, $model, $collection);
+    }
+
+    /**
      * Download media from base64 string and attach to model with MD5 deduplication.
      *
      * @param  Model&HasMedia  $model
