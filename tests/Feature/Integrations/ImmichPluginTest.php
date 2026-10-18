@@ -3,6 +3,9 @@
 namespace Tests\Feature\Integrations;
 
 use App\Integrations\Immich\ImmichPlugin;
+use App\Models\Integration;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -183,5 +186,70 @@ class ImmichPluginTest extends TestCase
     public function it_supports_migration()
     {
         $this->assertTrue($this->plugin->supportsMigration());
+    }
+
+    #[Test]
+    public function it_pulls_photos_via_metadata_search_and_follows_pages()
+    {
+        Http::fake([
+            'immich.test/api/search/metadata' => Http::sequence()
+                ->push(['assets' => ['items' => [['id' => 'a1'], ['id' => 'a2']], 'nextPage' => '2']])
+                ->push(['assets' => ['items' => [['id' => 'a3']], 'nextPage' => null]]),
+        ]);
+
+        $integration = new Integration(['id' => 'test-integration']);
+        $result = $this->plugin->pullPhotoData($integration, 'https://immich.test', 'key', '2026-10-01T00:00:00+00:00');
+
+        $this->assertEquals(['a1', 'a2', 'a3'], array_column($result['assets'], 'id'));
+
+        $requests = Http::recorded();
+        $this->assertCount(2, $requests);
+
+        [$first] = $requests[0];
+        $this->assertInstanceOf(Request::class, $first);
+        $this->assertEquals('POST', $first->method());
+        $this->assertEquals('2026-10-01T00:00:00+00:00', $first['updatedAfter']);
+        $this->assertTrue($first['withExif']);
+        $this->assertTrue($first['withPeople']);
+        $this->assertEquals(1, $first['page']);
+        $this->assertEquals(2, $requests[1][0]['page']);
+    }
+
+    #[Test]
+    public function it_follows_cursor_pagination_for_photos()
+    {
+        Http::fake([
+            'immich.test/api/search/metadata' => Http::sequence()
+                ->push(['assets' => ['items' => [['id' => 'a1']], 'nextCursor' => 'abc', 'nextPage' => null]])
+                ->push(['assets' => ['items' => [['id' => 'a2']], 'nextCursor' => null, 'nextPage' => null]]),
+        ]);
+
+        $integration = new Integration(['id' => 'test-integration']);
+        $result = $this->plugin->pullPhotoData($integration, 'https://immich.test', 'key');
+
+        $this->assertEquals(['a1', 'a2'], array_column($result['assets'], 'id'));
+
+        $second = Http::recorded()[1][0];
+        $this->assertEquals('abc', $second['cursor']);
+        $this->assertArrayNotHasKey('page', $second->data());
+    }
+
+    #[Test]
+    public function it_sends_with_hidden_as_string_when_pulling_people()
+    {
+        Http::fake([
+            'immich.test/api/people*' => Http::sequence()
+                ->push(['people' => [['id' => 'p1']], 'hasNextPage' => true, 'total' => 2, 'hidden' => 0])
+                ->push(['people' => [['id' => 'p2']], 'hasNextPage' => false, 'total' => 2, 'hidden' => 0]),
+        ]);
+
+        $integration = new Integration(['id' => 'test-integration']);
+        $result = $this->plugin->pullPeopleData($integration, 'https://immich.test', 'key');
+
+        $this->assertEquals(['p1', 'p2'], array_column($result['people'], 'id'));
+
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'withHidden=true')
+            && str_contains($request->url(), 'page=1'));
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'page=2'));
     }
 }

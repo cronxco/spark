@@ -50,8 +50,11 @@ class ConfigurationAudit
         if (config('app.debug') && ! app()->environment(['local', 'testing'])) {
             $add('error', 'APP_DEBUG', 'Debug mode is enabled outside local/testing.');
         }
-        if (config('app.enable_task_pipeline') && config('app.allowed_task_commands') === null) {
-            $add('warning', 'ALLOWED_TASK_COMMANDS', 'Task pipeline is enabled without an Artisan command allowlist.');
+        // RunIntegrationTask (the admin-only Task plugin) runs any Artisan
+        // command while the allowlist is unset. ENABLE_TASK_PIPELINE is the
+        // unrelated enrichment pipeline and has no bearing on this.
+        if (config('app.allowed_task_commands') === null) {
+            $add('warning', 'ALLOWED_TASK_COMMANDS', 'Task integrations can run any Artisan command: no allowlist is set.');
         }
         if (config('fetch.list_detection.enabled') && ! config('services.jev.enabled')) {
             $add('warning', 'JEV_ENABLED', 'Fetch list detection is enabled while Jev is disabled.');

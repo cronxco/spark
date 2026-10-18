@@ -151,6 +151,7 @@ class Day extends Component
             'target_id',
         ])
             ->with(['actor', 'target']) // Load actor and target immediately
+            ->withoutInternal()
             ->whereHas('integration', function ($q) {
                 $userId = optional(auth()->guard('web')->user())->id;
                 if ($userId) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Integrations\GoCardless\GoCardlessBankPlugin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -161,23 +162,11 @@ class GoCardlessAdminController extends Controller
     }
 
     /**
-     * Get access token from GoCardless API
+     * Get access token from GoCardless API, shared with the plugin's token cache
+     * so the admin UI doesn't spend the 10/minute /token/new/ allowance.
      */
     protected function getAccessToken(): string
     {
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-        ])->post(config('services.gocardless.api_base') . '/token/new/', [
-            'secret_id' => config('services.gocardless.secret_id'),
-            'secret_key' => config('services.gocardless.secret_key'),
-        ]);
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Failed to get access token: ' . $response->body());
-        }
-
-        $data = $response->json();
-
-        return $data['access'] ?? '';
+        return (new GoCardlessBankPlugin)->getAccessToken();
     }
 }

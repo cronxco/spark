@@ -216,6 +216,18 @@ class ProcessOysterEmailJob implements ShouldQueue
                 continue;
             }
 
+            $touchedInTime = $journey['start_datetime'] ?? $journey['end_datetime'];
+
+            if (! $touchedInTime) {
+                Log::warning('Oyster: Skipping journey with no parseable time', [
+                    'integration_id' => $this->integration->id,
+                    'date' => $journey['date'],
+                    'raw_action' => $journey['raw_action'],
+                ]);
+
+                continue;
+            }
+
             // Get or create origin station
             $originStation = $stationLookup->getOrCreateStationObject(
                 $journey['origin'],
@@ -237,7 +249,7 @@ class ProcessOysterEmailJob implements ShouldQueue
                     'source_id' => $touchedInSourceId,
                 ],
                 [
-                    'time' => $journey['start_datetime'],
+                    'time' => $touchedInTime,
                     'service' => 'oyster',
                     'domain' => 'online',
                     'action' => 'touched_in_at',
@@ -285,7 +297,7 @@ class ProcessOysterEmailJob implements ShouldQueue
                         'source_id' => $touchedOutSourceId,
                     ],
                     [
-                        'time' => $journey['end_datetime'] ?? $journey['start_datetime'],
+                        'time' => $journey['end_datetime'] ?? $touchedInTime,
                         'service' => 'oyster',
                         'domain' => 'online',
                         'action' => 'touched_out_at',
