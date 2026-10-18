@@ -87,6 +87,30 @@ class GoCardlessAccessTokenCacheTest extends TestCase
     }
 
     #[Test]
+    public function a_rate_limited_refresh_keeps_the_refresh_token_and_skips_a_new_token(): void
+    {
+        Http::fake([
+            '*/token/new/' => Http::response($this->tokenPair('access-1', 'refresh-1')),
+            '*/token/refresh/' => Http::sequence()
+                ->push(['summary' => 'Rate limit exceeded'], 429)
+                ->push(['access' => 'access-2', 'access_expires' => 86400]),
+        ]);
+
+        (new GoCardlessBankPlugin)->getAccessToken();
+        $this->travel(86400)->seconds();
+
+        try {
+            (new GoCardlessBankPlugin)->getAccessToken();
+            $this->fail('Expected the rate-limited refresh to throw');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Failed to refresh access token', $e->getMessage());
+        }
+
+        $this->assertSame('access-2', (new GoCardlessBankPlugin)->getAccessToken());
+        Http::assertSentCount(3);
+    }
+
+    #[Test]
     public function rotating_credentials_requests_a_new_token(): void
     {
         Http::fake([

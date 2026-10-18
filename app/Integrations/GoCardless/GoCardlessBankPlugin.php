@@ -2099,7 +2099,8 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
     /**
      * Exchange the cached refresh token for a new access token.
-     * Returns null when there is no refresh token or GoCardless rejects it.
+     * Returns null when there is no refresh token or GoCardless rejects it;
+     * throws on rate limits and server errors so they don't spend a /token/new/ call.
      *
      * @return array<string, mixed>|null
      */
@@ -2126,8 +2127,12 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         $this->logApiResponse('POST', '/api/v2/token/refresh/', $response->status(), $response->body(), $response->headers());
 
+        if ($response->serverError() || $response->status() === 429) {
+            throw new RuntimeException('Failed to refresh access token: ' . $response->body());
+        }
+
         if (! $response->successful() || empty($response->json('access'))) {
-            Log::warning('GoCardless token refresh failed, requesting a new token', [
+            Log::warning('GoCardless token refresh rejected, requesting a new token', [
                 'status' => $response->status(),
             ]);
             Cache::forget($this->tokenCacheKey('refresh'));
