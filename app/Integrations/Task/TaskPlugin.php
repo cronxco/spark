@@ -51,6 +51,15 @@ class TaskPlugin extends ManualPlugin
         return 'online';
     }
 
+    /**
+     * Task instances run a job or an Artisan command and write no events of
+     * their own, so they declare no action, block or object types.
+     */
+    public static function emitsEvents(): bool
+    {
+        return false;
+    }
+
     public static function getActionTypes(): array
     {
         return [];

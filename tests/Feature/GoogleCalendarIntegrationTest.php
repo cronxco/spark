@@ -566,7 +566,7 @@ class GoogleCalendarIntegrationTest extends TestCase
             'source_id' => 'google_calendar_primary_old_event_' . $now->timestamp,
             'actor_id' => $calendarObject->id,
             'target_id' => $eventObject->id,
-            'service' => 'google_calendar',
+            'service' => 'google-calendar',
             'domain' => 'health',
             'action' => 'had_event',
             'time' => $now->copy()->addHours(3),

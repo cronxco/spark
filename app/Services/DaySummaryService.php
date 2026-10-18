@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Integrations\GoogleCalendar\GoogleCalendarPlugin;
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
 use App\Models\Integration;
@@ -755,7 +756,7 @@ class DaySummaryService
         }
 
         // Google Calendar events
-        $calendarEvents = $events->filter(fn ($e) => $e->service === 'google_calendar' && $e->action === 'had_event');
+        $calendarEvents = $events->filter(fn ($e) => $e->service === GoogleCalendarPlugin::getIdentifier() && $e->action === 'had_event');
         if ($calendarEvents->isNotEmpty()) {
             $section['calendar_events'] = $calendarEvents->map(function ($event) {
                 $calEvent = [

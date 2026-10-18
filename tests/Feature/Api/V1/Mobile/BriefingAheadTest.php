@@ -65,7 +65,7 @@ class BriefingAheadTest extends TestCase
     #[Test]
     public function synced_calendar_events_form_the_schedule_without_a_digest(): void
     {
-        $calendar = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'google_calendar']);
+        $calendar = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'google-calendar']);
         $this->calendarEvent($calendar, 'Lunch with Sam', '2026-10-11 12:00:00', 90, 'Peckham');
         $this->calendarEvent($calendar, 'parkrun', '2026-10-11 08:00:00', 30);
         $this->calendarEvent($calendar, "Dan's birthday", '2026-10-11 00:00:00', null);
@@ -88,7 +88,7 @@ class BriefingAheadTest extends TestCase
     #[Test]
     public function the_evening_digest_supplies_attribution_weather_and_birthdays(): void
     {
-        $calendar = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'google_calendar']);
+        $calendar = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'google-calendar']);
         $synced = $this->calendarEvent($calendar, 'Office', '2026-10-11 08:00:00', 480, 'Kings Cross');
 
         $this->dayContext('2026-10-11', [
@@ -175,7 +175,7 @@ class BriefingAheadTest extends TestCase
                 'event_metadata' => ['end' => $bedtime->copy()->addHours(8)->addMinutes(30)->toIso8601String()],
             ]);
         }
-        $calendar = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'google_calendar']);
+        $calendar = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'google-calendar']);
         $this->calendarEvent($calendar, 'Flight', '2026-10-11 05:30:00', 120);
 
         $this->getJson('/api/v1/mobile/briefing/today?date=tomorrow')
@@ -199,7 +199,7 @@ class BriefingAheadTest extends TestCase
                 'event_metadata' => ['end' => $bedtime->copy()->addHours(8)->addMinutes(30)->toIso8601String()],
             ]);
         }
-        $calendar = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'google_calendar']);
+        $calendar = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'google-calendar']);
         $this->calendarEvent($calendar, 'Brunch', '2026-10-11 10:00:00', 60);
 
         $this->getJson('/api/v1/mobile/briefing/today?date=tomorrow')
@@ -211,7 +211,7 @@ class BriefingAheadTest extends TestCase
     {
         return Event::factory()->create([
             'integration_id' => $integration->id,
-            'service' => 'google_calendar',
+            'service' => 'google-calendar',
             'domain' => 'knowledge',
             'action' => $minutes === null ? 'had_all_day_event' : 'had_event',
             'time' => $utcStart,
