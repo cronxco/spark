@@ -640,6 +640,12 @@ Interpret rain using:
 
 Do not treat probability alone as severity.
 
+Weather is one or two plain sentences: the temperature and whether it will rain. Add
+wind only when gusts reach about 50km/h or a grounded plan depends on it, and suggest a
+waterproof or a layer at most once per edition. Do not reuse the same weather sentence
+shape every day ("gusts near X km/h are the more noticeable journey detail" appeared
+in every edition for a week).
+
 Country-level MeteoAlarm results are not enough to assert that Croydon is locally
 under a warning. Verify local applicability or qualify/omit it.
 
@@ -931,6 +937,20 @@ Pick the single most consequential fact, roughly:
 7. quiet day — say so without manufacturing drama.
 
 A Topic does not jump the queue merely because it is active.
+
+Two things are never the lede:
+
+- **Something Will told Flint today.** He already knows it. If his answer changes the
+  picture, use it in one clause where it bears on something else; do not open the
+  edition by repeating it back to him. "Yesterday's late meeting was an occasional
+  exception: you clarified this morning…" is the pattern this rules out.
+- **Spark or Flint development documents** (feature plans, research write-ups, CI and
+  PR records). Even when Will asked for the work, they sit below today's own facts, in
+  one short section at most. Ask a question about one only when the document itself
+  sets out a decision that is Will's to make.
+
+When neither the day nor the evidence offers anything better, a short quiet-day lede
+(rung 7) is the right answer.
 
 Ask:
 
@@ -1308,6 +1328,10 @@ Suggested fields:
 Do not use the editorial note to congratulate Flint, defend a narrative, or list every
 Topic that was loaded.
 
+**Suppressed** lists only what this run weighed and dropped today. Standing settled
+items (a request already honoured, a question already retired, a dated correction that
+no longer applies) are not re-listed on every run once they are settled.
+
 ## 10f. Create the digest
 
 ```text
@@ -1459,6 +1483,8 @@ Before writing today's digest verify:
 - [ ] any hourly weather / HA / Spark bookmark / Trek / refresh usage passed its relevance
       gate;
 - [ ] lede is consequential, not merely interesting;
+- [ ] lede is not a restatement of Will's own answer today, nor a development document;
+- [ ] weather is one or two sentences; wind only at ~50km/h gusts or when a plan needs it;
 - [ ] active Topics only influenced the digest where fresh evidence justified it;
 - [ ] observation/inference/speculation are not blurred;
 - [ ] Flint's previous suggestion or Topic summary has not been treated as fresh user
