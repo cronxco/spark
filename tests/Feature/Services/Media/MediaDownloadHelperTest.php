@@ -217,14 +217,14 @@ class MediaDownloadHelperTest extends TestCase
 
         $attached = $this->helper->attachExistingMedia($original, $target, 'downloaded_images');
 
-        $this->assertNotSame($original->uuid, $attached->uuid);
+        $this->assertNotSame((string) $original->uuid, (string) $attached->uuid);
         $this->assertSame($target->id, $attached->model_id);
         $this->assertSame('downloaded_images', $attached->collection_name);
         $this->assertSame($original->getCustomProperty('md5_hash'), $attached->getCustomProperty('md5_hash'));
 
         $again = $this->helper->attachExistingMedia($original, $target, 'downloaded_images');
 
-        $this->assertSame($attached->uuid, $again->uuid);
+        $this->assertSame((string) $attached->uuid, (string) $again->uuid);
         $this->assertCount(1, $target->fresh()->getMedia('downloaded_images'));
     }
 
