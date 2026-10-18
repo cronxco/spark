@@ -201,6 +201,33 @@ class MediaDownloadHelperTest extends TestCase
         $this->assertEquals('custom_value', $media->getCustomProperty('custom_field'));
     }
 
+    #[Test]
+    public function attaches_existing_media_to_another_model_without_reuploading(): void
+    {
+        $user = User::factory()->create();
+        $source = EventObject::factory()->create(['user_id' => $user->id]);
+        $target = EventObject::factory()->create(['user_id' => $user->id]);
+
+        $original = $this->helper->attachMediaFromBase64(
+            base64_encode($this->createTestImageContent()),
+            $source,
+            'beer.jpg',
+            'downloaded_images'
+        );
+
+        $attached = $this->helper->attachExistingMedia($original, $target, 'downloaded_images');
+
+        $this->assertNotSame($original->uuid, $attached->uuid);
+        $this->assertSame($target->id, $attached->model_id);
+        $this->assertSame('downloaded_images', $attached->collection_name);
+        $this->assertSame($original->getCustomProperty('md5_hash'), $attached->getCustomProperty('md5_hash'));
+
+        $again = $this->helper->attachExistingMedia($original, $target, 'downloaded_images');
+
+        $this->assertSame($attached->uuid, $again->uuid);
+        $this->assertCount(1, $target->fresh()->getMedia('downloaded_images'));
+    }
+
     /**
      * Create test image content (tiny 1x1 JPEG).
      */
