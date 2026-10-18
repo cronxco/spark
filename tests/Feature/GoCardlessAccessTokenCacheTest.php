@@ -126,6 +126,19 @@ class GoCardlessAccessTokenCacheTest extends TestCase
     }
 
     #[Test]
+    public function token_requests_use_the_configured_api_base(): void
+    {
+        config(['services.gocardless.api_base' => 'https://sandbox.example.test/api/v2/']);
+        Http::fake([
+            'https://sandbox.example.test/api/v2/token/new/' => Http::response($this->tokenPair('access-1', 'refresh-1')),
+        ]);
+
+        $this->assertSame('access-1', (new GoCardlessBankPlugin)->getAccessToken());
+
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://sandbox.example.test/api/v2/token/new/');
+    }
+
+    #[Test]
     public function a_failed_token_request_is_not_cached(): void
     {
         Http::fake([

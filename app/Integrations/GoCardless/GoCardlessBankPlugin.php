@@ -65,9 +65,9 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
      * GoCardless Bank Account Data API integration
      * Uses direct HTTP calls instead of the unmaintained Nordigen package
      */
-    protected string $apiBase = 'https://bankaccountdata.gocardless.com/api/v2';
+    protected string $apiBase;
 
-    protected string $tokenEndpoint = 'https://bankaccountdata.gocardless.com/api/v2/token/new/';
+    protected string $tokenEndpoint;
 
     protected string $secretId;
 
@@ -81,6 +81,8 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
     public function __construct()
     {
+        $this->apiBase = rtrim((string) (config('services.gocardless.api_base') ?: 'https://bankaccountdata.gocardless.com/api/v2'), '/');
+        $this->tokenEndpoint = $this->apiBase . '/token/new/';
         $this->secretId = (string) (config('services.gocardless.secret_id') ?? '');
         $this->secretKey = (string) (config('services.gocardless.secret_key') ?? '');
         $this->redirectUri = (string) (config('services.gocardless.redirect')
