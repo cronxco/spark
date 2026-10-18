@@ -76,7 +76,7 @@ class GoCardlessConsentExpiring extends SparkNotification
     public function toMail(User $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->warning()
+            ->level($this->getColor() === 'error' ? 'error' : 'info')
             ->subject("Reconnect {$this->bankName()} before {$this->expiresAt->format('j M')}")
             ->greeting("Hello {$notifiable->name}!")
             ->line($this->getMessage())
