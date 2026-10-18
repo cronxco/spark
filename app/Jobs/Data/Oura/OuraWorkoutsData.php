@@ -69,8 +69,7 @@ class OuraWorkoutsData extends BaseProcessingJob
         }
 
         $actor = $plugin->ensureUserProfile($this->integration);
-        // Oura sends camelCase names (strengthTraining, HIIT); object types are snake_case
-        $activityType = strtolower(preg_replace('/(?<=[a-z])(?=[A-Z])/', '_', (string) ($item['activity'] ?? 'workout')));
+        $activityType = OuraPlugin::normaliseActivityType((string) ($item['activity'] ?? 'workout'));
 
         // Create workout object only once per workout ID
         $target = EventObject::firstOrCreate([

@@ -38,7 +38,8 @@ class SenseCheckDeclarationsTest extends TestCase
         $this->event('flint', 'had_summary', 'user_profile', 'morning_digest');
         $this->event('google-calendar', 'had_event', 'google_calendar', 'calendar_event', ['event_time']);
         $this->event('fetch', 'fetched', 'fetch_user', 'fetch_webpage', ['fetch_content']);
-        $this->event('oura', 'did_workout', 'oura_user', 'strengthTraining');
+        $this->event('oura', 'did_workout', 'oura_user', 'strength_training');
+        $this->event('oura', 'had_spo2', 'oura_user', 'oura_daily_spo2');
         $this->event('receipt', 'had_receipt_from', 'user', 'receipt_merchant');
         $this->event('manual_account', 'had_balance', 'monzo_account', 'day');
 
@@ -55,7 +56,7 @@ class SenseCheckDeclarationsTest extends TestCase
     {
         $this->event('receipt', 'receipt_received_from', 'user', 'receipt_merchant');
         $this->event('flint', 'had_summary', 'user_profile', 'evening_digest', ['flint_story', 'flint_urgent_alert']);
-        $this->event('oura', 'had_spo2', 'oura_user', 'oura_daily_spo2');
+        $this->event('oura', 'did_workout', 'oura_user', 'horsebackRiding');
 
         $page = $this->page();
 

@@ -805,6 +805,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'description' => 'Daily Resilience from Oura Ring',
                 'hidden' => false,
             ],
+            'oura_daily_spo2' => [
+                'icon' => 'fas.lungs',
+                'display_name' => 'Daily SpO2',
+                'description' => 'Daily SpO2 record from Oura Ring',
+                'hidden' => false,
+            ],
         ];
     }
 
@@ -815,11 +821,10 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
      */
     public static function getLegacyTypes(): array
     {
-        $camelCase = 'Workout type as Oura sent it, before OuraWorkoutsData normalised it to snake_case';
+        $camelCase = 'Workout type as Oura sent it, before normaliseActivityType() converted it to snake_case';
 
         return [
             'object_types' => [
-                'oura_daily_spo2' => 'SpO2 object before the switch to daily_spo2',
                 'strengthTraining' => $camelCase,
                 'coreExercise' => $camelCase,
                 'HIIT' => $camelCase,
@@ -1589,6 +1594,14 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         }
     }
 
+    /**
+     * Oura sends workout names in camelCase (strengthTraining, HIIT); object types are snake_case.
+     */
+    public static function normaliseActivityType(string $activity): string
+    {
+        return strtolower(preg_replace('/(?<=[a-z])(?=[A-Z])/', '_', $activity));
+    }
+
     public function createWorkoutEvent(Integration $integration, array $item): void
     {
         $start = Arr::get($item, 'start_datetime');
@@ -1602,7 +1615,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
 
         $actor = $this->ensureUserProfile($integration);
         $workoutId = Arr::get($item, 'id', md5(json_encode($item)));
-        $activityType = Arr::get($item, 'activity', 'workout');
+        $activityType = self::normaliseActivityType((string) Arr::get($item, 'activity', 'workout'));
 
         // Create workout object once per workout instance
         $target = EventObject::firstOrCreate([
