@@ -16,7 +16,9 @@ class LogController extends Controller
     public function store(StoreLogRequest $request): JsonResponse
     {
         try {
-            $result = $this->logs->log($request->user(), $request->validated());
+            $result = $request->boolean('dry_run')
+                ? $this->logs->preview($request->user(), $request->validated())
+                : $this->logs->log($request->user(), $request->validated());
         } catch (InvalidArgumentException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
@@ -24,7 +26,7 @@ class LogController extends Controller
             ], 422);
         }
 
-        if ($result['status'] === 'needs_clarification') {
+        if (in_array($result['status'], ['needs_clarification', 'preview'], true)) {
             return response()->json($result);
         }
 

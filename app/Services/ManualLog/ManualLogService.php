@@ -42,6 +42,7 @@ class ManualLogService
 
     public function __construct(
         protected TvdbClient $tvdb,
+        protected ManualLogLookup $lookup,
     ) {}
 
     /**
@@ -63,6 +64,79 @@ class ManualLogService
         }
 
         return $result;
+    }
+
+    /**
+     * What logging this would match and enrich, without writing anything.
+     *
+     * Wine and beer search Vivino or Untappd now (kept for a few minutes so the log that follows reuses it).
+     * TV asks TheTVDB the same questions a real log would, including which series or season.
+     *
+     * @param  array<string, mixed>  $data  Validated StoreLogRequest input
+     * @return array{status: 'preview', match: array<string, mixed>|null}|array{status: 'needs_clarification', field: string, question: string, options: array<int, array<string, mixed>>, suggested?: mixed}
+     */
+    public function preview(User $user, array $data): array
+    {
+        if (in_array($data['kind'], ['wine', 'beer'], true)) {
+            $integration = ManualLogPlugin::resolveIntegration($user->id);
+            $cards = $this->lookup->results($data['kind'], $data['title'], $integration->group);
+
+            return ['status' => 'preview', 'match' => ['kind' => $data['kind']] + $this->lookup->describe($cards, $data['title'])];
+        }
+
+        if ($data['kind'] !== 'tv') {
+            return ['status' => 'preview', 'match' => null];
+        }
+
+        return $this->previewTv($data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function previewTv(array $data): array
+    {
+        $unavailable = ['status' => 'preview', 'match' => ['kind' => 'tv', 'state' => 'unavailable']];
+
+        if (! $this->tvdb->isConfigured()) {
+            return $unavailable;
+        }
+
+        try {
+            $series = $this->resolveSeries($data);
+            if (isset($series['status'])) {
+                return $series;
+            }
+
+            $season = isset($data['season']) ? (int) $data['season'] : $this->resolveSeason($series['id']);
+            if (is_array($season)) {
+                return $season;
+            }
+            if ($season === null) {
+                return ['status' => 'preview', 'match' => ['kind' => 'tv', 'state' => 'matched', 'series' => $series, 'season' => null, 'episodes' => [], 'missing_episodes' => []]];
+            }
+
+            $available = collect($this->tvdb->episodes($series['id'], $season))->keyBy('number');
+        } catch (InvalidArgumentException $e) {
+            return ['status' => 'preview', 'match' => ['kind' => 'tv', 'state' => 'none']];
+        } catch (Throwable $e) {
+            Log::warning('TV preview: TheTVDB lookup failed', ['title' => $data['title'], 'error' => $e->getMessage()]);
+
+            return $unavailable;
+        }
+
+        $wanted = collect($data['episodes'])->map(fn ($number) => (int) $number)->unique()->sort()->values();
+
+        return ['status' => 'preview', 'match' => [
+            'kind' => 'tv',
+            'state' => 'matched',
+            'series' => $series,
+            'season' => $season,
+            'episodes' => $wanted->filter(fn (int $number) => $available->has($number))
+                ->map(fn (int $number) => ['number' => $number, 'name' => $available->get($number)['name'], 'aired' => $available->get($number)['aired']])
+                ->values()->all(),
+            'missing_episodes' => $wanted->reject(fn (int $number) => $available->has($number))->values()->all(),
+        ]];
     }
 
     /**
@@ -130,6 +204,7 @@ class ManualLogService
                     'occurred_at' => $this->occurredAt($data),
                     'source_id' => $sourceId,
                     'event_metadata' => $this->consumptionMetadata($data),
+                    'match_url' => $data['match_url'] ?? null,
                 ],
             );
         } catch (UniqueConstraintViolationException $e) {

@@ -27,7 +27,8 @@ class StoreLogRequest extends FormRequest
     {
         return [
             'kind' => ['required', Rule::in(array_keys(ManualLogService::KINDS))],
-            'idempotency_key' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._:-]+$/'],
+            'dry_run' => ['nullable', 'boolean'],
+            'idempotency_key' => [Rule::requiredIf(fn () => ! $this->boolean('dry_run')), 'string', 'max:100', 'regex:/^[A-Za-z0-9._:-]+$/'],
             'title' => ['required', 'string', 'max:255'],
             'occurred_at' => ['nullable', 'date', 'before_or_equal:+5 minutes'],
             'quantity' => ['nullable', 'numeric', 'gt:0', 'max:100'],
@@ -39,6 +40,7 @@ class StoreLogRequest extends FormRequest
             'season' => ['nullable', 'integer', 'between:1,99'],
             'episodes' => ['required_if:kind,tv', 'prohibited_unless:kind,tv', 'array', 'min:1', 'max:50'],
             'episodes.*' => ['integer', 'between:1,999'],
+            'match_url' => ['nullable', 'url:https', 'max:500', 'prohibited_unless:kind,wine,beer'],
             'with' => ['nullable', 'array', 'max:10'],
             'with.*' => ['string', 'min:1', 'max:100'],
             'tvdb_id' => ['nullable', 'integer', 'min:1', 'prohibited_unless:kind,tv'],

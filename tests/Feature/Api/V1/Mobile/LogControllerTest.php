@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
+use App\Integrations\Fetch\PlaywrightFetchClient;
 use App\Integrations\ManualLog\ManualLogPlugin;
+use App\Jobs\Data\ManualLog\VivinoEnrichmentData;
 use App\Jobs\OAuth\ManualLog\BoardGameGeekEnrichmentPull;
 use App\Jobs\OAuth\ManualLog\UntappdBeerEnrichmentPull;
 use App\Jobs\OAuth\ManualLog\VivinoEnrichmentPull;
@@ -433,6 +435,105 @@ class LogControllerTest extends TestCase
 
         $this->postJson('/api/v1/mobile/log', $base + ['with' => array_fill(0, 11, 'Dan')])->assertUnprocessable();
         $this->postJson('/api/v1/mobile/log', $base + ['with' => ['']])->assertUnprocessable();
+    }
+
+    #[Test]
+    public function a_dry_run_previews_a_tv_match_without_writing(): void
+    {
+        $this->configureTvdb();
+        $this->fakeTvdb([$this->diplomat()], seasons: [1, 2, 3]);
+
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'tv', 'dry_run' => true, 'title' => 'The Diplomat', 'season' => 3, 'episodes' => [1, 2, 9],
+        ])->assertOk()
+            ->assertJsonPath('status', 'preview')
+            ->assertJsonPath('match.state', 'matched')
+            ->assertJsonPath('match.series.name', 'The Diplomat')
+            ->assertJsonPath('match.season', 3)
+            ->assertJsonPath('match.episodes.0.name', 'The Last Straw')
+            ->assertJsonPath('match.missing_episodes', [9]);
+
+        $this->assertSame(0, Event::count());
+    }
+
+    #[Test]
+    public function a_dry_run_asks_the_same_season_question_a_log_would(): void
+    {
+        $this->configureTvdb();
+        $this->fakeTvdb([$this->diplomat()], seasons: [1, 2, 3]);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'tv', 'dry_run' => true, 'title' => 'The Diplomat', 'episodes' => [1]])
+            ->assertOk()
+            ->assertJsonPath('status', 'needs_clarification')
+            ->assertJsonPath('field', 'season');
+    }
+
+    #[Test]
+    public function a_wine_dry_run_shows_the_closest_vivino_cards_and_reuses_them_when_logged(): void
+    {
+        $this->mock(PlaywrightFetchClient::class)
+            ->shouldReceive('fetch')
+            ->once()
+            ->andReturn(['success' => true, 'html' => file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'))]);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'wine', 'dry_run' => true, 'title' => 'Raquillet Mercurey'])
+            ->assertOk()
+            ->assertJsonPath('status', 'preview')
+            ->assertJsonPath('match.kind', 'wine')
+            ->assertJsonPath('match.state', 'matched')
+            ->assertJsonPath('match.best.score', 1);
+
+        $this->assertSame(0, Event::count());
+
+        Queue::fake([VivinoEnrichmentData::class]);
+        VivinoEnrichmentPull::dispatchSync(
+            ManualLogPlugin::resolveIntegration($this->user->id),
+            'event-id',
+            'Raquillet Mercurey',
+        );
+        Queue::assertPushed(VivinoEnrichmentData::class, 1);
+    }
+
+    #[Test]
+    public function a_wine_dry_run_with_no_close_card_lists_the_nearest(): void
+    {
+        $this->mock(PlaywrightFetchClient::class)
+            ->shouldReceive('fetch')
+            ->once()
+            ->andReturn(['success' => true, 'html' => file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'))]);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'wine', 'dry_run' => true, 'title' => 'Cafe Francois Rouge'])
+            ->assertOk()
+            ->assertJsonPath('match.state', 'candidates')
+            ->assertJsonPath('match.best', null)
+            ->assertJsonPath('match.candidates.0.score', 0.67);
+    }
+
+    #[Test]
+    public function a_dry_run_says_so_when_the_site_cannot_be_searched(): void
+    {
+        $this->mock(PlaywrightFetchClient::class)
+            ->shouldReceive('fetch')
+            ->once()
+            ->andReturn(['success' => false, 'error' => 'timeout']);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'beer', 'dry_run' => true, 'title' => 'Nebulous Sky'])
+            ->assertOk()
+            ->assertJsonPath('match.state', 'unavailable');
+    }
+
+    #[Test]
+    public function a_chosen_match_is_passed_to_the_enrichment_job(): void
+    {
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'wine', 'idempotency_key' => 'pick-1', 'title' => 'Malbec', 'match_url' => 'https://www.vivino.com/en/x/w/1',
+        ])->assertCreated();
+
+        Queue::assertPushed(VivinoEnrichmentPull::class, fn ($job) => $job->matchUrl === 'https://www.vivino.com/en/x/w/1');
+
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'tv', 'idempotency_key' => 'pick-2', 'title' => 'Show', 'episodes' => [1], 'match_url' => 'https://example.com',
+        ])->assertUnprocessable();
     }
 
     private function diplomat(): array
