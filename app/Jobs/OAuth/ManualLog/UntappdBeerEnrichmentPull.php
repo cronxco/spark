@@ -2,13 +2,10 @@
 
 namespace App\Jobs\OAuth\ManualLog;
 
-use App\Integrations\Fetch\PlaywrightFetchClient;
-use App\Integrations\ManualLog\UntappdSearchParser;
 use App\Jobs\Base\BaseFetchJob;
 use App\Jobs\Data\ManualLog\UntappdBeerEnrichmentData;
 use App\Models\Integration;
-use Illuminate\Support\Facades\Log;
-use Throwable;
+use App\Services\ManualLog\ManualLogLookup;
 
 /**
  * Looks up style, ABV, IBU, rating and label for a manually-logged beer via a
@@ -25,6 +22,7 @@ class UntappdBeerEnrichmentPull extends BaseFetchJob
         Integration $integration,
         public string $eventId,
         public string $beerName,
+        public ?string $matchUrl = null,
     ) {
         parent::__construct($integration);
     }
@@ -47,27 +45,10 @@ class UntappdBeerEnrichmentPull extends BaseFetchJob
             return ['event_id' => $this->eventId, 'beer' => null];
         }
 
-        $searchUrl = config('services.untappd.search_url') . '?' . http_build_query(['q' => $this->beerName]);
+        $lookup = app(ManualLogLookup::class);
+        $cards = $lookup->results('beer', $this->beerName, $group);
 
-        try {
-            $result = app(PlaywrightFetchClient::class)->fetch($searchUrl, $group);
-        } catch (Throwable $e) {
-            Log::warning('Beer enrichment: Untappd search failed', [
-                'event_id' => $this->eventId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return ['event_id' => $this->eventId, 'beer' => null];
-        }
-
-        if (! ($result['success'] ?? false) || empty($result['html'])) {
-            return ['event_id' => $this->eventId, 'beer' => null];
-        }
-
-        return [
-            'event_id' => $this->eventId,
-            'beer' => app(UntappdSearchParser::class)->parseBestMatch($result['html'], $this->beerName),
-        ];
+        return ['event_id' => $this->eventId, 'beer' => $cards === null ? null : $lookup->pick($cards, $this->beerName, $this->matchUrl)];
     }
 
     protected function dispatchProcessingJobs(array $rawData): void
