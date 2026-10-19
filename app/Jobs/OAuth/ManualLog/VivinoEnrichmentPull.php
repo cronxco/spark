@@ -23,8 +23,8 @@ use Throwable;
  * PlaywrightFetchClient's per-domain cookie-replay signature, not because
  * any Vivino auth is actually needed.
  *
- * CAVEAT: VivinoSearchParser's selectors are a best-effort scaffold, not
- * verified against Vivino's real markup - see its class docblock.
+ * Only a card whose name covers the logged name is used: Vivino's search is
+ * fuzzy and its first card is often an unrelated wine.
  */
 class VivinoEnrichmentPull extends BaseFetchJob
 {
@@ -54,7 +54,7 @@ class VivinoEnrichmentPull extends BaseFetchJob
             return ['event_id' => $this->eventId, 'wine' => null];
         }
 
-        $searchUrl = config('services.vivino.search_url') . '?' . http_build_query(['q' => $this->wineName]);
+        $searchUrl = config('services.vivino.search_url').'?'.http_build_query(['q' => $this->wineName]);
 
         try {
             $result = app(PlaywrightFetchClient::class)->fetch($searchUrl, $group);
@@ -71,7 +71,7 @@ class VivinoEnrichmentPull extends BaseFetchJob
             return ['event_id' => $this->eventId, 'wine' => null];
         }
 
-        $wine = app(VivinoSearchParser::class)->parseFirstResult($result['html']);
+        $wine = app(VivinoSearchParser::class)->parseBestMatch($result['html'], $this->wineName);
 
         return ['event_id' => $this->eventId, 'wine' => $wine];
     }

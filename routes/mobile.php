@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
 use App\Http\Controllers\Api\V1\Mobile\KnowledgeReprocessingController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\LocationsController;
+use App\Http\Controllers\Api\V1\Mobile\LogController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
@@ -321,6 +322,10 @@ Route::post('captures', [CapturesController::class, 'store'])
     ->middleware('spark.ability:data:write')
     ->name('captures.store');
 
+Route::post('log', [LogController::class, 'store'])
+    ->middleware('spark.ability:data:write')
+    ->name('log.store');
+
 /*
 |--------------------------------------------------------------------------
 | API token management
@@ -483,7 +488,7 @@ Route::get('money/net-worth', [NetWorthController::class, 'index'])
     ->middleware('spark.ability:finance:read')
     ->name('money.net-worth');
 
-require __DIR__ . '/knowledge.php';
+require __DIR__.'/knowledge.php';
 Route::get('money/plan', [MoneyPlanController::class, 'plan'])->middleware('spark.ability:finance:read')->name('money.plan');
 Route::get('money/spending', [MoneyPlanController::class, 'spending'])->middleware('spark.ability:finance:read')->name('money.spending');
 Route::get('money/budgets', [MoneyPlanController::class, 'budgetsIndex'])->middleware('spark.ability:finance:read')->name('money.budgets.index');

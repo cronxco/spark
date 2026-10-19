@@ -25,22 +25,28 @@ class AlcoholUnits
     /** Used when the serving style is unknown or unrecognised. */
     public const DEFAULT_ML = 440;
 
-    public static function estimate(float|int|string|null $abv, ?string $servingStyle): ?array
+    /**
+     * @param  int|null  $servingMl  Exact volume of one serving, when the user said it (e.g. half a pint = 284)
+     * @param  float  $quantity  Number of servings drunk
+     */
+    public static function estimate(float|int|string|null $abv, ?string $servingStyle, ?int $servingMl = null, float $quantity = 1.0): ?array
     {
         if (! is_numeric($abv) || (float) $abv <= 0) {
             return null;
         }
 
         $style = strtolower(trim((string) $servingStyle));
-        $millilitres = self::SERVING_ML[$style] ?? self::DEFAULT_ML;
+        $known = $servingMl !== null || isset(self::SERVING_ML[$style]);
+        $millilitres = $servingMl ?? self::SERVING_ML[$style] ?? self::DEFAULT_ML;
+        $quantity = $quantity > 0 ? $quantity : 1.0;
 
         return [
-            'alcohol_units' => round((float) $abv * $millilitres / 1000, 1),
+            'alcohol_units' => round((float) $abv * $millilitres * $quantity / 1000, 1),
             'alcohol_units_basis' => [
                 'abv' => (float) $abv,
                 'serving_ml' => $millilitres,
-                'serving_ml_assumed' => ! isset(self::SERVING_ML[$style]),
-            ],
+                'serving_ml_assumed' => ! $known,
+            ] + ($quantity !== 1.0 ? ['quantity' => $quantity] : []),
         ];
     }
 
@@ -50,7 +56,12 @@ class AlcoholUnits
     public static function applyTo(Event $event): void
     {
         $metadata = $event->event_metadata ?? [];
-        $estimate = self::estimate($event->target?->metadata['abv'] ?? null, $metadata['serving_style'] ?? null);
+        $estimate = self::estimate(
+            $event->target?->metadata['abv'] ?? null,
+            $metadata['serving_style'] ?? null,
+            isset($metadata['serving_ml']) ? (int) $metadata['serving_ml'] : null,
+            (float) ($metadata['quantity'] ?? 1),
+        );
         if (! $estimate) {
             return;
         }

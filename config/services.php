@@ -79,7 +79,7 @@ return [
         'country' => env('GOCARDLESS_COUNTRY', 'GB'),
         'institution_id' => env('GOCARDLESS_INSTITUTION_ID'),
         // Redirect URI for requisition flow
-        'redirect' => env('GOCARDLESS_REDIRECT_URI', env('APP_URL') . '/integrations/gocardless/callback'),
+        'redirect' => env('GOCARDLESS_REDIRECT_URI', env('APP_URL').'/integrations/gocardless/callback'),
     ],
 
     'oura' => [
@@ -194,6 +194,15 @@ return [
 
     'vivino' => [
         'search_url' => env('VIVINO_SEARCH_URL', 'https://www.vivino.com/search/wines'),
+    ],
+
+    'untappd' => [
+        'search_url' => env('UNTAPPD_SEARCH_URL', 'https://untappd.com/search'),
+    ],
+
+    'tvdb' => [
+        'base_url' => env('TVDB_BASE_URL', 'https://api4.thetvdb.com/v4'),
+        'api_key' => env('TVDB_API_KEY'),
     ],
 
     'receipt' => [

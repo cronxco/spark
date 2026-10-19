@@ -7,129 +7,198 @@ use DOMElement;
 use DOMXPath;
 
 /**
- * Parses a Vivino wine-search results page into the single best (first)
- * match for a manually-logged wine name.
+ * Parses a Vivino wine-search results page.
  *
- * IMPORTANT: this could not be built or verified against Vivino's real,
- * live markup in the environment this was written in (no outbound browsing
- * access to vivino.com). The selectors below are a best-effort scaffold
- * based on common patterns for this kind of search-result card (a
- * repeating item carrying a wine name, winery, vintage, and rating), not a
- * confirmed match for Vivino's actual DOM. This needs a pass against real
- * fetched HTML (e.g. via VivinoEnrichmentPull's Playwright fetch, or a
- * saved sample search page) to correct the selectors before relying on it
- * in production. The parsing logic itself (extraction, normalization) is
- * unit-tested against a constructed fixture so it's correct for whatever
- * shape of matching HTML it's given.
+ * Verified against the live page (19 Oct 2026): the search URL redirects to
+ * /en/explore?search_term=..., a server-rendered list of
+ * [data-testid="wineCard"] cards. Only that test id and
+ * [data-testid="vintagePageLink"] are stable; the inner elements carry
+ * hashed CSS-module classes (e.g. "wineInfoVintage__truncate--JwXCa"), so
+ * they are matched on the class prefix. A saved real page lives in
+ * tests/Fixtures/ManualLog/vivino-search-results.html.
+ *
+ * Vivino's search is fuzzy and its first card is often unrelated to the
+ * query, so callers should use parseBestMatch(), which only returns a card
+ * whose name covers the query, rather than parseFirstResult().
  */
 class VivinoSearchParser
 {
+    private const BASE_URL = 'https://www.vivino.com';
+
     /**
-     * @return array{title: string, winery: ?string, vintage: ?string, rating: ?float, region: ?string, url: ?string, image: ?string}|null
+     * @return array<int, array{title: string, wine: string, winery: ?string, vintage: ?string, rating: ?float, rating_count: ?int, region: ?string, url: ?string, image: ?string}>
      */
-    public function parseFirstResult(string $html): ?array
+    public function parseResults(string $html, int $limit = 10): array
     {
         if (trim($html) === '') {
-            return null;
+            return [];
         }
 
         $document = new DOMDocument;
         libxml_use_internal_errors(true);
-        $document->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+        $document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
         libxml_clear_errors();
 
         $xpath = new DOMXPath($document);
+        $cards = $xpath->query('//*[@data-testid="wineCard"]');
 
-        $cards = $xpath->query('//*[@data-testid="wineCard" or contains(concat(" ", normalize-space(@class), " "), " wine-card ")]');
+        $results = [];
+        foreach ($cards ?: [] as $card) {
+            if (! $card instanceof DOMElement) {
+                continue;
+            }
 
-        if ($cards === false || $cards->length === 0) {
+            $result = $this->parseCard($xpath, $card);
+            if ($result !== null) {
+                $results[] = $result;
+            }
+            if (count($results) >= $limit) {
+                break;
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * The first card on the page. Only trustworthy when the query was exact;
+     * prefer parseBestMatch().
+     */
+    public function parseFirstResult(string $html): ?array
+    {
+        return $this->parseResults($html, 1)[0] ?? null;
+    }
+
+    /**
+     * The card that best matches the query, or null when none covers enough
+     * of it.
+     */
+    public function parseBestMatch(string $html, string $query): ?array
+    {
+        return NameMatcher::best($this->parseResults($html), $query, fn (array $result) => $result['title']);
+    }
+
+    /**
+     * Cards that partly match the query, best first, for asking the user which one they meant.
+     *
+     * @return array<int, array>
+     */
+    public function parseCandidates(string $html, string $query, int $limit = 5): array
+    {
+        return NameMatcher::candidates($this->parseResults($html), $query, fn (array $result) => $result['title'], $limit);
+    }
+
+    public function matchScore(string $query, string $title): float
+    {
+        return NameMatcher::score($query, $title);
+    }
+
+    private function parseCard(DOMXPath $xpath, DOMElement $card): ?array
+    {
+        $info = $xpath->query('.//*[contains(@class, "wineInfoVintage__wineInfoVintage")]', $card)->item(0);
+        if (! $info instanceof DOMElement) {
             return null;
         }
 
-        $card = $cards->item(0);
+        $rows = $xpath->query('./div', $info);
+        $winery = $this->clean($rows->item(0)?->textContent);
+        $wineAndYear = $this->clean($rows->item(1)?->textContent);
 
-        if (! $card instanceof DOMElement) {
+        if ($wineAndYear === null) {
             return null;
         }
 
-        $title = $this->firstText($xpath, $card, './/*[@data-testid="wineName" or contains(@class, "wine-name")]');
-
-        if ($title === null) {
-            return null;
+        $vintage = null;
+        $wine = $wineAndYear;
+        if (preg_match('/^(.*?)\s+((?:19|20)\d{2})$/', $wineAndYear, $matches) === 1) {
+            $wine = $matches[1];
+            $vintage = $matches[2];
         }
 
-        $winery = $this->firstText($xpath, $card, './/*[@data-testid="wineryName" or contains(@class, "winery-name")]');
-        $vintage = $this->firstText($xpath, $card, './/*[@data-testid="vintageYear" or contains(@class, "vintage-year")]');
-        $region = $this->firstText($xpath, $card, './/*[@data-testid="regionName" or contains(@class, "region-name")]');
-        $url = $this->firstAttribute($xpath, $card, './/a[@data-testid="wineNameLink" or contains(@class, "wine-name")]', 'href');
-        $image = $this->firstAttribute($xpath, $card, './/img[@data-testid="wineLabel" or contains(@class, "wine-label")]', 'src');
-
-        $ratingText = $this->firstAttribute($xpath, $card, './/*[@data-testid="ratingStars" or contains(@class, "rating-stars")]', 'aria-label')
-            ?? $this->firstText($xpath, $card, './/*[@data-testid="ratingValue" or contains(@class, "rating-value")]');
+        $href = $this->attribute($xpath, $card, './/a[@data-testid="vintagePageLink"]', 'href');
+        $ratingLabel = $this->attribute($xpath, $card, './/*[@role="img" and starts-with(@aria-label, "Rated ")]', 'aria-label');
+        $ratingText = $this->clean($xpath->query('.//*[contains(@class, "vivinoRating__averageValue")]', $card)->item(0)?->textContent)
+            ?? $ratingLabel;
+        $caption = $this->clean($xpath->query('.//*[contains(@class, "vivinoRating__caption")]', $card)->item(0)?->textContent);
 
         return [
-            'title' => $title,
+            'title' => trim(($winery ? $winery.' ' : '').$wine),
+            'wine' => $wine,
             'winery' => $winery,
             'vintage' => $vintage,
             'rating' => $this->parseRating($ratingText),
-            'region' => $region,
-            'url' => $url,
-            'image' => $image,
+            'rating_count' => $caption !== null && preg_match('/([\d,]+)\s+ratings?/', $caption, $m) === 1
+                ? (int) str_replace(',', '', $m[1])
+                : null,
+            'region' => $this->clean($xpath->query('.//*[contains(@class, "wineInfoLocation__regionAndCountry")]', $card)->item(0)?->textContent),
+            'url' => $this->absoluteUrl($href),
+            'image' => $this->image($xpath, $card),
         ];
     }
 
-    private function firstText(DOMXPath $xpath, DOMElement $context, string $query): ?string
+    private function image(DOMXPath $xpath, DOMElement $card): ?string
     {
-        $nodes = $xpath->query($query, $context);
-
-        if ($nodes === false || $nodes->length === 0) {
+        $src = $this->attribute($xpath, $card, './/img[contains(@src, "images.vivino.com")]', 'src');
+        if ($src === null) {
             return null;
         }
 
-        $text = trim($nodes->item(0)->textContent);
+        return str_starts_with($src, '//') ? 'https:'.$src : $src;
+    }
+
+    /**
+     * Wine page URL without the price/tracking query, keeping the vintage year.
+     */
+    private function absoluteUrl(?string $href): ?string
+    {
+        if ($href === null) {
+            return null;
+        }
+
+        $parts = parse_url(html_entity_decode($href));
+        if (! is_array($parts) || ! isset($parts['path'])) {
+            return null;
+        }
+
+        parse_str($parts['query'] ?? '', $query);
+        $url = self::BASE_URL.$parts['path'];
+
+        return isset($query['year']) ? $url.'?year='.$query['year'] : $url;
+    }
+
+    private function clean(?string $text): ?string
+    {
+        if ($text === null) {
+            return null;
+        }
+
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
 
         return $text === '' ? null : $text;
     }
 
-    private function firstAttribute(DOMXPath $xpath, DOMElement $context, string $query, string $attribute): ?string
+    private function attribute(DOMXPath $xpath, DOMElement $context, string $query, string $attribute): ?string
     {
-        $nodes = $xpath->query($query, $context);
-
-        if ($nodes === false || $nodes->length === 0) {
-            return null;
-        }
-
-        $node = $nodes->item(0);
+        $node = $xpath->query($query, $context)->item(0);
 
         if (! $node instanceof DOMElement || ! $node->hasAttribute($attribute)) {
             return null;
         }
 
-        $value = trim($node->getAttribute($attribute));
-
-        return $value === '' ? null : $value;
+        return $this->clean($node->getAttribute($attribute));
     }
 
     /**
-     * Extract a 1-5 rating from either a plain numeric string ("4.5") or an
-     * accessibility label like "Rated 4.5 out of 5".
+     * Extract a 0-5 rating from a plain number ("4.2") or a label ("Rated 4.2 stars").
      */
     private function parseRating(?string $raw): ?float
     {
-        if ($raw === null) {
-            return null;
-        }
-
-        if (preg_match('/(\d+(?:\.\d+)?)/', $raw, $matches) !== 1) {
+        if ($raw === null || preg_match('/(\d+(?:\.\d+)?)/', $raw, $matches) !== 1) {
             return null;
         }
 
         $rating = (float) $matches[1];
 
-        if ($rating < 0 || $rating > 5) {
-            return null;
-        }
-
-        return $rating;
+        return $rating >= 0 && $rating <= 5 ? $rating : null;
     }
 }
