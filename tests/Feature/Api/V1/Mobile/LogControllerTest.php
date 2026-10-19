@@ -366,33 +366,6 @@ class LogControllerTest extends TestCase
         $this->assertSame($integration->id, Event::findOrFail($response->json('events.0.id'))->integration_id);
     }
 
-    private function configureTvdb(): void
-    {
-        config(['services.tvdb.api_key' => 'test-key', 'services.tvdb.base_url' => 'https://tvdb.test/v4']);
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>  $series
-     * @param  array<int, int>  $seasons
-     */
-    private function fakeTvdb(array $series, array $seasons = [1, 2, 3], ?array $episodes = null): void
-    {
-        $episodes ??= [
-            ['id' => 501, 'number' => 1, 'seasonNumber' => 3, 'name' => 'The Last Straw', 'aired' => '2026-01-01', 'runtime' => 50, 'image' => 'https://img/501.jpg'],
-            ['id' => 502, 'number' => 2, 'seasonNumber' => 3, 'name' => 'Crossing', 'aired' => '2026-01-01', 'runtime' => 52],
-        ];
-
-        Http::fake([
-            'tvdb.test/v4/login' => Http::response(['data' => ['token' => 'abc']]),
-            'tvdb.test/v4/search*' => Http::response(['data' => $series]),
-            'tvdb.test/v4/series/*/extended*' => Http::response(['data' => ['seasons' => array_map(
-                fn (int $number) => ['number' => $number, 'type' => ['type' => 'official']],
-                $seasons,
-            )]]),
-            'tvdb.test/v4/series/*/episodes/default*' => Http::response(['data' => ['episodes' => $episodes]]),
-        ]);
-    }
-
     #[Test]
     public function tags_people_with_the_event_creating_new_ones_and_reusing_known_ones(): void
     {
@@ -433,6 +406,33 @@ class LogControllerTest extends TestCase
 
         $this->postJson('/api/v1/mobile/log', $base + ['with' => array_fill(0, 11, 'Dan')])->assertUnprocessable();
         $this->postJson('/api/v1/mobile/log', $base + ['with' => ['']])->assertUnprocessable();
+    }
+
+    private function configureTvdb(): void
+    {
+        config(['services.tvdb.api_key' => 'test-key', 'services.tvdb.base_url' => 'https://tvdb.test/v4']);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $series
+     * @param  array<int, int>  $seasons
+     */
+    private function fakeTvdb(array $series, array $seasons = [1, 2, 3], ?array $episodes = null): void
+    {
+        $episodes ??= [
+            ['id' => 501, 'number' => 1, 'seasonNumber' => 3, 'name' => 'The Last Straw', 'aired' => '2026-01-01', 'runtime' => 50, 'image' => 'https://img/501.jpg'],
+            ['id' => 502, 'number' => 2, 'seasonNumber' => 3, 'name' => 'Crossing', 'aired' => '2026-01-01', 'runtime' => 52],
+        ];
+
+        Http::fake([
+            'tvdb.test/v4/login' => Http::response(['data' => ['token' => 'abc']]),
+            'tvdb.test/v4/search*' => Http::response(['data' => $series]),
+            'tvdb.test/v4/series/*/extended*' => Http::response(['data' => ['seasons' => array_map(
+                fn (int $number) => ['number' => $number, 'type' => ['type' => 'official']],
+                $seasons,
+            )]]),
+            'tvdb.test/v4/series/*/episodes/default*' => Http::response(['data' => ['episodes' => $episodes]]),
+        ]);
     }
 
     private function diplomat(): array
