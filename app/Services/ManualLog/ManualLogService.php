@@ -43,6 +43,7 @@ class ManualLogService
     public function __construct(
         protected TvdbClient $tvdb,
         protected ManualLogLookup $lookup,
+        protected PersonMatcher $personMatcher,
     ) {}
 
     /**
@@ -73,9 +74,20 @@ class ManualLogService
      * TV asks TheTVDB the same questions a real log would, including which series or season.
      *
      * @param  array<string, mixed>  $data  Validated StoreLogRequest input
-     * @return array{status: 'preview', match: array<string, mixed>|null}|array{status: 'needs_clarification', field: string, question: string, options: array<int, array<string, mixed>>, suggested?: mixed}
+     * @return array{status: 'preview', match: array<string, mixed>|null, people: array<int, array<string, mixed>>}|array{status: 'needs_clarification', field: string, question: string, options: array<int, array<string, mixed>>, suggested?: mixed, people: array<int, array<string, mixed>>}
      */
     public function preview(User $user, array $data): array
+    {
+        return $this->previewMatch($user, $data) + [
+            'people' => $this->personMatcher->check((string) $user->id, $data['with'] ?? []),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function previewMatch(User $user, array $data): array
     {
         if (in_array($data['kind'], ['wine', 'beer'], true)) {
             $integration = ManualLogPlugin::resolveIntegration($user->id);

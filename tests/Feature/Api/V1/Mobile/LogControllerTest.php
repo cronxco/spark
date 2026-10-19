@@ -415,6 +415,51 @@ class LogControllerTest extends TestCase
     }
 
     #[Test]
+    public function a_dry_run_matches_people_exactly_partially_or_not_at_all(): void
+    {
+        $daniel = $this->person('Daniel Smith');
+        $this->person('Samantha');
+        $this->person('Sam Jones');
+
+        $response = $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'cinema', 'dry_run' => true, 'title' => 'Dune', 'with' => ['daniel smith', 'Dan', 'Sam', 'Priya', 'Al'],
+        ])->assertOk();
+
+        $response->assertJsonPath('people.0.state', 'existing')
+            ->assertJsonPath('people.0.matches.0.id', (string) $daniel->id)
+            ->assertJsonPath('people.1.state', 'likely')
+            ->assertJsonPath('people.1.matches.0.name', 'Daniel Smith')
+            ->assertJsonPath('people.2.state', 'ambiguous')
+            ->assertJsonCount(2, 'people.2.matches')
+            ->assertJsonPath('people.3.state', 'new')
+            ->assertJsonPath('people.4.state', 'new');
+    }
+
+    #[Test]
+    public function a_dry_run_matches_a_short_name_and_ignores_accents(): void
+    {
+        $this->person('Dan');
+        $this->person('Zoë');
+
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'cinema', 'dry_run' => true, 'title' => 'Dune', 'with' => ['Daniel', 'zoe'],
+        ])->assertOk()
+            ->assertJsonPath('people.0.state', 'likely')
+            ->assertJsonPath('people.0.matches.0.name', 'Dan')
+            ->assertJsonPath('people.1.state', 'existing');
+    }
+
+    #[Test]
+    public function a_dry_run_does_not_match_other_users_people(): void
+    {
+        Person::create(['user_id' => User::factory()->create()->id, 'type' => 'person', 'title' => 'Daniel', 'time' => now(), 'metadata' => []]);
+
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'cinema', 'dry_run' => true, 'title' => 'Dune', 'with' => ['Dan'],
+        ])->assertOk()->assertJsonPath('people.0.state', 'new');
+    }
+
+    #[Test]
     public function rejects_too_many_or_blank_names(): void
     {
         $base = ['kind' => 'wine', 'idempotency_key' => 'with-bad', 'title' => 'Malbec'];
@@ -520,6 +565,11 @@ class LogControllerTest extends TestCase
         $this->postJson('/api/v1/mobile/log', [
             'kind' => 'tv', 'idempotency_key' => 'pick-2', 'title' => 'Show', 'episodes' => [1], 'match_url' => 'https://example.com',
         ])->assertUnprocessable();
+    }
+
+    private function person(string $title): Person
+    {
+        return Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => $title, 'time' => now(), 'metadata' => []]);
     }
 
     private function configureTvdb(): void
