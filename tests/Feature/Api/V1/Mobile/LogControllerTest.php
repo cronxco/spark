@@ -39,11 +39,6 @@ class LogControllerTest extends TestCase
         Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read', 'data:write']));
     }
 
-    private function person(string $title): Person
-    {
-        return Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => $title, 'time' => now(), 'metadata' => []]);
-    }
-
     #[Test]
     public function requires_write_ability(): void
     {
@@ -570,6 +565,11 @@ class LogControllerTest extends TestCase
         $this->postJson('/api/v1/mobile/log', [
             'kind' => 'tv', 'idempotency_key' => 'pick-2', 'title' => 'Show', 'episodes' => [1], 'match_url' => 'https://example.com',
         ])->assertUnprocessable();
+    }
+
+    private function person(string $title): Person
+    {
+        return Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => $title, 'time' => now(), 'metadata' => []]);
     }
 
     private function configureTvdb(): void
