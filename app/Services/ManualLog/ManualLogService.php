@@ -142,7 +142,7 @@ class ManualLogService
         $missing = array_values(array_diff($episodes, $available->keys()->all()));
 
         if (count($missing) === count($episodes)) {
-            throw new InvalidArgumentException("{$series['name']} season {$season} has no episode ".implode(', ', $missing).'.');
+            throw new InvalidArgumentException("{$series['name']} season {$season} has no episode " . implode(', ', $missing) . '.');
         }
 
         try {
@@ -220,7 +220,7 @@ class ManualLogService
             'field' => 'series',
             'question' => "Which \"{$data['title']}\"?",
             'options' => array_map(fn (array $series) => [
-                'label' => trim($series['name'].($series['year'] ? " ({$series['year']})" : '')),
+                'label' => trim($series['name'] . ($series['year'] ? " ({$series['year']})" : '')),
                 'value' => $series['id'],
                 'name' => $series['name'],
                 'overview' => $series['overview'],
@@ -343,7 +343,7 @@ class ManualLogService
 
     private function sourceId(string $idempotencyKey, ?string $suffix = null): string
     {
-        return 'manual_log_'.$idempotencyKey.($suffix ? '_'.$suffix : '');
+        return 'manual_log_' . $idempotencyKey . ($suffix ? '_' . $suffix : '');
     }
 
     /**
