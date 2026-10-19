@@ -352,7 +352,7 @@ class ManualLogPlugin extends ManualPlugin
         $valueMultiplier = 10;
 
         $event = Event::create([
-            'source_id' => $options['source_id'] ?? 'manual_log_'.$actionType.'_'.Str::uuid(),
+            'source_id' => $options['source_id'] ?? 'manual_log_' . $actionType . '_' . Str::uuid(),
             'time' => $occurredAt,
             'integration_id' => $integration->id,
             'actor_id' => $userObject->id,

@@ -36,7 +36,7 @@ class VivinoSearchParser
 
         $document = new DOMDocument;
         libxml_use_internal_errors(true);
-        $document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+        $document->loadHTML('<?xml encoding="utf-8" ?>' . $html);
         libxml_clear_errors();
 
         $xpath = new DOMXPath($document);
@@ -122,7 +122,7 @@ class VivinoSearchParser
         $caption = $this->clean($xpath->query('.//*[contains(@class, "vivinoRating__caption")]', $card)->item(0)?->textContent);
 
         return [
-            'title' => trim(($winery ? $winery.' ' : '').$wine),
+            'title' => trim(($winery ? $winery . ' ' : '') . $wine),
             'wine' => $wine,
             'winery' => $winery,
             'vintage' => $vintage,
@@ -143,7 +143,7 @@ class VivinoSearchParser
             return null;
         }
 
-        return str_starts_with($src, '//') ? 'https:'.$src : $src;
+        return str_starts_with($src, '//') ? 'https:' . $src : $src;
     }
 
     /**
@@ -161,9 +161,9 @@ class VivinoSearchParser
         }
 
         parse_str($parts['query'] ?? '', $query);
-        $url = self::BASE_URL.$parts['path'];
+        $url = self::BASE_URL . $parts['path'];
 
-        return isset($query['year']) ? $url.'?year='.$query['year'] : $url;
+        return isset($query['year']) ? $url . '?year=' . $query['year'] : $url;
     }
 
     private function clean(?string $text): ?string

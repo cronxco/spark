@@ -16,11 +16,6 @@ class VivinoEnrichmentPullTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function resultHtml(): string
-    {
-        return file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'));
-    }
-
     #[Test]
     public function searches_vivino_and_dispatches_the_data_job_on_a_match(): void
     {
@@ -105,5 +100,10 @@ class VivinoEnrichmentPullTest extends TestCase
         VivinoEnrichmentPull::dispatchSync($integration, 'event-id', 'Malbec');
 
         Queue::assertNotPushed(VivinoEnrichmentData::class);
+    }
+
+    private function resultHtml(): string
+    {
+        return file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'));
     }
 }

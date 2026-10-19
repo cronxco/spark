@@ -29,7 +29,7 @@ class UntappdSearchParser
 
         $document = new DOMDocument;
         libxml_use_internal_errors(true);
-        $document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+        $document->loadHTML('<?xml encoding="utf-8" ?>' . $html);
         libxml_clear_errors();
 
         $xpath = new DOMXPath($document);
@@ -85,19 +85,19 @@ class UntappdSearchParser
         $rating = $xpath->query('.//*[@data-rating]', $item)->item(0);
         $image = $xpath->query('.//a[contains(@class, "label")]//img', $item)->item(0);
 
-        $href = $nameHref instanceof DOMElement ? $nameHref->getAttribute('href') : '/beer/'.$beerId;
+        $href = $nameHref instanceof DOMElement ? $nameHref->getAttribute('href') : '/beer/' . $beerId;
 
         return [
             'beer_id' => $beerId,
             'name' => $name,
-            'title' => trim(($brewery ? $brewery.' ' : '').$name),
+            'title' => trim(($brewery ? $brewery . ' ' : '') . $name),
             'brewery' => $brewery,
             'brewery_id' => $breweryHref instanceof DOMElement && preg_match('#/brewery/(\d+)#', $breweryHref->getAttribute('href'), $m) === 1 ? $m[1] : null,
             'style' => $this->text($xpath, $item, './/p[contains(@class, "style")]'),
             'abv' => $this->number($this->text($xpath, $item, './/p[contains(@class, "abv")]')),
             'ibu' => ($ibu = $this->number($this->text($xpath, $item, './/p[contains(@class, "ibu")]'))) !== null ? (int) $ibu : null,
             'rating' => $rating instanceof DOMElement && is_numeric($rating->getAttribute('data-rating')) ? (float) $rating->getAttribute('data-rating') : null,
-            'url' => self::BASE_URL.$href,
+            'url' => self::BASE_URL . $href,
             'image' => $image instanceof DOMElement && $image->getAttribute('src') !== '' ? $image->getAttribute('src') : null,
         ];
     }

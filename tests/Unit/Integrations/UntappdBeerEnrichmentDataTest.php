@@ -26,26 +26,6 @@ class UntappdBeerEnrichmentDataTest extends TestCase
         'image' => 'https://assets.untappd.com/site/beer_logos/beer-5063519_8e78d_sm.jpeg',
     ];
 
-    private function eventFor(Integration $integration, array $eventMetadata = []): Event
-    {
-        $target = EventObject::create([
-            'user_id' => $integration->user_id,
-            'concept' => 'media',
-            'type' => 'untappd_beer',
-            'title' => 'Nebulous Sky',
-            'time' => now(),
-            'metadata' => ['rating' => 5],
-        ]);
-
-        return Event::factory()->create([
-            'integration_id' => $integration->id,
-            'service' => 'manual_log',
-            'action' => 'drank_beer',
-            'target_id' => $target->id,
-            'event_metadata' => $eventMetadata,
-        ]);
-    }
-
     #[Test]
     public function enriches_the_beer_adds_a_details_block_and_works_out_units(): void
     {
@@ -83,5 +63,25 @@ class UntappdBeerEnrichmentDataTest extends TestCase
 
         $this->assertSame(0, $event->refresh()->blocks()->count());
         $this->assertArrayNotHasKey('abv', $event->target->metadata);
+    }
+
+    private function eventFor(Integration $integration, array $eventMetadata = []): Event
+    {
+        $target = EventObject::create([
+            'user_id' => $integration->user_id,
+            'concept' => 'media',
+            'type' => 'untappd_beer',
+            'title' => 'Nebulous Sky',
+            'time' => now(),
+            'metadata' => ['rating' => 5],
+        ]);
+
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'manual_log',
+            'action' => 'drank_beer',
+            'target_id' => $target->id,
+            'event_metadata' => $eventMetadata,
+        ]);
     }
 }

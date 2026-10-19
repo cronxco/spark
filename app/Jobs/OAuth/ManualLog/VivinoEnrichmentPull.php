@@ -54,7 +54,7 @@ class VivinoEnrichmentPull extends BaseFetchJob
             return ['event_id' => $this->eventId, 'wine' => null];
         }
 
-        $searchUrl = config('services.vivino.search_url').'?'.http_build_query(['q' => $this->wineName]);
+        $searchUrl = config('services.vivino.search_url') . '?' . http_build_query(['q' => $this->wineName]);
 
         try {
             $result = app(PlaywrightFetchClient::class)->fetch($searchUrl, $group);

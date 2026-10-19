@@ -16,11 +16,6 @@ class UntappdBeerEnrichmentPullTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function resultHtml(): string
-    {
-        return file_get_contents(base_path('tests/Fixtures/ManualLog/untappd-search-results.html'));
-    }
-
     #[Test]
     public function searches_untappd_and_dispatches_the_data_job_on_a_match(): void
     {
@@ -88,5 +83,10 @@ class UntappdBeerEnrichmentPullTest extends TestCase
         UntappdBeerEnrichmentPull::dispatchSync($integration, 'event-id', 'Verdant Nebulous Sky');
 
         Queue::assertNotPushed(UntappdBeerEnrichmentData::class);
+    }
+
+    private function resultHtml(): string
+    {
+        return file_get_contents(base_path('tests/Fixtures/ManualLog/untappd-search-results.html'));
     }
 }

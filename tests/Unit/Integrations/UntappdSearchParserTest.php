@@ -13,11 +13,6 @@ use Tests\FrameworkTestCase;
  */
 class UntappdSearchParserTest extends FrameworkTestCase
 {
-    private function fixture(): string
-    {
-        return file_get_contents(base_path('tests/Fixtures/ManualLog/untappd-search-results.html'));
-    }
-
     #[Test]
     public function extracts_every_field_from_a_real_result(): void
     {
@@ -75,5 +70,10 @@ class UntappdSearchParserTest extends FrameworkTestCase
 
         $this->assertSame([], $parser->parseResults('<div id="algolia-hits"></div><p>Use the Search Box above to search for a Drink.</p>'));
         $this->assertSame([], $parser->parseResults(''));
+    }
+
+    private function fixture(): string
+    {
+        return file_get_contents(base_path('tests/Fixtures/ManualLog/untappd-search-results.html'));
     }
 }

@@ -13,11 +13,6 @@ use Tests\FrameworkTestCase;
  */
 class VivinoSearchParserTest extends FrameworkTestCase
 {
-    private function fixture(): string
-    {
-        return file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'));
-    }
-
     #[Test]
     public function extracts_every_field_from_a_real_card(): void
     {
@@ -90,5 +85,10 @@ class VivinoSearchParserTest extends FrameworkTestCase
         $this->assertNull($parser->parseFirstResult('<html><body>No results</body></html>'));
         $this->assertNull($parser->parseFirstResult(''));
         $this->assertNull($parser->parseBestMatch('', 'Malbec'));
+    }
+
+    private function fixture(): string
+    {
+        return file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'));
     }
 }

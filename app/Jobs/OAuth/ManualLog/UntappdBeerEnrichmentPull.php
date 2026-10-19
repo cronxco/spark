@@ -47,7 +47,7 @@ class UntappdBeerEnrichmentPull extends BaseFetchJob
             return ['event_id' => $this->eventId, 'beer' => null];
         }
 
-        $searchUrl = config('services.untappd.search_url').'?'.http_build_query(['q' => $this->beerName]);
+        $searchUrl = config('services.untappd.search_url') . '?' . http_build_query(['q' => $this->beerName]);
 
         try {
             $result = app(PlaywrightFetchClient::class)->fetch($searchUrl, $group);
