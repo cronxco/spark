@@ -37,6 +37,7 @@ class LogController extends Controller
                 'time' => $event->time?->toIso8601String(),
             ], $result['events']),
             'missing_episodes' => $result['missing_episodes'] ?? [],
+            'people' => $result['people'] ?? [],
         ], $result['created'] ? 201 : 200);
     }
 }

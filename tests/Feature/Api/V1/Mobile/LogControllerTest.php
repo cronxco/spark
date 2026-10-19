@@ -8,6 +8,8 @@ use App\Jobs\OAuth\ManualLog\UntappdBeerEnrichmentPull;
 use App\Jobs\OAuth\ManualLog\VivinoEnrichmentPull;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Person;
+use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -389,6 +391,48 @@ class LogControllerTest extends TestCase
             )]]),
             'tvdb.test/v4/series/*/episodes/default*' => Http::response(['data' => ['episodes' => $episodes]]),
         ]);
+    }
+
+    #[Test]
+    public function tags_people_with_the_event_creating_new_ones_and_reusing_known_ones(): void
+    {
+        $dan = Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => 'Dan', 'time' => now(), 'metadata' => []]);
+
+        $response = $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'wine',
+            'idempotency_key' => 'with-1',
+            'title' => 'Malbec',
+            'with' => ['dan', ' Sam ', 'DAN'],
+        ])->assertCreated()
+            ->assertJsonCount(2, 'people')
+            ->assertJsonPath('people.0.id', (string) $dan->id)
+            ->assertJsonPath('people.0.created', false)
+            ->assertJsonPath('people.1.name', 'Sam')
+            ->assertJsonPath('people.1.created', true);
+
+        $eventId = $response->json('events.0.id');
+        $this->assertSame(2, Relationship::where('type', 'with')->where('to_type', Event::class)->where('to_id', $eventId)->count());
+        $this->assertSame(2, Person::where('user_id', $this->user->id)->count());
+    }
+
+    #[Test]
+    public function a_retried_request_does_not_tag_people_again(): void
+    {
+        $payload = ['kind' => 'wine', 'idempotency_key' => 'with-retry', 'title' => 'Malbec', 'with' => ['Dan']];
+
+        $this->postJson('/api/v1/mobile/log', $payload)->assertCreated();
+        $this->postJson('/api/v1/mobile/log', $payload)->assertOk()->assertJsonCount(0, 'people');
+
+        $this->assertSame(1, Relationship::where('type', 'with')->count());
+    }
+
+    #[Test]
+    public function rejects_too_many_or_blank_names(): void
+    {
+        $base = ['kind' => 'wine', 'idempotency_key' => 'with-bad', 'title' => 'Malbec'];
+
+        $this->postJson('/api/v1/mobile/log', $base + ['with' => array_fill(0, 11, 'Dan')])->assertUnprocessable();
+        $this->postJson('/api/v1/mobile/log', $base + ['with' => ['']])->assertUnprocessable();
     }
 
     private function diplomat(): array

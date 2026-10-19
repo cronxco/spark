@@ -39,6 +39,8 @@ class StoreLogRequest extends FormRequest
             'season' => ['nullable', 'integer', 'between:1,99'],
             'episodes' => ['required_if:kind,tv', 'prohibited_unless:kind,tv', 'array', 'min:1', 'max:50'],
             'episodes.*' => ['integer', 'between:1,999'],
+            'with' => ['nullable', 'array', 'max:10'],
+            'with.*' => ['string', 'min:1', 'max:100'],
             'tvdb_id' => ['nullable', 'integer', 'min:1', 'prohibited_unless:kind,tv'],
         ];
     }

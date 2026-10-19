@@ -6,12 +6,16 @@ use App\Integrations\ManualLog\ManualLogPlugin;
 use App\Integrations\ManualLog\NameMatcher;
 use App\Integrations\ManualLog\TvdbClient;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
+use App\Models\Person;
+use App\Models\Relationship;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
 
@@ -42,7 +46,7 @@ class ManualLogService
 
     /**
      * @param  array<string, mixed>  $data  Validated StoreLogRequest input
-     * @return array{status: 'logged', created: bool, events: array<int, Event>, missing_episodes?: array<int, int>}|array{status: 'needs_clarification', field: string, question: string, options: array<int, array<string, mixed>>, suggested?: mixed}
+     * @return array{status: 'logged', created: bool, events: array<int, Event>, missing_episodes?: array<int, int>, people?: array<int, array{id: string, name: string, created: bool}>}|array{status: 'needs_clarification', field: string, question: string, options: array<int, array<string, mixed>>, suggested?: mixed}
      *
      * @throws InvalidArgumentException When a requested episode does not exist
      */
@@ -50,9 +54,58 @@ class ManualLogService
     {
         $integration = ManualLogPlugin::resolveIntegration($user->id);
 
-        return $data['kind'] === 'tv'
+        $result = $data['kind'] === 'tv'
             ? $this->logTv($integration, $data)
             : $this->logSimple($integration, $data);
+
+        if ($result['status'] === 'logged' && $result['created'] && ! empty($data['with'])) {
+            $result['people'] = $this->tagPeople($user, $result['events'], $data['with']);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Links each named person to the events with a `with` relationship, creating people not seen before.
+     *
+     * @param  array<int, Event>  $events
+     * @param  array<int, string>  $names
+     * @return array<int, array{id: string, name: string, created: bool}>
+     */
+    private function tagPeople(User $user, array $events, array $names): array
+    {
+        $people = [];
+
+        foreach (collect($names)->map(fn (string $name) => trim($name))->filter()->unique(fn (string $name) => Str::lower($name)) as $name) {
+            $person = Person::query()
+                ->where('user_id', $user->id)
+                ->whereRaw('lower(title) = ?', [Str::lower($name)])
+                ->first();
+            $created = $person === null;
+
+            $person ??= Person::create([
+                'user_id' => $user->id,
+                'type' => 'person',
+                'title' => $name,
+                'time' => now(),
+                'metadata' => [],
+            ]);
+
+            foreach ($events as $event) {
+                Relationship::createRelationship([
+                    'user_id' => $user->id,
+                    'from_type' => EventObject::class,
+                    'from_id' => $person->id,
+                    'to_type' => Event::class,
+                    'to_id' => $event->id,
+                    'type' => 'with',
+                ]);
+            }
+
+            $people[] = ['id' => (string) $person->id, 'name' => $person->title, 'created' => $created];
+        }
+
+        return $people;
     }
 
     /**
