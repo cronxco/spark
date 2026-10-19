@@ -9,6 +9,8 @@ use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Throwable;
@@ -64,18 +66,22 @@ class ManualLogService
             return ['status' => 'logged', 'created' => false, 'events' => $existing];
         }
 
-        $event = (new ManualLogPlugin)->createManualEvent(
-            $integration,
-            self::KINDS[$data['kind']],
-            $data['title'],
-            isset($data['rating']) ? (float) $data['rating'] : null,
-            $data['notes'] ?? null,
-            [
-                'occurred_at' => $this->occurredAt($data),
-                'source_id' => $sourceId,
-                'event_metadata' => $this->consumptionMetadata($data),
-            ],
-        );
+        try {
+            $event = (new ManualLogPlugin)->createManualEvent(
+                $integration,
+                self::KINDS[$data['kind']],
+                $data['title'],
+                isset($data['rating']) ? (float) $data['rating'] : null,
+                $data['notes'] ?? null,
+                [
+                    'occurred_at' => $this->occurredAt($data),
+                    'source_id' => $sourceId,
+                    'event_metadata' => $this->consumptionMetadata($data),
+                ],
+            );
+        } catch (UniqueConstraintViolationException $e) {
+            return ['status' => 'logged', 'created' => false, 'events' => $this->existing($integration, [$sourceId])];
+        }
 
         return ['status' => 'logged', 'created' => true, 'events' => [$event]];
     }
@@ -89,7 +95,7 @@ class ManualLogService
         $sourceIds = array_map(fn (int $number) => $this->sourceId($data['idempotency_key'], "e{$number}"), $episodes);
 
         if ($existing = $this->existing($integration, $sourceIds)) {
-            return ['status' => 'logged', 'created' => false, 'events' => $existing];
+            return $this->replayTv($data, $episodes, $existing);
         }
 
         $series = null;
@@ -107,6 +113,8 @@ class ManualLogService
                 if (is_array($season)) {
                     return $season;
                 }
+            } catch (InvalidArgumentException $e) {
+                throw $e;
             } catch (Throwable $e) {
                 Log::warning('TV log: TheTVDB lookup failed, logging without enrichment', [
                     'title' => $data['title'],
@@ -134,19 +142,43 @@ class ManualLogService
         $missing = array_values(array_diff($episodes, $available->keys()->all()));
 
         if (count($missing) === count($episodes)) {
-            throw new InvalidArgumentException("{$series['name']} season {$season} has no episode " . implode(', ', $missing) . '.');
+            throw new InvalidArgumentException("{$series['name']} season {$season} has no episode ".implode(', ', $missing).'.');
         }
 
-        $events = [];
-        foreach ($episodes as $number) {
-            if (! $available->has($number)) {
-                continue;
-            }
+        try {
+            $events = DB::transaction(function () use ($episodes, $available, $integration, $data, $series, $season) {
+                $events = [];
+                foreach ($episodes as $number) {
+                    if ($available->has($number)) {
+                        $events[] = $this->createEpisode($integration, $data, $series, $season, $available->get($number));
+                    }
+                }
 
-            $events[] = $this->createEpisode($integration, $data, $series, $season, $available->get($number));
+                return $events;
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            return $this->replayTv($data, $episodes, $this->existing($integration, $sourceIds));
         }
 
         return ['status' => 'logged', 'created' => true, 'events' => $events] + ($missing ? ['missing_episodes' => $missing] : []);
+    }
+
+    /**
+     * The response for a retried TV request: the events already written, and any requested episode with no event.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<int, int>  $episodes
+     * @param  array<int, Event>  $existing
+     */
+    private function replayTv(array $data, array $episodes, array $existing): array
+    {
+        $found = array_map(fn (Event $event) => $event->source_id, $existing);
+        $missing = array_values(array_filter(
+            $episodes,
+            fn (int $number) => ! in_array($this->sourceId($data['idempotency_key'], "e{$number}"), $found, true),
+        ));
+
+        return ['status' => 'logged', 'created' => false, 'events' => $existing] + ($missing ? ['missing_episodes' => $missing] : []);
     }
 
     /**
@@ -188,7 +220,7 @@ class ManualLogService
             'field' => 'series',
             'question' => "Which \"{$data['title']}\"?",
             'options' => array_map(fn (array $series) => [
-                'label' => trim($series['name'] . ($series['year'] ? " ({$series['year']})" : '')),
+                'label' => trim($series['name'].($series['year'] ? " ({$series['year']})" : '')),
                 'value' => $series['id'],
                 'name' => $series['name'],
                 'overview' => $series['overview'],
@@ -311,22 +343,21 @@ class ManualLogService
 
     private function sourceId(string $idempotencyKey, ?string $suffix = null): string
     {
-        return 'manual_log_' . $idempotencyKey . ($suffix ? '_' . $suffix : '');
+        return 'manual_log_'.$idempotencyKey.($suffix ? '_'.$suffix : '');
     }
 
     /**
-     * Events already written for these source ids, when every one of them exists (a retried request).
+     * Events already written for these source ids (a retried request).
      *
      * @param  array<int, string>  $sourceIds
      * @return array<int, Event>
      */
     private function existing(Integration $integration, array $sourceIds): array
     {
-        $events = Event::with('target')
+        return Event::with('target')
             ->where('integration_id', $integration->id)
             ->whereIn('source_id', $sourceIds)
-            ->get();
-
-        return $events->count() === count($sourceIds) ? $events->all() : [];
+            ->get()
+            ->all();
     }
 }

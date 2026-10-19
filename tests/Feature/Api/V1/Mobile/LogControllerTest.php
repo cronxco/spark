@@ -257,6 +257,39 @@ class LogControllerTest extends TestCase
     }
 
     #[Test]
+    public function retrying_a_partial_episode_request_replays_the_events_and_the_missing_list(): void
+    {
+        $this->configureTvdb();
+        $this->fakeTvdb([$this->diplomat()], seasons: [3]);
+        $payload = ['kind' => 'tv', 'idempotency_key' => 'tv-13', 'title' => 'The Diplomat', 'episodes' => [1, 9]];
+
+        $first = $this->postJson('/api/v1/mobile/log', $payload)
+            ->assertCreated()
+            ->assertJsonPath('missing_episodes', [9]);
+
+        $this->postJson('/api/v1/mobile/log', $payload)
+            ->assertOk()
+            ->assertJsonCount(1, 'events')
+            ->assertJsonPath('events.0.id', $first->json('events.0.id'))
+            ->assertJsonPath('missing_episodes', [9]);
+
+        $this->assertSame(1, Event::where('action', 'watched_episode')->count());
+    }
+
+    #[Test]
+    public function rejects_a_title_thetvdb_cannot_match_at_all(): void
+    {
+        $this->configureTvdb();
+        $this->fakeTvdb([]);
+
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'tv', 'idempotency_key' => 'tv-14', 'title' => 'Zzzz Qqqq', 'episodes' => [1],
+        ])->assertUnprocessable();
+
+        $this->assertSame(0, Event::where('action', 'watched_episode')->count());
+    }
+
+    #[Test]
     public function rejects_a_request_where_no_episode_exists(): void
     {
         $this->configureTvdb();

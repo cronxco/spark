@@ -2,6 +2,8 @@
 
 namespace App\Integrations\ManualLog;
 
+use Illuminate\Support\Str;
+
 /**
  * Scores how well a search result's name covers what the user typed.
  *
@@ -81,9 +83,7 @@ class NameMatcher
      */
     public static function words(string $text): array
     {
-        $text = mb_strtolower($text);
-        $transliterated = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
-        $text = preg_replace('/[^a-z0-9]+/', ' ', $transliterated !== false ? $transliterated : $text) ?? '';
+        $text = preg_replace('/[^a-z0-9]+/', ' ', strtolower(Str::ascii($text))) ?? '';
 
         return array_values(array_unique(array_filter(explode(' ', trim($text)))));
     }
