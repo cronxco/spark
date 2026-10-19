@@ -8,17 +8,6 @@ use Tests\TestCase;
 
 class ManualLogLookupTest extends TestCase
 {
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function vintages(): array
-    {
-        return [
-            ['title' => 'Les Toisieres Monthelie Rouge 2023', 'url' => 'https://www.vivino.com/en/x/w/1?year=2023'],
-            ['title' => 'Les Toisieres Monthelie Rouge 2024', 'url' => 'https://www.vivino.com/en/x/w/1?year=2024'],
-        ];
-    }
-
     #[Test]
     public function a_chosen_vintage_picks_that_vintage_not_the_first_of_the_wine(): void
     {
@@ -37,5 +26,16 @@ class ManualLogLookupTest extends TestCase
         $picked = $lookup->pick($this->vintages(), 'Monthelie 2023', 'https://www.vivino.com/en/y/w/2?year=2023');
 
         $this->assertSame('https://www.vivino.com/en/x/w/1?year=2023', $picked['url']);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function vintages(): array
+    {
+        return [
+            ['title' => 'Les Toisieres Monthelie Rouge 2023', 'url' => 'https://www.vivino.com/en/x/w/1?year=2023'],
+            ['title' => 'Les Toisieres Monthelie Rouge 2024', 'url' => 'https://www.vivino.com/en/x/w/1?year=2024'],
+        ];
     }
 }
