@@ -123,10 +123,17 @@ class ManualLogLookup
         ];
     }
 
+    /**
+     * The same wine page and vintage: path and `year`, ignoring tracking params like `price_id`.
+     */
     private function sameUrl(string $a, string $b): bool
     {
-        $strip = fn (string $url) => rtrim((string) strtok($url, '?#'), '/');
+        $key = function (string $url): string {
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
 
-        return $strip($a) === $strip($b);
+            return rtrim((string) parse_url($url, PHP_URL_PATH), '/') . '?' . ($query['year'] ?? '');
+        };
+
+        return $key($a) === $key($b);
     }
 }

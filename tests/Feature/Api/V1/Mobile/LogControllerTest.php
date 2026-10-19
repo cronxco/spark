@@ -391,12 +391,25 @@ class LogControllerTest extends TestCase
     }
 
     #[Test]
-    public function a_retried_request_does_not_tag_people_again(): void
+    public function a_retried_request_tags_people_once(): void
     {
         $payload = ['kind' => 'wine', 'idempotency_key' => 'with-retry', 'title' => 'Malbec', 'with' => ['Dan']];
 
         $this->postJson('/api/v1/mobile/log', $payload)->assertCreated();
-        $this->postJson('/api/v1/mobile/log', $payload)->assertOk()->assertJsonCount(0, 'people');
+        $this->postJson('/api/v1/mobile/log', $payload)->assertOk()->assertJsonPath('people.0.created', false);
+
+        $this->assertSame(1, Relationship::where('type', 'with')->count());
+    }
+
+    #[Test]
+    public function a_retry_finishes_tagging_that_failed_the_first_time(): void
+    {
+        $payload = ['kind' => 'wine', 'idempotency_key' => 'with-resume', 'title' => 'Malbec', 'with' => ['Dan']];
+
+        $this->postJson('/api/v1/mobile/log', ['with' => []] + $payload)->assertCreated();
+        $this->assertSame(0, Relationship::where('type', 'with')->count());
+
+        $this->postJson('/api/v1/mobile/log', $payload)->assertOk()->assertJsonPath('people.0.name', 'Dan');
 
         $this->assertSame(1, Relationship::where('type', 'with')->count());
     }

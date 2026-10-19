@@ -59,7 +59,7 @@ class ManualLogService
             ? $this->logTv($integration, $data)
             : $this->logSimple($integration, $data);
 
-        if ($result['status'] === 'logged' && $result['created'] && ! empty($data['with'])) {
+        if ($result['status'] === 'logged' && ! empty($data['with'])) {
             $result['people'] = $this->tagPeople($user, $result['events'], $data['with']);
         }
 
