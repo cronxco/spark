@@ -379,15 +379,65 @@ class FlintDigestServiceTest extends TestCase
         });
     }
 
-    private function runTokenFor(string $routine, string $period): string
+    #[Test]
+    public function a_second_scheduled_run_for_the_same_slot_returns_the_first_digest(): void
     {
-        return app(FlintRunToken::class)->issue([
+        $payload = fn (string $title) => ['title' => $title, 'period' => 'evening', 'blocks' => $this->digestBlocks(), 'question_omission' => [
+            'reason' => 'Nothing worth asking.',
+            'candidates' => ['One', 'Two', 'Three'],
+        ]];
+
+        $first = $this->service->create($this->user, $payload('Evening A') + [
+            'run_token' => $this->runTokenFor('digest', 'evening', 'scheduled'),
+        ]);
+        $second = $this->service->create($this->user, $payload('Evening B') + [
+            'run_token' => $this->runTokenFor('digest', 'evening', 'scheduled'),
+        ]);
+
+        $this->assertFalse($first['deduplicated']);
+        $this->assertTrue($second['deduplicated']);
+        $this->assertSame($first['event_id'], $second['event_id']);
+        $this->assertSame(1, Event::where('service', 'flint')->where('action', 'had_summary')->count());
+    }
+
+    #[Test]
+    public function a_manual_run_still_writes_its_own_digest_for_a_filled_slot(): void
+    {
+        $payload = fn (string $title) => ['title' => $title, 'period' => 'evening', 'blocks' => $this->digestBlocks(), 'question_omission' => [
+            'reason' => 'Nothing worth asking.',
+            'candidates' => ['One', 'Two', 'Three'],
+        ]];
+
+        $first = $this->service->create($this->user, $payload('Evening A') + [
+            'run_token' => $this->runTokenFor('digest', 'evening', 'scheduled'),
+        ]);
+        $manual = $this->service->create($this->user, $payload('Evening B') + [
+            'run_token' => $this->runTokenFor('digest', 'evening', 'manual'),
+        ]);
+
+        $this->assertFalse($manual['deduplicated']);
+        $this->assertNotSame($first['event_id'], $manual['event_id']);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function digestBlocks(): array
+    {
+        return [
+            ['block_type' => 'flint_day_context', 'title' => 'Tomorrow at a glance', 'day_context' => ['calendar' => []]],
+            ['block_type' => 'flint_editorial_note', 'title' => 'Editorial note', 'content' => 'Note.'],
+        ];
+    }
+
+    private function runTokenFor(string $routine, string $period, ?string $triggerSource = null): string
+    {
+        return app(FlintRunToken::class)->issue(array_filter([
             'user_id' => (string) $this->user->id,
             'local_date' => now($this->user->getTimezone())->toDateString(),
             'period' => $period,
             'run_uuid' => (string) Str::uuid(),
             'routine' => $routine,
-        ]);
+            'trigger_source' => $triggerSource,
+        ]));
     }
 
     private function firstBlock(array $result): Block
