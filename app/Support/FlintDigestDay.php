@@ -17,12 +17,6 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class FlintDigestDay
 {
-    /** @param Builder<Event> $query */
-    public static function on(Builder $query, string $localDate): Builder
-    {
-        return self::between($query, $localDate, $localDate);
-    }
-
     /**
      * Block types that identify a routine's output when its digest was written
      * without a run token, and so carries no `routine` in its metadata.
@@ -33,6 +27,12 @@ final class FlintDigestDay
         'news_roundup' => ['flint_news'],
         'reading_list' => ['flint_reading_pick', 'flint_reading_drop'],
     ];
+
+    /** @param Builder<Event> $query */
+    public static function on(Builder $query, string $localDate): Builder
+    {
+        return self::between($query, $localDate, $localDate);
+    }
 
     /**
      * Narrows to the digest a scheduled run of `$routine` already wrote for
