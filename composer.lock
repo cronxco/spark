@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "423cdc0388972bc76afe843876145ef1",
+    "content-hash": "aeab6e5e0807e6bc2d0711803c9f3fe5",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -9641,26 +9641,26 @@
         },
         {
             "name": "symfony/emoji",
-            "version": "v7.4.8",
+            "version": "v8.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/emoji.git",
-                "reference": "b40b8ad11110a84f69e6751356a7ef4f4e962dc6"
+                "reference": "c297a56939dfdcfb256fa1ce6ae11b4ff9ec489e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/emoji/zipball/b40b8ad11110a84f69e6751356a7ef4f4e962dc6",
-                "reference": "b40b8ad11110a84f69e6751356a7ef4f4e962dc6",
+                "url": "https://api.github.com/repos/symfony/emoji/zipball/c297a56939dfdcfb256fa1ce6ae11b4ff9ec489e",
+                "reference": "c297a56939dfdcfb256fa1ce6ae11b4ff9ec489e",
                 "shasum": ""
             },
             "require": {
                 "ext-intl": "*",
-                "php": ">=8.2"
+                "php": ">=8.4.1"
             },
             "require-dev": {
-                "symfony/filesystem": "^7.1|^8.0",
-                "symfony/finder": "^6.4|^7.0|^8.0",
-                "symfony/var-exporter": "^6.4|^7.0|^8.0"
+                "symfony/filesystem": "^7.4|^8.0",
+                "symfony/finder": "^7.4|^8.0",
+                "symfony/var-exporter": "^7.4|^8.0"
             },
             "type": "library",
             "autoload": {
@@ -9697,7 +9697,7 @@
                 "unicode"
             ],
             "support": {
-                "source": "https://github.com/symfony/emoji/tree/v7.4.8"
+                "source": "https://github.com/symfony/emoji/tree/v8.1.0"
             },
             "funding": [
                 {
@@ -9717,7 +9717,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-24T13:12:05+00:00"
+            "time": "2026-05-29T05:06:50+00:00"
         },
         {
             "name": "symfony/error-handler",
