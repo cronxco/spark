@@ -419,6 +419,78 @@ class FlintDigestServiceTest extends TestCase
         $this->assertNotSame($first['event_id'], $manual['event_id']);
     }
 
+    #[Test]
+    public function a_scheduled_news_roundup_returns_a_tokenless_roundup_already_written_for_the_slot(): void
+    {
+        $tokenless = $this->service->create($this->user, [
+            'title' => 'News roundup — today',
+            'period' => 'morning',
+            'blocks' => [
+                ['block_type' => 'flint_news', 'title' => 'A story', 'content' => 'Something happened.'],
+            ],
+        ]);
+
+        $scheduled = $this->service->create($this->user, $this->newsRoundup('News roundup — Friday') + [
+            'run_token' => $this->runTokenFor('news_roundup', 'morning', 'scheduled'),
+        ]);
+
+        $this->assertTrue($scheduled['deduplicated']);
+        $this->assertSame($tokenless['event_id'], $scheduled['event_id']);
+    }
+
+    #[Test]
+    public function a_scheduled_news_roundup_does_not_mistake_the_day_digest_for_a_roundup(): void
+    {
+        $digest = $this->service->create($this->user, [
+            'title' => 'Morning Digest',
+            'period' => 'morning',
+            'blocks' => [],
+        ]);
+
+        $roundup = $this->service->create($this->user, $this->newsRoundup('News roundup — Friday') + [
+            'run_token' => $this->runTokenFor('news_roundup', 'morning', 'scheduled'),
+        ]);
+
+        $this->assertFalse($roundup['deduplicated']);
+        $this->assertNotSame($digest['event_id'], $roundup['event_id']);
+    }
+
+    #[Test]
+    public function a_run_for_one_slot_of_a_multi_slot_schedule_is_not_deduplicated(): void
+    {
+        $roundup = fn (string $occurrence) => $this->service->create($this->user, $this->newsRoundup('News roundup — ' . $occurrence) + [
+            'run_token' => $this->runTokenFor('news_roundup', 'morning', 'scheduled', ['occurrence' => $occurrence]),
+        ]);
+
+        $first = $roundup('0700');
+        $second = $roundup('1300');
+
+        $this->assertFalse($second['deduplicated']);
+        $this->assertNotSame($first['event_id'], $second['event_id']);
+    }
+
+    /** @return array<string, mixed> */
+    private function newsRoundup(string $title): array
+    {
+        return [
+            'title' => $title,
+            'period' => 'morning',
+            'blocks' => [
+                [
+                    'block_type' => 'flint_news',
+                    'title' => 'A story',
+                    'content' => 'TL;DR.',
+                    'news' => [
+                        'key_points' => ['One.', 'Two.'],
+                        'sources' => [['publication' => 'BBC', 'position' => 'Reports it.', 'origin' => 'research', 'url' => 'https://example.com/a']],
+                        'what_to_watch' => 'Next steps.',
+                    ],
+                ],
+                ['block_type' => 'flint_editorial_note', 'title' => 'Run notes', 'content' => 'Notes.'],
+            ],
+        ];
+    }
+
     /** @return array<int, array<string, mixed>> */
     private function digestBlocks(): array
     {
@@ -428,7 +500,7 @@ class FlintDigestServiceTest extends TestCase
         ];
     }
 
-    private function runTokenFor(string $routine, string $period, ?string $triggerSource = null): string
+    private function runTokenFor(string $routine, string $period, ?string $triggerSource = null, array $claims = []): string
     {
         return app(FlintRunToken::class)->issue(array_filter([
             'user_id' => (string) $this->user->id,
@@ -437,7 +509,7 @@ class FlintDigestServiceTest extends TestCase
             'run_uuid' => (string) Str::uuid(),
             'routine' => $routine,
             'trigger_source' => $triggerSource,
-        ]));
+        ] + $claims));
     }
 
     private function firstBlock(array $result): Block

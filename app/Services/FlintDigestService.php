@@ -353,25 +353,22 @@ class FlintDigestService
     }
 
     /**
-     * The scheduled day-briefing digest already written for this local date and
-     * period, if the run asking to write another is itself a scheduled one.
+     * The digest already written for this routine's slot, if the run asking to
+     * write another is itself a scheduled one. Runs with an occurrence claim
+     * belong to a multi-slot schedule, where several digests a day are intended.
      *
      * @param  array<string, mixed>|null  $run
      */
     private function scheduledSlotDigest(Integration $integration, Carbon $date, string $period, ?array $run): ?Event
     {
-        if (($run['routine'] ?? null) !== 'digest' || ($run['trigger_source'] ?? null) !== 'scheduled') {
+        $routine = $run['routine'] ?? null;
+        if (! is_string($routine) || ($run['trigger_source'] ?? null) !== 'scheduled' || isset($run['occurrence'])) {
             return null;
         }
 
         return Event::query()
             ->where('integration_id', $integration->id)
-            ->where('service', 'flint')
-            ->where('action', 'had_summary')
-            ->whereJsonContains('event_metadata->period', $period)
-            ->where('event_metadata->routine', 'digest')
-            ->where('event_metadata->trigger_source', 'scheduled')
-            ->tap(fn ($query) => FlintDigestDay::on($query, $date->toDateString()))
+            ->tap(fn ($query) => FlintDigestDay::forScheduledSlot($query, $routine, $period, $date->toDateString()))
             ->oldest('created_at')
             ->lockForUpdate()
             ->with('blocks')
