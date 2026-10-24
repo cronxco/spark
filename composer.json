@@ -151,45 +151,8 @@
             "url": "git@github.com:cronxco/mary.git"
         },
         {
-            "type": "package",
-            "package": {
-                "name": "willscottuk/monzo-php",
-                "version": "dev-master",
-                "description": "An API client for Monzo Bank (https://monzo.com)",
-                "type": "library",
-                "license": "BSD-3-Clause",
-                "source": {
-                    "type": "git",
-                    "url": "https://github.com/cronxco/monzo-php.git",
-                    "reference": "b7495fee77e656d9ce0ec70707a8e606070ab4b9"
-                },
-                "dist": {
-                    "type": "zip",
-                    "url": "https://api.github.com/repos/cronxco/monzo-php/zipball/b7495fee77e656d9ce0ec70707a8e606070ab4b9",
-                    "reference": "b7495fee77e656d9ce0ec70707a8e606070ab4b9"
-                },
-                "require": {
-                    "php": ">=7.1",
-                    "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
-                    "ramsey/uuid": "^4.2",
-                    "guzzlehttp/guzzle": "^7.5"
-                },
-                "autoload": {
-                    "psr-4": {
-                        "Amelia\\Monzo\\": "src/"
-                    },
-                    "files": [
-                        "src/helpers.php"
-                    ]
-                },
-                "extra": {
-                    "laravel": {
-                        "providers": [
-                            "Amelia\\Monzo\\MonzoServiceProvider"
-                        ]
-                    }
-                }
-            }
+            "type": "vcs",
+            "url": "git@github.com:cronxco/monzo-php.git"
         },
         {
             "type": "vcs",
