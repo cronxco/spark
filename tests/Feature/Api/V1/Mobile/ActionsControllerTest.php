@@ -45,7 +45,7 @@ class ActionsControllerTest extends TestCase
         $this->assertContains('nav.today', $ids);
         $this->assertContains('events.delete', $ids);
         $this->assertNotContains('nav.activity', $ids, 'web-only actions stay off the native list');
-        $this->assertNotContains('flint.run_digest', $ids);
+        $this->assertContains('flint.run_digest', $ids);
     }
 
     #[Test]
@@ -89,7 +89,7 @@ class ActionsControllerTest extends TestCase
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
         $this->postJson('/api/v1/mobile/actions/nope.nothing/run')->assertNotFound();
-        $this->postJson('/api/v1/mobile/actions/flint.run_digest/run')->assertNotFound();
+        $this->postJson('/api/v1/mobile/actions/nav.activity/run')->assertNotFound();
     }
 
     #[Test]
@@ -205,6 +205,21 @@ class ActionsControllerTest extends TestCase
             ->assertJsonPath('error.code', 'invalid');
 
         $this->assertSame(1, ActionProgress::where('action_type', 'command')->count());
+    }
+
+    #[Test]
+    public function a_flint_routine_can_be_run_from_the_app(): void
+    {
+        Queue::fake();
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/actions/flint.run_topics/run')
+            ->assertStatus(202)
+            ->assertJsonPath('status', 'accepted')
+            ->assertJsonPath('result.queued', true);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+        $this->postJson('/api/v1/mobile/actions/flint.run_topics/run')->assertForbidden();
     }
 
     #[Test]
