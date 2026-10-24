@@ -59,7 +59,7 @@ Authorization: Bearer <token>
 `SparkServer::$defaultPaginationLength = 50`, comfortably above the current
 28 tools, so clients that don't implement cursor-following still see the
 full tool set. The server's own `$instructions` block (returned during
-`initialize`) gives the LLM client a curated tour of the tools grouped by
+`server/discover`, or `initialize` for legacy clients) gives the LLM client a curated tour of the tools grouped by
 task — briefing/summary, metrics/trends, precise filtering, search/detail,
 actions, Flint digest, and web fetching — which this document mirrors
 below.
@@ -520,20 +520,25 @@ request all-powerful in any other environment.
 
 ## Observability
 
-`app/Mcp/Tracing/McpSpan.php` wraps three JSON-RPC phases in Sentry spans
+`app/Mcp/Tracing/McpSpan.php` wraps three kinds of JSON-RPC request in Sentry spans
 (no-op if `config('mcp.sentry.enabled', true)` is false or there's no
 active parent span):
 
 - **`tools/call`** — a child span tagged with `mcp.tool.name`,
-  `mcp.transport`, `mcp.request.id`, `mcp.session.id`, and each primitive
+  `mcp.transport`, `mcp.request.id`, and each primitive
   argument as `mcp.request.argument.{key}` (truncated at 1000 chars);
   marks `mcp.tool.result.is_error` and re-throws on exception.
 - **`resources/read`** — same pattern, tagged with `mcp.resource.uri` /
   `mcp.resource.name`.
-- **`initialize`** — tags client name/version, then calls
-  `setSessionMetadata()` to stamp `mcp.client.name/version`,
-  `mcp.server.name/version`, and `mcp.protocol.version` on the Sentry scope
-  for every subsequent span in the session.
+- **`server/discover`** (and legacy **`initialize`**) — tags client
+  name/version under the handshake's own method name.
+
+`SparkServer::handleMessage()` also calls `setSessionMetadata()` on every
+request that carries client info or a protocol version (the `_meta` block
+for modern clients, the `initialize` params for legacy ones), stamping
+`mcp.client.name/version`, `mcp.server.name/version`, and
+`mcp.protocol.version` on the Sentry scope. laravel/mcp 1.0 is stateless, so
+there is no `mcp.session.id`.
 
 `App\Mcp\Tracing\TransportDetector` maps the live `Transport` instance to
 `"http"`/`"stdio"`/`"unknown"` (and the OSI-level `network.transport` tag)
@@ -543,7 +548,10 @@ for the spans above.
 
 ## Testing coverage
 
-`tests/Feature/Mcp/` covers `SparkServerTest.php` (registration/auth for
+`tests/Feature/Mcp/` covers `SparkServerProtocolTest.php` (modern
+`server/discover` / `tools/list` / `tools/call` with the `MCP-Protocol-Version`
+and `Mcp-Method` / `Mcp-Name` headers, the `-32020` rejection when they are
+missing, and legacy `initialize` clients), `SparkServerTest.php` (registration/auth for
 several read tools, ownership-scoping denials, UUID validation, keyword
 filtering), plus dedicated files for `AcknowledgeAnomalyTool`,
 `CreateFlintDigestTool`, `GetLatestFlintDigestTool`,
