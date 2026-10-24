@@ -554,6 +554,28 @@ paths:
         "428": { $ref: "#/components/responses/PreconditionRequired" }
         "412": { $ref: "#/components/responses/PreconditionFailed" }
 
+  /people/{id}/timeline:
+    get:
+      operationId: getPersonTimeline
+      tags: [entities]
+      summary: A person's timeline (actor, target, `with` tags, @mentions) and month calendar
+      parameters:
+        - { $ref: "#/components/parameters/EntityId" }
+        - { name: month, in: query, schema: { type: string, example: "2026-10" } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 50, default: 25 },
+          }
+      responses:
+        "200":
+          {
+            description: "person, event_count, month, calendar (Y-m-d to count), events",
+            content: { application/json: { schema: { type: object } } },
+          }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /objects/{id}/restore:
     post:
       operationId: restoreObject
