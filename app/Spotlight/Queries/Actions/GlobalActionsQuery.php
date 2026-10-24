@@ -4,6 +4,7 @@ namespace App\Spotlight\Queries\Actions;
 
 use App\Services\Actions\ActionDefinition;
 use App\Services\Actions\ActionRegistry;
+use Illuminate\Support\Collection;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -44,9 +45,9 @@ class GlobalActionsQuery
      * step. Each non-navigation one is run by the `run-action` listener
      * mounted in the app layout.
      *
-     * @return \Illuminate\Support\Collection<int, ActionDefinition>
+     * @return Collection<int, ActionDefinition>
      */
-    public static function visible(): \Illuminate\Support\Collection
+    public static function visible(): Collection
     {
         return app(ActionRegistry::class)->forSurface('web')
             ->filter(fn (ActionDefinition $action): bool => $action->isNavigation() || $action->runsWithoutInput())
