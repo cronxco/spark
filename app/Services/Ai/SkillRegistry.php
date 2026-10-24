@@ -38,6 +38,7 @@ class SkillRegistry
         'docs__update_document',
         'fastmail__search_events',
         'spark__acknowledge-anomaly-tool',
+        'spark__acknowledge-flint-notes',
         'spark__complete-flint-run',
         'spark__create-flint-digest',
         'spark__get-baselines-tool',

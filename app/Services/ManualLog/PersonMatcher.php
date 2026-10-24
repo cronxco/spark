@@ -17,9 +17,12 @@ class PersonMatcher
 
     private const MAX_CANDIDATES = 5;
 
+    /** Handles that address the app rather than a person, so `@flint` is always a Note to Flint. */
+    private const RESERVED_HANDLES = ['flint'];
+
     /**
      * @param  array<int, string>  $names
-     * @return array<int, array{name: string, state: 'existing'|'likely'|'ambiguous'|'new', matches: array<int, array{id: string, name: string}>}>
+     * @return array<int, array{name: string, state: 'existing'|'likely'|'ambiguous'|'new'|'reserved', matches: array<int, array{id: string, name: string}>}>
      */
     public function check(string $userId, array $names): array
     {
@@ -35,11 +38,23 @@ class PersonMatcher
     }
 
     /**
+     * Whether a typed name is a reserved handle such as `@flint`, which never matches or creates a person.
+     */
+    public static function isReserved(string $name): bool
+    {
+        return in_array(Str::lower(ltrim(trim($name), '@')), self::RESERVED_HANDLES, true);
+    }
+
+    /**
      * @param  array<int, Person>  $people
      * @return array{name: string, state: string, matches: array<int, array{id: string, name: string}>}
      */
     private function match(string $name, array $people): array
     {
+        if (self::isReserved($name)) {
+            return ['name' => $name, 'state' => 'reserved', 'matches' => []];
+        }
+
         $key = $this->fold($name);
         $exact = array_values(array_filter($people, fn (Person $person) => $this->fold($person->title) === $key));
 

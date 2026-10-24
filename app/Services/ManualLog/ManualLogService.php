@@ -162,7 +162,7 @@ class ManualLogService
     {
         $people = [];
 
-        foreach (collect($names)->map(fn (string $name) => trim($name))->filter()->unique(fn (string $name) => Str::lower($name)) as $name) {
+        foreach (collect($names)->map(fn (string $name) => trim($name))->filter(fn (string $name) => $name !== '' && ! PersonMatcher::isReserved($name))->unique(fn (string $name) => Str::lower($name)) as $name) {
             $person = Person::query()
                 ->where('user_id', $user->id)
                 ->whereRaw('lower(title) = ?', [Str::lower($name)])

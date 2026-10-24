@@ -139,6 +139,54 @@ class FlintNoteService
         });
     }
 
+    /**
+     * Marks notes as read by a routine. Already-acknowledged notes keep their original acknowledgement.
+     *
+     * @param  array<int, string>  $ids
+     * @param  array{routine?: string, run_uuid?: string}  $by  The routine run that read the notes
+     * @return array{acknowledged: array<int, string>, already_acknowledged: array<int, string>, not_found: array<int, string>}
+     */
+    public function acknowledge(User $user, array $ids, array $by = []): array
+    {
+        $ids = collect($ids)->map(fn (string $id) => strtolower($id))->unique()->values();
+
+        return DB::transaction(function () use ($user, $ids, $by): array {
+            $notes = EventObject::query()
+                ->where('user_id', $user->id)
+                ->where('concept', 'document')
+                ->where('type', 'flint_note')
+                ->whereIn('id', $ids->all())
+                ->lockForUpdate()
+                ->get()
+                ->keyBy(fn (EventObject $note) => (string) $note->id);
+
+            $result = ['acknowledged' => [], 'already_acknowledged' => [], 'not_found' => []];
+            foreach ($ids as $id) {
+                $note = $notes->get($id);
+                if (! $note) {
+                    $result['not_found'][] = $id;
+
+                    continue;
+                }
+                if (data_get($note->metadata, 'acknowledged_at')) {
+                    $result['already_acknowledged'][] = $id;
+
+                    continue;
+                }
+
+                $note->metadata = [
+                    ...($note->metadata ?? []),
+                    'acknowledged_at' => now()->toIso8601String(),
+                    'acknowledged_by' => $by === [] ? null : $by,
+                ];
+                $note->save();
+                $result['acknowledged'][] = $id;
+            }
+
+            return $result;
+        });
+    }
+
     /** @return array<string, mixed> */
     public function payload(EventObject $note): array
     {
@@ -158,6 +206,8 @@ class FlintNoteService
             ])->values()->all(),
             'consent_version' => data_get($note->metadata, 'consent_version'),
             'consented_at' => data_get($note->metadata, 'consented_at'),
+            'acknowledged_at' => data_get($note->metadata, 'acknowledged_at'),
+            'acknowledged_by' => data_get($note->metadata, 'acknowledged_by'),
             'version' => $this->versions->etag($note),
         ];
     }
