@@ -8,13 +8,11 @@ use App\Services\Ai\AiUsageContext;
 use App\Services\Ai\AiUsageRecorder;
 use App\Services\Ai\AiUsageReservation;
 use App\Services\Ai\ChatClient;
-use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Laravel\Ai\Contracts\Tool;
-use Laravel\Ai\Tools\Request;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Tests\Fixtures\FakeOpenAi;
+use Tests\Fixtures\RecordingTool;
 use Tests\TestCase;
 
 class ChatClientTest extends TestCase
@@ -171,36 +169,5 @@ class ChatClientTest extends TestCase
 
         $this->assertSame('still succeeds', $result);
         $this->assertCount(1, FakeOpenAi::requests());
-    }
-}
-
-class RecordingTool implements Tool
-{
-    /** @var array<int, array<string, mixed>> */
-    public array $received = [];
-
-    /** @param array<string, mixed> $result */
-    public function __construct(private array $result) {}
-
-    public function name(): string
-    {
-        return 'search_thing';
-    }
-
-    public function description(): string
-    {
-        return 'Searches for a thing';
-    }
-
-    public function handle(Request $request): string
-    {
-        $this->received[] = $request->all();
-
-        return (string) json_encode($this->result);
-    }
-
-    public function schema(JsonSchema $schema): array
-    {
-        return ['query' => $schema->string()->required()];
     }
 }
