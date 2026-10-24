@@ -77,7 +77,7 @@ class CookieExpiryWarning extends SparkNotification
         $subject = $this->daysUntilExpiry <= 1 ? 'Cookies Expiring Soon!' : 'Cookie Expiry Reminder';
 
         return (new MailMessage)
-            ->warning()
+            ->level($this->getColor() === 'error' ? 'error' : 'info')
             ->subject($subject)
             ->greeting("Hello {$notifiable->name}!")
             ->line($this->getMessage())
