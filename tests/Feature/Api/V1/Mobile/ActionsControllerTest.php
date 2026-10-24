@@ -146,7 +146,7 @@ class ActionsControllerTest extends TestCase
     {
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
         $event = $this->eventFor($this->integration);
-        $event->attachTag('keep');
+        $event->attachTag('keep', 'spark');
 
         $first = $this->postJson('/api/v1/mobile/actions/events.tag_add/run', ['target' => ['event_id' => $event->id, 'name' => 'pub']])
             ->assertOk()->json();
