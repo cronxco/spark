@@ -61,6 +61,23 @@ for the evidence-based reasons in Step 9.
 Never supplement from memory — including for background you are confident about.
 If a fact is worth stating, it is worth a source you can name.
 
+## Output contract — read this first
+
+Check each of these before calling `create-flint-digest`:
+
+1. **Interesting beats official.** Each story is one Will would want to know about or
+   pass on: a decision, a conflict, a finding or a consequence. A launch, campaign,
+   consultation or savings package with nothing yet decided ranks below a real story.
+2. **No repeats within two days** unless a new decision or event happened. A new angle,
+   new reactions or a deeper explainer on a story carded yesterday or the day before is
+   not a development.
+3. **No disclaimers.** No "X, not Y" clauses whose only job is to say what something is
+   not ("probing, not confirmed compromises", "estimates, not cash"). State what is
+   known; put a real uncertainty in one `Not yet known:` clause at most.
+4. **Every fact sourced**, cards in the shape Step 10 sets out, Run notes last and under
+   200 words.
+5. **The run token** copied from the payload into `create-flint-digest` exactly.
+
 ---
 
 # RUN
@@ -110,6 +127,11 @@ Record item counts and service sync timestamps before judging coverage:
 
 Distinguish failure, partial coverage and genuinely empty feeds in Run notes.
 
+A fetched page is only today's news if its content is. A fetch whose title and headline
+items match the one a previous roundup already used (the same "World in Brief" snapshot
+cited three days running, say) is stale: do not cite it as a same-day source, and record
+it in Run notes so the feed can be fixed.
+
 ## Step 4: Check recent coverage and active Topics
 
 ```text
@@ -126,7 +148,9 @@ record the gap and use the available history.
 A repeated story needs a **material development**: a decision, implemented
 change, consequential new evidence or a substantive change in the stakes.
 Another outlet's explanation, a new quotation or the same figures recast is not
-enough. Record the development against the last published account.
+enough. Nor is a new angle on the same event: on 22 and 23 October the same PHP flaw
+ran on consecutive days as "emergency shutdowns" and then "AI found the flaws". Record
+the development against the last published account.
 
 Use Topics for context and maintenance, not automatic priority. Review the
 three-day mix for repeated subjects and geographic concentration; a continuing
@@ -183,7 +207,9 @@ Rank candidates by:
    not reasons to elevate an otherwise weaker story.
 
 Normally include a consequential, well-sourced UK politics or policy development
-when one is available. This is a strong editorial expectation, not a daily quota:
+when one is available. The UK slot is for decisions, votes, rulings, data and fights,
+not announcements: a campaign launch or a package of estimated savings earns a slot only
+when it changes something for Will or is contested. This is a strong editorial expectation, not a daily quota:
 if stronger stories displace the best UK candidate, name it and explain the
 comparison in the run notes. Do not manufacture a UK card on a genuinely thin day.
 
@@ -343,8 +369,9 @@ it gets its own place in the app rather than being folded into the morning
 briefing.
 
 **The `summary` is an index, not the stories again.** One line per story, in
-the order of the blocks. The day briefing points at it and notifications quote
-it; the full story lives in the block. Writing the three stories out as prose a
+the order of the blocks. The day briefing links to it in one line, and its own
+reading section covers the newsletters this roundup did not use, so cite every feed
+item a card draws on in `referenced_event_ids`. Notifications quote the summary; the full story lives in the block. Writing the three stories out as prose a
 second time is what made earlier roundups say everything twice.
 
 ### The story blocks — one `flint_news` per story
@@ -383,7 +410,9 @@ out from these blocks, one card per story.
 - **Content:** Give the gist in one or two sentences, at most about 40 words.
 - **Key points:** Give two to four concrete specifics that add to the gist;
   **at most 300 characters each**, including attribution. Attribute researched
-  facts inline. Cut restatements.
+  facts inline. Cut restatements, and cut any clause that only says what the fact is
+  not ("all-age figures, not a count of children", "a proposed role, not a measure in
+  force").
 - **Contested:** Include only a genuine difference between named accounts or
   an account and the record; explain what it turns on. Never invent balance.
   When a key point you are drafting reports one named party disputing another
@@ -410,7 +439,8 @@ across card fields.
 ### The editorial note
 
 **Always include a `flint_editorial_note` block**, titled `"Run notes"`, and put
-it **last**. Record, in a few lines:
+it **last**. Keep it **under 200 words**: one short line per item below, no prose
+paragraphs. Record:
 
 - the source counts from Step 3 — newsletters, fetches, bookmarks;
 - any coverage gap, and the service it was in;
@@ -505,6 +535,8 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 - [ ] No unsupported UK angle, default US framing, invented facts or padding.
 - [ ] Structured cards, distinct titles, field limits and final summary order checked.
 - [ ] Every disagreement between named parties sits in `contested`, not in key points.
+- [ ] No story repeats one carded in the last two days without a new decision or event.
+- [ ] No "X, not Y" disclaimer clauses; Run notes under 200 words.
 - [ ] Styleguide fetched; Run notes last with selection, sweep and budget outcomes.
 - [ ] Trigger token preserved when supplied; relevant Topics maintained; no questions.
 - [ ] Topic `content` rewritten to 150 words or fewer, one story per topic, no caveat
