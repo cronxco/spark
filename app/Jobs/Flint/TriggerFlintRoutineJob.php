@@ -13,6 +13,7 @@ use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\FlintDigestService;
 use App\Services\TaskPipeline\TaskDefinition;
 use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Support\FlintDigestDay;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -50,8 +51,13 @@ class TriggerFlintRoutineJob implements ShouldQueue
 
     public bool $failOnTimeout = true;
 
-    /** @var array<int, int> */
-    public array $backoff = [30];
+    /**
+     * Long enough for a run that was accepted but not yet answered to write its
+     * digest, so the retry's successfulScheduledEventExists() check can see it.
+     *
+     * @var array<int, int>
+     */
+    public array $backoff = [300];
 
     public string $runUuid;
 
@@ -381,13 +387,8 @@ class TriggerFlintRoutineJob implements ShouldQueue
     private function successfulScheduledEventExists(): bool
     {
         return Event::query()
-            ->where('service', 'flint')
-            ->where('action', 'had_summary')
             ->whereHas('integration', fn ($query) => $query->where('user_id', $this->user->id))
-            ->where('event_metadata->routine', $this->routine)
-            ->where('event_metadata->trigger_source', 'scheduled')
-            ->where('event_metadata->local_date', $this->localDate)
-            ->where('event_metadata->period', $this->period())
+            ->tap(fn ($query) => FlintDigestDay::forScheduledSlot($query, $this->routine, $this->period(), $this->localDate))
             ->exists();
     }
 
