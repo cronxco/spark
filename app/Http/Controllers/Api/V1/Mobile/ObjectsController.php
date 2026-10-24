@@ -6,9 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\CompactEventResource;
 use App\Http\Resources\Compact\CompactObjectResource;
 use App\Services\Api\ResourceVersion;
+use App\Services\EffectiveTimezoneResolver;
 use App\Services\Mobile\ObjectLookup;
+use App\Services\PersonProfileService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use stdClass;
 
 class ObjectsController extends Controller
 {
@@ -51,6 +55,47 @@ class ObjectsController extends Controller
         $response->header('ETag', $this->versions->etag($object));
 
         return $response;
+    }
+
+    /**
+     * GET /api/v1/mobile/people/{id}/timeline
+     *
+     * A person's timeline: events they act in, are tagged on with `with`, or
+     * are @mentioned in. `month` (Y-m, default this month) sets the calendar
+     * grid, a count of events per local day. `date` (Y-m-d) lists that day's
+     * events; without it the latest `limit` (1..50) come back.
+     */
+    public function timeline(Request $request, string $id): JsonResponse
+    {
+        $user = $request->user();
+        $person = $this->lookup->find($user, $id);
+
+        if (! $person || $person->concept !== 'person') {
+            return response()->json(['message' => 'Person not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'month' => ['nullable', 'date_format:Y-m'],
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:' . PersonProfileService::EVENT_LIMIT],
+        ]);
+
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($user);
+        $month = Carbon::createFromFormat('Y-m', $validated['month'] ?? Carbon::now($timezone)->format('Y-m'), $timezone);
+        $limit = (int) ($validated['limit'] ?? 25);
+        $service = app(PersonProfileService::class);
+
+        $events = isset($validated['date'])
+            ? $service->eventsOn($person, Carbon::createFromFormat('Y-m-d', $validated['date'], $timezone), $timezone, $limit)
+            : $service->events($person, $limit);
+
+        return response()->json([
+            'person' => (new CompactObjectResource($person))->resolve($request),
+            'event_count' => $service->eventCount($person),
+            'month' => $month->format('Y-m'),
+            'calendar' => $service->calendar($person, $month, $timezone) ?: new stdClass,
+            'events' => CompactEventResource::collection($events->load(['blocks']))->resolve($request),
+        ]);
     }
 
     /**

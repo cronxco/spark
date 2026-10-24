@@ -110,6 +110,7 @@ Route::patch('events/{id}/note', [EventsController::class, 'updateNote'])
     ->middleware(['spark.ability:data:write', 'if-match:event'])
     ->name('events.note.update');
 Route::get('objects/{id}', [ObjectsController::class, 'show'])->middleware('spark.ability:data:read')->name('objects.show');
+Route::get('people/{id}/timeline', [ObjectsController::class, 'timeline'])->middleware('spark.ability:data:read')->name('people.timeline');
 
 /*
  * Soft delete takes the entity's If-Match like every destructive write.
