@@ -212,6 +212,7 @@ class NotificationFeedService
                 : CarbonImmutable::parse($notification->archived_at)->toJSON(),
             'entity' => $this->entity($data),
             'destination' => $data['deep_link'] ?? $data['action_url'] ?? null,
+            'web_url' => $this->webUrl($data),
             'primary_action' => $this->primaryAction($data),
             'progress' => null,
             'has_technical_detail' => filled($data['technical_detail'] ?? null),
@@ -243,6 +244,7 @@ class NotificationFeedService
             'archived_at' => null,
             'entity' => null,
             'destination' => null,
+            'web_url' => null,
             'primary_action' => null,
             'progress' => [
                 'current' => (int) $progress->progress,
@@ -300,6 +302,14 @@ class NotificationFeedService
             : null;
     }
 
+    /** The browser-openable target. `destination` prefers the app deep link, which the web can't follow. */
+    private function webUrl(array $data): ?string
+    {
+        $url = $data['action_url'] ?? null;
+
+        return is_string($url) && (str_starts_with($url, 'http') || str_starts_with($url, '/')) ? $url : null;
+    }
+
     /** @return array{id: string, label: string}|null */
     private function primaryAction(array $data): ?array
     {
@@ -307,10 +317,12 @@ class NotificationFeedService
             return null;
         }
 
-        return [
-            'id' => ($data['type'] ?? null) === 'integration_authentication_failed' ? 'reconnect' : 'view',
-            'label' => ($data['type'] ?? null) === 'integration_authentication_failed' ? 'Reconnect' : 'View',
-        ];
+        $reconnect = ($data['type'] ?? null) === 'integration_authentication_failed'
+            || str_starts_with((string) ($data['deep_link'] ?? ''), 'integration-reauth:');
+
+        return $reconnect
+            ? ['id' => 'reconnect', 'label' => 'Reconnect']
+            : ['id' => 'view', 'label' => 'View'];
     }
 
     private function compareItems(array $left, array $right): int

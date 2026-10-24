@@ -55,8 +55,13 @@ class TriggerFlintDigestRoutineJob implements ShouldQueue
 
     public bool $failOnTimeout = true;
 
-    /** @var array<int, int> */
-    public array $backoff = [30];
+    /**
+     * Long enough for a run that was accepted but not yet answered to write its
+     * digest, so the retry's digestAlreadyExists() check can see it.
+     *
+     * @var array<int, int>
+     */
+    public array $backoff = [300];
 
     public string $runUuid;
 

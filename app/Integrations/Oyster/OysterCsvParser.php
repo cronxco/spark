@@ -124,7 +124,7 @@ class OysterCsvParser
         $endDateTime = ! empty($endTime) ? $this->parseDateTime($date, $endTime) : null;
 
         // Handle journeys that cross midnight
-        if ($endDateTime && $endDateTime->lt($startDateTime)) {
+        if ($startDateTime && $endDateTime && $endDateTime->lt($startDateTime)) {
             $endDateTime = $endDateTime->copy()->addDay();
         }
 

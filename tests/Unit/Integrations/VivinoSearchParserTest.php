@@ -7,107 +7,88 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\FrameworkTestCase;
 
 /**
- * Tests the parsing/normalization logic against a constructed fixture that
- * matches VivinoSearchParser's assumed markup contract (data-testid
- * hooks). This does NOT confirm the selectors match Vivino's real, live
- * DOM - that couldn't be verified in the environment this was written in
- * (no outbound browsing access to vivino.com). It confirms the parser
- * correctly extracts and normalizes data from HTML of that assumed shape,
- * so the logic is right even if the real selectors need adjustment later.
+ * Runs against a saved real Vivino search page (three cards, from the query
+ * "Cafe Francois Rouge", 19 Oct 2026). If Vivino changes its markup, replace
+ * tests/Fixtures/ManualLog/vivino-search-results.html with a fresh capture.
  */
 class VivinoSearchParserTest extends FrameworkTestCase
 {
-    private const FIXTURE_HTML = <<<'HTML'
-        <html><body>
-            <div data-testid="wineCard">
-                <a data-testid="wineNameLink" href="https://www.vivino.com/wines/1234">
-                    <span data-testid="wineName">Malbec Reserva 2021</span>
-                </a>
-                <span data-testid="wineryName">Bodega Test</span>
-                <span data-testid="vintageYear">2021</span>
-                <span data-testid="regionName">Mendoza</span>
-                <span data-testid="ratingStars" aria-label="Rated 4.5 out of 5"></span>
-                <img data-testid="wineLabel" src="https://images.vivino.com/labels/1234.jpg" />
-            </div>
-            <div data-testid="wineCard">
-                <a data-testid="wineNameLink" href="https://www.vivino.com/wines/5678">
-                    <span data-testid="wineName">Second Result</span>
-                </a>
-            </div>
-        </body></html>
-        HTML;
-
     #[Test]
-    public function extracts_all_fields_from_the_first_matching_card(): void
+    public function extracts_every_field_from_a_real_card(): void
     {
-        $wine = (new VivinoSearchParser)->parseFirstResult(self::FIXTURE_HTML);
+        $wine = (new VivinoSearchParser)->parseFirstResult($this->fixture());
 
         $this->assertNotNull($wine);
-        $this->assertSame('Malbec Reserva 2021', $wine['title']);
-        $this->assertSame('Bodega Test', $wine['winery']);
-        $this->assertSame('2021', $wine['vintage']);
-        $this->assertSame('Mendoza', $wine['region']);
-        $this->assertSame(4.5, $wine['rating']);
-        $this->assertSame('https://www.vivino.com/wines/1234', $wine['url']);
-        $this->assertSame('https://images.vivino.com/labels/1234.jpg', $wine['image']);
+        $this->assertSame('François Mikulski Les Toisieres Monthelie Rouge', $wine['title']);
+        $this->assertSame('Les Toisieres Monthelie Rouge', $wine['wine']);
+        $this->assertSame('François Mikulski', $wine['winery']);
+        $this->assertSame('2023', $wine['vintage']);
+        $this->assertSame('Monthélie, France', $wine['region']);
+        $this->assertSame(4.2, $wine['rating']);
+        $this->assertSame(178, $wine['rating_count']);
+        $this->assertSame('https://www.vivino.com/en/francois-mikulski-les-toisieres-monthelie-rouge/w/11084178?year=2023', $wine['url']);
+        $this->assertSame('https://images.vivino.com/thumbs/tPGSQcFcQMeHkcT_gKye8Q_pb_x300.png', $wine['image']);
     }
 
     #[Test]
-    public function ignores_later_cards_and_only_returns_the_first(): void
+    public function parses_every_card_on_the_page(): void
     {
-        $wine = (new VivinoSearchParser)->parseFirstResult(self::FIXTURE_HTML);
+        $results = (new VivinoSearchParser)->parseResults($this->fixture());
 
-        $this->assertNotSame('Second Result', $wine['title']);
+        $this->assertCount(3, $results);
+        $this->assertSame('Domaine François Raquillet Vieilles Vignes Mercurey Rouge', $results[2]['title']);
     }
 
     #[Test]
-    public function falls_back_to_a_plain_numeric_rating_value(): void
+    public function respects_the_result_limit(): void
     {
-        $html = <<<'HTML'
-            <html><body>
-                <div data-testid="wineCard">
-                    <span data-testid="wineName">Rioja Crianza</span>
-                    <span data-testid="ratingValue">3.5</span>
-                </div>
-            </body></html>
-            HTML;
-
-        $wine = (new VivinoSearchParser)->parseFirstResult($html);
-
-        $this->assertSame(3.5, $wine['rating']);
-        $this->assertNull($wine['vintage']);
-        $this->assertNull($wine['winery']);
+        $this->assertCount(1, (new VivinoSearchParser)->parseResults($this->fixture(), 1));
     }
 
     #[Test]
-    public function returns_null_when_no_cards_are_present(): void
+    public function best_match_rejects_an_unrelated_first_card(): void
     {
-        $wine = (new VivinoSearchParser)->parseFirstResult('<html><body>No results</body></html>');
-
-        $this->assertNull($wine);
+        $this->assertNull((new VivinoSearchParser)->parseBestMatch($this->fixture(), 'Cafe Francois Rouge'));
     }
 
     #[Test]
-    public function returns_null_for_empty_html(): void
+    public function best_match_finds_the_card_that_covers_the_query_regardless_of_position_and_accents(): void
     {
-        $wine = (new VivinoSearchParser)->parseFirstResult('');
+        $wine = (new VivinoSearchParser)->parseBestMatch($this->fixture(), 'raquillet mercurey vieilles vignes');
 
-        $this->assertNull($wine);
+        $this->assertSame('Domaine François Raquillet Vieilles Vignes Mercurey Rouge', $wine['title']);
     }
 
     #[Test]
-    public function returns_null_when_a_card_has_no_wine_name(): void
+    public function candidates_are_the_partial_matches_best_first(): void
     {
-        $html = <<<'HTML'
-            <html><body>
-                <div data-testid="wineCard">
-                    <span data-testid="wineryName">Bodega Test</span>
-                </div>
-            </body></html>
-            HTML;
+        $candidates = (new VivinoSearchParser)->parseCandidates($this->fixture(), 'Francois Rouge');
 
-        $wine = (new VivinoSearchParser)->parseFirstResult($html);
+        $this->assertCount(3, $candidates);
+    }
 
-        $this->assertNull($wine);
+    #[Test]
+    public function match_score_is_the_share_of_query_words_found(): void
+    {
+        $parser = new VivinoSearchParser;
+
+        $this->assertSame(1.0, $parser->matchScore('François Rouge', 'Domaine Francois Lumpp Rouge'));
+        $this->assertEqualsWithDelta(0.5, $parser->matchScore('Cafe Rouge', 'Domaine Lumpp Rouge'), 0.001);
+        $this->assertSame(0.0, $parser->matchScore('', 'Anything'));
+    }
+
+    #[Test]
+    public function returns_nothing_for_pages_without_cards_or_empty_html(): void
+    {
+        $parser = new VivinoSearchParser;
+
+        $this->assertNull($parser->parseFirstResult('<html><body>No results</body></html>'));
+        $this->assertNull($parser->parseFirstResult(''));
+        $this->assertNull($parser->parseBestMatch('', 'Malbec'));
+    }
+
+    private function fixture(): string
+    {
+        return file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'));
     }
 }

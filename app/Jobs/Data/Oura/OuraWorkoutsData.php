@@ -69,7 +69,7 @@ class OuraWorkoutsData extends BaseProcessingJob
         }
 
         $actor = $plugin->ensureUserProfile($this->integration);
-        $activityType = $item['activity'] ?? 'workout';
+        $activityType = OuraPlugin::normaliseActivityType((string) ($item['activity'] ?? 'workout'));
 
         // Create workout object only once per workout ID
         $target = EventObject::firstOrCreate([

@@ -27,6 +27,20 @@ class UntappdAlcoholUnitsTest extends TestCase
     }
 
     #[Test]
+    public function uses_an_exact_volume_and_quantity_when_given(): void
+    {
+        $half = AlcoholUnits::estimate(5.0, 'draft', 284);
+        $this->assertSame(1.4, $half['alcohol_units']);
+        $this->assertFalse($half['alcohol_units_basis']['serving_ml_assumed']);
+
+        $two = AlcoholUnits::estimate(5.0, 'can', null, 2);
+        $this->assertSame(4.4, $two['alcohol_units']);
+        $this->assertSame(2.0, $two['alcohol_units_basis']['quantity']);
+
+        $this->assertArrayNotHasKey('quantity', AlcoholUnits::estimate(5.0, 'can')['alcohol_units_basis']);
+    }
+
+    #[Test]
     public function stores_units_on_a_check_in_once_the_beer_abv_is_known(): void
     {
         Queue::fake();

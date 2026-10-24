@@ -4,12 +4,14 @@ namespace App\Integrations\ManualLog;
 
 use App\Integrations\Base\ManualPlugin;
 use App\Jobs\OAuth\ManualLog\BoardGameGeekEnrichmentPull;
+use App\Jobs\OAuth\ManualLog\UntappdBeerEnrichmentPull;
 use App\Jobs\OAuth\ManualLog\VivinoEnrichmentPull;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -31,10 +33,14 @@ class ManualLogPlugin extends ManualPlugin
     /**
      * Per-action target object shape and event domain. Keys must match
      * getActionTypes(). Not part of the IntegrationPlugin contract - this is
-     * this plugin's own internal registry for createManualEvent().
+     * this plugin's own internal registry for createManualEvent(). A "shared"
+     * target is looked up by title first, so a beer logged by hand lands on
+     * the same object as the Untappd RSS check-ins.
      */
     private const ACTIVITY_TARGETS = [
         'drank_wine' => ['concept' => 'wine', 'type' => 'wine', 'domain' => 'health'],
+        'drank_beer' => ['concept' => 'media', 'type' => 'untappd_beer', 'domain' => 'health', 'shared' => true],
+        'watched_episode' => ['concept' => 'media', 'type' => 'tv_episode', 'domain' => 'media', 'shared' => true],
         'watched_at_cinema' => ['concept' => 'media', 'type' => 'cinema_visit', 'domain' => 'media'],
         'played_board_game' => ['concept' => 'game', 'type' => 'board_game', 'domain' => 'media'],
     ];
@@ -139,6 +145,22 @@ class ManualLogPlugin extends ManualPlugin
                 'value_unit' => '/5',
                 'hidden' => false,
             ],
+            'drank_beer' => [
+                'icon' => 'fas.beer-mug-empty',
+                'display_name' => 'Drank Beer',
+                'description' => 'A pint, can or bottle of beer',
+                'display_with_object' => true,
+                'value_unit' => '/5',
+                'hidden' => false,
+            ],
+            'watched_episode' => [
+                'icon' => 'fas.tv',
+                'display_name' => 'Watched an Episode',
+                'description' => 'An episode of a TV show',
+                'display_with_object' => true,
+                'value_unit' => '/5',
+                'hidden' => false,
+            ],
             'watched_at_cinema' => [
                 'icon' => 'fas.film',
                 'display_name' => 'Watched at the Cinema',
@@ -185,6 +207,14 @@ class ManualLogPlugin extends ManualPlugin
                 'value_unit' => null,
                 'hidden' => false,
             ],
+            'beer_details' => [
+                'icon' => 'fas.beer-mug-empty',
+                'display_name' => 'Beer Details',
+                'description' => 'Brewery, style, ABV, IBU, and Untappd community rating',
+                'display_with_object' => false,
+                'value_unit' => '/5',
+                'hidden' => false,
+            ],
             'wine_details' => [
                 'icon' => 'fas.wine-glass',
                 'display_name' => 'Wine Details',
@@ -209,6 +239,18 @@ class ManualLogPlugin extends ManualPlugin
                 'icon' => 'fas.wine-glass',
                 'display_name' => 'Wine',
                 'description' => 'A wine that was drunk',
+                'hidden' => false,
+            ],
+            'untappd_beer' => [
+                'icon' => 'fas.beer-mug-empty',
+                'display_name' => 'Beer',
+                'description' => 'A beer that was drunk',
+                'hidden' => false,
+            ],
+            'tv_episode' => [
+                'icon' => 'fas.tv',
+                'display_name' => 'TV Episode',
+                'description' => 'A TV episode that was watched',
                 'hidden' => false,
             ],
             'cinema_visit' => [
@@ -245,6 +287,7 @@ class ManualLogPlugin extends ManualPlugin
      * @param  string  $title  The thing being logged (wine name, film title, game name)
      * @param  float|null  $rating  Optional 1-5 rating
      * @param  string|null  $notes  Optional free-text notes
+     * @param  array{occurred_at?: CarbonInterface, source_id?: string, event_metadata?: array<string, mixed>, target_metadata?: array<string, mixed>, media_url?: string, enrich?: bool}  $options  Extras used by the mobile log endpoint: when it happened, an idempotent source id, extra event/target metadata, and whether to queue the Vivino/Untappd/BGG lookup (default true)
      */
     public function createManualEvent(
         Integration $integration,
@@ -252,6 +295,7 @@ class ManualLogPlugin extends ManualPlugin
         string $title,
         ?float $rating = null,
         ?string $notes = null,
+        array $options = [],
     ): Event {
         if (! isset(self::ACTIVITY_TARGETS[$actionType])) {
             throw new InvalidArgumentException("Unknown manual log activity type: {$actionType}");
@@ -274,17 +318,32 @@ class ManualLogPlugin extends ManualPlugin
             ['time' => now()]
         );
 
-        $targetObject = EventObject::create([
+        $occurredAt = $options['occurred_at'] ?? now();
+        $targetMetadata = array_filter([
+            'rating' => $rating,
+            'notes' => $notes,
+        ], fn ($value) => $value !== null) + ($options['target_metadata'] ?? []);
+
+        $identity = [
             'user_id' => $integration->user_id,
             'concept' => $target['concept'],
             'type' => $target['type'],
             'title' => $title,
-            'time' => now(),
-            'metadata' => array_filter([
-                'rating' => $rating,
-                'notes' => $notes,
-            ], fn ($value) => $value !== null),
-        ]);
+        ];
+
+        if ($target['shared'] ?? false) {
+            $targetObject = EventObject::firstOrCreate($identity, array_filter([
+                'time' => $occurredAt,
+                'metadata' => $targetMetadata,
+                'media_url' => $options['media_url'] ?? null,
+            ]));
+        } else {
+            $targetObject = EventObject::create($identity + array_filter([
+                'time' => $occurredAt,
+                'metadata' => $targetMetadata,
+                'media_url' => $options['media_url'] ?? null,
+            ]));
+        }
 
         // events.value is a bigint - a fractional rating (e.g. 4.5) has to be
         // stored as an integer numerator against a multiplier, the same way
@@ -293,8 +352,8 @@ class ManualLogPlugin extends ManualPlugin
         $valueMultiplier = 10;
 
         $event = Event::create([
-            'source_id' => 'manual_log_' . $actionType . '_' . Str::uuid(),
-            'time' => now(),
+            'source_id' => $options['source_id'] ?? 'manual_log_' . $actionType . '_' . Str::uuid(),
+            'time' => $occurredAt,
             'integration_id' => $integration->id,
             'actor_id' => $userObject->id,
             'service' => self::getIdentifier(),
@@ -306,15 +365,23 @@ class ManualLogPlugin extends ManualPlugin
             'target_id' => $targetObject->id,
             'event_metadata' => array_filter([
                 'notes' => $notes,
-            ], fn ($value) => $value !== null),
+            ], fn ($value) => $value !== null) + ($options['event_metadata'] ?? []),
         ]);
+
+        if (! ($options['enrich'] ?? true)) {
+            return $event;
+        }
 
         if ($actionType === 'played_board_game') {
             BoardGameGeekEnrichmentPull::dispatch($integration, $event->id, $title);
         }
 
         if ($actionType === 'drank_wine') {
-            VivinoEnrichmentPull::dispatch($integration, $event->id, $title);
+            VivinoEnrichmentPull::dispatch($integration, $event->id, $title, $options['match_url'] ?? null);
+        }
+
+        if ($actionType === 'drank_beer') {
+            UntappdBeerEnrichmentPull::dispatch($integration, $event->id, $title, $options['match_url'] ?? null);
         }
 
         return $event;

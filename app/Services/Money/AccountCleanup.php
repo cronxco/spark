@@ -33,11 +33,16 @@ class AccountCleanup
 
     public const KIND_CATEGORY = 'rename_category';
 
+    public const KIND_DUPLICATE_TRANSACTIONS = 'merge_duplicate_transactions';
+
+    public const TRANSACTION_KINDS = [self::KIND_DUPLICATE_TRANSACTIONS];
+
     public const GOCARDLESS_KINDS = [self::KIND_MERGE, self::KIND_QUARANTINE, self::KIND_RENAME];
 
     public function __construct(
         private GoCardlessAccounts $accounts,
         private GoCardlessAccountMerger $merger,
+        private GoCardlessTransactionDeduper $deduper,
     ) {}
 
     /**
@@ -48,6 +53,7 @@ class AccountCleanup
     {
         $steps = array_merge(
             $this->gocardlessSteps($userId),
+            $this->duplicateTransactionSteps($userId),
             $this->snapshotSteps($userId),
             $this->potDetailSteps($userId),
             $this->categorySteps($userId),
@@ -123,11 +129,27 @@ class AccountCleanup
             self::KIND_MERGE => ['severity' => 'high', 'impact' => 'Duplicate accounts double count balances and spending. Merging keeps one account and an alias for the other.'],
             self::KIND_QUARANTINE => ['severity' => 'high', 'impact' => 'This account looks like a leftover and is skewing totals. It is hidden and can be restored.'],
             self::KIND_RENAME => ['severity' => 'low', 'impact' => 'The account only has a placeholder name. Renaming changes how it is shown.'],
+            self::KIND_DUPLICATE_TRANSACTIONS => ['severity' => 'high', 'impact' => 'The same bank transaction is stored twice, so spending and card balances are overstated. Merging keeps one copy and moves its links across.'],
             self::KIND_SNAPSHOTS => ['severity' => 'medium', 'impact' => 'Balance history from archived pots feeds net worth and inferred interest. Empty rows are removed.'],
             self::KIND_POT_DETAILS => ['severity' => 'medium', 'impact' => 'Pot goals and interest rates are missing, so pot figures and interest checks are incomplete.'],
             self::KIND_CATEGORY => ['severity' => 'low', 'impact' => 'Spending categories show a raw id until they are named.'],
             default => ['severity' => 'low', 'impact' => ''],
         };
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function duplicateTransactionSteps(string $userId): array
+    {
+        return array_map(fn (array $group): array => $this->step(
+            self::KIND_DUPLICATE_TRANSACTIONS . ':' . $group['canonical_id'],
+            self::KIND_DUPLICATE_TRANSACTIONS,
+            sprintf('Merge %d copy of %s on %s (£%s)', count($group['duplicate_ids']), trim(preg_replace('/\s+/', ' ', $group['merchant'])) ?: 'a transaction', $group['date'], number_format($group['amount'] / 100, 2)),
+            'Same bank transaction id on the same account. Links, blocks and buffer state move to the kept copy.',
+            ['canonical_id' => $group['canonical_id'], 'duplicate_ids' => $group['duplicate_ids']],
+            $group['conflict'],
+        ), $this->deduper->groups($userId));
     }
 
     /**
@@ -372,6 +394,7 @@ class AccountCleanup
             ),
             self::KIND_QUARANTINE => $this->quarantine(EventObject::where('user_id', $userId)->findOrFail($payload['object_id'])),
             self::KIND_RENAME => $this->rename(EventObject::where('user_id', $userId)->findOrFail($payload['object_id']), $payload['title']),
+            self::KIND_DUPLICATE_TRANSACTIONS => $this->deduper->merge($userId, $payload['canonical_id'], $payload['duplicate_ids']),
             self::KIND_SNAPSHOTS => $this->removeSnapshots($userId),
             self::KIND_POT_DETAILS => MonzoPotPull::dispatch($this->potsIntegration($userId)),
             self::KIND_CATEGORY => $this->renameCategory($userId, $payload['category_id'], $payload['name']),

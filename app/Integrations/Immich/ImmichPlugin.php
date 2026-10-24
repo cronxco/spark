@@ -289,39 +289,46 @@ class ImmichPlugin extends ManualPlugin
 
     /**
      * Pull photo data from Immich API
+     *
+     * Uses POST /api/search/metadata (GET /api/assets was removed from Immich).
      */
     public function pullPhotoData(Integration $integration, string $serverUrl, string $apiKey, ?string $afterDate = null): array
     {
         $assets = [];
-        $take = 100;
-        $skip = 0;
+        $body = [
+            'size' => 250,
+            'page' => 1,
+            'withExif' => true,
+            'withPeople' => true,
+        ];
+
+        if ($afterDate) {
+            $body['updatedAfter'] = $afterDate;
+        }
 
         do {
-            $params = [
-                'take' => $take,
-                'skip' => $skip,
-            ];
-
-            if ($afterDate) {
-                $params['updatedAfter'] = $afterDate;
-            }
-
             $response = $this->makeRequest(
-                'GET',
-                "{$serverUrl}/api/assets",
+                'POST',
+                "{$serverUrl}/api/search/metadata",
                 $apiKey,
-                $params,
+                $body,
                 $integration->id
             );
 
-            // API might return array directly or nested in 'assets' key
-            $batch = is_array($response) && isset($response[0]) ? $response : ($response['assets'] ?? []);
+            $result = $response['assets'] ?? [];
+            $assets = array_merge($assets, $result['items'] ?? []);
 
-            $assets = array_merge($assets, $batch);
-            $skip += $take;
+            // Newer Immich paginates with an opaque cursor; older versions return a page number
+            $nextCursor = $result['nextCursor'] ?? null;
+            $nextPage = $result['nextPage'] ?? null;
 
-            // Continue if we got a full batch
-        } while (count($batch) === $take);
+            if ($nextCursor) {
+                unset($body['page']);
+                $body['cursor'] = $nextCursor;
+            } elseif ($nextPage) {
+                $body['page'] = (int) $nextPage;
+            }
+        } while ($nextCursor || $nextPage);
 
         return [
             'assets' => $assets,
@@ -334,16 +341,22 @@ class ImmichPlugin extends ManualPlugin
      */
     public function pullPeopleData(Integration $integration, string $serverUrl, string $apiKey): array
     {
-        $response = $this->makeRequest(
-            'GET',
-            "{$serverUrl}/api/people",
-            $apiKey,
-            ['withHidden' => true],
-            $integration->id
-        );
+        $people = [];
+        $page = 1;
 
-        // API might return array directly or nested in 'people' key
-        $people = is_array($response) && isset($response[0]) ? $response : ($response['people'] ?? []);
+        do {
+            // Immich validates query booleans as the strings "true"/"false"
+            $response = $this->makeRequest(
+                'GET',
+                "{$serverUrl}/api/people",
+                $apiKey,
+                ['withHidden' => 'true', 'page' => $page, 'size' => 500],
+                $integration->id
+            );
+
+            $people = array_merge($people, $response['people'] ?? []);
+            $page++;
+        } while (($response['hasNextPage'] ?? false) === true);
 
         return [
             'people' => $people,

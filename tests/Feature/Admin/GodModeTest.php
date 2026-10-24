@@ -73,7 +73,7 @@ class GodModeTest extends TestCase
 
         $response->assertRedirect();
         $this->assertStringContainsString('prompt=login', $response->headers->get('Location'));
-        $this->assertStringContainsString('max_age=0', $response->headers->get('Location'));
+        $this->assertStringNotContainsString('max_age', $response->headers->get('Location'));
         $this->assertFalse(AdminTenant::isGodMode());
     }
 

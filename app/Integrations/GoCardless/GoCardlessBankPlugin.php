@@ -13,8 +13,11 @@ use App\Models\IntegrationGroup;
 use App\Services\GoCardlessAccounts;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 // Carbon already imported above
 use Illuminate\Support\Facades\Http;
 // Http and Log already imported above
@@ -36,6 +39,13 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
     private const REQUISITION_CACHE_TTL = 3600; // 1 hour
 
+    // Token cache: GoCardless allows only 10 /token/new/ calls a minute
+    private const TOKEN_CACHE_PREFIX = 'gocardless_token_';
+
+    private const TOKEN_EXPIRY_BUFFER_SECONDS = 300;
+
+    private const TOKEN_LOCK_SECONDS = 15;
+
     // API monitoring constants
     private const API_CALLS_CACHE_KEY = 'gocardless_api_calls';
 
@@ -55,9 +65,9 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
      * GoCardless Bank Account Data API integration
      * Uses direct HTTP calls instead of the unmaintained Nordigen package
      */
-    protected string $apiBase = 'https://bankaccountdata.gocardless.com/api/v2';
+    protected string $apiBase;
 
-    protected string $tokenEndpoint = 'https://bankaccountdata.gocardless.com/api/v2/token/new/';
+    protected string $tokenEndpoint;
 
     protected string $secretId;
 
@@ -71,6 +81,8 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
     public function __construct()
     {
+        $this->apiBase = rtrim((string) (config('services.gocardless.api_base') ?: 'https://bankaccountdata.gocardless.com/api/v2'), '/');
+        $this->tokenEndpoint = $this->apiBase . '/token/new/';
         $this->secretId = (string) (config('services.gocardless.secret_id') ?? '');
         $this->secretKey = (string) (config('services.gocardless.secret_key') ?? '');
         $this->redirectUri = (string) (config('services.gocardless.redirect')
@@ -777,7 +789,12 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
     }
 
     /**
-     * Get access token for API calls
+     * Get access token for API calls.
+     *
+     * GoCardless limits /token/new/ to 10 calls a minute, so the token pair is
+     * shared across jobs through the cache: a cached access token is reused
+     * until shortly before it expires, then renewed with the refresh token,
+     * and only when that is missing or rejected is a new pair requested.
      */
     public function getAccessToken(): string
     {
@@ -785,49 +802,56 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
             return $this->accessToken;
         }
 
-        Log::info('Getting GoCardless access token', [
-            'endpoint' => $this->tokenEndpoint,
-            'secret_id_length' => strlen($this->secretId),
-            'secret_key_length' => strlen($this->secretKey),
-        ]);
-
-        // Log the API request
-        $this->logApiRequest('POST', '/api/v2/token/new/', [
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ], [
-            'secret_id' => '[REDACTED]',
-            'secret_key' => '[REDACTED]',
-        ]);
-
-        // Send credentials in POST body as JSON
-        $response = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ])->post($this->tokenEndpoint, [
-            'secret_id' => $this->secretId,
-            'secret_key' => $this->secretKey,
-        ]);
-
-        // Log the API response
-        $this->logApiResponse('POST', '/api/v2/token/new/', $response->status(), $response->body(), $response->headers());
-
-        if (! $response->successful()) {
-            throw new RuntimeException('Failed to get access token: ' . $response->body());
+        $cached = $this->readCachedToken('access');
+        if ($cached) {
+            return $this->accessToken = $cached;
         }
 
-        $tokenData = $response->json();
-        $this->accessToken = $tokenData['access'] ?? '';
-
-        if (empty($this->accessToken)) {
-            throw new RuntimeException('No access token in response');
+        // Stop concurrent workers from all requesting a token at once.
+        $lock = Cache::lock($this->tokenCacheKey('lock'), self::TOKEN_LOCK_SECONDS);
+        $locked = false;
+        try {
+            $locked = (bool) $lock->block(self::TOKEN_LOCK_SECONDS);
+        } catch (LockTimeoutException) {
+            Log::warning('GoCardless token lock timed out, requesting token without it');
         }
 
-        Log::info('GoCardless access token obtained', [
-            'token_length' => strlen($this->accessToken),
-        ]);
+        try {
+            $cached = $this->readCachedToken('access');
+            if ($cached) {
+                return $this->accessToken = $cached;
+            }
 
-        return $this->accessToken;
+            $tokenData = $this->refreshAccessToken() ?? $this->requestNewToken();
+            $this->accessToken = $tokenData['access'] ?? '';
+
+            if (empty($this->accessToken)) {
+                throw new RuntimeException('No access token in response');
+            }
+
+            $this->storeTokens($tokenData);
+
+            Log::info('GoCardless access token obtained', [
+                'token_length' => strlen($this->accessToken),
+                'refreshed' => ! isset($tokenData['refresh']),
+            ]);
+
+            return $this->accessToken;
+        } finally {
+            if ($locked) {
+                $lock->release();
+            }
+        }
+    }
+
+    /**
+     * Drop the cached token pair, e.g. after the API rejects the access token.
+     */
+    public function forgetAccessToken(): void
+    {
+        $this->accessToken = null;
+        Cache::forget($this->tokenCacheKey('access'));
+        Cache::forget($this->tokenCacheKey('refresh'));
     }
 
     /**
@@ -860,14 +884,43 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
             'proprietary_bank_transaction_code' => $tx['proprietaryBankTransactionCode'] ?? null,
         ]);
 
-        // Create consistent source ID based on transaction content
-        // This ensures pending and booked versions of the same transaction have the same ID
-        $sourceId = $this->generateConsistentTransactionId($tx);
+        // Create or update actor (bank account). When the account object is not ready yet, skip:
+        // the account data job will create it.
+        $actorObject = $this->upsertAccountObject($integration, $account);
+        if (! $actorObject) {
+            Log::info('GoCardless processTransactionItem: Skipping transaction - account object not ready yet', [
+                'integration_id' => $integration->id,
+                'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
+            ]);
 
-        // Check if this transaction already exists (for status transitions)
-        $existingEvent = Event::where('integration_id', $integration->id)
-            ->where('source_id', $sourceId)
-            ->first();
+            return;
+        }
+
+        // The bank's own transaction id outranks the content hash: the counterparty name the bank
+        // reports for a transaction can change between pulls, which changes the hash.
+        $existingEvent = $this->findByProviderId($integration, $actorObject, $tx);
+        if ($existingEvent) {
+            $sourceId = $existingEvent->source_id;
+            $integrationId = $existingEvent->integration_id;
+        } else {
+            // Create consistent source ID based on transaction content
+            // This ensures pending and booked versions of the same transaction have the same ID
+            $sourceId = $this->generateConsistentTransactionId($tx);
+            $integrationId = $integration->id;
+
+            // Check if this transaction already exists (for status transitions)
+            $existingEvent = Event::where('integration_id', $integration->id)
+                ->where('source_id', $sourceId)
+                ->first();
+
+            // Same day, shop and amount but a different bank id is a second purchase, not a repeat
+            if ($existingEvent && $status === 'booked' && $this->isDifferentBookedTransaction($existingEvent, $tx)) {
+                $sourceId .= '_' . substr(md5((string) ($tx['transactionId'] ?? $tx['internalTransactionId'])), 0, 12);
+                $existingEvent = Event::where('integration_id', $integration->id)
+                    ->where('source_id', $sourceId)
+                    ->first();
+            }
+        }
 
         // A pending transaction often books under a different date or counterparty name, which
         // changes the content hash. Reuse the pending event's ID so it settles instead of duplicating.
@@ -893,20 +946,6 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         // Preserve the best available timestamp
         $timestamp = $this->determineBestTimestamp($tx, $existingEvent, $status, $isStatusChange);
-
-        // Create or update actor (bank account)
-        $actorObject = $this->upsertAccountObject($integration, $account);
-
-        // If account object doesn't exist yet (minimal data and no existing object),
-        // skip transaction event creation - the account data job will create the object
-        if (! $actorObject) {
-            Log::info('GoCardless processTransactionItem: Skipping transaction - account object not ready yet', [
-                'integration_id' => $integration->id,
-                'transaction_id' => $tx['transactionId'] ?? $tx['internalTransactionId'] ?? 'unknown',
-            ]);
-
-            return;
-        }
 
         // Create or update target (counterparty)
         $targetObject = $this->upsertCounterpartyObject($integration, $tx);
@@ -951,7 +990,7 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
 
         $event = Event::updateOrCreate(
             [
-                'integration_id' => $integration->id,
+                'integration_id' => $integrationId,
                 'source_id' => $sourceId,
             ],
             $eventData
@@ -1946,6 +1985,46 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
     }
 
     /**
+     * Find the event already stored for a transaction by the bank's own ids.
+     *
+     * Scoped to the same user and canonical account object, so account renewals that move events
+     * between integrations still match, and two accounts never share an event. The oldest match
+     * wins so existing links, buffers and budgets stay attached to the event they were made on.
+     *
+     * @param  array<string, mixed>  $tx
+     */
+    public function findByProviderId(Integration $integration, EventObject $account, array $tx): ?Event
+    {
+        $ids = array_values(array_filter(
+            [$tx['transactionId'] ?? null, $tx['internalTransactionId'] ?? null],
+            fn ($id): bool => is_string($id) && trim($id) !== '',
+        ));
+        if ($ids === []) {
+            return null;
+        }
+
+        $query = Event::forUser($integration->user_id)
+            ->where('service', 'gocardless')
+            ->where('actor_id', $account->id)
+            ->where(function ($match) use ($tx): void {
+                if (! empty($tx['transactionId'])) {
+                    $match->orWhere('event_metadata->raw->transactionId', $tx['transactionId']);
+                }
+                if (! empty($tx['internalTransactionId'])) {
+                    $match->orWhere('event_metadata->raw->internalTransactionId', $tx['internalTransactionId']);
+                }
+            });
+
+        $date = $tx['bookingDate'] ?? $tx['valueDate'] ?? null;
+        if ($date) {
+            $day = Carbon::parse($date)->utc();
+            $query->whereBetween('time', [$day->copy()->subDays(15)->startOfDay(), $day->copy()->addDays(15)->endOfDay()]);
+        }
+
+        return $query->orderBy('created_at')->orderBy('id')->first();
+    }
+
+    /**
      * Find the pending event a booked transaction settles, when its content hash differs.
      *
      * Matches on account, direction, amount and currency within PENDING_TWIN_DAYS of the
@@ -1977,6 +2056,140 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
             $counterparty !== '' && Str::lower((string) ($event->event_metadata['raw']['creditorName'] ?? $event->event_metadata['raw']['debtorName'] ?? '')) === $counterparty ? 0 : 1,
             abs($event->time->diffInSeconds($bookedAt)),
         ])->first();
+    }
+
+    /**
+     * Request a brand new token pair (rate limited to 10/minute by GoCardless).
+     *
+     * @return array<string, mixed>
+     */
+    protected function requestNewToken(): array
+    {
+        Log::info('Getting GoCardless access token', [
+            'endpoint' => $this->tokenEndpoint,
+            'secret_id_length' => strlen($this->secretId),
+            'secret_key_length' => strlen($this->secretKey),
+        ]);
+
+        // Log the API request
+        $this->logApiRequest('POST', '/api/v2/token/new/', [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ], [
+            'secret_id' => '[REDACTED]',
+            'secret_key' => '[REDACTED]',
+        ]);
+
+        // Send credentials in POST body as JSON
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ])->post($this->tokenEndpoint, [
+            'secret_id' => $this->secretId,
+            'secret_key' => $this->secretKey,
+        ]);
+
+        // Log the API response
+        $this->logApiResponse('POST', '/api/v2/token/new/', $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Failed to get access token: ' . $response->body());
+        }
+
+        return (array) $response->json();
+    }
+
+    /**
+     * Exchange the cached refresh token for a new access token.
+     * Returns null when there is no refresh token or GoCardless rejects it;
+     * throws on rate limits and server errors so they don't spend a /token/new/ call.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function refreshAccessToken(): ?array
+    {
+        $refresh = $this->readCachedToken('refresh');
+        if (! $refresh) {
+            return null;
+        }
+
+        $this->logApiRequest('POST', '/api/v2/token/refresh/', [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ], [
+            'refresh' => '[REDACTED]',
+        ]);
+
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ])->post($this->getBaseUrl() . '/token/refresh/', [
+            'refresh' => $refresh,
+        ]);
+
+        $this->logApiResponse('POST', '/api/v2/token/refresh/', $response->status(), $response->body(), $response->headers());
+
+        if ($response->serverError() || $response->status() === 429) {
+            throw new RuntimeException('Failed to refresh access token: ' . $response->body());
+        }
+
+        if (! $response->successful() || empty($response->json('access'))) {
+            Log::warning('GoCardless token refresh rejected, requesting a new token', [
+                'status' => $response->status(),
+            ]);
+            Cache::forget($this->tokenCacheKey('refresh'));
+
+            return null;
+        }
+
+        return (array) $response->json();
+    }
+
+    /**
+     * @param  array<string, mixed>  $tokenData
+     */
+    protected function storeTokens(array $tokenData): void
+    {
+        $this->cacheToken('access', $tokenData['access'] ?? null, $tokenData['access_expires'] ?? null);
+        $this->cacheToken('refresh', $tokenData['refresh'] ?? null, $tokenData['refresh_expires'] ?? null);
+    }
+
+    protected function cacheToken(string $type, mixed $token, mixed $expiresIn): void
+    {
+        if (! is_string($token) || $token === '' || ! is_numeric($expiresIn)) {
+            return;
+        }
+
+        $ttl = (int) $expiresIn - self::TOKEN_EXPIRY_BUFFER_SECONDS;
+        if ($ttl <= 0) {
+            return;
+        }
+
+        Cache::put($this->tokenCacheKey($type), Crypt::encryptString($token), $ttl);
+    }
+
+    protected function readCachedToken(string $type): ?string
+    {
+        $value = Cache::get($this->tokenCacheKey($type));
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($value);
+        } catch (DecryptException) {
+            Cache::forget($this->tokenCacheKey($type));
+
+            return null;
+        }
+    }
+
+    /**
+     * Keyed by secret ID so rotating credentials never reuses an old token.
+     */
+    protected function tokenCacheKey(string $type): string
+    {
+        return self::TOKEN_CACHE_PREFIX . $type . '_' . sha1($this->secretId);
     }
 
     protected function getRequiredScopes(): string
@@ -3079,6 +3292,20 @@ class GoCardlessBankPlugin extends OAuthPlugin implements SupportsSweeps
         ]);
 
         return $response->json();
+    }
+
+    /**
+     * @param  array<string, mixed>  $tx
+     */
+    private function isDifferentBookedTransaction(Event $existing, array $tx): bool
+    {
+        if (($existing->event_metadata['transaction_status'] ?? null) !== 'booked') {
+            return false;
+        }
+        $theirs = array_filter([$tx['transactionId'] ?? null, $tx['internalTransactionId'] ?? null]);
+        $ours = array_filter([$existing->event_metadata['raw']['transactionId'] ?? null, $existing->event_metadata['raw']['internalTransactionId'] ?? null]);
+
+        return $theirs !== [] && $ours !== [] && array_intersect($theirs, $ours) === [];
     }
 
     private function availableAccountTitle(string $userId, string $name, string $accountId, ?string $exceptId = null): string

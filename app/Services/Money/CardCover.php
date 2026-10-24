@@ -125,6 +125,29 @@ class CardCover
     }
 
     /**
+     * Record what the issuer printed for a statement. A recorded balance replaces the estimate for
+     * that statement and is never changed by later imports.
+     */
+    public function recordStatement(string $userId, string $cardId, CarbonImmutable $closed, int $balance, ?CarbonImmutable $directDebit = null, ?CarbonImmutable $due = null): void
+    {
+        $card = EventObject::where('user_id', $userId)->where('concept', 'account')->where('type', 'bank_account')->find($cardId);
+        if (! $card || ($card->metadata['account_type'] ?? null) !== 'credit_card') {
+            throw new InvalidArgumentException('That is not one of your credit cards.');
+        }
+        if ($balance < 0) {
+            throw new InvalidArgumentException('A statement balance cannot be negative.');
+        }
+
+        $metadata = $card->metadata ?? [];
+        $metadata['money']['statements'][$closed->toDateString()] = [
+            'balance' => $balance,
+            'direct_debit' => $directDebit?->toDateString(),
+            'due' => $due?->toDateString(),
+        ];
+        $card->update(['metadata' => $metadata]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function card(string $userId, EventObject $card, CarbonImmutable $now): array
@@ -136,25 +159,43 @@ class CardCover
         $paymentDay = (int) ($card->metadata['money']['billing']['payment_day'] ?? 0);
 
         $closed = null;
-        $due = null;
+        $previous = null;
+        $directDebit = null;
         if ($statementDay > 0) {
             $closed = $this->lastClose($now, $statementDay);
+            $previous = $this->lastClose($closed->subDay(), $statementDay);
             $paid = $repayment !== null && CarbonImmutable::instance($repayment->time)->gt($closed->endOfDay());
-            $since = $paid ? $closed->addDay()->startOfDay() : $this->lastClose($closed->subDay(), $statementDay)->addDay()->startOfDay();
-            $due = ! $paid && $paymentDay > 0 ? $this->paymentDate($closed, $paymentDay) : null;
+            $since = $paid ? $closed->addDay()->startOfDay() : $previous->addDay()->startOfDay();
+            $directDebit = ! $paid && $paymentDay > 0 ? $this->paymentDate($closed, $paymentDay) : null;
         } else {
             $paid = null;
             $since = $repayment ? CarbonImmutable::instance($repayment->time) : $now->startOfMonth();
         }
 
-        $entries = $this->scope->entries($userId, $since, $now)
-            ->where('account_id', (string) $card->id);
+        $recorded = $closed !== null ? ($card->metadata['money']['statements'][$closed->toDateString()] ?? null) : null;
 
-        $owed = max(0, (int) $entries->sum('amount'));
-        $buffered = max(0, (int) $entries->filter(fn (array $entry): bool => in_array($entry['buffer'] ?? null, ['requested', 'linked'], true))->sum('amount'));
+        // Statement membership follows the date the issuer processed a line, which can trail the
+        // transaction date, so look back a few days and sort lines by that date.
+        $entries = $this->scope->entries($userId, $closed !== null ? $since->subDays(5) : $since, $now)
+            ->where('account_id', (string) $card->id);
+        if ($closed !== null) {
+            $entries = $entries->filter(fn (array $entry): bool => $this->processedOn($entry, $closed) >= $since->toDateString())
+                ->values();
+        }
+
+        $inStatement = $closed !== null && ! $paid
+            ? $entries->filter(fn (array $entry): bool => $this->processedOn($entry, $closed) <= $closed->toDateString())
+            : collect();
         $statementOwed = $closed !== null && ! $paid
-            ? max(0, (int) $entries->filter(fn (array $entry): bool => CarbonImmutable::instance($entry['time'])->lte($closed->endOfDay()))->sum('amount'))
+            ? ($recorded !== null ? (int) $recorded['balance'] : max(0, (int) $inStatement->sum('amount')))
             : 0;
+        $after = $closed !== null ? $entries->reject(fn (array $entry): bool => $inStatement->contains('id', $entry['id']))->values() : $entries;
+        $sinceStatement = (int) $after->sum('amount');
+
+        $owed = $closed !== null ? max(0, $statementOwed + $sinceStatement) : max(0, (int) $entries->sum('amount'));
+        $buffered = max(0, (int) $entries->filter(fn (array $entry): bool => in_array($entry['buffer'] ?? null, ['requested', 'linked'], true))->sum('amount'));
+        $confirmed = $recorded !== null && ! $paid;
+        $directDebit = $confirmed && ! empty($recorded['direct_debit']) ? CarbonImmutable::parse($recorded['direct_debit']) : $directDebit;
 
         return [
             'id' => (string) $card->id,
@@ -162,13 +203,39 @@ class CardCover
             'since' => $since->toDateString(),
             'owed' => $owed,
             'buffered' => min($owed, $buffered),
+            'pending' => max(0, (int) $entries->where('pending', true)->sum('amount')),
+            'statement_pending' => (int) $inStatement->where('pending', true)->sum('amount'),
             'transactions' => $entries->count(),
             'statement_day' => $statementDay ?: null,
             'payment_day' => $paymentDay ?: null,
             'statement_closed' => $closed?->toDateString(),
             'statement_owed' => $statementOwed,
-            'statement_due' => $due?->toDateString(),
+            'statement_basis' => $closed === null || $paid ? null : ($confirmed ? 'confirmed' : 'estimate'),
+            'spent_since_statement' => $closed !== null ? max(0, $sinceStatement) : null,
+            'direct_debit' => $directDebit?->toDateString(),
+            'payment_due' => $confirmed && ! empty($recorded['due']) ? $recorded['due'] : null,
+            'statement_due' => $directDebit?->toDateString(),
         ];
+    }
+
+    /**
+     * The day a line belongs to for statement purposes: the day the issuer processed it (value
+     * date), else its booking date, else the day it happened. An authorisation the bank still
+     * shows as pending is dated as if it settled SpendingScope::PENDING_SETTLEMENT_DAYS after it was
+     * made, so one left open past a statement close is assumed billed on it.
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    private function processedOn(array $entry, CarbonImmutable $closed): string
+    {
+        if ($entry['pending']) {
+            return CarbonImmutable::parse((string) ($entry['booking_date']
+                ?? CarbonImmutable::instance($entry['time'])->setTimezone($closed->getTimezone())->toDateString()))
+                ->addDays(SpendingScope::PENDING_SETTLEMENT_DAYS)->toDateString();
+        }
+
+        return (string) ($entry['value_date'] ?? $entry['booking_date']
+            ?? CarbonImmutable::instance($entry['time'])->setTimezone($closed->getTimezone())->toDateString());
     }
 
     /**
