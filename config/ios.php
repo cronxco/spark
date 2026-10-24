@@ -33,6 +33,20 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Quick Log Intents
+    |--------------------------------------------------------------------------
+    |
+    | Below this on-device confidence the quick log asks which intent was
+    | meant before saving anything. Tune against real override rates.
+    |
+    */
+
+    'quick_log' => [
+        'confidence_threshold' => (float) env('IOS_QUICK_LOG_CONFIDENCE_THRESHOLD', 0.7),
+    ],
+
     'mobile_api_enabled' => env('IOS_MOBILE_API_ENABLED', false),
 
     /*
