@@ -2095,6 +2095,12 @@ paths:
             schema: { type: integer, minimum: 1, maximum: 50, default: 20 },
           }
         - { name: cursor, in: query, schema: { type: string } }
+        - {
+            name: unacknowledged,
+            in: query,
+            description: Only notes no routine has acknowledged yet,
+            schema: { type: boolean },
+          }
       responses:
         "200":
           description: OK
@@ -2136,6 +2142,49 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /flint/notes/acknowledge:
+    post:
+      operationId: acknowledgeFlintNotes
+      tags: [flint]
+      summary: Mark Flint notes as read by a routine
+      description: >-
+        Sets acknowledged_at and acknowledged_by on owned notes. Notes that
+        are already acknowledged keep their original acknowledgement; IDs that
+        are not owned by this account are reported as not_found.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note_ids]
+              properties:
+                note_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items: { type: string, format: uuid }
+                routine: { type: string, maxLength: 64 }
+                run_uuid: { type: string, maxLength: 64 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      acknowledged:
+                        { type: array, items: { type: string, format: uuid } }
+                      already_acknowledged:
+                        { type: array, items: { type: string, format: uuid } }
+                      not_found:
+                        { type: array, items: { type: string, format: uuid } }
         "422": { $ref: "#/components/responses/ValidationError" }
 
   /flint/notes/{id}:
@@ -3089,6 +3138,16 @@ components:
           items: { $ref: "#/components/schemas/FlintContextLink" }
         consent_version: { type: string, const: flint-note-v1 }
         consented_at: { type: [string, "null"], format: date-time }
+        acknowledged_at:
+          type: [string, "null"]
+          format: date-time
+          description: When a routine marked the note as read.
+        acknowledged_by:
+          type: [object, "null"]
+          description: The routine (and run, when known) that acknowledged the note.
+          properties:
+            routine: { type: string }
+            run_uuid: { type: string }
         version:
           type: string
           description: Strong opaque EventObject version.

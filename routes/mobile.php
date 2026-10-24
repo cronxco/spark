@@ -431,6 +431,7 @@ Route::patch('flint/topics/{id}/tasks/{taskId}', [FlintTopicsController::class, 
 
 Route::get('flint/notes', [FlintNotesController::class, 'index'])->middleware('spark.ability:flint:read')->name('flint.notes.index');
 Route::post('flint/notes', [FlintNotesController::class, 'store'])->middleware('spark.ability:flint:write')->name('flint.notes.store');
+Route::post('flint/notes/acknowledge', [FlintNotesController::class, 'acknowledge'])->middleware('spark.ability:flint:write')->name('flint.notes.acknowledge');
 Route::delete('flint/notes/{id}', [FlintNotesController::class, 'destroy'])->middleware('spark.ability:flint:write')->name('flint.notes.destroy');
 
 Route::get('flint/routines/health', FlintRoutineHealthController::class)

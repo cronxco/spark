@@ -14,6 +14,7 @@ allowed_tools:
   - spark__get-money-plan
   - spark__get-latest-flint-digest
   - spark__get-flint-notes
+  - spark__acknowledge-flint-notes
   - spark__get-events-by-filter-tool
   - spark__create-flint-digest
   - docs__fetch
@@ -86,6 +87,10 @@ spark__get-flint-notes()
 Do not repeat last week's point unless it has changed; say what changed. Notes to
 Flint outrank anything inferred (for example, "that Amex spend is for a trip").
 
+Keep the IDs of the notes you actually applied. After Step 5 succeeds, acknowledge
+only those. Leave notes that are about something else unacknowledged so the routine
+they are for still sees them.
+
 ## Step 4: Write it
 
 ### Weekly mode
@@ -149,6 +154,16 @@ Blocks:
   question was worth asking.
 
 Do not write a `flint_day_context` block. Do not create Topics.
+
+If you applied any notes, acknowledge them once the digest exists:
+
+```text
+spark__acknowledge-flint-notes(
+  note_ids: ["<the notes you applied>"],
+  run_token: "<run_token from the trigger payload>",
+  routine: "money_<mode>"
+)
+```
 
 ---
 
