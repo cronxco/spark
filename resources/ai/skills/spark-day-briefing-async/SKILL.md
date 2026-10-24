@@ -18,6 +18,7 @@ allowed_tools:
   - spark__get-block-tool
   - spark__get-latest-flint-digest
   - spark__get-flint-notes
+  - spark__acknowledge-flint-notes
   - spark__get-saved-bookmarks
   - spark__create-flint-digest
   - spark__manage-flint-topic
@@ -263,7 +264,14 @@ Always fetch the user's explicit notes before interpreting any other source:
 
 ```text
 spark__get-flint-notes(updated_since: "<local_date - 30d at 00:00 in timezone>", limit: 50)
+spark__get-flint-notes(unacknowledged: true, limit: 50)
 ```
+
+The second call returns every note no routine has acknowledged yet, however old. Merge
+the two lists by `id`. Keep the IDs of the unacknowledged notes: you acknowledge them
+after the digest is created (Step 10f). Each note's `acknowledged_at` and
+`acknowledged_by` show whether another routine has already read it; an acknowledged
+note still counts as direct user intent.
 
 These are direct user intent, not optional colour. A correction overrides a stale
 calendar label, Topic, prior digest, or inference. An instruction applies at the next
@@ -1537,6 +1545,19 @@ spark__create-flint-digest(
 )
 ```
 
+After `create-flint-digest` succeeds, acknowledge every unacknowledged note you read
+in Step 0c, whether or not it ended up in the digest. Reading and weighing it is the
+acknowledgement. Do this only once the digest exists; if the digest call failed, leave
+the notes unacknowledged so the retry sees them.
+
+```text
+spark__acknowledge-flint-notes(
+  note_ids: ["<every unacknowledged note UUID from Step 0c>"],
+  run_token: "<run_token from the trigger payload>",
+  routine: "digest"
+)
+```
+
 When and only when there is no question block, add:
 
 ```text
@@ -1644,7 +1665,8 @@ Before writing today's digest verify:
 - [ ] every clock time quoted uses its applicable source timezone; for Pass One, use `effective_timezone` when it differs from `timezone`;
 - [ ] morning `trigger_reason` / `sleep_score_event_id` understood where relevant;
 - [ ] current style guide fetched;
-- [ ] Notes to Flint fetched before interpreting other sources;
+- [ ] Notes to Flint fetched before interpreting other sources, including every unacknowledged one;
+- [ ] unacknowledged notes acknowledged after the digest was created;
 - [ ] explicit note corrections applied ahead of stale calendar/Topic/inference data;
 - [ ] yesterday Pass One processed;
 - [ ] current Flint Topics loaded read-only;
