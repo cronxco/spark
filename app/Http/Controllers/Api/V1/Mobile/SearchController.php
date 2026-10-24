@@ -46,7 +46,7 @@ class SearchController extends Controller
 
         $data = $request->validate([
             'query' => ['present', 'nullable', 'string', 'max:500'],
-            'mode' => ['nullable', 'string', Rule::in(SearchDispatcher::MODES)],
+            'mode' => ['nullable', 'string', Rule::in(SearchDispatcher::V1_MODES)],
             'limit' => ['nullable', 'integer', 'min:1', 'max:' . SearchDispatcher::MAX_LIMIT],
         ]);
 

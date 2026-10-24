@@ -10,6 +10,7 @@ use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\Place;
 use App\Models\User;
+use App\Services\Actions\ActionRegistry;
 use App\Services\Ai\EmbeddingClient;
 use App\Services\Mobile\SearchContract;
 use App\Services\Search\LegacyAliasUsage;
@@ -103,7 +104,7 @@ class SearchContractTest extends TestCase
         $this->assertNull($response['execution']['fallback_reason']);
         $this->assertSame($response['meta']['count'], count($response['results']));
 
-        foreach (SearchContract::KINDS as $kind) {
+        foreach (array_diff(SearchContract::KINDS, ['command']) as $kind) {
             $this->assertSame($this->keysOfKind($fixture, $kind), $this->keysOfKind($response, $kind), "Keys drifted for kind {$kind}.");
         }
 
@@ -112,6 +113,28 @@ class SearchContractTest extends TestCase
             collect($response['results'])->where('kind', 'object')->where('id', (string) $target->id)->count(),
             'The target object is listed once, and a place is not also listed as an object.',
         );
+    }
+
+    #[Test]
+    public function commands_are_the_eighth_kind_and_match_the_registry(): void
+    {
+        $fixture = $this->fixture('complete');
+
+        $all = $this->getJson('/api/v1/mobile/search?contract_version=1&query=sync')->assertOk()->json();
+        $this->assertSame($this->keysOfKind($fixture, 'command'), $this->keysOfKind($all, 'command'), 'Keys drifted for kind command.');
+
+        $only = $this->getJson('/api/v1/mobile/search?contract_version=1&query=sync&mode=command')->assertOk()->json();
+        $this->assertNotEmpty($only['results']);
+        $this->assertSame(['command'], collect($only['results'])->pluck('kind')->unique()->values()->all());
+
+        $registry = app(ActionRegistry::class);
+        foreach ($only['results'] as $hit) {
+            $definition = $registry->find($hit['id']);
+            $this->assertNotNull($definition, "{$hit['id']} is not in the registry.");
+            $this->assertTrue($definition->on('native'));
+            $this->assertSame($definition->kind->value, $hit['action_kind']);
+            $this->assertSame($definition->confirm->value, $hit['confirm']);
+        }
     }
 
     #[Test]

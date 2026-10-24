@@ -2,15 +2,74 @@
   "schema_version": 1,
   "query": "coffee",
   "mode": "default",
-  "execution": { "status": "complete", "fallback_reason": null },
+  "execution": {
+    "status": "complete",
+    "fallback_reason": null
+  },
   "results": [
-    { "kind": "event", "id": "0b6c0f60-5d3e-4e8e-9d5b-1c2a3f4e5d6a", "title": "Costa Coffee", "subtitle": "money", "domain": "money" },
-    { "kind": "object", "id": "1c7d1a71-6e4f-4f9f-8e6c-2d3b4a5f6e7b", "title": "Costa Coffee", "subtitle": "merchant", "concept": "merchant" },
-    { "kind": "block", "id": "2d8e2b82-7f50-4aa0-9f7d-3e4c5b6a7f8c", "title": "Coffee spend", "subtitle": "summary", "block_type": "summary" },
-    { "kind": "metric", "id": "oura.sleep_score", "identifier": "oura.sleep_score", "title": "Sleep Score", "subtitle": "points", "domain": "health" },
-    { "kind": "integration", "id": "3e9f3c93-8061-4bb1-a08e-4f5d6c7b8a9d", "title": "Personal Monzo", "subtitle": "monzo", "service": "monzo" },
-    { "kind": "place", "id": "4fa04da4-9172-4cc2-b19f-5a6e7d8c9bae", "title": "Costa Coffee, High Street", "subtitle": "1 High Street" },
-    { "kind": "tag", "id": "12", "name": "coffee", "type": "merchant_category", "title": "coffee", "subtitle": "3 items", "count": 3 }
+    {
+      "kind": "event",
+      "id": "0b6c0f60-5d3e-4e8e-9d5b-1c2a3f4e5d6a",
+      "title": "Costa Coffee",
+      "subtitle": "money",
+      "domain": "money"
+    },
+    {
+      "kind": "object",
+      "id": "1c7d1a71-6e4f-4f9f-8e6c-2d3b4a5f6e7b",
+      "title": "Costa Coffee",
+      "subtitle": "merchant",
+      "concept": "merchant"
+    },
+    {
+      "kind": "block",
+      "id": "2d8e2b82-7f50-4aa0-9f7d-3e4c5b6a7f8c",
+      "title": "Coffee spend",
+      "subtitle": "summary",
+      "block_type": "summary"
+    },
+    {
+      "kind": "metric",
+      "id": "oura.sleep_score",
+      "identifier": "oura.sleep_score",
+      "title": "Sleep Score",
+      "subtitle": "points",
+      "domain": "health"
+    },
+    {
+      "kind": "integration",
+      "id": "3e9f3c93-8061-4bb1-a08e-4f5d6c7b8a9d",
+      "title": "Personal Monzo",
+      "subtitle": "monzo",
+      "service": "monzo"
+    },
+    {
+      "kind": "place",
+      "id": "4fa04da4-9172-4cc2-b19f-5a6e7d8c9bae",
+      "title": "Costa Coffee, High Street",
+      "subtitle": "1 High Street"
+    },
+    {
+      "kind": "tag",
+      "id": "12",
+      "name": "coffee",
+      "type": "merchant_category",
+      "title": "coffee",
+      "subtitle": "3 items",
+      "count": 3
+    },
+    {
+      "kind": "command",
+      "id": "integrations.sync_all",
+      "title": "Sync all integrations",
+      "subtitle": "Fetch the latest data",
+      "icon": "arrow-path",
+      "action_kind": "safe",
+      "confirm": "none"
+    }
   ],
-  "meta": { "count": 7, "limit": 20 }
+  "meta": {
+    "count": 8,
+    "limit": 20
+  }
 }
