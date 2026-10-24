@@ -111,6 +111,20 @@ class ObjectsControllerTest extends TestCase
     }
 
     #[Test]
+    public function person_calendar_does_not_overflow_a_shorter_month_on_the_31st(): void
+    {
+        $this->travelTo(Carbon::parse('2026-01-31 12:00:00'));
+        $person = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'person', 'type' => 'person']);
+        Event::factory()->create(['integration_id' => $this->integration->id, 'target_id' => $person->id, 'time' => '2026-02-05 12:00:00']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->getJson("/api/v1/mobile/people/{$person->id}/timeline?month=2026-02")
+            ->assertOk()
+            ->assertJsonPath('month', '2026-02')
+            ->assertJsonPath('calendar.2026-02-05', 1);
+    }
+
+    #[Test]
     public function can_exclude_recent_events(): void
     {
         $object = EventObject::factory()->create(['user_id' => $this->user->id]);

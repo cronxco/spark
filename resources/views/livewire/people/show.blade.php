@@ -50,16 +50,18 @@ new class extends Component
     #[Computed]
     public function calendar(): array
     {
+        $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor(auth()->user());
+
         return app(PersonProfileService::class)->calendar(
             $this->person,
-            Carbon::createFromFormat('Y-m', $this->month)->startOfMonth(),
-            app(EffectiveTimezoneResolver::class)->timezoneFor(auth()->user()),
+            Carbon::createFromFormat('!Y-m', $this->month, $timezone),
+            $timezone,
         );
     }
 
     public function shiftMonth(int $by): void
     {
-        $this->month = Carbon::createFromFormat('Y-m', $this->month)->startOfMonth()->addMonths($by)->format('Y-m');
+        $this->month = Carbon::createFromFormat('!Y-m', $this->month)->addMonths($by)->format('Y-m');
     }
 
     #[Computed]
@@ -182,7 +184,7 @@ new class extends Component
 
     <x-card class="bg-base-200/50 border-2 border-secondary/10">
         @php
-            $first = \Illuminate\Support\Carbon::createFromFormat('Y-m', $this->month)->startOfMonth();
+            $first = \Illuminate\Support\Carbon::createFromFormat('!Y-m', $this->month);
             $counts = $this->calendar;
         @endphp
         <div class="mb-4 flex items-center justify-between">

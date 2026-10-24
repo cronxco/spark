@@ -6,11 +6,13 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\Person;
 use App\Models\Relationship;
 use App\Models\User;
 use App\Services\PersonProfileService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
@@ -151,6 +153,24 @@ class PersonPageTest extends TestCase
 
         $this->assertSame([$own->id], $service->events($person)->pluck('id')->all());
         $this->assertSame(1, $service->eventCount($person));
+    }
+
+    #[Test]
+    public function calendar_navigation_does_not_skip_february_on_the_31st(): void
+    {
+        $this->travelTo(Carbon::parse('2026-01-31 12:00:00'));
+        $person = $this->person('Dan');
+        $this->actingAs($this->user);
+
+        Volt::test('people.show', ['person' => Person::findOrFail($person->id)])
+            ->assertSet('month', '2026-01')
+            ->call('shiftMonth', 1)
+            ->assertSet('month', '2026-02')
+            ->assertSee('February 2026')
+            ->call('shiftMonth', 1)
+            ->assertSet('month', '2026-03')
+            ->call('shiftMonth', -1)
+            ->assertSet('month', '2026-02');
     }
 
     private function person(string $name): EventObject
