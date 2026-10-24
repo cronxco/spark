@@ -17,8 +17,10 @@ use App\Services\Search\LegacyAliasUsage;
 use App\Support\SparkAbility;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
+use Spatie\Tags\Tag;
 use Tests\TestCase;
 
 /**
@@ -216,12 +218,13 @@ class SearchContractTest extends TestCase
     {
         $event = Event::factory()->create(['integration_id' => $this->integration->id]);
         $block = Block::factory()->create(['event_id' => $event->id, 'block_type' => 'summary', 'title' => 'Plain']);
-        $block->attachTag('blockonly');
+        $tag = Tag::findOrCreate('blockonly');
+        DB::table('taggables')->insert(['tag_id' => $tag->id, 'taggable_type' => Block::class, 'taggable_id' => $block->id]);
 
-        $tag = collect($this->getJson('/api/v1/mobile/search?contract_version=1&query=blockonly')->assertOk()->json('results'))
+        $hit = collect($this->getJson('/api/v1/mobile/search?contract_version=1&query=blockonly')->assertOk()->json('results'))
             ->firstWhere('kind', 'tag');
 
-        $this->assertSame(1, $tag['count']);
+        $this->assertSame(1, $hit['count']);
     }
 
     #[Test]
