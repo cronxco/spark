@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "query": "quiet mornings",
+  "mode": "semantic",
+  "execution": { "status": "degraded", "fallback_reason": "embedding_failed" },
+  "results": [
+    { "kind": "object", "id": "1c7d1a71-6e4f-4f9f-8e6c-2d3b4a5f6e7b", "title": "Quiet mornings", "subtitle": "note", "concept": "note" }
+  ],
+  "meta": { "count": 1, "limit": 20 }
+}

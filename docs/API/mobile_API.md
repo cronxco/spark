@@ -909,6 +909,51 @@ Searches across events, objects, integrations, and metrics using one of five mod
 
 Empty collections are included as `[]`. An unknown `mode` returns `422`.
 
+#### Search contract v1
+
+Send `contract_version=1` to get the versioned contract. Without it you get the
+pre-v1 grouped response above, kept for shipped builds.
+
+| Parameter          | Type    | Default   | Description                                             |
+| ------------------ | ------- | --------- | ------------------------------------------------------- |
+| `contract_version` | integer | —         | Must be `1`. Any other value returns `422` with `supported_versions` |
+| `query`            | string  | required  | Search text (max 500). May be empty. `q` is not accepted |
+| `mode`             | string  | `default` | Singular modes only: `default`, `semantic`, `tag`, `metric`, `integration`. Plural names return `422` |
+| `limit`            | integer | 20        | 1–50                                                    |
+
+```json
+{
+    "schema_version": 1,
+    "query": "coffee",
+    "mode": "default",
+    "execution": { "status": "complete", "fallback_reason": null },
+    "results": [
+        { "kind": "event", "id": "…", "title": "…", "subtitle": "money", "domain": "money" }
+    ],
+    "meta": { "count": 1, "limit": 20 }
+}
+```
+
+- `results` is one flat list, ordered by family: `event`, `object`, `block`,
+  `metric`, `integration`, `place`, `tag`. `default` mode returns all seven;
+  `semantic` returns events and objects.
+- Every hit has `kind` (singular), `id`, `title` and `subtitle`, plus the keys
+  for its kind (`domain`, `concept`, `block_type`, `identifier`, `service`,
+  `name`/`type`/`count`). Keys are always present, null when empty. A metric's
+  `id` is its `identifier`.
+- `execution.status` is `complete` or `degraded`. A semantic search that cannot
+  embed the query falls back to keyword matching and returns `degraded` with
+  `fallback_reason` `embedding_failed` (or `embeddings_unavailable`). Clients
+  should label degraded results "keyword matches".
+- Clients must drop a `kind` they do not know and render the rest.
+- Fixtures for every shape live in `tests/Fixtures/search-contract/v1` and are
+  decoded by spark-ios. Change both together; bump `schema_version` for a
+  breaking change.
+
+The pre-v1 spellings (`q`, plural modes, `"true"`/`"false"`) are counted per day
+by `App\Services\Search\LegacyAliasUsage` (counts only, no query text) so they
+can be removed once no shipped build uses them.
+
 ---
 
 ### `GET /integrations`
