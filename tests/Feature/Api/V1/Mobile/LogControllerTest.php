@@ -599,6 +599,55 @@ class LogControllerTest extends TestCase
         ]);
     }
 
+    #[Test]
+    public function logs_a_reflection_as_a_document_object_with_a_logged_event(): void
+    {
+        $body = "Slow morning, good call to skip the gym.\nFelt better for it.";
+
+        $response = $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'reflection',
+            'idempotency_key' => 'reflect-1',
+            'body' => $body,
+            'with' => ['Dan'],
+        ])->assertCreated()
+            ->assertJsonPath('status', 'logged')
+            ->assertJsonPath('events.0.action', 'logged_reflection')
+            ->assertJsonPath('events.0.title', 'Slow morning, good call to skip the gym.');
+
+        $event = Event::with('target')->findOrFail($response->json('events.0.id'));
+        $this->assertSame('manual_log', $event->service);
+        $this->assertSame('knowledge', $event->domain);
+        $this->assertSame('document', $event->target->concept);
+        $this->assertSame('reflection', $event->target->type);
+        $this->assertSame($body, $event->target->content);
+        $this->assertNull($event->value);
+        Queue::assertNothingPushed();
+    }
+
+    #[Test]
+    public function a_reflection_keeps_an_explicit_title_and_is_idempotent(): void
+    {
+        $payload = ['kind' => 'reflection', 'idempotency_key' => 'reflect-2', 'title' => 'Sunday thoughts', 'body' => 'Quiet week.'];
+
+        $first = $this->postJson('/api/v1/mobile/log', $payload)->assertCreated()->assertJsonPath('events.0.title', 'Sunday thoughts');
+        $second = $this->postJson('/api/v1/mobile/log', $payload)->assertOk();
+
+        $this->assertSame($first->json('events.0.id'), $second->json('events.0.id'));
+        $this->assertSame(1, EventObject::where('type', 'reflection')->count());
+    }
+
+    #[Test]
+    public function a_reflection_needs_a_body_and_only_a_reflection_takes_one(): void
+    {
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'reflection', 'idempotency_key' => 'r'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['body']);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'wine', 'idempotency_key' => 'r', 'title' => 'Malbec', 'body' => 'x'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['body']);
+    }
+
     private function diplomat(): array
     {
         return ['tvdb_id' => '371572', 'name' => 'The Diplomat', 'year' => '2023'];

@@ -36,6 +36,7 @@ class ManualLogService
         'tv' => 'watched_episode',
         'cinema' => 'watched_at_cinema',
         'board_game' => 'played_board_game',
+        'reflection' => 'logged_reflection',
     ];
 
     private const MAX_SEASON_OPTIONS = 8;
@@ -200,9 +201,14 @@ class ManualLogService
     private function logSimple(Integration $integration, array $data): array
     {
         $sourceId = $this->sourceId($data['idempotency_key']);
+        $reflection = $data['kind'] === 'reflection';
 
         if ($existing = $this->existing($integration, [$sourceId])) {
             return ['status' => 'logged', 'created' => false, 'events' => $existing];
+        }
+
+        if ($reflection) {
+            $data['title'] = $data['title'] ?? Str::limit(Str::before(trim($data['body']), "\n"), 80, '…');
         }
 
         try {
@@ -217,6 +223,7 @@ class ManualLogService
                     'source_id' => $sourceId,
                     'event_metadata' => $this->consumptionMetadata($data),
                     'match_url' => $data['match_url'] ?? null,
+                    'content' => $reflection ? $data['body'] : null,
                 ],
             );
         } catch (UniqueConstraintViolationException $e) {

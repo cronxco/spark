@@ -10,7 +10,7 @@ Both endpoints sit under `/api/v1/mobile`, need `data:write`, and are covered by
 
 | `intent` | Meaning | Written by the server? |
 |----------|---------|------------------------|
-| `log` | Something that happened. Structured drafts (wine, beer, TV) go to `POST /log` | No. The client calls `POST /log` |
+| `log` | Something that happened. Structured drafts (wine, beer, TV) go to `POST /log`; any other line goes there as `kind: reflection` | No. The client calls `POST /log` |
 | `flint_note` | A note for Flint | Yes, on commit |
 | `command` | An action from the registry | No. The client runs the action |
 | `search` | Open search | No |
@@ -80,8 +80,17 @@ Responses:
 
 Every commit (a replayed note excepted) logs `quick_log.intent` with: `suggested`, `chosen`, `source` (`accepted`, `override`, `picked`), `overridden`, a confidence bucket (0.1 steps), a text length bucket (20 characters) and the mention count. The typed text is never logged. Override rate is the quality metric.
 
+## Generic lines: `kind: reflection`
+
+A `log` line that PCC cannot turn into wine, beer, TV, cinema or a board game is sent to `POST /log` as a reflection:
+
+```json
+{ "kind": "reflection", "idempotency_key": "…", "body": "coffee with Dan, good chat about the move", "with": ["Dan"], "occurred_at": "…" }
+```
+
+It creates a `reflection` document object (the text is its content) and a `logged_reflection` event ("Logged a Reflection", domain `knowledge`). `title` is optional and defaults to the first line, cut to 80 characters. `body` is required (max 10000) and only valid for this kind. `with`, `occurred_at`, `idempotency_key` and `dry_run` behave as for the other kinds. Nothing is queued for enrichment.
+
 ## Open
 
-- A plain free-text `log` with no wine, beer or TV kind has no write path yet (`POST /log` needs a `kind`). Decision needed on what a generic log becomes before the client can commit one.
 - Whether a user may override `@flint` to something else (currently refused, per "`@flint` always means a note").
 - Confidence threshold: 0.7 is a placeholder to tune against real override rates.
