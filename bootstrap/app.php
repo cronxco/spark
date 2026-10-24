@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\ETag;
 use App\Http\Middleware\RecordGodModeAccess;
 use App\Http\Middleware\RequireGodMode;
+use App\Http\Middleware\ReplayIdempotentRequest;
 use App\Http\Middleware\RequireIfMatch;
 use App\Http\Middleware\RequireMobileSession;
 use App\Http\Middleware\RequireSparkAbility;
@@ -55,6 +56,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.god-mode.audit' => RecordGodModeAccess::class,
             'admin.god-mode.required' => RequireGodMode::class,
             'if-match' => RequireIfMatch::class,
+            'idempotent' => ReplayIdempotentRequest::class,
         ]);
 
         // Place mobile logging before auth in the priority list so it wraps the

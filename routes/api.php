@@ -113,9 +113,9 @@ Route::prefix('v1')
         Route::middleware('spark.ability:data:write')->group(function (): void {
             Route::patch('{kind}/{id}', [V1EntityMutationsController::class, 'update'])->whereIn('kind', ['events', 'objects', 'blocks'])->middleware('if-match:entity')->name('entities.update');
             Route::patch('events/{id}/note', [V1EventsController::class, 'updateNote'])->middleware('if-match:event')->name('events.note.update');
-            Route::post('events/{id}/tags', [V1TagsController::class, 'storeEventTag'])->middleware('if-match:event')->name('events.tags.store');
+            Route::post('events/{id}/tags', [V1TagsController::class, 'storeEventTag'])->middleware(['idempotent:tags.attach', 'if-match:event'])->name('events.tags.store');
             Route::delete('events/{id}/tags/{tagId}', [V1TagsController::class, 'destroyEventTag'])->whereNumber('tagId')->middleware('if-match:event')->name('events.tags.destroy');
-            Route::post('objects/{id}/tags', [V1TagsController::class, 'storeObjectTag'])->middleware('if-match:object')->name('objects.tags.store');
+            Route::post('objects/{id}/tags', [V1TagsController::class, 'storeObjectTag'])->middleware(['idempotent:tags.attach', 'if-match:object'])->name('objects.tags.store');
             Route::delete('objects/{id}/tags/{tagId}', [V1TagsController::class, 'destroyObjectTag'])->whereNumber('tagId')->middleware('if-match:object')->name('objects.tags.destroy');
             Route::post('knowledge/events/{id}/reprocess', [V1KnowledgeReprocessingController::class, 'store'])->middleware('if-match:event')->name('knowledge.events.reprocess');
             Route::post('{kind}/{id}/relationships', [V1EntityMutationsController::class, 'storeRelationship'])->whereIn('kind', ['events', 'objects', 'blocks'])->middleware('if-match:entity')->name('relationships.store');
@@ -139,7 +139,7 @@ Route::prefix('v1')
         Route::post('finance/accounts', [V1MoneyAccountsController::class, 'store'])->middleware('spark.ability:finance:write')->name('finance.accounts.store');
         Route::patch('finance/accounts/{id}', [V1MoneyAccountsController::class, 'update'])->middleware(['spark.ability:finance:write', 'if-match:object'])->name('finance.accounts.update');
         Route::delete('finance/accounts/{id}', [V1MoneyAccountsController::class, 'destroy'])->middleware(['spark.ability:finance:write', 'if-match:object'])->name('finance.accounts.destroy');
-        Route::post('finance/accounts/{id}/balances', [V1MoneyAccountsController::class, 'addBalance'])->middleware(['spark.ability:finance:write', 'if-match:object'])->name('finance.accounts.balances.store');
+        Route::post('finance/accounts/{id}/balances', [V1MoneyAccountsController::class, 'addBalance'])->middleware(['spark.ability:finance:write', 'idempotent:money.balances.store', 'if-match:object'])->name('finance.accounts.balances.store');
     });
 
 // Mobile API surface — gated behind config('ios.mobile_api_enabled') so it's

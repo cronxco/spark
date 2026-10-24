@@ -104,13 +104,21 @@ class MoneyAccountsControllerTest extends TestCase
             'If-Match' => app(ResourceVersion::class)->etag($account),
         ];
 
+        // `updated_at` is whole-second, so the first write's touch() only
+        // moves the account's version on when the clock has ticked since the
+        // account was created. Move the clock on so it always does: the retry
+        // below then carries a stale If-Match, as a real phone's would.
+        $this->travel(1)->minute();
+
         $first = $this->postJson("/api/v1/mobile/money/accounts/{$account->id}/balances", $payload, $headers)
             ->assertCreated();
+        $this->assertNotSame($headers['If-Match'], $first->headers->get('ETag'));
 
         $second = $this->postJson("/api/v1/mobile/money/accounts/{$account->id}/balances", $payload, $headers)
             ->assertCreated();
 
         $this->assertSame($first->json('data.id'), $second->json('data.id'));
+        $this->assertSame($first->headers->get('ETag'), $second->headers->get('ETag'));
 
         $balances = $this->getJson("/api/v1/mobile/money/accounts/{$account->id}/balances")->assertOk();
         $this->assertCount(1, $balances->json('data'));

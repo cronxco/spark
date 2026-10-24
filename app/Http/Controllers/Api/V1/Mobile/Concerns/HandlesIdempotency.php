@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1\Mobile\Concerns;
 
+use App\Services\Api\IdempotentResponses;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 /**
  * `Idempotency-Key` support for mutating POSTs that create something, so a
@@ -14,35 +14,24 @@ use Illuminate\Support\Facades\Cache;
  * When present, a repeat of the same key replays the first response rather
  * than re-running the handler, scoped per user and per call site so the same
  * key on two different endpoints can't collide.
+ *
+ * Routes guarded by `if-match` must use the `idempotent:<scope>` middleware
+ * instead, ordered ahead of `if-match`: the first write moves the resource's
+ * version on, so a retry carrying the original If-Match would otherwise be
+ * refused with a 412 before this replay ever ran.
  */
 trait HandlesIdempotency
 {
-    /** How long a replayed response stays available. */
-    private const TTL_HOURS = 24;
-
     protected function idempotent(Request $request, string $scope, callable $handler): JsonResponse
     {
-        $key = $request->header('Idempotency-Key');
+        $responses = app(IdempotentResponses::class);
 
-        if (! is_string($key) || $key === '') {
-            return $handler();
-        }
-
-        $cacheKey = "idempotency:{$scope}:{$request->user()->id}:{$key}";
-        $cached = Cache::get($cacheKey);
-
-        if (is_array($cached)) {
-            return response()->json($cached['body'], $cached['status']);
+        if ($replay = $responses->replay($request, $scope)) {
+            return $replay;
         }
 
         $response = $handler();
-
-        if ($response->isSuccessful()) {
-            Cache::put($cacheKey, [
-                'body' => $response->getData(true),
-                'status' => $response->getStatusCode(),
-            ], now()->addHours(self::TTL_HOURS));
-        }
+        $responses->remember($request, $scope, $response);
 
         return $response;
     }
