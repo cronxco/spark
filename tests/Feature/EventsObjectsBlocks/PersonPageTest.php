@@ -63,6 +63,27 @@ class PersonPageTest extends TestCase
     }
 
     #[Test]
+    public function the_timeline_includes_with_tags_and_note_mentions_and_the_calendar_counts_them(): void
+    {
+        $person = $this->person('Dan');
+        $other = $this->person('Sam');
+        $tagged = Event::factory()->create(['integration_id' => $this->integration->id, 'time' => '2026-10-05 10:00:00']);
+        $this->relateWith($person, $tagged);
+        $this->relateWith($other, Event::factory()->create(['integration_id' => $this->integration->id, 'time' => '2026-10-05 11:00:00']));
+        $mentioned = Event::factory()->create(['integration_id' => $this->integration->id, 'time' => '2026-10-07 09:00:00']);
+        $mentioned->createBlock(['title' => 'Note', 'block_type' => 'note', 'time' => $mentioned->time, 'metadata' => ['content' => 'Pints with @dan']]);
+
+        $service = app(PersonProfileService::class);
+
+        $this->assertEqualsCanonicalizing([$tagged->id, $mentioned->id], $service->events($person)->pluck('id')->all());
+        $this->assertSame(
+            ['2026-10-05' => 1, '2026-10-07' => 1],
+            $service->calendar($person, \Illuminate\Support\Carbon::parse('2026-10-01'), 'UTC'),
+        );
+        $this->assertSame([$tagged->id], $service->eventsOn($person, \Illuminate\Support\Carbon::parse('2026-10-05'), 'UTC')->pluck('id')->all());
+    }
+
+    #[Test]
     public function an_object_that_is_not_a_person_has_no_person_page(): void
     {
         $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account']);
@@ -151,6 +172,18 @@ class PersonPageTest extends TestCase
             'to_type' => EventObject::class,
             'to_id' => $to->id,
             'type' => $type,
+        ]);
+    }
+
+    private function relateWith(EventObject $person, Event $event): Relationship
+    {
+        return Relationship::create([
+            'user_id' => $this->user->id,
+            'from_type' => EventObject::class,
+            'from_id' => $person->id,
+            'to_type' => Event::class,
+            'to_id' => $event->id,
+            'type' => 'with',
         ]);
     }
 
