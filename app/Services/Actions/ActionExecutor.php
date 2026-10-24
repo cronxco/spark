@@ -57,6 +57,14 @@ class ActionExecutor
         return $this->runOnce($user, $action, $validated, null);
     }
 
+    /** @throws ActionFailed */
+    public function undo(User $user, string $receiptId): ActionReceipt
+    {
+        $lockKey = 'actions:undo:' . hash('sha256', "{$user->id}:{$receiptId}");
+
+        return Cache::lock($lockKey, 120)->block(30, fn () => $this->undoOnce($user, $receiptId));
+    }
+
     /** @param array<string, mixed> $validated */
     private function runOnce(User $user, ActionDefinition $action, array $validated, ?string $idempotencyKey): ActionReceipt
     {
@@ -105,14 +113,6 @@ class ActionExecutor
         }
 
         return new ActionReceipt($progress->fresh());
-    }
-
-    /** @throws ActionFailed */
-    public function undo(User $user, string $receiptId): ActionReceipt
-    {
-        $lockKey = 'actions:undo:' . hash('sha256', "{$user->id}:{$receiptId}");
-
-        return Cache::lock($lockKey, 120)->block(30, fn () => $this->undoOnce($user, $receiptId));
     }
 
     private function undoOnce(User $user, string $receiptId): ActionReceipt
