@@ -39,6 +39,18 @@ class ContextualActionsQuery
      */
     public static function results(?string $route, array $parameters, string $query): Collection
     {
+        return self::commands($route, $parameters, $query)
+            ->map(fn (array $contextual, int $position): SpotlightResult => self::result($contextual['action'], $contextual['target'], $position + 1));
+    }
+
+    /**
+     * The registry actions a page offers that match what was typed.
+     *
+     * @param  array<string, mixed>  $parameters
+     * @return Collection<int, array{action: ActionDefinition, target: array<string, string>}>
+     */
+    public static function commands(?string $route, array $parameters, string $query): Collection
+    {
         $user = Auth::user();
 
         if ($route === null || $user === null) {
@@ -47,8 +59,7 @@ class ContextualActionsQuery
 
         return app(ContextualActions::class)->for($user, $route, $parameters)
             ->filter(fn (array $contextual): bool => $contextual['action']->matches($query))
-            ->values()
-            ->map(fn (array $contextual, int $position): SpotlightResult => self::result($contextual['action'], $contextual['target'], $position + 1));
+            ->values();
     }
 
     /**

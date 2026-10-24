@@ -153,15 +153,15 @@ class ContextualActionsTest extends TestCase
     {
         $this->actingAs($this->alice);
 
-        $this->assertCount(2, ContextualActionsQuery::results('metrics.index', [], ''));
-        $this->assertCount(1, ContextualActionsQuery::results('metrics.index', [], 'detect'));
-        $this->assertCount(0, ContextualActionsQuery::results('metrics.index', [], 'nothing like this'));
+        $this->assertCount(2, ContextualActionsQuery::commands('metrics.index', [], ''));
+        $this->assertCount(1, ContextualActionsQuery::commands('metrics.index', [], 'detect'));
+        $this->assertCount(0, ContextualActionsQuery::commands('metrics.index', [], 'nothing like this'));
     }
 
     #[Test]
     public function spotlight_offers_nothing_to_a_guest(): void
     {
-        $this->assertCount(0, ContextualActionsQuery::results('metrics.index', [], ''));
+        $this->assertCount(0, ContextualActionsQuery::commands('metrics.index', [], ''));
     }
 
     #[Test]
