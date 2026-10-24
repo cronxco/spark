@@ -7,6 +7,7 @@ use App\Models\Person;
 use App\Models\User;
 use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
@@ -129,19 +130,22 @@ class LogIntentsControllerTest extends TestCase
     #[Test]
     public function telemetry_records_overrides_without_the_text(): void
     {
-        Log::spy();
+        $logged = [];
+        Log::listen(function (MessageLogged $event) use (&$logged): void {
+            if ($event->message === 'quick_log.intent') {
+                $logged[] = $event->context;
+            }
+        });
 
         $this->commit(['text' => 'secret dentist plan', 'intent' => 'search', 'suggested_intent' => 'log', 'confidence' => 0.83])->assertOk();
 
-        Log::shouldHaveReceived('info')->withArgs(function (string $message, array $context = []) {
-            return $message === 'quick_log.intent'
-                && $context['source'] === 'override'
-                && $context['overridden'] === true
-                && $context['suggested'] === 'log'
-                && $context['chosen'] === 'search'
-                && $context['confidence_bucket'] === 0.8
-                && ! str_contains(json_encode($context), 'dentist');
-        })->once();
+        $this->assertCount(1, $logged);
+        $this->assertSame('override', $logged[0]['source']);
+        $this->assertTrue($logged[0]['overridden']);
+        $this->assertSame('log', $logged[0]['suggested']);
+        $this->assertSame('search', $logged[0]['chosen']);
+        $this->assertSame(0.8, $logged[0]['confidence_bucket']);
+        $this->assertStringNotContainsString('dentist', json_encode($logged[0]));
     }
 
     #[Test]
