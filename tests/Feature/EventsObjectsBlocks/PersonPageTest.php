@@ -10,6 +10,7 @@ use App\Models\Relationship;
 use App\Models\User;
 use App\Services\PersonProfileService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
@@ -78,9 +79,9 @@ class PersonPageTest extends TestCase
         $this->assertEqualsCanonicalizing([$tagged->id, $mentioned->id], $service->events($person)->pluck('id')->all());
         $this->assertSame(
             ['2026-10-05' => 1, '2026-10-07' => 1],
-            $service->calendar($person, \Illuminate\Support\Carbon::parse('2026-10-01'), 'UTC'),
+            $service->calendar($person, Carbon::parse('2026-10-01'), 'UTC'),
         );
-        $this->assertSame([$tagged->id], $service->eventsOn($person, \Illuminate\Support\Carbon::parse('2026-10-05'), 'UTC')->pluck('id')->all());
+        $this->assertSame([$tagged->id], $service->eventsOn($person, Carbon::parse('2026-10-05'), 'UTC')->pluck('id')->all());
     }
 
     #[Test]
