@@ -48,6 +48,18 @@ class ActionExecutor
             throw new ConfirmationRequired($action);
         }
 
+        if ($idempotencyKey !== null) {
+            $lockKey = 'actions:lock:' . hash('sha256', "{$user->id}:{$action->id}:{$idempotencyKey}");
+
+            return Cache::lock($lockKey, 120)->block(30, fn () => $this->runOnce($user, $action, $validated, $idempotencyKey));
+        }
+
+        return $this->runOnce($user, $action, $validated, null);
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function runOnce(User $user, ActionDefinition $action, array $validated, ?string $idempotencyKey): ActionReceipt
+    {
         $cacheKey = $idempotencyKey === null ? null : "actions:run:{$user->id}:{$action->id}:{$idempotencyKey}";
         if ($cacheKey !== null && is_string($previous = Cache::get($cacheKey))) {
             if ($receipt = ActionReceipt::find($user, $previous)) {
@@ -97,6 +109,13 @@ class ActionExecutor
 
     /** @throws ActionFailed */
     public function undo(User $user, string $receiptId): ActionReceipt
+    {
+        $lockKey = 'actions:undo:' . hash('sha256', "{$user->id}:{$receiptId}");
+
+        return Cache::lock($lockKey, 120)->block(30, fn () => $this->undoOnce($user, $receiptId));
+    }
+
+    private function undoOnce(User $user, string $receiptId): ActionReceipt
     {
         $receipt = ActionReceipt::find($user, $receiptId) ?? throw ActionFailed::notFound('Receipt');
 
