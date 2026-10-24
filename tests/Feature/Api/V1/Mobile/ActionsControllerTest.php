@@ -346,7 +346,7 @@ class ActionsControllerTest extends TestCase
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
         $this->integration->update(['name' => 'Monzo']);
 
-        $this->getJson('/api/v1/mobile/actions/resolve?q='.urlencode('sync monzo'))
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('sync monzo'))
             ->assertOk()
             ->assertJsonPath('data.status', 'matched')
             ->assertJsonPath('data.action.id', 'integrations.sync')
@@ -362,7 +362,7 @@ class ActionsControllerTest extends TestCase
         $other = $this->integrationFor($this->user);
         $other->update(['name' => 'Monzo Pot']);
 
-        $data = $this->getJson('/api/v1/mobile/actions/resolve?q='.urlencode('pause monzo'))
+        $data = $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('pause monzo'))
             ->assertOk()
             ->assertJsonPath('data.status', 'ambiguous')
             ->assertJsonCount(2, 'data.candidates')
@@ -378,7 +378,7 @@ class ActionsControllerTest extends TestCase
         $this->integration->update(['name' => 'Monzo']);
         $this->integrationFor($this->user)->update(['name' => 'Monzo Pot']);
 
-        $this->getJson('/api/v1/mobile/actions/resolve?q='.urlencode('resume Monzo'))
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('resume Monzo'))
             ->assertOk()
             ->assertJsonPath('data.status', 'matched')
             ->assertJsonPath('data.action.id', 'integrations.resume')
@@ -396,7 +396,7 @@ class ActionsControllerTest extends TestCase
         $theirs = $this->eventFor($this->integrationFor($stranger));
         $theirs->target()->associate(EventObject::factory()->create(['user_id' => $stranger->id, 'title' => 'Flat white at Pret']))->save();
 
-        $this->getJson('/api/v1/mobile/actions/resolve?q='.urlencode('delete flat white'))
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('delete flat white'))
             ->assertOk()
             ->assertJsonPath('data.status', 'matched')
             ->assertJsonPath('data.action.id', 'events.delete')
@@ -410,11 +410,11 @@ class ActionsControllerTest extends TestCase
         $event = $this->eventFor($this->integration);
         $event->target()->associate(EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'Parkrun']))->save();
 
-        $this->getJson('/api/v1/mobile/actions/resolve?q='.urlencode('tag parkrun'))
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('tag parkrun'))
             ->assertOk()
             ->assertJsonPath('data.status', 'incomplete');
 
-        $this->getJson('/api/v1/mobile/actions/resolve?q='.urlencode('tag parkrun #fitness'))
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('tag parkrun #fitness'))
             ->assertOk()
             ->assertJsonPath('data.status', 'matched')
             ->assertJsonPath('data.target.event_id', $event->id)
@@ -427,7 +427,7 @@ class ActionsControllerTest extends TestCase
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
         $this->integration->update(['name' => 'Monzo']);
 
-        $this->getJson('/api/v1/mobile/actions/resolve?q='.urlencode('pause monzo'))
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('pause monzo'))
             ->assertOk()
             ->assertJsonPath('data.status', 'none');
     }
@@ -437,9 +437,9 @@ class ActionsControllerTest extends TestCase
     {
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
 
-        $this->getJson('/api/v1/mobile/actions/resolve?q='.urlencode('juggle monzo'))
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('juggle monzo'))
             ->assertOk()->assertJsonPath('data.status', 'none');
-        $this->getJson('/api/v1/mobile/actions/resolve?q='.urlencode('sync nothing-here'))
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('sync nothing-here'))
             ->assertOk()->assertJsonPath('data.status', 'none');
         $this->getJson('/api/v1/mobile/actions/resolve?q=pause')
             ->assertOk()->assertJsonPath('data.status', 'incomplete');

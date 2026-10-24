@@ -52,7 +52,7 @@ final class ActionResolver
 
         $subject = trim(implode(' ', $words));
         if ($subject === '') {
-            return ['status' => 'incomplete', 'message' => 'Name what to '.$verb, 'action' => $action];
+            return ['status' => 'incomplete', 'message' => 'Name what to ' . $verb, 'action' => $action];
         }
 
         $field = $this->entityField($action);
@@ -156,6 +156,6 @@ final class ActionResolver
 
     private function like(string $subject): string
     {
-        return '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], strtolower($subject)).'%';
+        return '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], strtolower($subject)) . '%';
     }
 }
