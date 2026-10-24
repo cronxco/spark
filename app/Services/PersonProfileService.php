@@ -121,7 +121,8 @@ class PersonProfileService
      */
     public function eventsQuery(EventObject $person): Builder
     {
-        $mention = '%@' . addcslashes($person->title, '\\%_') . '%';
+        // PostgreSQL word boundaries prevent @Dan matching @Daniel or @Dan Smithson.
+        $mention = '(^|[^[:alnum:]_])@' . preg_quote($person->title, '/') . '([^[:alnum:]_]|$)';
 
         return Event::query()
             ->whereHas('integration', fn (Builder $query) => $query->where('user_id', $person->user_id))
@@ -139,7 +140,7 @@ class PersonProfileService
                         ->select('event_id')
                         ->where('block_type', CompactEventResource::NOTE_BLOCK_TYPE)
                         ->whereNull('deleted_at')
-                        ->whereRaw("metadata->>'content' ILIKE ?", [$mention]));
+                        ->whereRaw("metadata->>'content' ~* ?", [$mention]));
             });
     }
 
