@@ -11,6 +11,7 @@ use App\Services\Api\ResourceVersion;
 use App\Services\Mobile\EventLookup;
 use App\Services\Mobile\ObjectLookup;
 use App\Support\OwnedTagQuery;
+use App\Support\TagName;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -314,22 +315,7 @@ class TagsController extends Controller
 
     private function normaliseTag(string $value, ?string $type): array
     {
-        $name = trim($value);
-        $detectedType = $type !== null ? trim($type) : null;
-
-        if ($detectedType === null && preg_match('/^([A-Za-z0-9-]+)[_:](.+)$/', $name, $matches) === 1) {
-            $detectedType = strtolower($matches[1]);
-            $name = trim($matches[2]);
-        } elseif ($detectedType !== null
-            && preg_match('/^' . preg_quote($detectedType, '/') . '[_:](.+)$/i', $name, $matches) === 1) {
-            $name = trim($matches[1]);
-        }
-
-        $detectedType ??= preg_match('/^\p{Extended_Pictographic}(?:[\x{FE0F}\x{FE0E}])?(?:\x{200D}\p{Extended_Pictographic}(?:[\x{FE0F}\x{FE0E}])?)*$/u', $name) === 1
-            ? 'emoji'
-            : 'spark';
-
-        return [$name, $detectedType];
+        return TagName::normalise($value, $type);
     }
 
     private function paginate(Collection $items, ?string $cursor, int $limit): array

@@ -567,6 +567,72 @@ class LogControllerTest extends TestCase
         ])->assertUnprocessable();
     }
 
+    #[Test]
+    public function logs_a_reflection_as_a_document_object_with_a_logged_event(): void
+    {
+        $body = "Slow morning, good call to skip the gym.\nFelt better for it.";
+
+        $response = $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'reflection',
+            'idempotency_key' => 'reflect-1',
+            'body' => $body,
+            'with' => ['Dan'],
+        ])->assertCreated()
+            ->assertJsonPath('status', 'logged')
+            ->assertJsonPath('events.0.action', 'logged_reflection')
+            ->assertJsonPath('events.0.title', 'Slow morning, good call to skip the gym.');
+
+        $event = Event::with('target')->findOrFail($response->json('events.0.id'));
+        $this->assertSame('manual_log', $event->service);
+        $this->assertSame('knowledge', $event->domain);
+        $this->assertSame('document', $event->target->concept);
+        $this->assertSame('reflection', $event->target->type);
+        $this->assertSame($body, $event->target->content);
+        $this->assertNull($event->value);
+        Queue::assertNothingPushed();
+    }
+
+    #[Test]
+    public function a_reflection_keeps_an_explicit_title_and_is_idempotent(): void
+    {
+        $payload = ['kind' => 'reflection', 'idempotency_key' => 'reflect-2', 'title' => 'Sunday thoughts', 'body' => 'Quiet week.'];
+
+        $first = $this->postJson('/api/v1/mobile/log', $payload)->assertCreated()->assertJsonPath('events.0.title', 'Sunday thoughts');
+        $second = $this->postJson('/api/v1/mobile/log', $payload)->assertOk();
+
+        $this->assertSame($first->json('events.0.id'), $second->json('events.0.id'));
+        $this->assertSame(1, EventObject::where('type', 'reflection')->count());
+    }
+
+    #[Test]
+    public function a_reflection_needs_a_body_and_only_a_reflection_takes_one(): void
+    {
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'reflection', 'idempotency_key' => 'r'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['body']);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'wine', 'idempotency_key' => 'r', 'title' => 'Malbec', 'body' => 'x'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['body']);
+    }
+
+    #[Test]
+    public function a_reflection_preserves_a_zero_body_and_preview_writes_nothing(): void
+    {
+        $payload = ['kind' => 'reflection', 'idempotency_key' => 'reflect-zero', 'body' => '0'];
+
+        $this->postJson('/api/v1/mobile/log', $payload + ['dry_run' => true])
+            ->assertOk()
+            ->assertJsonPath('status', 'preview');
+        $this->assertSame(0, EventObject::where('type', 'reflection')->count());
+
+        $response = $this->postJson('/api/v1/mobile/log', $payload)->assertCreated();
+        $event = Event::with('target')->findOrFail($response->json('events.0.id'));
+        $this->assertSame('0', $event->target->title);
+        $this->assertSame('0', $event->target->content);
+        Queue::assertNothingPushed();
+    }
+
     private function person(string $title): Person
     {
         return Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => $title, 'time' => now(), 'metadata' => []]);

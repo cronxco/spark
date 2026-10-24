@@ -14,6 +14,8 @@ use App\Observers\BlockObserver;
 use App\Observers\EventObjectObserver;
 use App\Observers\EventObserver;
 use App\Observers\NotificationEntityObserver;
+use App\Services\Actions\ActionCatalogue;
+use App\Services\Actions\ActionRegistry;
 use App\Services\EffectiveTimezoneResolver;
 use App\Services\Notifications\NotificationDeliveryRecorder;
 use App\Services\Notifications\NotificationIncidentResolver;
@@ -51,6 +53,8 @@ class AppServiceProvider extends ServiceProvider
         // job. `scoped` (not `singleton`) so long-lived Horizon workers flush the
         // memo between jobs and pick up a freshly acknowledged timezone.
         $this->app->scoped(EffectiveTimezoneResolver::class);
+
+        $this->app->singleton(ActionRegistry::class, fn () => new ActionRegistry(ActionCatalogue::definitions()));
     }
 
     /**

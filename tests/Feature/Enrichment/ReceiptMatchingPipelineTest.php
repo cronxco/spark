@@ -229,7 +229,7 @@ class ReceiptMatchingPipelineTest extends TestCase
     {
         Queue::fake();
         $receipt = $this->receiptFor($this->alice, 1250, now(), 'Coffee Shop');
-        $transaction = $this->transactionFor($this->alice, 1250, now(), 'card_payment_to', 'Coffee Shop');
+        $transaction = $this->transactionFor($this->alice, 1250, now(), 'card_payment_to', 'Coffee Shop', $receipt->target_id);
         $actions = app(ReceiptMatchingActions::class);
         $actions->markNoMatch($receipt);
         $actions->retry($receipt);
@@ -263,7 +263,7 @@ class ReceiptMatchingPipelineTest extends TestCase
         return Integration::factory()->create(['user_id' => $user->id, 'service' => $service]);
     }
 
-    private function transactionFor(User $user, int $value, DateTimeInterface $at, string $action, string $merchant = 'Somewhere'): Event
+    private function transactionFor(User $user, int $value, DateTimeInterface $at, string $action, string $merchant = 'Somewhere', ?string $targetId = null): Event
     {
         return Event::factory()->create([
             'integration_id' => $this->integrationFor($user, 'monzo')->id,
@@ -272,7 +272,7 @@ class ReceiptMatchingPipelineTest extends TestCase
             'action' => $action,
             'value' => $value,
             'time' => $at,
-            'target_id' => EventObject::factory()->create(['user_id' => $user->id, 'title' => $merchant])->id,
+            'target_id' => $targetId ?? EventObject::factory()->create(['user_id' => $user->id, 'title' => $merchant])->id,
         ]);
     }
 
