@@ -8,21 +8,12 @@ use App\Models\EventObject;
 use App\Models\User;
 use App\Services\Flint\FlintRunToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AcknowledgeFlintNotesToolTest extends TestCase
 {
     use RefreshDatabase;
-
-    private function note(User $user, array $metadata = []): EventObject
-    {
-        return EventObject::factory()->create([
-            'user_id' => $user->id, 'concept' => 'document', 'type' => 'flint_note',
-            'content' => 'A note', 'metadata' => ['consent_version' => 'flint-note-v1', ...$metadata],
-        ]);
-    }
 
     #[Test]
     public function it_acknowledges_owned_notes_and_records_the_routine(): void
@@ -70,5 +61,13 @@ class AcknowledgeFlintNotesToolTest extends TestCase
         SparkServer::actingAs($user)->tool(AcknowledgeFlintNotesTool::class, ['note_ids' => ['nope']])->assertHasErrors();
         SparkServer::actingAs($user)->tool(AcknowledgeFlintNotesTool::class, ['note_ids' => [(string) $note->id], 'run_token' => $token])->assertHasErrors();
         $this->assertArrayNotHasKey('acknowledged_at', $note->refresh()->metadata);
+    }
+
+    private function note(User $user, array $metadata = []): EventObject
+    {
+        return EventObject::factory()->create([
+            'user_id' => $user->id, 'concept' => 'document', 'type' => 'flint_note',
+            'content' => 'A note', 'metadata' => ['consent_version' => 'flint-note-v1', ...$metadata],
+        ]);
     }
 }
