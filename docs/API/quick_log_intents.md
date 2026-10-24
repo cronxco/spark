@@ -94,3 +94,7 @@ It creates a `reflection` document object (the text is its content) and a `logge
 
 - `@flint` is reserved and cannot be overridden to another intent.
 - The confidence threshold is 0.7 (70%). Lower-confidence input requires a choice before saving.
+
+## Linking people on `POST /log`
+
+`with` names people exactly (or creates them). To link people `classify` already matched (`@dan` is Daniel), send their ids as `with_ids` (UUIDs, max 10). Ids that are not the user's people are ignored, and an id is never duplicated by a matching name in `with`. Send `with` only for people nobody matched.
