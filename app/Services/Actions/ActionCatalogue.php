@@ -68,9 +68,6 @@ final class ActionCatalogue
             capability: 'flint:run',
             handler: RunFlintRoutine::class,
             params: ['skill' => $skill],
-            // `flint:run` is not in SparkAbility::MOBILE_SESSION, so a phone could
-            // never run these. Web only until that grant is decided.
-            surfaces: ['web'],
         );
 
         return [
