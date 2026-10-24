@@ -178,12 +178,41 @@ class SearchContractTest extends TestCase
     public function results_are_tenant_scoped(): void
     {
         $other = User::factory()->create();
-        EventObject::factory()->create(['user_id' => $other->id, 'title' => 'coffee secrets']);
-        Place::factory()->create(['user_id' => $other->id, 'title' => 'Coffee secret place']);
+        $otherGroup = IntegrationGroup::factory()->create(['user_id' => $other->id, 'service' => 'monzo']);
+        $otherIntegration = Integration::factory()->create([
+            'user_id' => $other->id,
+            'integration_group_id' => $otherGroup->id,
+            'service' => 'monzo',
+            'name' => 'coffee other',
+        ]);
+        $otherObject = EventObject::factory()->create(['user_id' => $other->id, 'title' => 'coffee secrets']);
+        $otherPlace = Place::factory()->create(['user_id' => $other->id, 'title' => 'Coffee secret place']);
+        $otherEvent = Event::factory()->create([
+            'integration_id' => $otherIntegration->id,
+            'service' => 'monzo',
+            'action' => 'coffee_payment_to',
+            'actor_id' => $otherObject->id,
+            'target_id' => $otherObject->id,
+        ]);
+        $otherBlock = Block::factory()->create(['event_id' => $otherEvent->id, 'block_type' => 'summary', 'title' => 'Coffee spend']);
+        $otherMetric = MetricStatistic::factory()->create(['user_id' => $other->id, 'service' => 'coffee', 'action' => 'had_coffee_count']);
+        $otherEvent->attachTag('coffee-secret');
 
         $response = $this->getJson('/api/v1/mobile/search?contract_version=1&query=coffee')->assertOk()->json();
+        $ids = collect($response['results'])->pluck('id')->all();
 
-        $this->assertSame([], $response['results']);
+        foreach ([$otherIntegration->id, $otherObject->id, $otherPlace->id, $otherEvent->id, $otherBlock->id] as $foreign) {
+            $this->assertNotContains((string) $foreign, $ids, 'Another tenant\'s record leaked into search.');
+        }
+        $this->assertNotContains('coffee.coffee_count', $ids);
+        $this->assertNotContains((string) $otherMetric->id, $ids);
+        $this->assertSame([], collect($response['results'])->where('kind', 'tag')->all());
+
+        $this->assertSame(
+            [(string) $this->integration->id],
+            collect($response['results'])->where('kind', 'integration')->pluck('id')->values()->all(),
+            'Only the signed-in user\'s own integration matches.',
+        );
     }
 
     #[Test]
