@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\CapturedBookmarksController;
+use App\Http\Controllers\Api\V1\Mobile\ActionsController;
 use App\Http\Controllers\Api\V1\Mobile\AnomaliesController;
 use App\Http\Controllers\Api\V1\Mobile\ApiTokensController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController;
@@ -326,6 +327,24 @@ Route::post('captures', [CapturesController::class, 'store'])
 Route::post('log', [LogController::class, 'store'])
     ->middleware('spark.ability:data:write')
     ->name('log.store');
+
+/*
+ * Native Actions. The registry declares each action's capability, so these
+ * routes only require a mobile session; ActionsController checks the token
+ * against the action it is asked to list, run or undo.
+ */
+Route::get('actions', [ActionsController::class, 'index'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.index');
+Route::get('actions/receipts/{id}', [ActionsController::class, 'receipt'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.receipts.show');
+Route::post('actions/receipts/{id}/undo', [ActionsController::class, 'undo'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.receipts.undo');
+Route::post('actions/{action}/run', [ActionsController::class, 'run'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.run');
 
 /*
 |--------------------------------------------------------------------------
