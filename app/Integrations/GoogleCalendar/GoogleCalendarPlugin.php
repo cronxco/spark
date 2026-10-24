@@ -667,7 +667,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'time' => $startTime,
                 'actor_id' => $calendarObject->id,
                 'target_id' => $eventObject->id,
-                'service' => 'google_calendar',
+                'service' => self::getIdentifier(),
                 'domain' => self::getDomain(),
                 'action' => $actionType,
                 'value' => $durationMinutes,

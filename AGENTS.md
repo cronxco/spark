@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Spark is a Laravel 12 and Livewire 3 application. Core PHP code lives in `app/`, with integration plugins under `app/Integrations/`, console commands in `app/Console/Commands/`, and helpers in `app/Support/`. Routes are split by surface in `routes/web.php`, `routes/api.php`, `routes/mobile.php`, and related files. Database migrations, factories, and seeders are in `database/`. Frontend entry points are in `resources/js/` and `resources/css/`, built by Vite into `public/`. Tests are in `tests/Unit/` and `tests/Feature/`. Architecture and integration notes are in `docs/Architecture/` and `docs/Integrations/`.
+Spark is a Laravel 13 and Livewire 3 application. Core PHP code lives in `app/`, with integration plugins under `app/Integrations/`, console commands in `app/Console/Commands/`, and helpers in `app/Support/`. Routes are split by surface in `routes/web.php`, `routes/api.php`, `routes/mobile.php`, and related files. Database migrations, factories, and seeders are in `database/`. Frontend entry points are in `resources/js/` and `resources/css/`, built by Vite into `public/`. Tests are in `tests/Unit/` and `tests/Feature/`. Architecture and integration notes are in `docs/Architecture/` and `docs/Integrations/`.
 
 ## Build, Test, and Development Commands
 

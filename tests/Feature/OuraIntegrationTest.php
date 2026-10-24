@@ -720,4 +720,13 @@ class OuraIntegrationTest extends TestCase
         $this->assertEquals($multiplier, $event->value_multiplier);
         $this->assertEquals('restored', $event->event_metadata['original_day_summary']);
     }
+
+    #[Test]
+    public function workout_activity_names_are_normalised_to_snake_case(): void
+    {
+        $this->assertSame('strength_training', OuraPlugin::normaliseActivityType('strengthTraining'));
+        $this->assertSame('horseback_riding', OuraPlugin::normaliseActivityType('horsebackRiding'));
+        $this->assertSame('hiit', OuraPlugin::normaliseActivityType('HIIT'));
+        $this->assertSame('walking', OuraPlugin::normaliseActivityType('walking'));
+    }
 }

@@ -169,6 +169,14 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
     public static function getBlockTypes(): array
     {
         return [
+            'fetch_content' => [
+                'icon' => 'fas.file-code',
+                'display_name' => 'Raw Content',
+                'description' => 'Extracted page content the summaries are generated from',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
             'fetch_summary_tweet' => [
                 'icon' => 'fas.comment',
                 'display_name' => 'Tweet Summary',

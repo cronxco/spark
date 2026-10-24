@@ -16,18 +16,6 @@ class VivinoEnrichmentPullTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const RESULT_HTML = <<<'HTML'
-        <html><body>
-            <div data-testid="wineCard">
-                <a data-testid="wineNameLink" href="https://www.vivino.com/wines/1234">
-                    <span data-testid="wineName">Malbec Reserva 2021</span>
-                </a>
-                <span data-testid="wineryName">Bodega Test</span>
-                <span data-testid="ratingStars" aria-label="Rated 4.2 out of 5"></span>
-            </div>
-        </body></html>
-        HTML;
-
     #[Test]
     public function searches_vivino_and_dispatches_the_data_job_on_a_match(): void
     {
@@ -36,14 +24,31 @@ class VivinoEnrichmentPullTest extends TestCase
         $this->mock(PlaywrightFetchClient::class)
             ->shouldReceive('fetch')
             ->once()
-            ->withArgs(fn (string $url, $group) => str_contains($url, 'q=Malbec+Reserva'))
-            ->andReturn(['success' => true, 'html' => self::RESULT_HTML]);
+            ->withArgs(fn (string $url, $group) => str_contains($url, 'q=Raquillet+Mercurey'))
+            ->andReturn(['success' => true, 'html' => $this->resultHtml()]);
 
         $integration = Integration::factory()->create(['service' => 'manual_log']);
 
-        VivinoEnrichmentPull::dispatchSync($integration, 'event-id', 'Malbec Reserva');
+        VivinoEnrichmentPull::dispatchSync($integration, 'event-id', 'Raquillet Mercurey');
 
         Queue::assertPushed(VivinoEnrichmentData::class, 1);
+    }
+
+    #[Test]
+    public function does_not_dispatch_the_data_job_when_the_best_card_is_an_unrelated_wine(): void
+    {
+        Queue::fake([VivinoEnrichmentData::class]);
+
+        $this->mock(PlaywrightFetchClient::class)
+            ->shouldReceive('fetch')
+            ->once()
+            ->andReturn(['success' => true, 'html' => $this->resultHtml()]);
+
+        $integration = Integration::factory()->create(['service' => 'manual_log']);
+
+        VivinoEnrichmentPull::dispatchSync($integration, 'event-id', 'Cafe Francois Rouge');
+
+        Queue::assertNotPushed(VivinoEnrichmentData::class);
     }
 
     #[Test]
@@ -95,5 +100,10 @@ class VivinoEnrichmentPullTest extends TestCase
         VivinoEnrichmentPull::dispatchSync($integration, 'event-id', 'Malbec');
 
         Queue::assertNotPushed(VivinoEnrichmentData::class);
+    }
+
+    private function resultHtml(): string
+    {
+        return file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'));
     }
 }

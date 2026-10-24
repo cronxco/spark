@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
 use App\Http\Controllers\Api\V1\Mobile\KnowledgeReprocessingController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\LocationsController;
+use App\Http\Controllers\Api\V1\Mobile\LogController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
@@ -320,6 +321,10 @@ Route::post('bookmarks/capture', [CapturedBookmarksController::class, 'store'])
 Route::post('captures', [CapturesController::class, 'store'])
     ->middleware('spark.ability:data:write')
     ->name('captures.store');
+
+Route::post('log', [LogController::class, 'store'])
+    ->middleware('spark.ability:data:write')
+    ->name('log.store');
 
 /*
 |--------------------------------------------------------------------------
