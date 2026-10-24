@@ -2,30 +2,36 @@
 
 namespace App\Services\Ai;
 
+use App\Ai\Agents\ChatAgent;
 use App\Models\Event;
 use App\Models\Integration;
 use Exception;
 use Illuminate\Support\Facades\Log;
-use OpenAI\Laravel\Facades\OpenAI;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Messages\Message;
+use Laravel\Ai\Responses\AgentResponse;
 use RuntimeException;
 
 /**
  * The single path every chat completion in Spark takes.
  *
- * Owns Sentry tracing, the reasoning-model temperature guard, retries, the
- * tool-calling conversation, JSON decoding and integration logging, so no call
- * site has to reimplement any of it — and so no call site can quietly skip the
- * tracing.
+ * Owns Sentry tracing, the reasoning-model temperature guard, retries, usage
+ * accounting, JSON decoding and integration logging around a laravel/ai
+ * agent, so no call site has to reimplement any of it — and so no call site
+ * can quietly skip the tracing. Tool calling is laravel/ai's own loop; each
+ * tool run is traced by {@see AiToolTracing}.
  */
 class ChatClient
 {
     private const RETRY_DELAY_SECONDS = 2;
 
+    private const PROVIDER = 'openai';
+
     /**
      * Run a completion and return the assistant's text.
      *
-     * @param  array<int, array<string, mixed>>  $messages
-     * @param  array{temperature?: float, max_completion_tokens?: int, json?: bool, tools?: array, tool_executor?: callable(string, array): mixed, max_tool_rounds?: int, retries?: int, service?: string, integration_id?: string, context?: array<string, mixed>, usage_context?: AiUsageContext}  $options
+     * @param  array<int, array{role: string, content: string}>  $messages
+     * @param  array{temperature?: float, max_completion_tokens?: int, json?: bool, tools?: array<int, Tool>, max_tool_rounds?: int, retries?: int, timeout?: int, service?: string, integration_id?: string, context?: array<string, mixed>, usage_context?: AiUsageContext}  $options
      */
     public function text(AiModel $role, array $messages, array $options = []): string
     {
@@ -66,7 +72,7 @@ class ChatClient
     /**
      * Run a completion in JSON mode and return the decoded payload.
      *
-     * @param  array<int, array<string, mixed>>  $messages
+     * @param  array<int, array{role: string, content: string}>  $messages
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
@@ -83,116 +89,99 @@ class ChatClient
     }
 
     /**
-     * One completion, or a whole tool-calling conversation when a tool
-     * executor is supplied. Each round is its own traced API call.
+     * One prompt to the agent. With tools, laravel/ai runs the tool-calling
+     * conversation for up to `max_tool_rounds` rounds before a final answer.
      *
-     * @param  array<int, array<string, mixed>>  $messages
+     * @param  array<int, array{role: string, content: string}>  $messages
      * @param  array<string, mixed>  $options
      */
     private function converse(string $model, array $messages, array $options): string
     {
-        $toolExecutor = $options['tool_executor'] ?? null;
-        $maxToolRounds = $options['max_tool_rounds'] ?? 3;
-        $toolRounds = 0;
+        [$agent, $prompt] = $this->agent($model, $messages, $options);
+        $usageContext = $this->usageContext($options);
+        $reservation = $usageContext ? app(AiUsageRecorder::class)->reserve(
+            $usageContext,
+            $model,
+            $this->estimatedReservation($messages, $options),
+        ) : null;
 
-        while (true) {
-            $payload = $this->payload($model, $messages, $options);
-            $usageContext = $this->usageContext($options);
-            $reservation = $usageContext ? app(AiUsageRecorder::class)->reserve(
-                $usageContext,
-                $model,
-                $this->estimatedReservation($messages, $options),
-            ) : null;
+        $span = start_ai_request_span($model, $messages, [
+            'temperature' => $options['temperature'] ?? null,
+            'max_completion_tokens' => $options['max_completion_tokens'] ?? null,
+        ]);
 
-            $span = start_ai_request_span($model, $messages, [
-                'temperature' => $options['temperature'] ?? null,
-                'max_completion_tokens' => $options['max_completion_tokens'] ?? null,
-            ]);
+        $this->logRequest($model, $options);
 
-            $this->logRequest($model, $options, $toolRounds);
+        $usage = [];
+        $finishReason = null;
+        $requestSucceeded = false;
 
-            $usage = [];
-            $finishReason = null;
-            $requestSucceeded = false;
-
-            try {
-                $response = OpenAI::chat()->create($payload);
-                $message = $response->choices[0]->message;
-                $usage = $response->usage ? $response->usage->toArray() : [];
-                $finishReason = $response->choices[0]->finishReason ?? null;
-                $requestSucceeded = true;
-            } catch (Exception $exception) {
-                if ($reservation) {
-                    $this->failAccountingSafely($reservation);
-                }
-
-                throw $exception;
-            } finally {
-                finish_ai_request_span($span, $usage, $finishReason, $requestSucceeded);
-            }
-
+        try {
+            $response = $agent->prompt($prompt, provider: self::PROVIDER, model: $model, timeout: $options['timeout'] ?? null);
+            $usage = $response->usage->toArray();
+            $finishReason = $response->steps->last()?->finishReason->value;
+            $requestSucceeded = true;
+        } catch (Exception $exception) {
             if ($reservation) {
-                $this->completeAccountingSafely($reservation, $usage, $response->id ?? null);
+                $this->failAccountingSafely($reservation);
             }
 
-            $this->logResponse($model, $options, $response, $usage, $finishReason, $toolRounds);
-
-            if (empty($message->toolCalls) || $toolExecutor === null || $toolRounds >= $maxToolRounds) {
-                return $message->content ?? '';
-            }
-
-            $messages[] = $message->toArray();
-
-            foreach ($message->toolCalls as $toolCall) {
-                $arguments = json_decode($toolCall->function->arguments, true) ?? [];
-                $toolSpan = start_ai_tool_span($toolCall->function->name);
-                $toolSucceeded = false;
-                try {
-                    $toolResult = ($toolExecutor)($toolCall->function->name, $arguments);
-                    $toolSucceeded = true;
-                } finally {
-                    finish_ai_tool_span($toolSpan, $toolSucceeded);
-                }
-
-                $messages[] = [
-                    'role' => 'tool',
-                    'tool_call_id' => $toolCall->id,
-                    'content' => is_string($toolResult) ? $toolResult : json_encode($toolResult),
-                ];
-            }
-
-            $toolRounds++;
+            throw $exception;
+        } finally {
+            finish_ai_request_span($span, $usage, $finishReason, $requestSucceeded);
         }
+
+        if ($reservation) {
+            $this->completeAccountingSafely($reservation, $response, $response->raw?->json('id'));
+        }
+
+        $this->logResponse($model, $options, $response, $finishReason);
+
+        return $response->text;
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $messages
+     * Split OpenAI-style messages into the agent's instructions, history and
+     * the prompt itself: system messages become the instructions and the last
+     * message is the prompt.
+     *
+     * @param  array<int, array{role: string, content: string}>  $messages
      * @param  array<string, mixed>  $options
-     * @return array<string, mixed>
+     * @return array{0: ChatAgent, 1: string}
      */
-    private function payload(string $model, array $messages, array $options): array
+    private function agent(string $model, array $messages, array $options): array
     {
-        $payload = ['model' => $model, 'messages' => $messages];
+        $instructions = [];
+        $history = [];
 
-        if (isset($options['max_completion_tokens'])) {
-            $payload['max_completion_tokens'] = $options['max_completion_tokens'];
+        foreach ($messages as $message) {
+            if ($message['role'] === 'system') {
+                $instructions[] = (string) $message['content'];
+            } else {
+                $history[] = new Message($message['role'], (string) $message['content']);
+            }
         }
 
-        // GPT-5 and o-series reasoning models reject any temperature other than
-        // their default with a 400, so it is only sent where it is supported.
-        if (isset($options['temperature']) && ! $this->isReasoningModel($model)) {
-            $payload['temperature'] = $options['temperature'];
+        $last = array_pop($history);
+        if ($last === null) {
+            throw new RuntimeException('A chat completion needs at least one non-system message.');
         }
 
-        if (! empty($options['json'])) {
-            $payload['response_format'] = ['type' => 'json_object'];
-        }
+        $tools = $options['tools'] ?? [];
 
-        if (isset($options['tools'])) {
-            $payload['tools'] = $options['tools'];
-        }
+        $agent = new ChatAgent(
+            instructions: implode("\n\n", $instructions),
+            history: $history,
+            tools: $tools,
+            maxTokens: $options['max_completion_tokens'] ?? null,
+            // GPT-5 and o-series reasoning models reject any temperature other
+            // than their default with a 400, so it is only sent where supported.
+            temperature: isset($options['temperature']) && ! $this->isReasoningModel($model) ? (float) $options['temperature'] : null,
+            maxSteps: $tools === [] ? 1 : ($options['max_tool_rounds'] ?? 3) + 1,
+            json: ! empty($options['json']),
+        );
 
-        return $payload;
+        return [$agent, (string) $last->content];
     }
 
     private function isReasoningModel(string $model): bool
@@ -252,11 +241,10 @@ class ChatClient
             : null;
     }
 
-    /** @param array<string, mixed> $usage */
-    private function completeAccountingSafely(AiUsageReservation $reservation, array $usage, ?string $requestId): void
+    private function completeAccountingSafely(AiUsageReservation $reservation, AgentResponse $response, ?string $requestId): void
     {
         try {
-            app(AiUsageRecorder::class)->complete($reservation, AiTokenUsage::fromArray($usage), $requestId);
+            app(AiUsageRecorder::class)->complete($reservation, AiTokenUsage::fromSdk($response->usage), $requestId);
         } catch (Exception $exception) {
             report($exception);
             Log::error('AI usage accounting failed after a completed chat request', [
@@ -278,7 +266,7 @@ class ChatClient
     /**
      * @param  array<string, mixed>  $options
      */
-    private function logRequest(string $model, array $options, int $toolRound): void
+    private function logRequest(string $model, array $options): void
     {
         if (empty($options['integration_id'])) {
             return;
@@ -286,19 +274,18 @@ class ChatClient
 
         log_integration_api_request(
             $options['service'] ?? 'openai',
-            'chat.completions',
-            'openai/chat/completions',
+            'responses',
+            'openai/responses',
             [],
-            array_merge($options['context'] ?? [], ['model' => $model, 'tool_round' => $toolRound]),
+            array_merge($options['context'] ?? [], ['model' => $model]),
             $options['integration_id']
         );
     }
 
     /**
      * @param  array<string, mixed>  $options
-     * @param  array<string, mixed>  $usage
      */
-    private function logResponse(string $model, array $options, mixed $response, array $usage, ?string $finishReason, int $toolRound): void
+    private function logResponse(string $model, array $options, AgentResponse $response, ?string $finishReason): void
     {
         if (empty($options['integration_id'])) {
             return;
@@ -306,17 +293,18 @@ class ChatClient
 
         log_integration_api_response(
             $options['service'] ?? 'openai',
-            'chat.completions',
-            'openai/chat/completions',
+            'responses',
+            'openai/responses',
             200,
-            json_encode($response->toArray()),
+            json_encode(['text' => $response->text, 'usage' => $response->usage->toArray()]),
             array_merge($options['context'] ?? [], [
                 'model' => $model,
-                'tool_round' => $toolRound,
+                'steps' => $response->steps->count(),
+                'tool_calls' => $response->toolCalls->count(),
                 'tokens' => [
-                    'prompt' => $usage['prompt_tokens'] ?? 0,
-                    'completion' => $usage['completion_tokens'] ?? 0,
-                    'total' => $usage['total_tokens'] ?? 0,
+                    'prompt' => $response->usage->inputTokens,
+                    'completion' => $response->usage->outputTokens,
+                    'total' => $response->usage->totalTokens(),
                 ],
                 'finish_reason' => $finishReason,
             ]),

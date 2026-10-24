@@ -2,6 +2,9 @@
 
 namespace App\Services\Ai;
 
+use Laravel\Ai\Responses\Data\TextUsage;
+use Laravel\Ai\Responses\Data\Usage;
+
 final readonly class AiTokenUsage
 {
     public function __construct(
@@ -22,6 +25,16 @@ final readonly class AiTokenUsage
             outputTokens: (int) ($usage['output_tokens'] ?? $usage['completion_tokens'] ?? 0),
             cachedTokens: (int) ($inputDetails['cached_tokens'] ?? 0),
             reasoningTokens: (int) ($outputDetails['reasoning_tokens'] ?? 0),
+        );
+    }
+
+    public static function fromSdk(Usage $usage): self
+    {
+        return new self(
+            inputTokens: $usage->inputTokens,
+            outputTokens: $usage->outputTokens,
+            cachedTokens: $usage instanceof TextUsage ? (int) $usage->cacheReadInputTokens : 0,
+            reasoningTokens: $usage instanceof TextUsage ? (int) $usage->reasoningTokens : 0,
         );
     }
 

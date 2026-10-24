@@ -13,10 +13,8 @@ use App\Services\TaskPipeline\TaskDefinition;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-use OpenAI\Laravel\Facades\OpenAI;
-use OpenAI\Resources\Chat;
-use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Fixtures\FakeOpenAi;
 use Tests\TestCase;
 
 class FetchGenerateSummariesTaskTest extends TestCase
@@ -26,7 +24,7 @@ class FetchGenerateSummariesTaskTest extends TestCase
     #[Test]
     public function it_generates_fetch_summary_blocks_and_marks_success(): void
     {
-        $fake = OpenAI::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
+        FakeOpenAi::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
 
         [$event, $webpage] = $this->fetchEvent(content: 'Clean article text');
 
@@ -41,7 +39,7 @@ class FetchGenerateSummariesTaskTest extends TestCase
         ])->count());
         $this->assertNotEmpty($webpage->refresh()->metadata['extracted_at']);
         $this->assertSame('success', $event->refresh()->event_metadata['task_executions']['fetch_generate_summaries']['last_attempt']['status']);
-        $fake->assertSent(Chat::class, 1);
+        $this->assertCount(1, FakeOpenAi::requests());
     }
 
     #[Test]
@@ -84,7 +82,7 @@ class FetchGenerateSummariesTaskTest extends TestCase
             ['tag' => 'Current affairs', 'tag_type' => 'topic-tag'],
             ['tag' => 'London', 'tag_type' => 'place-tag'],
         ];
-        OpenAI::fake([$this->openAiResponse(json_encode($payload))]);
+        FakeOpenAi::fake([$this->openAiResponse(json_encode($payload))]);
         [$event, $webpage] = $this->fetchEvent(content: 'Clean article text');
         $event->attachTags(['Old topic'], 'topic-tag');
         $webpage->attachTags(['Old topic'], 'topic-tag');
@@ -100,7 +98,7 @@ class FetchGenerateSummariesTaskTest extends TestCase
     #[Test]
     public function it_rolls_back_all_enrichment_writes_when_a_later_write_fails(): void
     {
-        OpenAI::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
+        FakeOpenAi::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
         [$event, $webpage] = $this->fetchEvent(content: 'Clean article text');
         $event->attachTags(['Original topic'], 'topic-tag');
         EventObject::updating(function (EventObject $object): void {
@@ -192,17 +190,9 @@ class FetchGenerateSummariesTaskTest extends TestCase
         ];
     }
 
-    private function openAiResponse(string $content): CreateResponse
+    /** @return array<string, mixed> */
+    private function openAiResponse(string $content): array
     {
-        return CreateResponse::fake([
-            'choices' => [
-                [
-                    'message' => [
-                        'role' => 'assistant',
-                        'content' => $content,
-                    ],
-                ],
-            ],
-        ]);
+        return FakeOpenAi::text($content);
     }
 }

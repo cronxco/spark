@@ -3,30 +3,39 @@
 namespace App\Services\Ai;
 
 use Exception;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
+use Laravel\Ai\Embeddings;
+use Laravel\Ai\Exceptions\FailoverableException;
+use Laravel\Ai\Exceptions\InsufficientCreditsException;
+use Laravel\Ai\Responses\EmbeddingsResponse;
+use Throwable;
 
+/**
+ * Text embeddings for semantic search, through laravel/ai's OpenAI provider.
+ *
+ * Adds what the SDK leaves to the application: retries, a model- and
+ * dimension-versioned cache, vector validation, usage accounting and tracing.
+ */
 class EmbeddingClient
 {
-    private ?string $apiKey;
+    private const PROVIDER = 'openai';
 
-    private ?string $organization;
+    private const ATTEMPTS = 3;
 
     private string $model;
-
-    private string $apiUrl = 'https://api.openai.com/v1/embeddings';
 
     private int $dimensions = 1536;
 
     public function __construct(private int $retryDelayMilliseconds = 1000)
     {
-        $this->apiKey = config('services.openai.api_key');
-        $this->organization = config('services.openai.organization');
         $this->model = AiModel::Embedding->model();
 
-        if (empty($this->apiKey)) {
+        if (empty(config('services.openai.api_key'))) {
             throw new Exception('OpenAI API key is not configured');
         }
     }
@@ -198,56 +207,25 @@ class EmbeddingClient
         $requestSucceeded = false;
 
         try {
-            $headers = [
-                'Authorization' => 'Bearer ' . $this->apiKey,
-                'Content-Type' => 'application/json',
-                'X-Client-Request-Id' => $clientRequestId,
-            ];
-
-            if ($this->organization) {
-                $headers['OpenAI-Organization'] = $this->organization;
-            }
-
             $span = start_ai_request_span($this->model, array_map(
                 fn (string $text) => ['role' => 'user', 'content' => $text],
                 array_values($truncatedTexts)
             ), []);
 
-            $response = Http::withHeaders($headers)
-                ->timeout(30)
-                ->retry(3, $this->retryDelayMilliseconds)
-                ->post($this->apiUrl, [
-                    'input' => array_values($truncatedTexts),
-                    'model' => $this->model,
-                    'dimensions' => $this->dimensions,
-                ]);
+            $response = $this->generate(array_values($truncatedTexts), $clientRequestId);
+            $usage = $response->usage->toArray();
 
-            if (! $response->successful()) {
-                Log::error('OpenAI API error', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-                throw new Exception('OpenAI API returned error: ' . $response->body());
-            }
-
-            $data = $response->json();
-            $usage = $data['usage'] ?? [];
-
-            if (! isset($data['data']) || ! is_array($data['data'])) {
-                throw new Exception('Invalid response from OpenAI API');
-            }
-
-            if (count($data['data']) !== count($texts)) {
+            if (count($response->embeddings) !== count($texts)) {
                 throw new Exception('OpenAI API returned an unexpected number of embeddings');
             }
 
-            $embeddings = array_map(function ($item, $index) {
-                if (! isset($item['embedding']) || ! is_array($item['embedding'])) {
+            $embeddings = array_map(function ($embedding, $index) {
+                if (! is_array($embedding)) {
                     throw new Exception("OpenAI API response missing embedding at index {$index}");
                 }
 
-                return $this->validateEmbedding($item['embedding']);
-            }, $data['data'], array_keys($data['data']));
+                return $this->validateEmbedding($embedding);
+            }, $response->embeddings, array_keys($response->embeddings));
 
             $requestSucceeded = true;
             if ($reservation) {
@@ -269,6 +247,54 @@ class EmbeddingClient
         } finally {
             finish_ai_request_span($span, $usage, null, $requestSucceeded);
         }
+    }
+
+    /**
+     * One embeddings request, retried on connection failures, rate limits and
+     * server errors. A client error is the request's fault and is not retried.
+     *
+     * @param  array<int, string>  $texts
+     */
+    private function generate(array $texts, string $clientRequestId): EmbeddingsResponse
+    {
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                return Embeddings::for($texts)
+                    ->dimensions($this->dimensions)
+                    ->timeout(30)
+                    ->withHeaders(['X-Client-Request-Id' => $clientRequestId])
+                    ->generate(self::PROVIDER, $this->model);
+            } catch (Throwable $e) {
+                if ($attempt >= self::ATTEMPTS || ! $this->isRetryable($e)) {
+                    Log::error('OpenAI API error', ['attempt' => $attempt, 'error' => $e->getMessage()]);
+
+                    throw new Exception('OpenAI API returned error: ' . $this->errorBody($e), 0, $e);
+                }
+
+                Sleep::for($this->retryDelayMilliseconds)->milliseconds();
+            }
+        }
+    }
+
+    private function isRetryable(Throwable $e): bool
+    {
+        if ($e instanceof InsufficientCreditsException) {
+            return false;
+        }
+
+        if ($e instanceof FailoverableException || $e instanceof ConnectionException) {
+            return true;
+        }
+
+        return $e instanceof RequestException && ($e->response->serverError() || $e->response->status() === 429);
+    }
+
+    private function errorBody(Throwable $e): string
+    {
+        $previous = $e->getPrevious();
+        $request = $e instanceof RequestException ? $e : ($previous instanceof RequestException ? $previous : null);
+
+        return mb_substr(redact_sensitive_urls($request?->response->body() ?? $e->getMessage()), 0, 500);
     }
 
     private function cacheKey(string $truncatedText): string

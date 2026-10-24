@@ -2,17 +2,24 @@
 
 namespace Tests\Feature\Services\Ai;
 
+use App\Ai\Tools\Skills\SkillToolSource;
 use App\Models\ActionProgress;
 use App\Models\User;
 use App\Services\Ai\SkillRegistry;
 use App\Services\Ai\SkillRunner;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Auth;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
+use Tests\Fixtures\FakeOpenAi;
+use Tests\Fixtures\FakeSkillTools;
 use Tests\TestCase;
 
 class SkillRunnerTest extends TestCase
 {
+    private const CRONXTOOLS = 'https://mcp.example.test/token/sse';
+
+    private const YOU = 'https://api.you.com/mcp?profile=free';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -20,137 +27,149 @@ class SkillRunnerTest extends TestCase
         config([
             'services.openai.api_key' => 'test-key',
             'services.openai.models.reasoning' => 'test-reasoning-model',
-            'services.flint_routine.cronxtools_url' => 'https://mcp.example.test/token/sse',
+            'services.flint_routine.cronxtools_url' => self::CRONXTOOLS,
+            'services.flint_routine.you_mcp_url' => null,
         ]);
     }
 
     #[Test]
-    public function it_accepts_only_a_completed_response_with_the_required_write_tool(): void
+    public function it_accepts_a_run_that_completes_the_required_write_tool(): void
     {
-        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody())]);
-        $user = User::factory()->create();
+        $tools = $this->fakeTools();
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['spark__create-flint-digest', ['title' => 'News']]], ['input_tokens' => 10, 'output_tokens' => 2]),
+            FakeOpenAi::text('Done.', ['input_tokens' => 5, 'output_tokens' => 3]),
+        ]);
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
-        $result = app(SkillRunner::class)->run($user, $skill, ['routine' => 'news_roundup']);
+        $result = app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
 
         $this->assertSame('evt-created', $result->eventId);
-        $this->assertSame('resp-one', $result->responseId);
+        $this->assertSame('Done.', $result->text);
+        $this->assertSame(['spark__create-flint-digest'], $result->toolsCalled);
         $this->assertSame(15, $result->inputTokens);
         $this->assertSame(5, $result->outputTokens);
-        $this->assertCount(1, $result->continuation->mcpListTools);
+        $this->assertNotEmpty($result->responseId);
+        $this->assertSame([['spark__create-flint-digest', ['title' => 'News']]], $tools->calls);
 
-        Http::assertSent(function ($request) use ($skill) {
-            $this->assertTrue($request['stream']);
-            $this->assertSame($skill->maxToolCalls, $request['max_tool_calls']);
-            $this->assertArrayNotHasKey('max_tool_calls', $request['tools'][0]);
-
-            return true;
-        });
+        $request = FakeOpenAi::requests()[0];
+        $this->assertSame('test-reasoning-model', $request['model']);
+        $this->assertSame(['routine' => 'news_roundup'], json_decode(collect($request['input'])->firstWhere('role', 'user')['content'][0]['text'], true));
+        $this->assertStringContainsString('Flint News Roundup', json_encode($request['input']));
     }
 
     #[Test]
-    public function it_rejects_incomplete_tool_errors_and_missing_required_writes(): void
+    public function only_the_manifest_tools_are_offered_under_their_manifest_names(): void
+    {
+        $this->fakeTools();
+        FakeOpenAi::fake([FakeOpenAi::text('Nothing to do.')]);
+        $skill = app(SkillRegistry::class)->get('flint-topics');
+
+        try {
+            app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'topics']);
+        } catch (RuntimeException) {
+            // flint-topics has required tools the model never called; only the offer matters here.
+        }
+
+        $offered = collect(FakeOpenAi::requests()[0]['tools'])->pluck('name')->sort()->values()->all();
+        $this->assertSame([
+            'spark__complete-flint-run',
+            'spark__get-events-by-filter-tool',
+            'spark__get-latest-flint-digest',
+            'spark__manage-flint-topic',
+        ], $offered);
+        $this->assertSame('function', FakeOpenAi::requests()[0]['tools'][0]['type']);
+    }
+
+    #[Test]
+    public function it_rejects_tool_errors_and_missing_required_writes(): void
     {
         $user = User::factory()->create();
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
         foreach ([
-            ['status' => 'incomplete', 'incomplete_details' => ['reason' => 'max_output_tokens'], 'output' => []],
-            $this->completedBody([['type' => 'mcp_call', 'name' => 'spark__create-flint-digest', 'output' => ['isError' => true]]]),
-            $this->completedBody([['type' => 'message', 'content' => [['text' => 'I forgot to persist it.']]]]),
-        ] as $body) {
-            Http::fake(['api.openai.com/v1/responses' => Http::response($body)]);
+            // The tool reports an error.
+            [json_encode(['isError' => true]), [FakeOpenAi::toolCalls([['spark__create-flint-digest', []]]), FakeOpenAi::text('Done.')]],
+            // The model never persists the digest.
+            [json_encode(['event_id' => 'evt-created']), [FakeOpenAi::text('I forgot to persist it.')]],
+            // The response stops short.
+            [json_encode(['event_id' => 'evt-created']), [['id' => 'r', 'status' => 'incomplete', 'incomplete_details' => ['reason' => 'max_output_tokens'], 'output' => []]]],
+        ] as [$output, $bodies]) {
+            $this->fakeTools(['create-flint-digest' => $output]);
+            FakeOpenAi::fake($bodies);
 
             try {
                 app(SkillRunner::class)->run($user, $skill, ['routine' => 'news_roundup']);
-                $this->fail('An invalid terminal response was accepted.');
-            } catch (RuntimeException) {
-                $this->assertTrue(true);
+                $this->fail('An invalid run was accepted.');
+            } catch (RuntimeException $e) {
+                $this->assertStringContainsString('flint-news-roundup', $e->getMessage());
             }
         }
     }
 
     #[Test]
-    public function it_does_not_crash_when_tool_output_content_is_a_string(): void
+    public function a_call_to_a_tool_the_manifest_does_not_allow_fails_the_run_without_running_it(): void
     {
-        $user = User::factory()->create();
-        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
-        $body = $this->completedBody([
-            [
-                'type' => 'mcp_call',
-                'name' => 'spark__create-flint-digest',
-                'output' => json_encode(['content' => 'plain string content', 'event_id' => 'evt-created']),
-            ],
+        $tools = $this->fakeTools(remote: [self::CRONXTOOLS => ['docs__fetch' => '{}', 'komodo__deploy_stack' => 'deployed']]);
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['komodo__deploy_stack', []]]),
+            FakeOpenAi::text('Done.'),
         ]);
-        Http::fake(['api.openai.com/v1/responses' => Http::response($body)]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
-        $result = app(SkillRunner::class)->run($user, $skill, ['routine' => 'news_roundup']);
+        try {
+            app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+            $this->fail('A call to an unapproved tool was accepted.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('komodo__deploy_stack', $e->getMessage());
+        }
 
-        $this->assertSame(['spark__create-flint-digest'], $result->toolsCalled);
+        $this->assertSame([], $tools->calledTools());
+        $this->assertNotContains('komodo__deploy_stack', collect(FakeOpenAi::requests()[0]['tools'])->pluck('name'));
     }
 
     #[Test]
-    public function streamed_tool_progress_and_continuation_are_forwarded_without_persisting_schemas(): void
+    public function tool_progress_is_reported_without_persisting_schemas(): void
     {
-        $terminal = $this->completedBody();
-        $stream = implode("\n\n", [
-            'data: ' . json_encode(['type' => 'response.mcp_list_tools.in_progress']),
-            'data: ' . json_encode(['type' => 'response.mcp_call.in_progress', 'name' => 'spark__create-flint-digest']),
-            'data: ' . json_encode(['type' => 'response.mcp_call.completed', 'name' => 'spark__create-flint-digest']),
-            'data: ' . json_encode(['type' => 'response.completed', 'response' => $terminal]),
-        ]) . "\n\n";
-        Http::fakeSequence()
-            ->push($stream, 200, ['Content-Type' => 'text/event-stream'])
-            ->push($this->completedBody(), 200);
-
+        $this->fakeTools();
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['spark__create-flint-digest', []]]),
+            FakeOpenAi::text('Done.'),
+        ]);
         $user = User::factory()->create();
         $progress = ActionProgress::createProgress($user->id, 'flint_skill', 'run-one', 'queued', 'Queued');
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
-        $first = app(SkillRunner::class)->run($user, $skill, [], $progress);
-        app(SkillRunner::class)->run($user, $skill, [], null, $first->continuation);
+
+        app(SkillRunner::class)->run($user, $skill, [], $progress);
 
         $progress->refresh();
         $steps = collect($progress->updates)->pluck('step');
-        $this->assertTrue($steps->contains('connecting'));
-        $this->assertTrue($steps->contains('discovering_tools'));
-        $this->assertTrue($steps->contains('tool_starting'));
-        $this->assertTrue($steps->contains('tool_completed'));
+        foreach (['connecting', 'discovering_tools', 'tool_starting', 'tool_completed', 'completed'] as $step) {
+            $this->assertTrue($steps->contains($step), "Missing progress step {$step}");
+        }
         $this->assertStringNotContainsString('inputSchema', json_encode($progress->toArray()));
-
-        Http::assertSent(fn ($request) => ($request['previous_response_id'] ?? null) === 'resp-one');
     }
 
     #[Test]
     public function research_tools_are_served_by_the_you_server_under_their_own_names(): void
     {
-        config(['services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp?profile=free']);
-        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody([
-            ['type' => 'mcp_call', 'server_label' => 'you', 'name' => 'you-search', 'output' => '{"results":{}}'],
-            [
-                'type' => 'mcp_call',
-                'server_label' => 'cronxtools',
-                'name' => 'spark__create-flint-digest',
-                'output' => json_encode(['event_id' => 'evt-created']),
-            ],
-        ]))]);
+        config(['services.flint_routine.you_mcp_url' => self::YOU]);
+        $tools = $this->fakeTools(remote: [self::YOU => ['you-search' => '{"results":{}}']]);
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['you__you-search', ['query' => 'budget']], ['spark__create-flint-digest', []]]),
+            FakeOpenAi::text('Done.'),
+        ]);
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
         $result = app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
 
         $this->assertSame(['you__you-search', 'spark__create-flint-digest'], $result->toolsCalled);
-        Http::assertSent(function ($request) {
-            [$cronxTools, $you] = $request['tools'];
-            $this->assertCount(2, $request['tools']);
-            $this->assertSame('cronxtools', $cronxTools['server_label']);
-            $this->assertNotContains('you__you-search', $cronxTools['allowed_tools']);
-            $this->assertContains('spark__create-flint-digest', $cronxTools['allowed_tools']);
-            $this->assertSame('you', $you['server_label']);
-            $this->assertSame('https://api.you.com/mcp?profile=free', $you['server_url']);
-            $this->assertSame(['you-search'], $you['allowed_tools']);
-            $this->assertSame('never', $you['require_approval']);
-
-            return true;
-        });
+        $this->assertSame([['you-search', ['query' => 'budget']], ['spark__create-flint-digest', []]], $tools->calls);
+        [$cronxTools, $you] = $tools->connections;
+        $this->assertSame(self::CRONXTOOLS, $cronxTools['url']);
+        $this->assertSame(['docs__fetch'], $cronxTools['names']);
+        $this->assertSame(self::YOU, $you['url']);
+        $this->assertSame(['you-search'], $you['names']);
     }
 
     #[Test]
@@ -160,110 +179,74 @@ class SkillRunnerTest extends TestCase
             'services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp',
             'services.flint_routine.you_mcp_key' => 'ydc-test-key',
         ]);
-        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody())]);
+        $tools = $this->fakeTools();
+        FakeOpenAi::fake([FakeOpenAi::toolCalls([['spark__create-flint-digest', []]]), FakeOpenAi::text('Done.')]);
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
         app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
 
-        Http::assertSent(function ($request) {
-            $you = $request['tools'][1];
-            $this->assertSame('https://api.you.com/mcp', $you['server_url']);
-            $this->assertSame('ydc-test-key', $you['authorization']);
-            $this->assertArrayNotHasKey('authorization', $request['tools'][0]);
-
-            return true;
-        });
+        $this->assertNull($tools->connections[0]['token']);
+        $this->assertSame('https://api.you.com/mcp', $tools->connections[1]['url']);
+        $this->assertSame('ydc-test-key', $tools->connections[1]['token']);
     }
 
     #[Test]
-    public function a_skill_still_runs_without_research_when_no_you_url_is_configured(): void
+    public function a_skill_runs_without_research_when_no_you_url_is_configured(): void
     {
-        config(['services.flint_routine.you_mcp_url' => null]);
-        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody())]);
+        $tools = $this->fakeTools();
+        FakeOpenAi::fake([FakeOpenAi::toolCalls([['spark__create-flint-digest', []]]), FakeOpenAi::text('Done.')]);
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
         app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
 
-        Http::assertSent(function ($request) {
-            $this->assertCount(1, $request['tools']);
-            $this->assertSame('cronxtools', $request['tools'][0]['server_label']);
-
-            return true;
-        });
+        $this->assertSame([self::CRONXTOOLS], array_column($tools->connections, 'url'));
     }
 
     #[Test]
-    public function a_skill_without_research_tools_never_connects_to_the_you_server(): void
+    public function a_skill_with_only_spark_tools_opens_no_remote_connection(): void
     {
-        config(['services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp?profile=free']);
-        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody())]);
+        config(['services.flint_routine.you_mcp_url' => self::YOU]);
+        $tools = $this->fakeTools();
+        FakeOpenAi::fake([FakeOpenAi::text('Nothing to do.')]);
         $skill = app(SkillRegistry::class)->get('flint-topics');
 
         try {
             app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'topics']);
         } catch (RuntimeException) {
-            // flint-topics has its own required tools; only the request shape matters here.
+            // flint-topics has its own required tools; only the connections matter here.
         }
 
-        Http::assertSent(fn ($request) => count($request['tools']) === 1);
+        $this->assertSame([], $tools->connections);
     }
 
     #[Test]
-    public function an_unlisted_you_tool_is_rejected(): void
+    public function a_required_tool_no_server_offers_fails_before_the_model_is_called(): void
     {
-        config(['services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp?profile=free']);
-        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody([
-            ['type' => 'mcp_call', 'server_label' => 'you', 'name' => 'you-contents', 'output' => '{}'],
-        ]))]);
+        $this->app->instance(SkillToolSource::class, new FakeSkillTools);
+        FakeOpenAi::fake([FakeOpenAi::text('Done.')]);
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('unapproved tool');
+        try {
+            app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+            $this->fail('A run without its required tool was started.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('spark__create-flint-digest', $e->getMessage());
+        }
 
-        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
-    }
-
-    #[Test]
-    public function a_you_tool_name_from_another_server_is_not_mistaken_for_research(): void
-    {
-        config(['services.flint_routine.you_mcp_url' => 'https://api.you.com/mcp?profile=free']);
-        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody([
-            ['type' => 'mcp_call', 'server_label' => 'cronxtools', 'name' => 'you-search', 'output' => '{}'],
-        ]))]);
-        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
-
-        $this->expectException(RuntimeException::class);
-
-        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+        $this->assertCount(0, FakeOpenAi::requests());
     }
 
     #[Test]
     public function a_dry_run_declines_and_records_writes_but_lets_reads_through(): void
     {
-        $paused = [
-            'id' => 'resp-paused',
-            'status' => 'completed',
-            'output' => [
-                ['type' => 'mcp_list_tools', 'tools' => [['name' => 'spark__manage-flint-topic']]],
-                [
-                    'type' => 'mcp_approval_request',
-                    'id' => 'mcpr-list',
-                    'server_label' => 'cronxtools',
-                    'name' => 'spark__manage-flint-topic',
-                    'arguments' => json_encode(['operation' => 'list']),
-                ],
-                [
-                    'type' => 'mcp_approval_request',
-                    'id' => 'mcpr-digest',
-                    'server_label' => 'cronxtools',
-                    'name' => 'spark__create-flint-digest',
-                    'arguments' => json_encode(['title' => 'News — 10 Oct', 'blocks' => []]),
-                ],
-            ],
-            'usage' => ['input_tokens' => 10, 'output_tokens' => 2],
-        ];
-        $finished = $this->completedBody([['type' => 'message', 'content' => [['text' => 'Run notes.']]]]);
-        Http::fakeSequence()->push($paused)->push($finished);
+        $tools = $this->fakeTools(['manage-flint-topic' => '{"topics":[]}']);
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([
+                ['spark__manage-flint-topic', ['operation' => 'list']],
+                ['spark__create-flint-digest', ['title' => 'News — 10 Oct', 'blocks' => []]],
+            ], ['input_tokens' => 10, 'output_tokens' => 2]),
+            FakeOpenAi::text('Run notes.', ['input_tokens' => 15, 'output_tokens' => 5]),
+        ]);
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
         $result = app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup'], dryRun: true);
@@ -272,71 +255,79 @@ class SkillRunnerTest extends TestCase
             'tool' => 'spark__create-flint-digest',
             'arguments' => ['title' => 'News — 10 Oct', 'blocks' => []],
         ]], $result->capturedWrites);
+        $this->assertSame(['spark__manage-flint-topic'], $tools->calledTools());
         $this->assertSame('Run notes.', $result->text);
         $this->assertSame(25, $result->inputTokens);
         $this->assertArrayNotHasKey('captured_writes', $result->toArray());
-
-        $requests = Http::recorded()->map(fn ($pair) => $pair[0]);
-        $this->assertContains('spark__create-flint-digest', $requests[0]['tools'][0]['require_approval']['always']['tool_names']);
-        $this->assertNotContains('spark__get-event-tool', $requests[0]['tools'][0]['require_approval']['always']['tool_names']);
-        $this->assertSame('resp-paused', $requests[1]['previous_response_id']);
-        $this->assertSame([
-            ['type' => 'mcp_approval_response', 'approval_request_id' => 'mcpr-list', 'approve' => true],
-            ['type' => 'mcp_approval_response', 'approval_request_id' => 'mcpr-digest', 'approve' => false],
-        ], $requests[1]['input']);
     }
 
     #[Test]
-    public function a_normal_run_never_asks_for_approval(): void
+    public function a_normal_run_never_declines_a_write(): void
     {
-        Http::fake(['api.openai.com/v1/responses' => Http::response($this->completedBody())]);
+        $tools = $this->fakeTools();
+        FakeOpenAi::fake([FakeOpenAi::toolCalls([['spark__create-flint-digest', []]]), FakeOpenAi::text('Done.')]);
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
         $result = app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
 
         $this->assertSame([], $result->capturedWrites);
-        Http::assertSentCount(1);
-        Http::assertSent(fn ($request) => $request['tools'][0]['require_approval'] === 'never');
+        $this->assertSame(['spark__create-flint-digest'], $tools->calledTools());
     }
 
     #[Test]
-    public function a_dry_run_rejects_an_approval_request_for_an_unlisted_tool(): void
+    public function spark_tools_run_in_process_as_the_user_with_a_scoped_token(): void
     {
-        Http::fake(['api.openai.com/v1/responses' => Http::response([
-            'id' => 'resp-paused',
-            'status' => 'completed',
-            'output' => [[
-                'type' => 'mcp_approval_request',
-                'id' => 'mcpr-x',
-                'server_label' => 'cronxtools',
-                'name' => 'komodo__deploy_stack',
-                'arguments' => '{}',
-            ]],
-        ])]);
+        $actor = null;
+        $this->app->instance(SkillToolSource::class, new FakeSkillTools(
+            spark: ['create-flint-digest' => function () use (&$actor): string {
+                $actor = Auth::user();
+
+                return json_encode(['event_id' => 'evt-created']);
+            }],
+            realSpark: true,
+        ));
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['spark__get-flint-notes', []]]),
+            FakeOpenAi::toolCalls([['spark__create-flint-digest', []]]),
+            FakeOpenAi::text('Done.'),
+        ]);
+        $user = User::factory()->create();
         $skill = app(SkillRegistry::class)->get('flint-news-roundup');
 
-        $this->expectException(RuntimeException::class);
-        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup'], dryRun: true);
+        $result = app(SkillRunner::class)->run($user, $skill, ['routine' => 'news_roundup']);
+
+        $this->assertSame(['spark__get-flint-notes', 'spark__create-flint-digest'], $result->toolsCalled);
+        $notes = collect(FakeOpenAi::requests()[1]['input'])->firstWhere('type', 'function_call_output')['output'];
+        $this->assertStringNotContainsString('error', strtolower($notes));
+        $this->assertSame($user->id, $actor->id);
+        $this->assertTrue($actor->tokenCan('flint:write'));
+        $this->assertFalse($actor->tokenCan('tokens:manage'));
+        $this->assertFalse($actor->tokenCan('integrations:manage'));
+        $this->assertNull($user->currentAccessToken(), 'The scoped token leaked onto the caller\'s user.');
+        $this->assertFalse(Auth::check(), 'The run left the user authenticated.');
     }
 
-    /** @param array<int, array<string, mixed>>|null $output */
-    private function completedBody(?array $output = null): array
+    /**
+     * Fakes every Spark tool the tests call; create-flint-digest answers with
+     * the digest event it created.
+     *
+     * @param  array<string, string>  $spark
+     * @param  array<string, array<string, string>>  $remote
+     */
+    private function fakeTools(array $spark = [], array $remote = []): FakeSkillTools
     {
-        return [
-            'id' => 'resp-one',
-            'status' => 'completed',
-            'error' => null,
-            'incomplete_details' => null,
-            'output' => $output ?? [
-                ['type' => 'mcp_list_tools', 'tools' => [['name' => 'spark__create-flint-digest', 'inputSchema' => ['type' => 'object']]]],
-                [
-                    'type' => 'mcp_call',
-                    'name' => 'spark__create-flint-digest',
-                    'output' => json_encode(['content' => [['type' => 'text', 'text' => json_encode(['event_id' => 'evt-created'])]]]),
-                ],
-                ['type' => 'message', 'content' => [['text' => 'Done.']]],
+        $tools = new FakeSkillTools(
+            spark: $spark + [
+                'create-flint-digest' => json_encode(['content' => [['type' => 'text', 'text' => json_encode(['event_id' => 'evt-created'])]]]),
+                'manage-flint-topic' => '{}',
+                'get-events-by-filter-tool' => '{}',
+                'get-latest-flint-digest' => '{}',
+                'complete-flint-run' => '{}',
             ],
-            'usage' => ['input_tokens' => 15, 'output_tokens' => 5],
-        ];
+            remote: $remote + [self::CRONXTOOLS => ['docs__fetch' => '{}']],
+        );
+        $this->app->instance(SkillToolSource::class, $tools);
+
+        return $tools;
     }
 }

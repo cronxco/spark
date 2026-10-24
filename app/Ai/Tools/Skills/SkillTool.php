@@ -1,0 +1,84 @@
+<?php
+
+namespace App\Ai\Tools\Skills;
+
+use App\Services\Ai\SkillRunner;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Tools\Request;
+use RuntimeException;
+
+/**
+ * One tool a Flint skill may call, under its manifest name
+ * (`namespace__tool`).
+ *
+ * Wraps the MCP tool that does the work, whether it runs in-process (Spark's
+ * own tools) or on a remote MCP server, and records every call in the run's
+ * {@see SkillToolLedger}. In a dry run, a write is recorded and declined
+ * instead of run. A failed call ends the run: an unattended skill must not
+ * write a confident digest over a tool that did not answer.
+ */
+class SkillTool implements Tool
+{
+    public function __construct(
+        private string $name,
+        private Tool $tool,
+        private SkillToolLedger $ledger,
+    ) {}
+
+    public function name(): string
+    {
+        return $this->name;
+    }
+
+    public function description(): string
+    {
+        return (string) $this->tool->description();
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return $this->tool->schema($schema);
+    }
+
+    public function handle(Request $request): string
+    {
+        if ($this->ledger->limitReached()) {
+            return 'Tool call limit reached for this run. Finish with what you already have.';
+        }
+
+        $this->ledger->called[] = $this->name;
+        $this->ledger->progress('tool_starting', "Running {$this->name}", 40, ['tool' => $this->name]);
+
+        if ($this->ledger->dryRun && $this->isWrite($request->all())) {
+            $this->ledger->capturedWrites[] = ['tool' => $this->name, 'arguments' => $request->all()];
+
+            return 'Declined: this is a dry run, so nothing is written. Carry on as if the call had succeeded.';
+        }
+
+        $output = (string) $this->tool->handle($request);
+
+        if (SkillRunner::isApplicationError($output)) {
+            throw new RuntimeException("Tool {$this->name} failed.");
+        }
+
+        $this->ledger->succeeded[] = $this->name;
+        if ($this->name === 'spark__create-flint-digest') {
+            $this->ledger->eventId = SkillRunner::eventIdFromOutput($output) ?? $this->ledger->eventId;
+        }
+        $this->ledger->progress('tool_completed', "Completed {$this->name}", 70, ['tool' => $this->name]);
+
+        return $output;
+    }
+
+    /** @param array<string, mixed> $arguments */
+    private function isWrite(array $arguments): bool
+    {
+        if (! in_array($this->name, SkillRunner::WRITE_TOOLS, true)) {
+            return false;
+        }
+
+        return ! ($this->name === 'spark__manage-flint-topic'
+            && in_array($arguments['operation'] ?? null, SkillRunner::READ_ONLY_TOPIC_OPERATIONS, true));
+    }
+}
