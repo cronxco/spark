@@ -43,6 +43,7 @@ class ManualLogPlugin extends ManualPlugin
         'watched_episode' => ['concept' => 'media', 'type' => 'tv_episode', 'domain' => 'media', 'shared' => true],
         'watched_at_cinema' => ['concept' => 'media', 'type' => 'cinema_visit', 'domain' => 'media'],
         'played_board_game' => ['concept' => 'game', 'type' => 'board_game', 'domain' => 'media'],
+        'logged_reflection' => ['concept' => 'document', 'type' => 'reflection', 'domain' => 'knowledge'],
     ];
 
     public static function getIdentifier(): string
@@ -177,6 +178,14 @@ class ManualLogPlugin extends ManualPlugin
                 'value_unit' => '/5',
                 'hidden' => false,
             ],
+            'logged_reflection' => [
+                'icon' => 'fas.pen',
+                'display_name' => 'Logged a Reflection',
+                'description' => 'A reflection written down',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
             'captured_text' => [
                 'icon' => 'fas.inbox',
                 'display_name' => 'Captured Text',
@@ -265,6 +274,12 @@ class ManualLogPlugin extends ManualPlugin
                 'description' => 'A board game played',
                 'hidden' => false,
             ],
+            'reflection' => [
+                'icon' => 'fas.pen',
+                'display_name' => 'Reflection',
+                'description' => 'A reflection written down',
+                'hidden' => false,
+            ],
             'capture_inbox' => [
                 'icon' => 'fas.inbox',
                 'display_name' => 'Inbox',
@@ -287,7 +302,7 @@ class ManualLogPlugin extends ManualPlugin
      * @param  string  $title  The thing being logged (wine name, film title, game name)
      * @param  float|null  $rating  Optional 1-5 rating
      * @param  string|null  $notes  Optional free-text notes
-     * @param  array{occurred_at?: CarbonInterface, source_id?: string, event_metadata?: array<string, mixed>, target_metadata?: array<string, mixed>, media_url?: string, enrich?: bool}  $options  Extras used by the mobile log endpoint: when it happened, an idempotent source id, extra event/target metadata, and whether to queue the Vivino/Untappd/BGG lookup (default true)
+     * @param  array{occurred_at?: CarbonInterface, source_id?: string, event_metadata?: array<string, mixed>, target_metadata?: array<string, mixed>, content?: string, media_url?: string, enrich?: bool}  $options  Extras used by the mobile log endpoint: when it happened, an idempotent source id, extra event/target metadata, the object's text content, and whether to queue the Vivino/Untappd/BGG lookup (default true)
      */
     public function createManualEvent(
         Integration $integration,
@@ -335,14 +350,16 @@ class ManualLogPlugin extends ManualPlugin
             $targetObject = EventObject::firstOrCreate($identity, array_filter([
                 'time' => $occurredAt,
                 'metadata' => $targetMetadata,
+                'content' => $options['content'] ?? null,
                 'media_url' => $options['media_url'] ?? null,
-            ]));
+            ], fn ($value) => $value !== null));
         } else {
             $targetObject = EventObject::create($identity + array_filter([
                 'time' => $occurredAt,
                 'metadata' => $targetMetadata,
+                'content' => $options['content'] ?? null,
                 'media_url' => $options['media_url'] ?? null,
-            ]));
+            ], fn ($value) => $value !== null));
         }
 
         // events.value is a bigint - a fractional rating (e.g. 4.5) has to be

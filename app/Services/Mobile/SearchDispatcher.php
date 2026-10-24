@@ -2,13 +2,19 @@
 
 namespace App\Services\Mobile;
 
+use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\MetricStatistic;
+use App\Models\Place;
 use App\Models\User;
+use App\Services\Actions\ActionDefinition;
+use App\Services\Actions\ActionRegistry;
 use App\Services\Ai\EmbeddingClient;
 use App\Services\Search\RecencyRanking;
+use App\Support\OwnedTagQuery;
+use App\Support\SparkAbility;
 use Illuminate\Support\Collection;
 use Throwable;
 
@@ -22,6 +28,11 @@ use Throwable;
  *
  * Default and semantic results are ordered by {@see RecencyRanking}, the
  * ranking Spotlight uses too, so recency is tuned in one place.
+ *
+ * Contract v1 asks for `$allFamilies`, which makes the default mode cover
+ * events, objects, blocks, metrics, integrations, places, tags and commands. A semantic
+ * search that cannot embed falls back to keyword matching and says why in
+ * `fallback_reason`; it never falls back silently.
  */
 class SearchDispatcher
 {
@@ -31,6 +42,12 @@ class SearchDispatcher
 
     public const MODES = ['default', 'semantic', 'tag', 'metric', 'integration'];
 
+    /** Modes contract v1 accepts: the pre-v1 modes plus commands only. */
+    public const V1_MODES = [...self::MODES, 'command'];
+
+    /** Commands shown in "All", so they do not crowd out the data families. */
+    public const COMMANDS_IN_ALL = 5;
+
     /**
      * Plural mode names sent by shipped iOS builds, mapped to their canonical
      * mode so those clients' Tags, Metrics and Integrations pills work.
@@ -39,17 +56,21 @@ class SearchDispatcher
      */
     public const MODE_ALIASES = ['tags' => 'tag', 'metrics' => 'metric', 'integrations' => 'integration'];
 
+    public const FALLBACK_EMBEDDINGS_UNAVAILABLE = 'embeddings_unavailable';
+
+    public const FALLBACK_EMBEDDING_FAILED = 'embedding_failed';
+
     protected RecencyRanking $ranking;
 
-    public function __construct(protected ?EmbeddingClient $embeddingService = null, ?RecencyRanking $ranking = null)
+    public function __construct(protected ?EmbeddingClient $embeddingService = null, ?RecencyRanking $ranking = null, protected ?ActionRegistry $actions = null)
     {
         $this->ranking = $ranking ?? new RecencyRanking;
     }
 
     /**
-     * @return array{mode: string, query: string, events: Collection, objects: Collection, integrations: Collection, metrics: Collection}
+     * @return array{mode: string, query: string, events: Collection, objects: Collection, blocks: Collection, integrations: Collection, metrics: Collection, places: Collection, tags: Collection, commands: Collection, fallback_reason: ?string}
      */
-    public function search(User $user, string $mode, string $query, int $limit = self::DEFAULT_LIMIT): array
+    public function search(User $user, string $mode, string $query, int $limit = self::DEFAULT_LIMIT, bool $allFamilies = false): array
     {
         $limit = max(1, min($limit, self::MAX_LIMIT));
         $query = trim($query);
@@ -59,8 +80,13 @@ class SearchDispatcher
             'query' => $query,
             'events' => collect(),
             'objects' => collect(),
+            'blocks' => collect(),
             'integrations' => collect(),
             'metrics' => collect(),
+            'places' => collect(),
+            'tags' => collect(),
+            'commands' => collect(),
+            'fallback_reason' => null,
         ];
 
         if ($query === '') {
@@ -70,13 +96,14 @@ class SearchDispatcher
         return match ($mode) {
             'semantic' => $this->semantic($user, $query, $limit, $result),
             'tag' => $this->byTag($user, $query, $limit, $result),
-            'metric' => $this->byMetric($user, $query, $result),
+            'metric' => $this->byMetric($user, $query, $result, $allFamilies ? $limit : self::MAX_LIMIT),
             'integration' => $this->byIntegration($user, $query, $limit, $result),
-            default => $this->defaultSearch($user, $query, $limit, $result),
+            'command' => $this->byCommand($user, $query, $limit, $result),
+            default => $this->defaultSearch($user, $query, $limit, $result, $allFamilies),
         };
     }
 
-    protected function defaultSearch(User $user, string $query, int $limit, array $result): array
+    protected function defaultSearch(User $user, string $query, int $limit, array $result, bool $allFamilies = false): array
     {
         $integrationIds = $user->integrations()->pluck('id')->all();
         $like = '%' . $query . '%';
@@ -94,9 +121,65 @@ class SearchDispatcher
         $objects = EventObject::query()
             ->where('user_id', $user->id)
             ->where(fn ($q) => $q->where('title', 'like', $like)->orWhere('content', 'like', $like))
+            ->when($allFamilies, fn ($q) => $q->where(fn ($q) => $q->whereNull('concept')->orWhere('concept', '!=', 'place')))
             ->limit($limit);
 
         $result['objects'] = $this->ranking->orderByText($objects, $query, 'title')->get();
+
+        if ($allFamilies) {
+            $result = $this->otherFamilies($user, $query, $limit, $integrationIds, $result);
+        }
+
+        return $result;
+    }
+
+    /**
+     * The families "All" adds in contract v1. Each has a detail route.
+     */
+    protected function otherFamilies(User $user, string $query, int $limit, array $integrationIds, array $result): array
+    {
+        $like = '%' . $query . '%';
+
+        if (! empty($integrationIds)) {
+            $blocks = Block::query()
+                ->whereHas('event', fn ($q) => $q->whereIn('integration_id', $integrationIds))
+                ->where(fn ($q) => $q->where('title', 'ILIKE', $like)->orWhere('block_type', 'ILIKE', $like))
+                ->limit($limit);
+
+            $result['blocks'] = $this->ranking->orderByText($blocks, $query, 'title')->get();
+        }
+
+        $result = $this->byMetric($user, $query, $result, $limit);
+        $result = $this->byIntegration($user, $query, $limit, $result);
+
+        $places = Place::query()
+            ->where('user_id', $user->id)
+            ->where('title', 'ILIKE', $like)
+            ->limit($limit);
+
+        $result['places'] = $this->ranking->orderByText($places, $query, 'title')->get();
+
+        $result['tags'] = OwnedTagQuery::for($user, $query)->limit($limit)->get();
+
+        return $this->byCommand($user, $query, min($limit, self::COMMANDS_IN_ALL), $result);
+    }
+
+    /**
+     * Native commands from the {@see ActionRegistry} that match the query and
+     * that this token may run (the same filter as GET /actions), so a command
+     * in the results is one the app can offer.
+     */
+    protected function byCommand(User $user, string $query, int $limit, array $result): array
+    {
+        if ($this->actions === null) {
+            return $result;
+        }
+
+        $result['commands'] = $this->actions->forSurface('native')
+            ->filter(fn (ActionDefinition $action): bool => $action->capability === null || SparkAbility::allows($user, $action->capability))
+            ->filter(fn (ActionDefinition $action): bool => $action->matches($query))
+            ->take($limit)
+            ->values();
 
         return $result;
     }
@@ -104,12 +187,16 @@ class SearchDispatcher
     protected function semantic(User $user, string $query, int $limit, array $result): array
     {
         if (! $this->embeddingService) {
+            $result['fallback_reason'] = self::FALLBACK_EMBEDDINGS_UNAVAILABLE;
+
             return $this->defaultSearch($user, $query, $limit, $result);
         }
 
         try {
             $embedding = $this->embeddingService->embed($query);
         } catch (Throwable) {
+            $result['fallback_reason'] = self::FALLBACK_EMBEDDING_FAILED;
+
             return $this->defaultSearch($user, $query, $limit, $result);
         }
 
@@ -153,7 +240,7 @@ class SearchDispatcher
         return $result;
     }
 
-    protected function byMetric(User $user, string $query, array $result): array
+    protected function byMetric(User $user, string $query, array $result, int $limit = self::MAX_LIMIT): array
     {
         $like = '%' . $query . '%';
 
@@ -162,7 +249,7 @@ class SearchDispatcher
             ->where(fn ($q) => $q->where('service', 'like', $like)->orWhere('action', 'like', $like))
             ->orderBy('service')
             ->orderBy('action')
-            ->limit(self::MAX_LIMIT)
+            ->limit($limit)
             ->get();
 
         return $result;

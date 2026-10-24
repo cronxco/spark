@@ -6,10 +6,13 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\Person;
 use App\Models\Relationship;
 use App\Models\User;
 use App\Services\PersonProfileService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
@@ -60,6 +63,27 @@ class PersonPageTest extends TestCase
             ->where('subject_type', EventObject::class)
             ->where('subject_id', $person->id)
             ->exists());
+    }
+
+    #[Test]
+    public function the_timeline_includes_with_tags_and_note_mentions_and_the_calendar_counts_them(): void
+    {
+        $person = $this->person('Dan');
+        $other = $this->person('Sam');
+        $tagged = Event::factory()->create(['integration_id' => $this->integration->id, 'time' => '2026-10-05 10:00:00']);
+        $this->relateWith($person, $tagged);
+        $this->relateWith($other, Event::factory()->create(['integration_id' => $this->integration->id, 'time' => '2026-10-05 11:00:00']));
+        $mentioned = Event::factory()->create(['integration_id' => $this->integration->id, 'time' => '2026-10-07 09:00:00']);
+        $mentioned->createBlock(['title' => 'Note', 'block_type' => 'note', 'time' => $mentioned->time, 'metadata' => ['content' => 'Pints with @dan']]);
+
+        $service = app(PersonProfileService::class);
+
+        $this->assertEqualsCanonicalizing([$tagged->id, $mentioned->id], $service->events($person)->pluck('id')->all());
+        $this->assertSame(
+            ['2026-10-05' => 1, '2026-10-07' => 1],
+            $service->calendar($person, Carbon::parse('2026-10-01'), 'UTC'),
+        );
+        $this->assertSame([$tagged->id], $service->eventsOn($person, Carbon::parse('2026-10-05'), 'UTC')->pluck('id')->all());
     }
 
     #[Test]
@@ -131,6 +155,24 @@ class PersonPageTest extends TestCase
         $this->assertSame(1, $service->eventCount($person));
     }
 
+    #[Test]
+    public function calendar_navigation_does_not_skip_february_on_the_31st(): void
+    {
+        $this->travelTo(Carbon::parse('2026-01-31 12:00:00'));
+        $person = $this->person('Dan');
+        $this->actingAs($this->user);
+
+        Volt::test('people.show', ['person' => Person::findOrFail($person->id)])
+            ->assertSet('month', '2026-01')
+            ->call('shiftMonth', 1)
+            ->assertSet('month', '2026-02')
+            ->assertSee('February 2026')
+            ->call('shiftMonth', 1)
+            ->assertSet('month', '2026-03')
+            ->call('shiftMonth', -1)
+            ->assertSet('month', '2026-02');
+    }
+
     private function person(string $name): EventObject
     {
         return EventObject::factory()->create([
@@ -151,6 +193,18 @@ class PersonPageTest extends TestCase
             'to_type' => EventObject::class,
             'to_id' => $to->id,
             'type' => $type,
+        ]);
+    }
+
+    private function relateWith(EventObject $person, Event $event): Relationship
+    {
+        return Relationship::create([
+            'user_id' => $this->user->id,
+            'from_type' => EventObject::class,
+            'from_id' => $person->id,
+            'to_type' => Event::class,
+            'to_id' => $event->id,
+            'type' => 'with',
         ]);
     }
 

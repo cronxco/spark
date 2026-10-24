@@ -29,7 +29,8 @@ class StoreLogRequest extends FormRequest
             'kind' => ['required', Rule::in(array_keys(ManualLogService::KINDS))],
             'dry_run' => ['nullable', 'boolean'],
             'idempotency_key' => [Rule::requiredIf(fn () => ! $this->boolean('dry_run')), 'string', 'max:100', 'regex:/^[A-Za-z0-9._:-]+$/'],
-            'title' => ['required', 'string', 'max:255'],
+            'title' => ['required_unless:kind,reflection', 'nullable', 'string', 'max:255'],
+            'body' => ['required_if:kind,reflection', 'prohibited_unless:kind,reflection', 'string', 'max:10000'],
             'occurred_at' => ['nullable', 'date', 'before_or_equal:+5 minutes'],
             'quantity' => ['nullable', 'numeric', 'gt:0', 'max:100'],
             'unit' => ['nullable', 'string', 'max:30'],
@@ -55,6 +56,7 @@ class StoreLogRequest extends FormRequest
         return [
             'idempotency_key.regex' => 'The idempotency key may only contain letters, numbers, dots, colons, underscores and dashes.',
             'episodes.required_if' => 'Say which episodes were watched.',
+            'body.required_if' => 'Write the reflection.',
             'occurred_at.before_or_equal' => 'Nothing can be logged in the future.',
         ];
     }

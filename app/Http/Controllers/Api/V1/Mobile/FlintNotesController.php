@@ -8,6 +8,7 @@ use App\Services\EffectiveTimezoneResolver;
 use App\Services\Flint\FlintNoteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 
 class FlintNotesController extends Controller
@@ -17,11 +18,13 @@ class FlintNotesController extends Controller
         $validated = $request->validate([
             'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
             'cursor' => ['nullable', 'string'],
+            'unacknowledged' => ['nullable', 'boolean'],
         ]);
         $paginator = EventObject::query()
             ->where('user_id', $request->user()->id)
             ->where('concept', 'document')
             ->where('type', 'flint_note')
+            ->when($request->boolean('unacknowledged'), fn ($query) => $query->whereNull('metadata->acknowledged_at'))
             ->with(['relationshipsFrom' => fn ($query) => $query->where('type', FlintNoteService::RELATIONSHIP_TYPE)])
             ->orderByDesc('time')
             ->orderByDesc('id')
@@ -57,6 +60,22 @@ class FlintNotesController extends Controller
         $payload = $notes->payload($result['note']);
 
         return response()->json(['data' => $payload], $result['status'])->header('ETag', $payload['version']);
+    }
+
+    public function acknowledge(Request $request, FlintNoteService $notes): JsonResponse
+    {
+        $validated = $request->validate([
+            'note_ids' => ['required', 'array', 'min:1', 'max:50'],
+            'note_ids.*' => ['required', 'uuid'],
+            'routine' => ['nullable', 'string', 'max:64'],
+            'run_uuid' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        return response()->json(['data' => $notes->acknowledge(
+            $request->user(),
+            $validated['note_ids'],
+            array_filter(Arr::only($validated, ['routine', 'run_uuid'])),
+        )]);
     }
 
     public function destroy(Request $request, string $id, FlintNoteService $notes): JsonResponse
