@@ -284,6 +284,25 @@ class ActionsControllerTest extends TestCase
     }
 
     #[Test]
+    public function undo_needs_the_capability_the_action_needed(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $event = $this->eventFor($this->integration);
+        $receipt = $this->postJson('/api/v1/mobile/actions/events.delete/run', ['target' => ['event_id' => $event->id]])->json();
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->postJson("/api/v1/mobile/actions/receipts/{$receipt['receipt_id']}/undo")
+            ->assertForbidden()
+            ->assertJsonPath('required_ability', 'data:write');
+        $this->assertSoftDeleted('events', ['id' => $event->id]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $this->postJson("/api/v1/mobile/actions/receipts/{$receipt['receipt_id']}/undo")->assertOk();
+        $this->assertNull($event->fresh()->deleted_at);
+    }
+
+    #[Test]
     public function receipts_belong_to_their_owner(): void
     {
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);

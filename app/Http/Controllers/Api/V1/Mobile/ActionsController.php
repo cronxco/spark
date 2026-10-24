@@ -105,6 +105,22 @@ class ActionsController extends Controller
     /** POST /api/v1/mobile/actions/receipts/{id}/undo */
     public function undo(Request $request, string $id): JsonResponse
     {
+        $receipt = ActionReceipt::find($request->user(), $id);
+
+        if ($receipt === null) {
+            return response()->json(['message' => 'Receipt not found.'], 404);
+        }
+
+        // Undo writes, so it needs the capability the action itself needed, even
+        // when a later, read-only session is the one asking.
+        $capability = $this->registry->find($receipt->actionId())?->capability;
+        if ($capability !== null && ! SparkAbility::allows($request->user(), $capability)) {
+            return response()->json([
+                'message' => 'Token lacks the required capability.',
+                'required_ability' => $capability,
+            ], 403);
+        }
+
         try {
             $receipt = $this->executor->undo($request->user(), $id);
         } catch (ActionFailed $e) {
