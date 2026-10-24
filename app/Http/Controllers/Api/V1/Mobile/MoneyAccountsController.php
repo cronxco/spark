@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1\Mobile;
 
-use App\Http\Controllers\Api\V1\Mobile\Concerns\HandlesIdempotency;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\BalanceEntryResource;
 use App\Http\Resources\Compact\MoneyAccountResource;
@@ -21,8 +20,6 @@ use Illuminate\Support\Str;
 
 class MoneyAccountsController extends Controller
 {
-    use HandlesIdempotency;
-
     public function __construct(protected FinancialPlugin $financial, protected ResourceVersion $versions) {}
 
     /**
@@ -276,35 +273,33 @@ class MoneyAccountsController extends Controller
      */
     public function addBalance(Request $request, string $id): JsonResponse
     {
-        // A phone on a bad connection retries this write; an Idempotency-Key
-        // means a retry replays the first response instead of recording the
-        // same balance twice.
-        return $this->idempotent($request, 'money.balances.store', function () use ($request, $id) {
-            $user = $request->user();
-            $account = $this->resolveAccount($id, $user->id);
+        // A retry with the same Idempotency-Key is replayed by the
+        // `idempotent` route middleware ahead of the If-Match check, so it
+        // never reaches here to record the same balance twice.
+        $user = $request->user();
+        $account = $this->resolveAccount($id, $user->id);
 
-            if (! $account) {
-                return response()->json(['message' => 'Account not found.'], 404);
-            }
+        if (! $account) {
+            return response()->json(['message' => 'Account not found.'], 404);
+        }
 
-            $validated = $request->validate([
-                'balance' => ['required', 'numeric'],
-                'date' => ['required', 'date_format:Y-m-d'],
-                'notes' => ['nullable', 'string', 'max:1000'],
-            ]);
+        $validated = $request->validate([
+            'balance' => ['required', 'numeric'],
+            'date' => ['required', 'date_format:Y-m-d'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
 
-            $integration = $this->resolveManualAccountIntegration($user);
+        $integration = $this->resolveManualAccountIntegration($user);
 
-            $event = $this->financial->createBalanceEvent($integration, $account, $validated);
-            // Balance history is part of the account's mutation surface, so move
-            // the account version forward for clients retrying with If-Match.
-            $account->touch();
+        $event = $this->financial->createBalanceEvent($integration, $account, $validated);
+        // Balance history is part of the account's mutation surface, so move
+        // the account version forward for clients retrying with If-Match.
+        $account->touch();
 
-            return response()->json(
-                ['data' => (new BalanceEntryResource($event))->toArray($request)],
-                201,
-            )->header('ETag', $this->versions->etag($account->fresh()));
-        });
+        return response()->json(
+            ['data' => (new BalanceEntryResource($event))->toArray($request)],
+            201,
+        )->header('ETag', $this->versions->etag($account->fresh()));
     }
 
     /**

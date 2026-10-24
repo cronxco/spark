@@ -1938,7 +1938,9 @@ otherwise it defaults to `spark`.
 **`Idempotency-Key` (optional):** send a UUID and a retried `POST` with
 the same key replays the first response instead of attaching (or
 find-or-creating) the tag a second time. Keys are scoped per user and per
-endpoint, and stay live for 24 hours.
+endpoint, and stay live for 24 hours. The replay is checked before `If-Match`,
+so a retry may resend the original `If-Match` even though the first write moved
+the entity's ETag on; the replay carries the first response's `ETag`.
 
 **Response `201`**: `{"tag": Tag, "tags": [Tag, ...]}` (the entity's full tag
 list), with a fresh `ETag`.

@@ -147,14 +147,14 @@ Route::get('tags', [TagsController::class, 'index'])->middleware('spark.ability:
 Route::get('tags/suggest', [TagsController::class, 'suggest'])->middleware('spark.ability:data:read')->name('tags.suggest');
 Route::get('tags/{id}', [TagsController::class, 'show'])->whereNumber('id')->middleware('spark.ability:data:read')->name('tags.show');
 Route::post('events/{id}/tags', [TagsController::class, 'storeEventTag'])
-    ->middleware(['spark.ability:data:write', 'if-match:event'])
+    ->middleware(['spark.ability:data:write', 'idempotent:tags.attach', 'if-match:event'])
     ->name('events.tags.store');
 Route::delete('events/{id}/tags/{tagId}', [TagsController::class, 'destroyEventTag'])
     ->whereNumber('tagId')
     ->middleware(['spark.ability:data:write', 'if-match:event'])
     ->name('events.tags.destroy');
 Route::post('objects/{id}/tags', [TagsController::class, 'storeObjectTag'])
-    ->middleware(['spark.ability:data:write', 'if-match:object'])
+    ->middleware(['spark.ability:data:write', 'idempotent:tags.attach', 'if-match:object'])
     ->name('objects.tags.store');
 Route::delete('objects/{id}/tags/{tagId}', [TagsController::class, 'destroyObjectTag'])
     ->whereNumber('tagId')
@@ -481,7 +481,7 @@ Route::delete('money/accounts/{id}', [MoneyAccountsController::class, 'destroy']
     ->name('money.accounts.destroy');
 
 Route::post('money/accounts/{id}/balances', [MoneyAccountsController::class, 'addBalance'])
-    ->middleware(['spark.ability:finance:write', 'if-match:object'])
+    ->middleware(['spark.ability:finance:write', 'idempotent:money.balances.store', 'if-match:object'])
     ->name('money.accounts.balances.store');
 
 Route::get('money/net-worth', [NetWorthController::class, 'index'])
