@@ -14,23 +14,22 @@
         "fivefilters/readability.php": "^3.3",
         "guzzlehttp/guzzle": "^7.10",
         "html2text/html2text": "^4.3",
-        "icehouse-ventures/laravel-chartjs": "^4.2",
         "intervention/image": "^3.11",
         "jenssegers/agent": "^2.6",
         "laravel-notification-channels/apn": "^6",
         "laravel-notification-channels/webpush": "^10.3",
-        "laravel/framework": "^12.0",
+        "laravel/framework": "^13.0",
         "laravel/horizon": "^5.30.3",
         "laravel/mcp": "^0.5.9",
         "laravel/octane": "*",
         "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.10.1",
+        "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.30",
         "livewire/livewire": "^3.6",
         "livewire/volt": "^1.7",
         "openai-php/laravel": "^0.20.0",
-        "owenvoke/blade-fontawesome": "^2.9",
+        "owenvoke/blade-fontawesome": "^3.3",
         "pgvector/pgvector": "^0.2.2",
         "pragmarx/version": "dev-master",
         "predis/predis": "^3.2",
@@ -52,7 +51,7 @@
         "brianium/paratest": "^7.20.0",
         "deployer/deployer": "^7.5",
         "fakerphp/faker": "^1.23",
-        "laravel/boost": "^1.8",
+        "laravel/boost": "^2.0",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.18",
         "laravel/sail": "^1.44",
@@ -152,8 +151,45 @@
             "url": "git@github.com:cronxco/mary.git"
         },
         {
-            "type": "vcs",
-            "url": "git@github.com:willscottuk/monzo-php.git"
+            "type": "package",
+            "package": {
+                "name": "willscottuk/monzo-php",
+                "version": "dev-master",
+                "description": "An API client for Monzo Bank (https://monzo.com)",
+                "type": "library",
+                "license": "BSD-3-Clause",
+                "source": {
+                    "type": "git",
+                    "url": "https://github.com/cronxco/monzo-php.git",
+                    "reference": "b7495fee77e656d9ce0ec70707a8e606070ab4b9"
+                },
+                "dist": {
+                    "type": "zip",
+                    "url": "https://api.github.com/repos/cronxco/monzo-php/zipball/b7495fee77e656d9ce0ec70707a8e606070ab4b9",
+                    "reference": "b7495fee77e656d9ce0ec70707a8e606070ab4b9"
+                },
+                "require": {
+                    "php": ">=7.1",
+                    "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+                    "ramsey/uuid": "^4.2",
+                    "guzzlehttp/guzzle": "^7.5"
+                },
+                "autoload": {
+                    "psr-4": {
+                        "Amelia\\Monzo\\": "src/"
+                    },
+                    "files": [
+                        "src/helpers.php"
+                    ]
+                },
+                "extra": {
+                    "laravel": {
+                        "providers": [
+                            "Amelia\\Monzo\\MonzoServiceProvider"
+                        ]
+                    }
+                }
+            }
         },
         {
             "type": "vcs",
