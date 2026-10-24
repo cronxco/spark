@@ -17,7 +17,7 @@ class McpSpan
      *
      * @param  string  $toolName  The name of the tool being called (e.g., "SearchEvents")
      * @param  Transport  $transport  The transport instance for detecting transport type
-     * @param  string|null  $requestId  The JSON-RPC request ID
+     * @param  int|string|null  $requestId  The JSON-RPC request ID
      * @param  array  $arguments  The tool arguments (will be stringified per MCP spec)
      * @param  callable  $callback  The callback to execute within the span
      * @return mixed The result from the callback
@@ -25,7 +25,7 @@ class McpSpan
     public static function toolCall(
         string $toolName,
         Transport $transport,
-        ?string $requestId,
+        int|string|null $requestId,
         array $arguments,
         callable $callback
     ): mixed {
@@ -60,10 +60,6 @@ class McpSpan
             $span->setData(['mcp.request.id' => $requestId]);
         }
 
-        if ($transport->sessionId() !== null) {
-            $span->setData(['mcp.session.id' => $transport->sessionId()]);
-        }
-
         // Add stringified arguments (per MCP spec: only primitive types allowed)
         foreach ($arguments as $key => $value) {
             $stringified = self::stringifyValue($value);
@@ -95,14 +91,14 @@ class McpSpan
      *
      * @param  string  $resourceUri  The URI of the resource being read
      * @param  Transport  $transport  The transport instance for detecting transport type
-     * @param  string|null  $requestId  The JSON-RPC request ID
+     * @param  int|string|null  $requestId  The JSON-RPC request ID
      * @param  callable  $callback  The callback to execute within the span
      * @return mixed The result from the callback
      */
     public static function resourceRead(
         string $resourceUri,
         Transport $transport,
-        ?string $requestId,
+        int|string|null $requestId,
         callable $callback
     ): mixed {
         if (! config('mcp.sentry.enabled', true)) {
@@ -142,10 +138,6 @@ class McpSpan
             $span->setData(['mcp.request.id' => $requestId]);
         }
 
-        if ($transport->sessionId() !== null) {
-            $span->setData(['mcp.session.id' => $transport->sessionId()]);
-        }
-
         SentrySdk::getCurrentHub()->setSpan($span);
 
         try {
@@ -159,19 +151,21 @@ class McpSpan
     }
 
     /**
-     * Start an initialize span with MCP-specific attributes.
+     * Start a handshake span (legacy `initialize` or `server/discover`) with MCP-specific attributes.
      *
      * @param  Transport  $transport  The transport instance for detecting transport type
-     * @param  string|null  $requestId  The JSON-RPC request ID
+     * @param  int|string|null  $requestId  The JSON-RPC request ID
      * @param  array  $clientInfo  Client information from initialization
      * @param  callable  $callback  The callback to execute within the span
+     * @param  string  $method  The handshake method being traced
      * @return mixed The result from the callback
      */
     public static function initialize(
         Transport $transport,
-        ?string $requestId,
+        int|string|null $requestId,
         array $clientInfo,
-        callable $callback
+        callable $callback,
+        string $method = 'initialize'
     ): mixed {
         if (! config('mcp.sentry.enabled', true)) {
             return $callback();
@@ -188,11 +182,11 @@ class McpSpan
         $context = new SpanContext;
         $span = $parentSpan->startChild($context);
         $span->setOp('mcp.server');
-        $span->setDescription('initialize');
+        $span->setDescription($method);
 
         // Required MCP attributes
         $span->setData([
-            'mcp.method.name' => 'initialize',
+            'mcp.method.name' => $method,
             'mcp.transport' => $mcpTransport,
             'network.transport' => $networkTransport,
             'network.protocol.version' => '2.0',
@@ -201,10 +195,6 @@ class McpSpan
         // Optional attributes
         if ($requestId !== null) {
             $span->setData(['mcp.request.id' => $requestId]);
-        }
-
-        if ($transport->sessionId() !== null) {
-            $span->setData(['mcp.session.id' => $transport->sessionId()]);
         }
 
         // Add client information

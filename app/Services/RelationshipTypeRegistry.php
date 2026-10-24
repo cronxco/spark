@@ -138,6 +138,13 @@ class RelationshipTypeRegistry
                 'description' => 'Person appears in photo cluster',
                 'supports_value' => false,
             ],
+            'with' => [
+                'display_name' => 'With',
+                'icon' => 'fas.user-group',
+                'is_directional' => true,
+                'description' => 'Person took part in an event with the user',
+                'supports_value' => false,
+            ],
             'discussed_in' => [
                 'display_name' => 'Discussed In',
                 'icon' => 'fas.comments',

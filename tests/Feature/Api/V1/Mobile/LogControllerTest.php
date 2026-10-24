@@ -2,12 +2,16 @@
 
 namespace Tests\Feature\Api\V1\Mobile;
 
+use App\Integrations\Fetch\PlaywrightFetchClient;
 use App\Integrations\ManualLog\ManualLogPlugin;
+use App\Jobs\Data\ManualLog\VivinoEnrichmentData;
 use App\Jobs\OAuth\ManualLog\BoardGameGeekEnrichmentPull;
 use App\Jobs\OAuth\ManualLog\UntappdBeerEnrichmentPull;
 use App\Jobs\OAuth\ManualLog\VivinoEnrichmentPull;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Person;
+use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -362,6 +366,210 @@ class LogControllerTest extends TestCase
 
         $integration = ManualLogPlugin::resolveIntegration($this->user->id);
         $this->assertSame($integration->id, Event::findOrFail($response->json('events.0.id'))->integration_id);
+    }
+
+    #[Test]
+    public function tags_people_with_the_event_creating_new_ones_and_reusing_known_ones(): void
+    {
+        $dan = Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => 'Dan', 'time' => now(), 'metadata' => []]);
+
+        $response = $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'wine',
+            'idempotency_key' => 'with-1',
+            'title' => 'Malbec',
+            'with' => ['dan', ' Sam ', 'DAN'],
+        ])->assertCreated()
+            ->assertJsonCount(2, 'people')
+            ->assertJsonPath('people.0.id', (string) $dan->id)
+            ->assertJsonPath('people.0.created', false)
+            ->assertJsonPath('people.1.name', 'Sam')
+            ->assertJsonPath('people.1.created', true);
+
+        $eventId = $response->json('events.0.id');
+        $this->assertSame(2, Relationship::where('type', 'with')->where('to_type', Event::class)->where('to_id', $eventId)->count());
+        $this->assertSame(2, Person::where('user_id', $this->user->id)->count());
+    }
+
+    #[Test]
+    public function a_retried_request_tags_people_once(): void
+    {
+        $payload = ['kind' => 'wine', 'idempotency_key' => 'with-retry', 'title' => 'Malbec', 'with' => ['Dan']];
+
+        $this->postJson('/api/v1/mobile/log', $payload)->assertCreated();
+        $this->postJson('/api/v1/mobile/log', $payload)->assertOk()->assertJsonPath('people.0.created', false);
+
+        $this->assertSame(1, Relationship::where('type', 'with')->count());
+    }
+
+    #[Test]
+    public function a_retry_finishes_tagging_that_failed_the_first_time(): void
+    {
+        $payload = ['kind' => 'wine', 'idempotency_key' => 'with-resume', 'title' => 'Malbec', 'with' => ['Dan']];
+
+        $this->postJson('/api/v1/mobile/log', ['with' => []] + $payload)->assertCreated();
+        $this->assertSame(0, Relationship::where('type', 'with')->count());
+
+        $this->postJson('/api/v1/mobile/log', $payload)->assertOk()->assertJsonPath('people.0.name', 'Dan');
+
+        $this->assertSame(1, Relationship::where('type', 'with')->count());
+    }
+
+    #[Test]
+    public function a_dry_run_matches_people_exactly_partially_or_not_at_all(): void
+    {
+        $daniel = $this->person('Daniel Smith');
+        $this->person('Samantha');
+        $this->person('Sam Jones');
+
+        $response = $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'cinema', 'dry_run' => true, 'title' => 'Dune', 'with' => ['daniel smith', 'Dan', 'Sam', 'Priya', 'Al'],
+        ])->assertOk();
+
+        $response->assertJsonPath('people.0.state', 'existing')
+            ->assertJsonPath('people.0.matches.0.id', (string) $daniel->id)
+            ->assertJsonPath('people.1.state', 'likely')
+            ->assertJsonPath('people.1.matches.0.name', 'Daniel Smith')
+            ->assertJsonPath('people.2.state', 'ambiguous')
+            ->assertJsonCount(2, 'people.2.matches')
+            ->assertJsonPath('people.3.state', 'new')
+            ->assertJsonPath('people.4.state', 'new');
+    }
+
+    #[Test]
+    public function a_dry_run_matches_a_short_name_and_ignores_accents(): void
+    {
+        $this->person('Dan');
+        $this->person('Zoë');
+
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'cinema', 'dry_run' => true, 'title' => 'Dune', 'with' => ['Daniel', 'zoe'],
+        ])->assertOk()
+            ->assertJsonPath('people.0.state', 'likely')
+            ->assertJsonPath('people.0.matches.0.name', 'Dan')
+            ->assertJsonPath('people.1.state', 'existing');
+    }
+
+    #[Test]
+    public function a_dry_run_does_not_match_other_users_people(): void
+    {
+        Person::create(['user_id' => User::factory()->create()->id, 'type' => 'person', 'title' => 'Daniel', 'time' => now(), 'metadata' => []]);
+
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'cinema', 'dry_run' => true, 'title' => 'Dune', 'with' => ['Dan'],
+        ])->assertOk()->assertJsonPath('people.0.state', 'new');
+    }
+
+    #[Test]
+    public function rejects_too_many_or_blank_names(): void
+    {
+        $base = ['kind' => 'wine', 'idempotency_key' => 'with-bad', 'title' => 'Malbec'];
+
+        $this->postJson('/api/v1/mobile/log', $base + ['with' => array_fill(0, 11, 'Dan')])->assertUnprocessable();
+        $this->postJson('/api/v1/mobile/log', $base + ['with' => ['']])->assertUnprocessable();
+    }
+
+    #[Test]
+    public function a_dry_run_previews_a_tv_match_without_writing(): void
+    {
+        $this->configureTvdb();
+        $this->fakeTvdb([$this->diplomat()], seasons: [1, 2, 3]);
+
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'tv', 'dry_run' => true, 'title' => 'The Diplomat', 'season' => 3, 'episodes' => [1, 2, 9],
+        ])->assertOk()
+            ->assertJsonPath('status', 'preview')
+            ->assertJsonPath('match.state', 'matched')
+            ->assertJsonPath('match.series.name', 'The Diplomat')
+            ->assertJsonPath('match.season', 3)
+            ->assertJsonPath('match.episodes.0.name', 'The Last Straw')
+            ->assertJsonPath('match.missing_episodes', [9]);
+
+        $this->assertSame(0, Event::count());
+    }
+
+    #[Test]
+    public function a_dry_run_asks_the_same_season_question_a_log_would(): void
+    {
+        $this->configureTvdb();
+        $this->fakeTvdb([$this->diplomat()], seasons: [1, 2, 3]);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'tv', 'dry_run' => true, 'title' => 'The Diplomat', 'episodes' => [1]])
+            ->assertOk()
+            ->assertJsonPath('status', 'needs_clarification')
+            ->assertJsonPath('field', 'season');
+    }
+
+    #[Test]
+    public function a_wine_dry_run_shows_the_closest_vivino_cards_and_reuses_them_when_logged(): void
+    {
+        $this->mock(PlaywrightFetchClient::class)
+            ->shouldReceive('fetch')
+            ->once()
+            ->andReturn(['success' => true, 'html' => file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'))]);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'wine', 'dry_run' => true, 'title' => 'Raquillet Mercurey'])
+            ->assertOk()
+            ->assertJsonPath('status', 'preview')
+            ->assertJsonPath('match.kind', 'wine')
+            ->assertJsonPath('match.state', 'matched')
+            ->assertJsonPath('match.best.score', 1);
+
+        $this->assertSame(0, Event::count());
+
+        Queue::fake([VivinoEnrichmentData::class]);
+        VivinoEnrichmentPull::dispatchSync(
+            ManualLogPlugin::resolveIntegration($this->user->id),
+            'event-id',
+            'Raquillet Mercurey',
+        );
+        Queue::assertPushed(VivinoEnrichmentData::class, 1);
+    }
+
+    #[Test]
+    public function a_wine_dry_run_with_no_close_card_lists_the_nearest(): void
+    {
+        $this->mock(PlaywrightFetchClient::class)
+            ->shouldReceive('fetch')
+            ->once()
+            ->andReturn(['success' => true, 'html' => file_get_contents(base_path('tests/Fixtures/ManualLog/vivino-search-results.html'))]);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'wine', 'dry_run' => true, 'title' => 'Cafe Francois Rouge'])
+            ->assertOk()
+            ->assertJsonPath('match.state', 'candidates')
+            ->assertJsonPath('match.best', null)
+            ->assertJsonPath('match.candidates.0.score', 0.67);
+    }
+
+    #[Test]
+    public function a_dry_run_says_so_when_the_site_cannot_be_searched(): void
+    {
+        $this->mock(PlaywrightFetchClient::class)
+            ->shouldReceive('fetch')
+            ->once()
+            ->andReturn(['success' => false, 'error' => 'timeout']);
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'beer', 'dry_run' => true, 'title' => 'Nebulous Sky'])
+            ->assertOk()
+            ->assertJsonPath('match.state', 'unavailable');
+    }
+
+    #[Test]
+    public function a_chosen_match_is_passed_to_the_enrichment_job(): void
+    {
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'wine', 'idempotency_key' => 'pick-1', 'title' => 'Malbec', 'match_url' => 'https://www.vivino.com/en/x/w/1',
+        ])->assertCreated();
+
+        Queue::assertPushed(VivinoEnrichmentPull::class, fn ($job) => $job->matchUrl === 'https://www.vivino.com/en/x/w/1');
+
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'tv', 'idempotency_key' => 'pick-2', 'title' => 'Show', 'episodes' => [1], 'match_url' => 'https://example.com',
+        ])->assertUnprocessable();
+    }
+
+    private function person(string $title): Person
+    {
+        return Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => $title, 'time' => now(), 'metadata' => []]);
     }
 
     private function configureTvdb(): void

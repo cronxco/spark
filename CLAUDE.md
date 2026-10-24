@@ -4,7 +4,7 @@ This file provides guidance to Claude Code ([claude.ai/code](http://claude.ai/co
 
 ## Quick Start (TL;DR)
 
-**Spark** is a Laravel 12 + Livewire 3 integration platform that connects external services (health, finance, media, etc.) and transforms their data into a unified event/object/block system using a sophisticated job pipeline.
+**Spark** is a Laravel 13 + Livewire 3 integration platform that connects external services (health, finance, media, etc.) and transforms their data into a unified event/object/block system using a sophisticated job pipeline.
 
 ## Development Commands
 
@@ -294,7 +294,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - laravel/socialite (SOCIALITE) - v5
 - livewire/livewire (LIVEWIRE) - v3
 - livewire/volt (VOLT) - v1
-- laravel/mcp (MCP) - v0
+- laravel/mcp (MCP) - v1
 - laravel/pint (PINT) - v1
 - laravel/sail (SAIL) - v1
 - phpunit/phpunit (PHPUNIT) - v13

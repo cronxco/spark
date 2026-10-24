@@ -13,6 +13,7 @@ use App\Services\Flint\FlintRunToken;
 use App\Services\Flint\RoutineConfig;
 use App\Services\Flint\RoutineModel;
 use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Support\FlintDigestDay;
 use App\Support\FlintDigestOpener;
 use App\Support\FlintQuestion;
 use Carbon\Carbon;
@@ -250,6 +251,15 @@ class FlintDigestService
             return $this->result($existing, $period, true);
         }
 
+        // A second scheduled run for a slot that already has its digest (a
+        // retried fire, a re-run session) carries a new run uuid, so the source
+        // id above cannot see it. The first digest stands; manual runs are
+        // deliberate regenerations and are left alone.
+        $slotDigest = $this->scheduledSlotDigest($integration, $date, $period, $run);
+        if ($slotDigest) {
+            return $this->result($slotDigest, $period, true);
+        }
+
         $digest = $this->resolveDigestObject($user, $period, $date, $run['routine'] ?? null);
         $actor = EventObject::firstOrCreate(
             ['user_id' => $user->id, 'concept' => 'user', 'type' => 'user_profile', 'title' => $user->name],
@@ -340,6 +350,29 @@ class FlintDigestService
         }
 
         return $this->result($event->load('blocks'), $period, false);
+    }
+
+    /**
+     * The digest already written for this routine's slot, if the run asking to
+     * write another is itself a scheduled one. Runs with an occurrence claim
+     * belong to a multi-slot schedule, where several digests a day are intended.
+     *
+     * @param  array<string, mixed>|null  $run
+     */
+    private function scheduledSlotDigest(Integration $integration, Carbon $date, string $period, ?array $run): ?Event
+    {
+        $routine = $run['routine'] ?? null;
+        if (! is_string($routine) || ($run['trigger_source'] ?? null) !== 'scheduled' || isset($run['occurrence'])) {
+            return null;
+        }
+
+        return Event::query()
+            ->where('integration_id', $integration->id)
+            ->tap(fn ($query) => FlintDigestDay::forScheduledSlot($query, $routine, $period, $date->toDateString()))
+            ->oldest('created_at')
+            ->lockForUpdate()
+            ->with('blocks')
+            ->first();
     }
 
     /** @return array<string, mixed> */

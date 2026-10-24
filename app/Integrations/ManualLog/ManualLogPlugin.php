@@ -377,11 +377,11 @@ class ManualLogPlugin extends ManualPlugin
         }
 
         if ($actionType === 'drank_wine') {
-            VivinoEnrichmentPull::dispatch($integration, $event->id, $title);
+            VivinoEnrichmentPull::dispatch($integration, $event->id, $title, $options['match_url'] ?? null);
         }
 
         if ($actionType === 'drank_beer') {
-            UntappdBeerEnrichmentPull::dispatch($integration, $event->id, $title);
+            UntappdBeerEnrichmentPull::dispatch($integration, $event->id, $title, $options['match_url'] ?? null);
         }
 
         return $event;
