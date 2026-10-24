@@ -36,12 +36,13 @@ use App\Mcp\Tools\SetEventNoteTool;
 use App\Mcp\Tools\TriggerIntegrationUpdateTool;
 use App\Mcp\Tools\UpdateEntityTool;
 use App\Mcp\Tracing\McpSpan;
+use Laravel\Mcp\Enums\MetaKey;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Prompt;
 use Laravel\Mcp\Server\Resource;
 use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Transport\JsonRpcRequest;
+use Laravel\Mcp\Transport\JsonRpcRequest;
 
 class SparkServer extends Server
 {
@@ -196,6 +197,21 @@ class SparkServer extends Server
      */
     protected function handleMessage(JsonRpcRequest $request, ServerContext $context): void
     {
+        $this->tagClient($request);
+
+        // Handle the handshake (legacy initialize or server/discover) with tracing
+        if (in_array($request->method, ['initialize', 'server/discover'], true)) {
+            McpSpan::initialize(
+                $this->transport,
+                $request->id,
+                $this->clientInfo($request),
+                fn () => parent::handleMessage($request, $context),
+                $request->method
+            );
+
+            return;
+        }
+
         // Handle tool calls with tracing
         if ($request->method === 'tools/call') {
             $toolName = $request->params['name'] ?? 'unknown';
@@ -231,27 +247,41 @@ class SparkServer extends Server
     }
 
     /**
-     * Handle initialization messages with Sentry tracing.
+     * Tag the Sentry scope with the client and protocol the request carries.
+     *
+     * Modern clients send both in every request's `_meta`; legacy clients send
+     * them once, in the `initialize` params.
      */
-    protected function handleInitializeMessage(JsonRpcRequest $request, ServerContext $context): void
+    protected function tagClient(JsonRpcRequest $request): void
     {
-        $clientInfo = $request->params['clientInfo'] ?? [];
+        $clientInfo = $this->clientInfo($request);
+        $protocolVersion = $request->isLegacy()
+            ? ($request->params['protocolVersion'] ?? null)
+            : ($request->meta()[MetaKey::PROTOCOL_VERSION->value] ?? null);
 
-        McpSpan::initialize(
-            $this->transport,
-            $request->id,
+        if ($clientInfo === [] && ! is_string($protocolVersion)) {
+            return;
+        }
+
+        McpSpan::setSessionMetadata(
             $clientInfo,
-            function () use ($request, $context, $clientInfo): void {
-                parent::handleInitializeMessage($request, $context);
-
-                // Set session-level metadata after successful initialization
-                McpSpan::setSessionMetadata(
-                    $clientInfo,
-                    $this->name,
-                    $this->version,
-                    '2025-11-25'
-                );
-            }
+            $this->name,
+            $this->version,
+            is_string($protocolVersion) ? $protocolVersion : 'unknown'
         );
+    }
+
+    /**
+     * Extract the client information from a request.
+     *
+     * @return array<string, mixed>
+     */
+    protected function clientInfo(JsonRpcRequest $request): array
+    {
+        $clientInfo = $request->isLegacy()
+            ? ($request->params['clientInfo'] ?? [])
+            : ($request->meta()[MetaKey::CLIENT_INFO->value] ?? []);
+
+        return is_array($clientInfo) ? $clientInfo : [];
     }
 }
