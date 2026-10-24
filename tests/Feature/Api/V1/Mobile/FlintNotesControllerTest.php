@@ -44,6 +44,21 @@ class FlintNotesControllerTest extends TestCase
     }
 
     #[Test]
+    public function notes_can_be_acknowledged_and_filtered(): void
+    {
+        $a = $this->postJson('/api/v1/mobile/flint/notes', $this->payload())->assertCreated()->json('data.id');
+        $b = $this->postJson('/api/v1/mobile/flint/notes', $this->payload(['body' => 'Second']))->assertCreated()->json('data.id');
+
+        $this->postJson('/api/v1/mobile/flint/notes/acknowledge', ['note_ids' => [$a], 'routine' => 'digest'])
+            ->assertOk()->assertJsonPath('data.acknowledged.0', $a);
+
+        $this->getJson('/api/v1/mobile/flint/notes?unacknowledged=1')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $b)->assertJsonPath('data.0.acknowledged_at', null);
+        $all = collect($this->getJson('/api/v1/mobile/flint/notes')->json('data'))->keyBy('id');
+        $this->assertSame('digest', $all[$a]['acknowledged_by']['routine']);
+    }
+
+    #[Test]
     public function create_is_idempotent_and_detects_mutation_conflicts(): void
     {
         $payload = $this->payload();

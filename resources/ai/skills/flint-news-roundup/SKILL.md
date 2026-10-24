@@ -18,6 +18,7 @@ allowed_tools:
   - spark__get-event-tool
   - spark__get-block-tool
   - spark__get-flint-notes
+  - spark__acknowledge-flint-notes
   - spark__create-flint-digest
   - spark__manage-flint-topic
   - docs__fetch
@@ -111,7 +112,9 @@ shortlisted feed originals in Step 7.
 Also call `spark__get-flint-notes` for notes updated in the last 30 days. Apply
 only notes that explicitly bear on news selection, framing, or a linked source
 or Topic. A relevant note is direct user intent and outranks inferred
-preferences. Keep the IDs of notes materially used.
+preferences. Keep the IDs of notes materially used; you acknowledge those after the
+roundup is written (Step 10). Notes about other subjects stay unacknowledged for the
+routine they are for.
 
 ## Step 3: Establish coverage from the data, not from impression
 
@@ -360,6 +363,16 @@ spark__create-flint-digest(
   note_ids_used: ["<relevant Flint Note UUIDs actually used>"],
   summary: "<one line per story — its headline and the single most useful fact>",
   blocks: [ <one flint_news per selected story>, <editorial note last> ]
+)
+```
+
+When `create-flint-digest` has succeeded and you used any notes, acknowledge them:
+
+```text
+spark__acknowledge-flint-notes(
+  note_ids: ["<the notes you used>"],
+  run_token: "<run_token from the trigger payload>",
+  routine: "news_roundup"
 )
 ```
 
