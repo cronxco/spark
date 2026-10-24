@@ -179,6 +179,8 @@ class FlintNoteService
                     'acknowledged_at' => now()->toIso8601String(),
                     'acknowledged_by' => $by === [] ? null : $by,
                 ];
+                // Acknowledgement changes the row version (xmin), but not the note content timestamp.
+                $note->timestamps = false;
                 $note->save();
                 $result['acknowledged'][] = $id;
             }
