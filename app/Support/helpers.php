@@ -380,8 +380,15 @@ if (! function_exists('format_event_value_display')) {
             }
         }
 
-        // Default fallback: simple concatenation
-        return (string) $value . ($unit ? (' ' . $unit) : '');
+        // Default fallback: simple concatenation. Ratio and percent units
+        // attach to the number ("4/5", "80%"), everything else gets a space.
+        if (! $unit) {
+            return (string) $value;
+        }
+
+        $separator = str_starts_with($unit, '/') || $unit === '%' ? '' : ' ';
+
+        return (string) $value . $separator . $unit;
     }
 }
 

@@ -67,7 +67,7 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         // Exclude webhook routes from CSRF protection
-        $middleware->validateCsrfTokens(except: [
+        $middleware->preventRequestForgery(except: [
             'webhook/*',
         ]);
 
