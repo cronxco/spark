@@ -89,4 +89,22 @@ class GetFlintNotesToolTest extends TestCase
             'query' => 'Montreal',
         ])->assertOk()->assertSee('booking date moved');
     }
+
+    #[Test]
+    public function unacknowledged_filter_returns_only_unread_notes_of_any_age(): void
+    {
+        $user = User::factory()->create();
+        $unread = EventObject::factory()->create([
+            'user_id' => $user->id, 'concept' => 'document', 'type' => 'flint_note',
+            'content' => 'Unread old note', 'updated_at' => now()->subDays(60), 'metadata' => [],
+        ]);
+        EventObject::factory()->create([
+            'user_id' => $user->id, 'concept' => 'document', 'type' => 'flint_note',
+            'content' => 'Already read note', 'updated_at' => now(),
+            'metadata' => ['acknowledged_at' => now()->toIso8601String()],
+        ]);
+
+        SparkServer::actingAs($user)->tool(GetFlintNotesTool::class, ['unacknowledged' => true])
+            ->assertOk()->assertSee((string) $unread->id)->assertDontSee('Already read note');
+    }
 }

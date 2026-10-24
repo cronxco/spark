@@ -28,7 +28,10 @@ class GetFlintNotesTool extends Tool
         corrections, so they outrank inferred context and stale calendar or topic data.
         By default returns notes updated in the last 30 days. Use updated_since as a
         watermark for new notes, query for a bounded keyword search, or context_id for
-        notes linked to a specific event, digest, block, or topic.
+        notes linked to a specific event, digest, block, or topic. Set unacknowledged to
+        true to get only notes no routine has marked as read yet; routines should read
+        notes this way and then call acknowledge-flint-notes. Each note reports
+        acknowledged_at and acknowledged_by.
     MARKDOWN;
 
     public function __construct(
@@ -64,7 +67,7 @@ class GetFlintNotesTool extends Tool
         // An unfiltered inbox read is deliberately bounded. A targeted query or
         // context lookup searches the durable note history unless the caller
         // supplies its own watermark.
-        if ($updatedSince === null && $queryText === '' && ! $hasContext) {
+        if ($updatedSince === null && $queryText === '' && ! $hasContext && $request->get('unacknowledged') !== true) {
             $updatedSince = now()->subDays(30);
         }
 
@@ -77,6 +80,7 @@ class GetFlintNotesTool extends Tool
                 $nested->where('title', 'ilike', "%{$queryText}%")
                     ->orWhere('content', 'ilike', "%{$queryText}%");
             }))
+            ->when($request->get('unacknowledged') === true, fn ($query) => $query->whereNull('metadata->acknowledged_at'))
             ->when($hasContext, fn ($query) => $query->whereHas(
                 'relationshipsFrom',
                 fn ($relationship) => $relationship
@@ -109,6 +113,8 @@ class GetFlintNotesTool extends Tool
                 ->description('Optional case-insensitive keyword search across note title and body.'),
             'context_id' => $schema->string()
                 ->description('Optional UUID of an event, digest, block, or topic to which the note is linked.'),
+            'unacknowledged' => $schema->boolean()
+                ->description('When true, return only notes not yet acknowledged by a routine, regardless of age.'),
             'limit' => $schema->integer()
                 ->description('Maximum notes to return, 1-50. Defaults to 50.')
                 ->default(50),

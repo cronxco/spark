@@ -4,6 +4,7 @@ namespace App\Mcp\Servers;
 
 use App\Mcp\Resources\DayContextResource;
 use App\Mcp\Tools\AcknowledgeAnomalyTool;
+use App\Mcp\Tools\AcknowledgeFlintNotesTool;
 use App\Mcp\Tools\AnswerFlintQuestionTool;
 use App\Mcp\Tools\CaptureBookmarkTool;
 use App\Mcp\Tools\CompleteFlintRunTool;
@@ -114,6 +115,7 @@ class SparkServer extends Server
         - `create-flint-digest`: Create a Flint digest event with an optional array of blocks. Requires `flint:write`. Supports `flint_user_question` (questions for the user with optional multiple-choice), `flint_editorial_note` (AI commentary), and any other `flint_*` block type. Returns event_id and block_ids.
         - `get-latest-flint-digest`: Retrieve the latest Flint digest for a date (default: today). Returns all blocks with full metadata — for `flint_user_question` blocks, includes the user's answer, answer_note, and answered_at.
         - `get-flint-notes`: Retrieve explicit Notes to Flint, optionally since a watermark, by keyword, or linked context. Fresh notes and corrections outrank inferred context.
+        - `acknowledge-flint-notes`: Mark Notes to Flint as read by a routine (sets acknowledged_at / acknowledged_by). Read with `get-flint-notes` `unacknowledged: true` first, then acknowledge what you have acted on. Requires `flint:write`.
         - `answer-flint-question`: Record the user's answer to a Flint question.
         - `manage-flint-topic`: Create, update, or list persistent Flint Topics. Topics track strategic, thematic, and tactical threads, and may link digest events or blocks that discussed them.
         - `complete-flint-run`: Confirm that a topic routine produced its expected persisted output using its verified run token.
@@ -168,6 +170,7 @@ class SparkServer extends Server
         CompleteFlintRunTool::class,
         GetLatestFlintDigestTool::class,
         GetFlintNotesTool::class,
+        AcknowledgeFlintNotesTool::class,
         AnswerFlintQuestionTool::class,
         ManageFlintTopicTool::class,
         RunFlintSkillTool::class,
