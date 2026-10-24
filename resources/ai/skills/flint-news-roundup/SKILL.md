@@ -109,7 +109,9 @@ Load both days to catch yesterday afternoon's arrivals.
 Build candidates from these summaries and the UK sweep (Step 5). Read only
 shortlisted feed originals in Step 7.
 
-Also call `spark__get-flint-notes` for notes updated in the last 30 days. Apply
+Also call `spark__get-flint-notes` for notes updated in the last 30 days, and
+`spark__get-flint-notes(unacknowledged: true)` to include older unread notes.
+Merge the two results by note ID before selecting applicable notes. Apply
 only notes that explicitly bear on news selection, framing, or a linked source
 or Topic. A relevant note is direct user intent and outranks inferred
 preferences. Keep the IDs of notes materially used; you acknowledge those after the
