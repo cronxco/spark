@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
 use App\Http\Controllers\Api\V1\Mobile\KnowledgeReprocessingController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\LocationsController;
+use App\Http\Controllers\Api\V1\Mobile\IntentsController;
 use App\Http\Controllers\Api\V1\Mobile\LogController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MeController;
@@ -325,6 +326,14 @@ Route::post('captures', [CapturesController::class, 'store'])
 Route::post('log', [LogController::class, 'store'])
     ->middleware('spark.ability:data:write')
     ->name('log.store');
+
+Route::post('log/intents/classify', [IntentsController::class, 'classify'])
+    ->middleware('spark.ability:data:write')
+    ->name('log.intents.classify');
+
+Route::post('log/intents', [IntentsController::class, 'commit'])
+    ->middleware('spark.ability:data:write')
+    ->name('log.intents.commit');
 
 /*
 |--------------------------------------------------------------------------
