@@ -12,6 +12,7 @@ use App\Services\Mobile\ObjectLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use stdClass;
 
 class ObjectsController extends Controller
 {
@@ -92,7 +93,7 @@ class ObjectsController extends Controller
             'person' => (new CompactObjectResource($person))->resolve($request),
             'event_count' => $service->eventCount($person),
             'month' => $month->format('Y-m'),
-            'calendar' => (object) $service->calendar($person, $month, $timezone),
+            'calendar' => $service->calendar($person, $month, $timezone) ?: new stdClass,
             'events' => CompactEventResource::collection($events->load(['blocks']))->resolve($request),
         ]);
     }
