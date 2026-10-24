@@ -45,6 +45,7 @@ class SearchController extends Controller
         }
 
         $data = $request->validate([
+            'q' => ['missing'],
             'query' => ['present', 'nullable', 'string', 'max:500'],
             'mode' => ['nullable', 'string', Rule::in(SearchDispatcher::V1_MODES)],
             'limit' => ['nullable', 'integer', 'min:1', 'max:' . SearchDispatcher::MAX_LIMIT],
@@ -73,7 +74,9 @@ class SearchController extends Controller
             LegacyAliasUsage::record('plural_mode');
         }
         $mode = SearchDispatcher::MODE_ALIASES[$mode] ?? $mode;
-        LegacyAliasUsage::record('q');
+        if ($request->query->has('q')) {
+            LegacyAliasUsage::record('q');
+        }
         $query = (string) $request->query('q', '');
         $limit = (int) $request->query('limit', SearchDispatcher::DEFAULT_LIMIT);
 

@@ -175,6 +175,56 @@ class SearchContractTest extends TestCase
     }
 
     #[Test]
+    public function v1_rejects_q_even_when_query_is_present(): void
+    {
+        $this->getJson('/api/v1/mobile/search?contract_version=1&query=coffee&q=other')->assertStatus(422)->assertJsonValidationErrors('q');
+        $this->getJson('/api/v1/mobile/search?contract_version=1&query=coffee&q=')->assertStatus(422)->assertJsonValidationErrors('q');
+    }
+
+    #[Test]
+    public function metric_hits_respect_the_requested_limit(): void
+    {
+        foreach (['a', 'b', 'c'] as $suffix) {
+            MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'coffee', 'action' => "had_{$suffix}_count"]);
+        }
+
+        foreach (['default', 'metric'] as $mode) {
+            $metrics = collect($this->getJson("/api/v1/mobile/search?contract_version=1&query=coffee&mode={$mode}&limit=1")->assertOk()->json('results'))
+                ->where('kind', 'metric');
+
+            $this->assertCount(1, $metrics, "mode={$mode}");
+        }
+    }
+
+    #[Test]
+    public function semantic_fallback_stays_within_events_and_objects(): void
+    {
+        EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'coffee beans']);
+
+        $this->mock(EmbeddingClient::class, function ($mock) {
+            $mock->shouldReceive('embed')->andThrow(new Exception('upstream down'));
+        });
+
+        $kinds = collect($this->getJson('/api/v1/mobile/search?contract_version=1&query=coffee&mode=semantic')->assertOk()->json('results'))
+            ->pluck('kind')->unique()->values()->all();
+
+        $this->assertSame(['object'], $kinds);
+    }
+
+    #[Test]
+    public function tag_counts_include_tagged_blocks(): void
+    {
+        $event = Event::factory()->create(['integration_id' => $this->integration->id]);
+        $block = Block::factory()->create(['event_id' => $event->id, 'block_type' => 'summary', 'title' => 'Plain']);
+        $block->attachTag('blockonly');
+
+        $tag = collect($this->getJson('/api/v1/mobile/search?contract_version=1&query=blockonly')->assertOk()->json('results'))
+            ->firstWhere('kind', 'tag');
+
+        $this->assertSame(1, $tag['count']);
+    }
+
+    #[Test]
     public function results_are_tenant_scoped(): void
     {
         $other = User::factory()->create();
@@ -223,6 +273,9 @@ class SearchContractTest extends TestCase
 
         $counts = LegacyAliasUsage::counts(now()->format('Y-m-d'));
 
+        $this->getJson('/api/v1/mobile/search?mode=default&query=ignored')->assertOk();
+
+        $this->assertSame(2, LegacyAliasUsage::counts(now()->format('Y-m-d'))['q'], 'A request without q is not counted.');
         $this->assertSame(2, $counts['q']);
         $this->assertSame(1, $counts['plural_mode']);
         $this->assertSame(1, $counts['string_boolean']);

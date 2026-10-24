@@ -189,7 +189,7 @@ class SearchContract
      */
     protected function tag(Tag $tag): array
     {
-        $count = (int) ($tag->events_count ?? 0) + (int) ($tag->objects_count ?? 0);
+        $count = (int) ($tag->events_count ?? 0) + (int) ($tag->objects_count ?? 0) + (int) ($tag->blocks_count ?? 0);
 
         return [
             'kind' => 'tag',

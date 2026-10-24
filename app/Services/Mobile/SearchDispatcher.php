@@ -94,9 +94,9 @@ class SearchDispatcher
         }
 
         return match ($mode) {
-            'semantic' => $this->semantic($user, $query, $limit, $result, $allFamilies),
+            'semantic' => $this->semantic($user, $query, $limit, $result),
             'tag' => $this->byTag($user, $query, $limit, $result),
-            'metric' => $this->byMetric($user, $query, $result),
+            'metric' => $this->byMetric($user, $query, $result, $allFamilies ? $limit : self::MAX_LIMIT),
             'integration' => $this->byIntegration($user, $query, $limit, $result),
             'command' => $this->byCommand($user, $query, $limit, $result),
             default => $this->defaultSearch($user, $query, $limit, $result, $allFamilies),
@@ -149,7 +149,7 @@ class SearchDispatcher
             $result['blocks'] = $this->ranking->orderByText($blocks, $query, 'title')->get();
         }
 
-        $result = $this->byMetric($user, $query, $result);
+        $result = $this->byMetric($user, $query, $result, $limit);
         $result = $this->byIntegration($user, $query, $limit, $result);
 
         $places = Place::query()
@@ -184,12 +184,12 @@ class SearchDispatcher
         return $result;
     }
 
-    protected function semantic(User $user, string $query, int $limit, array $result, bool $allFamilies = false): array
+    protected function semantic(User $user, string $query, int $limit, array $result): array
     {
         if (! $this->embeddingService) {
             $result['fallback_reason'] = self::FALLBACK_EMBEDDINGS_UNAVAILABLE;
 
-            return $this->defaultSearch($user, $query, $limit, $result, $allFamilies);
+            return $this->defaultSearch($user, $query, $limit, $result);
         }
 
         try {
@@ -197,7 +197,7 @@ class SearchDispatcher
         } catch (Throwable) {
             $result['fallback_reason'] = self::FALLBACK_EMBEDDING_FAILED;
 
-            return $this->defaultSearch($user, $query, $limit, $result, $allFamilies);
+            return $this->defaultSearch($user, $query, $limit, $result);
         }
 
         $integrationIds = $user->integrations()->pluck('id')->all();
@@ -240,7 +240,7 @@ class SearchDispatcher
         return $result;
     }
 
-    protected function byMetric(User $user, string $query, array $result): array
+    protected function byMetric(User $user, string $query, array $result, int $limit = self::MAX_LIMIT): array
     {
         $like = '%' . $query . '%';
 
@@ -249,7 +249,7 @@ class SearchDispatcher
             ->where(fn ($q) => $q->where('service', 'like', $like)->orWhere('action', 'like', $like))
             ->orderBy('service')
             ->orderBy('action')
-            ->limit(self::MAX_LIMIT)
+            ->limit($limit)
             ->get();
 
         return $result;
