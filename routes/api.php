@@ -73,7 +73,6 @@ Route::prefix('v1')
             Route::get('events', [V1FeedController::class, 'index'])->name('events.index');
             Route::get('events/{id}', [V1EventsController::class, 'show'])->name('events.show');
             Route::get('objects/{id}', [V1ObjectsController::class, 'show'])->name('objects.show');
-            Route::get('people/{id}/timeline', [V1ObjectsController::class, 'timeline'])->name('people.timeline');
             Route::get('blocks/{id}', [V1BlocksController::class, 'show'])->name('blocks.show');
             Route::get('search', [V1SearchController::class, 'index'])->name('search.index');
             Route::get('tags', [V1TagsController::class, 'index'])->name('tags.index');
