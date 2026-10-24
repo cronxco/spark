@@ -85,6 +85,22 @@ class PersonPageTest extends TestCase
     }
 
     #[Test]
+    public function mention_matching_requires_a_complete_person_name(): void
+    {
+        $dan = $this->person('Dan');
+        $daniel = Event::factory()->create(['integration_id' => $this->integration->id]);
+        $daniel->createBlock(['title' => 'Note', 'block_type' => 'note', 'time' => $daniel->time, 'metadata' => ['content' => 'Coffee with @Daniel']]);
+        $smithson = Event::factory()->create(['integration_id' => $this->integration->id]);
+        $smithson->createBlock(['title' => 'Note', 'block_type' => 'note', 'time' => $smithson->time, 'metadata' => ['content' => 'Coffee with @Dan Smithson']]);
+        $exact = Event::factory()->create(['integration_id' => $this->integration->id]);
+        $exact->createBlock(['title' => 'Note', 'block_type' => 'note', 'time' => $exact->time, 'metadata' => ['content' => 'Coffee with @Dan, then home']]);
+
+        $ids = app(PersonProfileService::class)->events($dan)->pluck('id')->all();
+
+        $this->assertSame([$exact->id], $ids);
+    }
+
+    #[Test]
     public function an_object_that_is_not_a_person_has_no_person_page(): void
     {
         $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account']);
