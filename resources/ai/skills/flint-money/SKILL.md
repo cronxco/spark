@@ -82,7 +82,11 @@ saying the Money Plan had nothing to report, and stop.
 spark__get-latest-flint-digest(date: "<local_date>", all: true)
 spark__get-latest-flint-digest(date: "<local_date - 7d>", all: true)
 spark__get-flint-notes()
+spark__get-flint-notes(unacknowledged: true)
 ```
+
+Merge the recent and unacknowledged results by note ID before deciding what to apply.
+Older unacknowledged notes must not be lost to the default 30-day window.
 
 Do not repeat last week's point unless it has changed; say what changed. Notes to
 Flint outrank anything inferred (for example, "that Amex spend is for a trip").
