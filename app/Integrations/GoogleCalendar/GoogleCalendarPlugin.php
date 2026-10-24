@@ -634,7 +634,9 @@ class GoogleCalendarPlugin extends OAuthPlugin
             } else {
                 $startTime = Carbon::parse($start['dateTime']);
                 $endTime = Carbon::parse($end['dateTime']);
-                $durationMinutes = $startTime->diffInMinutes($endTime);
+                // Carbon 3 returns a float, and events.value is a bigint: an event whose
+                // times carry seconds (Google Maps travel entries) failed the whole batch
+                $durationMinutes = (int) round($startTime->diffInMinutes($endTime));
                 $actionType = 'had_event';
             }
 
