@@ -8,6 +8,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Throwable;
 
@@ -28,7 +29,7 @@ class ActionExecutor
      * @param  array<string, mixed>  $target
      *
      * @throws ConfirmationRequired
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     public function run(
         User $user,
