@@ -51,24 +51,6 @@ class SearchContractTest extends TestCase
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
     }
 
-    /** @return array<string, mixed> */
-    protected function fixture(string $name): array
-    {
-        return json_decode(file_get_contents(base_path("tests/Fixtures/search-contract/v1/{$name}.json")), true, flags: JSON_THROW_ON_ERROR);
-    }
-
-    /** @return array<int, string> */
-    protected function keysOfKind(array $response, string $kind): array
-    {
-        $hit = collect($response['results'])->firstWhere('kind', $kind);
-        $this->assertNotNull($hit, "No {$kind} hit in response.");
-
-        $keys = array_keys($hit);
-        sort($keys);
-
-        return $keys;
-    }
-
     #[Test]
     public function fixtures_only_use_kinds_the_contract_declares(): void
     {
@@ -192,5 +174,23 @@ class SearchContractTest extends TestCase
         $this->assertSame(2, $counts['q']);
         $this->assertSame(1, $counts['plural_mode']);
         $this->assertSame(1, $counts['string_boolean']);
+    }
+
+    /** @return array<string, mixed> */
+    protected function fixture(string $name): array
+    {
+        return json_decode(file_get_contents(base_path("tests/Fixtures/search-contract/v1/{$name}.json")), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    /** @return array<int, string> */
+    protected function keysOfKind(array $response, string $kind): array
+    {
+        $hit = collect($response['results'])->firstWhere('kind', $kind);
+        $this->assertNotNull($hit, "No {$kind} hit in response.");
+
+        $keys = array_keys($hit);
+        sort($keys);
+
+        return $keys;
     }
 }
