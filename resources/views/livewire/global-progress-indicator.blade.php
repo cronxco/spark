@@ -2,6 +2,8 @@
 
 use App\Actions\DispatchIntegrationFetchJobs;
 use App\Models\Integration;
+use App\Services\Actions\ActionExecutor;
+use App\Services\Actions\ActionRegistry;
 use App\Services\Flint\FlintRunDispatcher;
 use App\Services\Notifications\NotificationArchiver;
 use App\Services\Notifications\NotificationFeedService;
@@ -21,6 +23,25 @@ new class extends Component
     public function refreshFeed(): void
     {
         $this->feed = app(NotificationFeedService::class)->feed(Auth::user(), limit: 6);
+    }
+
+    /**
+     * Spotlight's ">" commands. Mounted in the app layout, so they work on
+     * every page. Capabilities are a token concept; a signed-in web session
+     * runs what the registry offers it.
+     */
+    #[On('run-action')]
+    public function runAction(string $action): void
+    {
+        $definition = app(ActionRegistry::class)->forSurface('web')->get($action);
+
+        if ($definition === null || $definition->isNavigation() || ! $definition->runsWithoutInput()) {
+            return;
+        }
+
+        app(ActionExecutor::class)->run(Auth::user(), $definition);
+
+        $this->refreshFeed();
     }
 
     #[On('run-flint-routine')]

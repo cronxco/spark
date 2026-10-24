@@ -135,6 +135,7 @@ class NotificationFeedService
         $recentCutoff = now()->subDay();
         $historyCutoff = now()->subDays(30);
         $query = ActionProgress::query()
+            ->activity()
             ->where('user_id', $user->id)
             ->when($scope === 'history', function ($query) use ($recentCutoff, $historyCutoff) {
                 $query->where(function ($query) {
@@ -270,6 +271,7 @@ class NotificationFeedService
         }
 
         $activeActivities = ActionProgress::query()
+            ->activity()
             ->where('user_id', $user->id)
             ->whereNull('completed_at')
             ->whereNull('failed_at')
