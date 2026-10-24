@@ -90,6 +90,14 @@ A `log` line that PCC cannot turn into wine, beer, TV, cinema or a board game is
 
 It creates a `reflection` document object (the text is its content) and a `logged_reflection` event ("Logged a Reflection", domain `knowledge`). `title` is optional and defaults to the first line, cut to 80 characters. `body` is required (max 10000) and only valid for this kind. `with`, `occurred_at`, `idempotency_key` and `dry_run` behave as for the other kinds. Nothing is queued for enrichment.
 
+### Undo
+
+A reflection that was just written comes back with a `receipt`, the same shape as an Actions receipt (`action_id: events.log_reflection`). Undo it with `POST /api/v1/mobile/actions/receipts/{receipt_id}/undo`, no `If-Match`. The window is 15 minutes and the token needs `data:write`.
+
+Undo soft-deletes the event and its reflection object, removes the `with` links, and removes any person the log created (a person who already existed, or has other links, stays). A second Undo is harmless.
+
+A retry with the same `idempotency_key` returns `200` with the first receipt, `undo.undone_at` set once it has been undone, and never writes the reflection again: after an Undo, `events` is empty. Other kinds, and `dry_run`, return no `receipt`.
+
 ## Decisions
 
 - `@flint` is reserved and cannot be overridden to another intent.

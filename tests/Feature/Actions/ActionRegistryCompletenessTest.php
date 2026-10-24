@@ -47,7 +47,7 @@ class ActionRegistryCompletenessTest extends TestCase
             $this->assertLessThanOrEqual(32, strlen($action->title), "{$action->id} title is not terse");
             $this->assertNotSame('', $action->subtitle, "{$action->id} subtitle");
             $this->assertNotSame('', $action->icon, "{$action->id} icon");
-            $this->assertNotEmpty($action->surfaces, "{$action->id} surfaces");
+            $this->assertTrue($action->surfaces !== [] || $action->handler !== null, "{$action->id} is on no surface and has no handler");
         }
     }
 

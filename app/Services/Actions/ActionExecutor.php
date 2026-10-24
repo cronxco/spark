@@ -57,6 +57,32 @@ class ActionExecutor
         return $this->runOnce($user, $action, $validated, null);
     }
 
+    /**
+     * Records a receipt for work an endpoint already did, so it can offer the
+     * same Undo as a registry command. The retry of an idempotent request gets
+     * the first receipt back.
+     *
+     * @param  array<string, mixed>  $target
+     */
+    public function record(User $user, ActionDefinition $action, array $target, ActionOutcome $outcome, ?string $idempotencyKey = null): ActionReceipt
+    {
+        if ($idempotencyKey === null) {
+            return $this->write($user, $action, $target, null, fn (): ActionOutcome => $outcome);
+        }
+
+        $lockKey = 'actions:lock:' . hash('sha256', "{$user->id}:{$action->id}:{$idempotencyKey}");
+
+        return Cache::lock($lockKey, 120)->block(30, fn () => $this->write($user, $action, $target, $idempotencyKey, fn (): ActionOutcome => $outcome));
+    }
+
+    /** The receipt a keyed run of this action already wrote, if any. */
+    public function replay(User $user, ActionDefinition $action, string $idempotencyKey): ?ActionReceipt
+    {
+        $previous = Cache::get("actions:run:{$user->id}:{$action->id}:{$idempotencyKey}");
+
+        return is_string($previous) ? ActionReceipt::find($user, $previous) : null;
+    }
+
     /** @throws ActionFailed */
     public function undo(User $user, string $receiptId): ActionReceipt
     {
@@ -68,6 +94,17 @@ class ActionExecutor
     /** @param array<string, mixed> $validated */
     private function runOnce(User $user, ActionDefinition $action, array $validated, ?string $idempotencyKey): ActionReceipt
     {
+        $target = [...Arr::only($validated, array_keys($action->target)), ...$action->params];
+
+        return $this->write($user, $action, $target, $idempotencyKey, fn (): ActionOutcome => app($action->handler)->handle($user, $target));
+    }
+
+    /**
+     * @param  array<string, mixed>  $target
+     * @param  callable(): ActionOutcome  $work
+     */
+    private function write(User $user, ActionDefinition $action, array $target, ?string $idempotencyKey, callable $work): ActionReceipt
+    {
         $cacheKey = $idempotencyKey === null ? null : "actions:run:{$user->id}:{$action->id}:{$idempotencyKey}";
         if ($cacheKey !== null && is_string($previous = Cache::get($cacheKey))) {
             if ($receipt = ActionReceipt::find($user, $previous)) {
@@ -75,7 +112,6 @@ class ActionExecutor
             }
         }
 
-        $target = [...Arr::only($validated, array_keys($action->target)), ...$action->params];
         $receiptId = (string) Str::uuid();
 
         $progress = ActionProgress::createProgress(
@@ -97,7 +133,7 @@ class ActionExecutor
         }
 
         try {
-            $outcome = app($action->handler)->handle($user, $target);
+            $outcome = $work();
             $this->finish($progress, $outcome->status, $outcome->message, [
                 'result' => $outcome->result,
                 'undo' => $outcome->undo === null ? null : [

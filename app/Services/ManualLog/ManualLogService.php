@@ -207,6 +207,11 @@ class ManualLogService
             return ['status' => 'logged', 'created' => false, 'events' => $existing];
         }
 
+        // Undone since: a late retry must not write it again.
+        if (Event::onlyTrashed()->where('integration_id', $integration->id)->where('source_id', $sourceId)->exists()) {
+            return ['status' => 'logged', 'created' => false, 'events' => []];
+        }
+
         if ($reflection) {
             $data['title'] = $data['title'] ?? Str::limit(Str::before(trim($data['body']), "\n"), 80, '…');
         }
