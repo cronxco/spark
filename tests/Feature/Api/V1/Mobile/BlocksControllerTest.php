@@ -63,6 +63,20 @@ class BlocksControllerTest extends TestCase
     }
 
     #[Test]
+    public function includes_parent_event_without_its_blocks(): void
+    {
+        $block = $this->createBlock();
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->getJson("/api/v1/mobile/blocks/{$block->id}")
+            ->assertOk()
+            ->assertJsonPath('event.id', $block->event_id)
+            ->assertJsonPath('event.action', 'card_payment_to')
+            ->assertJsonPath('event.target.id', $block->event->target_id)
+            ->assertJsonMissingPath('event.blocks');
+    }
+
+    #[Test]
     public function returns_full_block_content_without_truncation(): void
     {
         $content = str_repeat('Long mobile block content. ', 30);
