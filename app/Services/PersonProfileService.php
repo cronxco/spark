@@ -121,8 +121,8 @@ class PersonProfileService
      */
     public function eventsQuery(EventObject $person): Builder
     {
-        // PostgreSQL word boundaries prevent @Dan matching @Daniel or @Dan Smithson.
-        $mention = '(^|[^[:alnum:]_])@' . preg_quote($person->title, '/') . '([^[:alnum:]_]|$)';
+        // A mention ends at punctuation or end-of-text, never in a longer name.
+        $mention = '(^|[^[:alnum:]_])@' . preg_quote($person->title, '/') . '([^[:alnum:]_[:space:]]|$)';
 
         return Event::query()
             ->whereHas('integration', fn (Builder $query) => $query->where('user_id', $person->user_id))
