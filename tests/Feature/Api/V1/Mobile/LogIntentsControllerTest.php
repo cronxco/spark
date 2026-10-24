@@ -27,22 +27,6 @@ class LogIntentsControllerTest extends TestCase
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
     }
 
-    private function classify(string $text, ?array $hint = null)
-    {
-        return $this->postJson('/api/v1/mobile/log/intents/classify', array_filter(['text' => $text, 'hint' => $hint]));
-    }
-
-    private function commit(array $overrides = [])
-    {
-        return $this->postJson('/api/v1/mobile/log/intents', [
-            'idempotency_key' => 'k1',
-            'text' => '@flint stop asking about sleep',
-            'intent' => 'flint_note',
-            'occurred_at' => now()->subMinute()->toIso8601String(),
-            ...$overrides,
-        ]);
-    }
-
     #[Test]
     public function requires_write_ability(): void
     {
@@ -169,5 +153,21 @@ class LogIntentsControllerTest extends TestCase
         $this->postJson('/api/v1/mobile/log/intents/classify', ['text' => 'x', 'hint' => ['intent' => 'log']])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['hint.confidence']);
+    }
+
+    private function classify(string $text, ?array $hint = null)
+    {
+        return $this->postJson('/api/v1/mobile/log/intents/classify', array_filter(['text' => $text, 'hint' => $hint]));
+    }
+
+    private function commit(array $overrides = [])
+    {
+        return $this->postJson('/api/v1/mobile/log/intents', [
+            'idempotency_key' => 'k1',
+            'text' => '@flint stop asking about sleep',
+            'intent' => 'flint_note',
+            'occurred_at' => now()->subMinute()->toIso8601String(),
+            ...$overrides,
+        ]);
     }
 }
