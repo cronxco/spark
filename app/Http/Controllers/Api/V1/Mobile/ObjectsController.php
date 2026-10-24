@@ -77,7 +77,7 @@ class ObjectsController extends Controller
         $validated = $request->validate([
             'month' => ['nullable', 'date_format:Y-m'],
             'date' => ['nullable', 'date_format:Y-m-d'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:'.PersonProfileService::EVENT_LIMIT],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:' . PersonProfileService::EVENT_LIMIT],
         ]);
 
         $timezone = app(EffectiveTimezoneResolver::class)->timezoneFor($user);
