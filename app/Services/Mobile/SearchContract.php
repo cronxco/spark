@@ -7,12 +7,16 @@ use App\Http\Resources\Compact\CompactMetricResource;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Services\Actions\ActionDefinition;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Spatie\Tags\Tag;
 
 /**
  * Search contract v1: the one response shape clients decode.
+ *
+ * Commands are the eighth kind: they come from the ActionRegistry, filtered to
+ * what the token can run.
  *
  * ```
  * { schema_version, query, mode,
@@ -36,10 +40,10 @@ class SearchContract
     public const STATUS_DEGRADED = 'degraded';
 
     /** The hit kinds v1 can return. Clients drop kinds they do not know. */
-    public const KINDS = ['event', 'object', 'block', 'metric', 'integration', 'place', 'tag'];
+    public const KINDS = ['event', 'object', 'block', 'metric', 'integration', 'place', 'tag', 'command'];
 
     /**
-     * @param  array{mode: string, query: string, events: Collection, objects: Collection, blocks?: Collection, metrics: Collection, integrations: Collection, places?: Collection, tags?: Collection, fallback_reason?: ?string}  $results
+     * @param  array{mode: string, query: string, events: Collection, objects: Collection, blocks?: Collection, metrics: Collection, integrations: Collection, places?: Collection, tags?: Collection, commands?: Collection, fallback_reason?: ?string}  $results
      * @return array<string, mixed>
      */
     public function present(array $results, Request $request, int $limit): array
@@ -52,6 +56,7 @@ class SearchContract
             ->concat($results['integrations']->map(fn ($integration) => $this->integration($integration, $request)))
             ->concat(($results['places'] ?? collect())->map(fn (EventObject $place) => $this->place($place)))
             ->concat(($results['tags'] ?? collect())->map(fn (Tag $tag) => $this->tag($tag)))
+            ->concat(($results['commands'] ?? collect())->map(fn (ActionDefinition $action) => $this->command($action)))
             ->values();
 
         $reason = $results['fallback_reason'] ?? null;
@@ -156,6 +161,26 @@ class SearchContract
             'id' => (string) $place->id,
             'title' => (string) $place->title,
             'subtitle' => $place->location_address ?: $place->type,
+        ];
+    }
+
+    /**
+     * A command the app can run through `POST /actions/{id}/run`. `id` is the
+     * action id; `action_kind` is navigation, safe or data; `confirm` is the
+     * registry's confirm policy (none, undo or confirm).
+     *
+     * @return array<string, mixed>
+     */
+    protected function command(ActionDefinition $action): array
+    {
+        return [
+            'kind' => 'command',
+            'id' => $action->id,
+            'title' => $action->title,
+            'subtitle' => $action->subtitle,
+            'icon' => $action->icon,
+            'action_kind' => $action->kind->value,
+            'confirm' => $action->confirm->value,
         ];
     }
 

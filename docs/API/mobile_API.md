@@ -918,7 +918,7 @@ pre-v1 grouped response above, kept for shipped builds.
 | ------------------ | ------- | --------- | ------------------------------------------------------- |
 | `contract_version` | integer | —         | Must be `1`. Any other value returns `422` with `supported_versions` |
 | `query`            | string  | required  | Search text (max 500). May be empty. `q` is not accepted |
-| `mode`             | string  | `default` | Singular modes only: `default`, `semantic`, `tag`, `metric`, `integration`. Plural names return `422` |
+| `mode`             | string  | `default` | Singular modes only: `default`, `semantic`, `tag`, `metric`, `integration`, `command`. Plural names return `422` |
 | `limit`            | integer | 20        | 1–50                                                    |
 
 ```json
@@ -935,16 +935,20 @@ pre-v1 grouped response above, kept for shipped builds.
 ```
 
 - `results` is one flat list, ordered by family: `event`, `object`, `block`,
-  `metric`, `integration`, `place`, `tag`. `default` mode returns all seven;
-  `semantic` returns events and objects.
+  `metric`, `integration`, `place`, `tag`, `command`. `default` mode returns all
+  eight (at most five commands); `semantic` returns events and objects.
 - Every hit has `kind` (singular), `id`, `title` and `subtitle`, plus the keys
   for its kind (`domain`, `concept`, `block_type`, `identifier`, `service`,
-  `name`/`type`/`count`). Keys are always present, null when empty. A metric's
+  `name`/`type`/`count`, and for `command`: `icon`, `action_kind`, `confirm`).
+  Keys are always present, null when empty. A metric's
   `id` is its `identifier`.
 - `execution.status` is `complete` or `degraded`. A semantic search that cannot
   embed the query falls back to keyword matching and returns `degraded` with
   `fallback_reason` `embedding_failed` (or `embeddings_unavailable`). Clients
   should label degraded results "keyword matches".
+- A `command` hit is an action from the ActionRegistry that this token can run
+  (`id` is the action id for `POST /actions/{id}/run`); `mode=command` returns
+  commands only.
 - Clients must drop a `kind` they do not know and render the rest.
 - Fixtures for every shape live in `tests/Fixtures/search-contract/v1` and are
   decoded by spark-ios. Change both together; bump `schema_version` for a

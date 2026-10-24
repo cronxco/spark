@@ -8,10 +8,13 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\MetricStatistic;
 use App\Models\Place;
+use App\Services\Actions\ActionDefinition;
+use App\Services\Actions\ActionRegistry;
 use App\Models\User;
 use App\Services\Ai\EmbeddingClient;
 use App\Services\Search\RecencyRanking;
 use App\Support\OwnedTagQuery;
+use App\Support\SparkAbility;
 use Illuminate\Support\Collection;
 use Throwable;
 
@@ -27,7 +30,7 @@ use Throwable;
  * ranking Spotlight uses too, so recency is tuned in one place.
  *
  * Contract v1 asks for `$allFamilies`, which makes the default mode cover
- * events, objects, blocks, metrics, integrations, places and tags. A semantic
+ * events, objects, blocks, metrics, integrations, places, tags and commands. A semantic
  * search that cannot embed falls back to keyword matching and says why in
  * `fallback_reason`; it never falls back silently.
  */
@@ -38,6 +41,12 @@ class SearchDispatcher
     public const MAX_LIMIT = 50;
 
     public const MODES = ['default', 'semantic', 'tag', 'metric', 'integration'];
+
+    /** Modes contract v1 accepts: the pre-v1 modes plus commands only. */
+    public const V1_MODES = [...self::MODES, 'command'];
+
+    /** Commands shown in "All", so they do not crowd out the data families. */
+    public const COMMANDS_IN_ALL = 5;
 
     /**
      * Plural mode names sent by shipped iOS builds, mapped to their canonical
@@ -53,13 +62,13 @@ class SearchDispatcher
 
     protected RecencyRanking $ranking;
 
-    public function __construct(protected ?EmbeddingClient $embeddingService = null, ?RecencyRanking $ranking = null)
+    public function __construct(protected ?EmbeddingClient $embeddingService = null, ?RecencyRanking $ranking = null, protected ?ActionRegistry $actions = null)
     {
         $this->ranking = $ranking ?? new RecencyRanking;
     }
 
     /**
-     * @return array{mode: string, query: string, events: Collection, objects: Collection, blocks: Collection, integrations: Collection, metrics: Collection, places: Collection, tags: Collection, fallback_reason: ?string}
+     * @return array{mode: string, query: string, events: Collection, objects: Collection, blocks: Collection, integrations: Collection, metrics: Collection, places: Collection, tags: Collection, commands: Collection, fallback_reason: ?string}
      */
     public function search(User $user, string $mode, string $query, int $limit = self::DEFAULT_LIMIT, bool $allFamilies = false): array
     {
@@ -76,6 +85,7 @@ class SearchDispatcher
             'metrics' => collect(),
             'places' => collect(),
             'tags' => collect(),
+            'commands' => collect(),
             'fallback_reason' => null,
         ];
 
@@ -88,6 +98,7 @@ class SearchDispatcher
             'tag' => $this->byTag($user, $query, $limit, $result),
             'metric' => $this->byMetric($user, $query, $result),
             'integration' => $this->byIntegration($user, $query, $limit, $result),
+            'command' => $this->byCommand($user, $query, $limit, $result),
             default => $this->defaultSearch($user, $query, $limit, $result, $allFamilies),
         };
     }
@@ -149,6 +160,26 @@ class SearchDispatcher
         $result['places'] = $this->ranking->orderByText($places, $query, 'title')->get();
 
         $result['tags'] = OwnedTagQuery::for($user, $query)->limit($limit)->get();
+
+        return $this->byCommand($user, $query, min($limit, self::COMMANDS_IN_ALL), $result);
+    }
+
+    /**
+     * Native commands from the {@see ActionRegistry} that match the query and
+     * that this token may run (the same filter as GET /actions), so a command
+     * in the results is one the app can offer.
+     */
+    protected function byCommand(User $user, string $query, int $limit, array $result): array
+    {
+        if ($this->actions === null) {
+            return $result;
+        }
+
+        $result['commands'] = $this->actions->forSurface('native')
+            ->filter(fn (ActionDefinition $action): bool => $action->capability === null || SparkAbility::allows($user, $action->capability))
+            ->filter(fn (ActionDefinition $action): bool => $action->matches($query))
+            ->take($limit)
+            ->values();
 
         return $result;
     }
