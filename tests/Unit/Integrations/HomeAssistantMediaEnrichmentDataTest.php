@@ -10,10 +10,9 @@ use App\Services\Ai\ChatClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use OpenAI\Laravel\Facades\OpenAI;
-use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
+use Tests\Fixtures\FakeOpenAi;
 use Tests\TestCase;
 
 class HomeAssistantMediaEnrichmentDataTest extends TestCase
@@ -88,28 +87,9 @@ class HomeAssistantMediaEnrichmentDataTest extends TestCase
     {
         config(['services.tmdb.api_key' => 'test-key']);
 
-        OpenAI::fake([
-            CreateResponse::fake([
-                'choices' => [[
-                    'message' => [
-                        'role' => 'assistant',
-                        'content' => null,
-                        'tool_calls' => [[
-                            'id' => 'call_1',
-                            'type' => 'function',
-                            'function' => [
-                                'name' => 'search_tmdb',
-                                'arguments' => json_encode(['query' => 'Loki']),
-                            ],
-                        ]],
-                    ],
-                ]],
-            ]),
-            CreateResponse::fake([
-                'choices' => [[
-                    'message' => ['role' => 'assistant', 'content' => '{"tmdb_id": 555}'],
-                ]],
-            ]),
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['search_tmdb', ['query' => 'Loki']]]),
+            FakeOpenAi::text('{"tmdb_id": 555}'),
         ]);
 
         Http::fake([

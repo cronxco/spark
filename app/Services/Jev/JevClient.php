@@ -2,23 +2,37 @@
 
 namespace App\Services\Jev;
 
+use App\Ai\Gateways\JevGateway;
 use App\Services\Jev\Exceptions\JevResponseException;
 use App\Services\Jev\Exceptions\JevUnavailableException;
+use ErrorException;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
+use Laravel\Ai\Ai;
+use Laravel\Ai\Classification;
+use Laravel\Ai\Exceptions\FailoverableException;
+use Laravel\Ai\Exceptions\InsufficientCreditsException;
+use Laravel\Ai\Providers\TypeSafeProvider;
+use Laravel\Ai\Responses\ClassificationResponse;
+use Laravel\Ai\Responses\Data\BooleanAnswer;
+use Laravel\Ai\Responses\Data\ChoiceAnswer;
+use Laravel\Ai\Responses\Data\ScoreAnswer;
 use Sentry\SentrySdk;
 use Sentry\Tracing\Span;
 use Sentry\Tracing\SpanContext;
+use Throwable;
+use TypeError;
 
 /**
- * Client for TypeSafe's Jev (System One) API.
+ * Client for TypeSafe's Jev (System One), through laravel/ai's TypeSafe
+ * classification provider.
  *
  * Jev answers typed questions about a piece of state with probabilities. It
  * never generates text, so every answer is validated against the question
- * that was asked before anything acts on it.
+ * that was asked before anything acts on it. The SDK sends the request; this
+ * client keeps the call inside its time budget and decides what to trust.
  */
 class JevClient
 {
@@ -63,17 +77,11 @@ class JevClient
         }
 
         $model = (string) config('services.jev.model', 'jev-1.13.0');
-        $payload = [
-            'state' => $state,
-            'model' => $model,
-            'questions' => array_map(fn (JevQuestion $question): array => $question->toPayload(), $questions),
-        ];
-
         $span = $this->startSpan($model, count($questions));
         $succeeded = false;
 
         try {
-            $response = $this->send($payload, $budgetSeconds ?? (float) config('services.jev.timeout', 10), $logContext);
+            $response = $this->send($state, $questions, $model, $budgetSeconds ?? (float) config('services.jev.timeout', 10), $logContext);
             $assessment = $this->parse($response, $questions, $model);
             $succeeded = true;
 
@@ -91,13 +99,14 @@ class JevClient
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>|string  $state
+     * @param  array<string, JevQuestion>  $questions
      * @param  array<string, mixed>  $logContext
      */
-    private function send(array $payload, float $budgetSeconds, array $logContext): Response
+    private function send(array|string $state, array $questions, string $model, float $budgetSeconds, array $logContext): ClassificationResponse
     {
         $deadline = microtime(true) + $budgetSeconds;
-        $url = rtrim((string) config('services.jev.base_url', 'https://api.typesafe.ai'), '/') . '/v1/systemone';
+        $provider = $this->provider();
         $lastError = 'no attempt made';
 
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
@@ -108,38 +117,57 @@ class JevClient
             }
 
             try {
-                $response = Http::withToken((string) config('services.jev.api_key'))
-                    ->acceptJson()
-                    ->asJson()
-                    ->connectTimeout(max(0.1, min(2.0, $remaining)))
-                    ->timeout(max(0.1, $remaining))
-                    ->post($url, $payload);
-            } catch (ConnectionException $e) {
+                return Classification::of($state)
+                    ->questions(array_map(fn (JevQuestion $question) => $question->toQuestion(), $questions))
+                    ->timeout(max(1, (int) ceil($remaining)))
+                    ->classify($provider, $model);
+            } catch (InsufficientCreditsException $e) {
+                throw new JevResponseException('Jev rejected the request: ' . $e->getMessage(), 0, $e);
+            } catch (FailoverableException|ConnectionException $e) {
                 $lastError = $e->getMessage();
-                Log::info('Jev: Request failed to connect', $logContext + ['attempt' => $attempt, 'error' => $lastError]);
-                $this->backoff($attempt, null, $deadline);
+                Log::info('Jev: Retryable failure', $logContext + ['attempt' => $attempt, 'error' => $lastError]);
+                $this->backoff($attempt, $this->retryAfter($e), $deadline);
+            } catch (RequestException $e) {
+                if (! $e->response->serverError()) {
+                    throw new JevResponseException("Jev rejected the request with HTTP {$e->response->status()}: " . mb_substr($e->response->body(), 0, 300), 0, $e);
+                }
 
-                continue;
+                $lastError = "HTTP {$e->response->status()}";
+                Log::info('Jev: Retryable response', $logContext + ['attempt' => $attempt, 'status' => $e->response->status()]);
+                $this->backoff($attempt, $e->response->header('retry-after'), $deadline);
+            } catch (ErrorException|TypeError $e) {
+                // The SDK maps answers without checking them; a field it needs is missing.
+                throw new JevResponseException('Jev returned a malformed response.', 0, $e);
             }
-
-            if ($response->successful()) {
-                return $response;
-            }
-
-            $status = $response->status();
-            $lastError = "HTTP {$status}";
-
-            if ($status === 429 || $status === 529 || $response->serverError()) {
-                Log::info('Jev: Retryable response', $logContext + ['attempt' => $attempt, 'status' => $status]);
-                $this->backoff($attempt, $response->header('retry-after'), $deadline);
-
-                continue;
-            }
-
-            throw new JevResponseException("Jev rejected the request with HTTP {$status}: " . mb_substr($response->body(), 0, 300));
         }
 
         throw new JevUnavailableException("Jev did not answer within {$budgetSeconds}s ({$lastError}).");
+    }
+
+    /**
+     * The TypeSafe provider, built from services.jev so Jev's settings stay in
+     * one place.
+     */
+    private function provider(): string
+    {
+        $provider = Ai::build(array_filter([
+            'driver' => 'typesafe',
+            'key' => (string) config('services.jev.api_key'),
+            'url' => rtrim((string) config('services.jev.base_url', 'https://api.typesafe.ai'), '/') . '/v1',
+        ]));
+
+        if ($provider instanceof TypeSafeProvider) {
+            $provider->useClassificationGateway(new JevGateway);
+        }
+
+        return $provider->name();
+    }
+
+    private function retryAfter(Throwable $e): ?string
+    {
+        $previous = $e->getPrevious();
+
+        return $previous instanceof RequestException ? $previous->response->header('retry-after') : null;
     }
 
     private function backoff(int $attempt, ?string $retryAfter, float $deadline): void
@@ -153,24 +181,26 @@ class JevClient
     }
 
     /**
+     * Turn the SDK's answers back into Jev's wire shape and validate them.
+     *
      * @param  array<string, JevQuestion>  $questions
      */
-    private function parse(Response $response, array $questions, string $requestedModel): JevAssessment
+    private function parse(ClassificationResponse $response, array $questions, string $requestedModel): JevAssessment
     {
-        $body = $response->json();
+        $answeredBy = $response->meta->model;
 
-        if (! is_array($body) || ! is_array($body['answers'] ?? null) || ! is_string($body['model'] ?? null)) {
+        if (! is_string($answeredBy) || $answeredBy === '') {
             throw new JevResponseException('Jev returned a malformed response.');
         }
 
-        if (! str_ends_with($requestedModel, '-latest') && ! str_ends_with($requestedModel, '-preview') && $body['model'] !== $requestedModel) {
-            throw new JevResponseException("Jev answered with model {$body['model']} but {$requestedModel} was requested.");
+        if (! str_ends_with($requestedModel, '-latest') && ! str_ends_with($requestedModel, '-preview') && $answeredBy !== $requestedModel) {
+            throw new JevResponseException("Jev answered with model {$answeredBy} but {$requestedModel} was requested.");
         }
 
         $answers = [];
 
         foreach ($questions as $id => $question) {
-            $answer = $body['answers'][$id] ?? null;
+            $answer = isset($response[$id]) ? $this->wireAnswer($response[$id]) : null;
 
             if (! is_array($answer) || ($answer['type'] ?? null) !== $question->type) {
                 throw new JevResponseException("Jev returned no {$question->type} answer for '{$id}'.");
@@ -180,9 +210,20 @@ class JevClient
             $answers[$id] = $answer;
         }
 
-        $inputTokens = $body['usage']['input_tokens'] ?? null;
+        return new JevAssessment($answeredBy, $answers, $response->usage->inputTokens ?: null);
+    }
 
-        return new JevAssessment($body['model'], $answers, is_numeric($inputTokens) ? (int) $inputTokens : null);
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function wireAnswer(mixed $answer): ?array
+    {
+        return match (true) {
+            $answer instanceof BooleanAnswer => ['type' => JevQuestion::NOUL, 'noul' => $answer->probability],
+            $answer instanceof ChoiceAnswer => ['type' => JevQuestion::CHOICE, 'choice' => $answer->choice, 'probabilities' => $answer->probabilities, 'confidence' => $answer->confidence],
+            $answer instanceof ScoreAnswer => ['type' => JevQuestion::SCORE, 'score' => $answer->score, 'probabilities' => $answer->probabilities, 'confidence' => $answer->confidence],
+            default => null,
+        };
     }
 
     /**

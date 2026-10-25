@@ -9,11 +9,10 @@ use App\Services\Ai\AiUsageRecorder;
 use App\Services\Ai\AiUsageReservation;
 use App\Services\Ai\ChatClient;
 use Mockery;
-use OpenAI\Laravel\Facades\OpenAI;
-use OpenAI\Resources\Chat;
-use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
+use Tests\Fixtures\FakeOpenAi;
+use Tests\Fixtures\RecordingTool;
 use Tests\TestCase;
 
 class ChatClientTest extends TestCase
@@ -21,75 +20,57 @@ class ChatClientTest extends TestCase
     #[Test]
     public function without_tools_it_makes_a_single_call_and_returns_the_content(): void
     {
-        $fake = OpenAI::fake([
-            $this->response('Hello there'),
+        FakeOpenAi::fake([FakeOpenAi::text('Hello there')]);
+
+        $result = app(ChatClient::class)->text(AiModel::Reasoning, [
+            ['role' => 'system', 'content' => 'Be brief.'],
+            ['role' => 'user', 'content' => 'Say hi'],
         ]);
 
-        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Say hi']]);
-
         $this->assertSame('Hello there', $result);
-        $fake->assertSent(Chat::class, 1);
-        $fake->assertSent(Chat::class, fn ($method, $args) => ! array_key_exists('tools', $args));
+        $requests = FakeOpenAi::requests();
+        $this->assertCount(1, $requests);
+        $this->assertArrayNotHasKey('tools', $requests[0]->data());
+        $this->assertFalse($requests[0]['store']);
+        $this->assertStringContainsString('Be brief.', json_encode($requests[0]['input']));
+        $this->assertStringContainsString('Say hi', json_encode($requests[0]['input']));
+    }
+
+    #[Test]
+    public function json_mode_asks_for_a_json_object_and_decodes_it(): void
+    {
+        FakeOpenAi::fake([FakeOpenAi::text('{"total": 12.5}')]);
+
+        $result = app(ChatClient::class)->json(AiModel::Extraction, [['role' => 'user', 'content' => 'Extract']]);
+
+        $this->assertSame(['total' => 12.5], $result);
+        $this->assertSame(['type' => 'json_object'], FakeOpenAi::requests()[0]['text']['format']);
     }
 
     #[Test]
     public function it_executes_a_tool_call_and_feeds_the_result_back_for_a_final_answer(): void
     {
-        $fake = OpenAI::fake([
-            $this->response(null, [
-                [
-                    'id' => 'call_1',
-                    'type' => 'function',
-                    'function' => [
-                        'name' => 'search_thing',
-                        'arguments' => json_encode(['query' => 'Loki']),
-                    ],
-                ],
-            ]),
-            $this->response('{"match_id": 42}'),
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['search_thing', ['query' => 'Loki']]]),
+            FakeOpenAi::text('{"match_id": 42}'),
         ]);
-
-        $received = [];
-        $toolExecutor = function (string $name, array $arguments) use (&$received) {
-            $received[] = [$name, $arguments];
-
-            return ['id' => 42, 'title' => 'Loki'];
-        };
+        $tool = new RecordingTool(['id' => 42, 'title' => 'Loki']);
 
         $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Find the right match']], [
-            'tools' => [
-                [
-                    'type' => 'function',
-                    'function' => [
-                        'name' => 'search_thing',
-                        'description' => 'Searches for a thing',
-                        'parameters' => [
-                            'type' => 'object',
-                            'properties' => ['query' => ['type' => 'string']],
-                            'required' => ['query'],
-                        ],
-                    ],
-                ],
-            ],
-            'tool_executor' => $toolExecutor,
+            'tools' => [$tool],
         ]);
 
         $this->assertSame('{"match_id": 42}', $result);
-        $this->assertSame([['search_thing', ['query' => 'Loki']]], $received);
-        $fake->assertSent(Chat::class, 2);
+        $this->assertSame([['query' => 'Loki']], $tool->received);
 
-        // Second request must carry the assistant tool-call message and the
-        // tool result message appended to the conversation.
-        $fake->assertSent(Chat::class, function ($method, $args) {
-            $messages = $args['messages'];
+        $requests = FakeOpenAi::requests();
+        $this->assertCount(2, $requests);
+        $this->assertSame('search_thing', $requests[0]['tools'][0]['name']);
 
-            return count($messages) === 3
-                && $messages[1]['role'] === 'assistant'
-                && $messages[1]['tool_calls'][0]['id'] === 'call_1'
-                && $messages[2]['role'] === 'tool'
-                && $messages[2]['tool_call_id'] === 'call_1'
-                && $messages[2]['content'] === json_encode(['id' => 42, 'title' => 'Loki']);
-        });
+        // The second request carries the tool call and its result.
+        $outputs = collect($requests[1]['input'])->where('type', 'function_call_output')->values();
+        $this->assertCount(1, $outputs);
+        $this->assertSame(json_encode(['id' => 42, 'title' => 'Loki']), $outputs[0]['output']);
     }
 
     #[Test]
@@ -97,21 +78,15 @@ class ChatClientTest extends TestCase
     {
         // A model that keeps calling the tool forever - the cap must kick
         // in rather than looping indefinitely.
-        $fake = OpenAI::fake([
-            $this->response(null, [$this->toolCall('call_1', 'search_thing', ['query' => 'a'])]),
-            $this->response(null, [$this->toolCall('call_2', 'search_thing', ['query' => 'b'])]),
-            $this->response(null, [$this->toolCall('call_3', 'search_thing', ['query' => 'c'])]),
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['search_thing', ['query' => 'a']]], id: 'r1'),
+            FakeOpenAi::toolCalls([['search_thing', ['query' => 'b']]], id: 'r2'),
+            FakeOpenAi::toolCalls([['search_thing', ['query' => 'c']]], id: 'r3'),
         ]);
-
-        $executions = 0;
+        $tool = new RecordingTool(['ok' => true]);
 
         $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Find it']], [
-            'tools' => [['type' => 'function', 'function' => ['name' => 'search_thing', 'parameters' => []]]],
-            'tool_executor' => function (string $name, array $arguments) use (&$executions) {
-                $executions++;
-
-                return ['ok' => true];
-            },
+            'tools' => [$tool],
             'max_tool_rounds' => 2,
         ]);
 
@@ -119,47 +94,58 @@ class ChatClientTest extends TestCase
         // already reached - so it's returned as-is (no content) rather than
         // executing a 3rd tool call.
         $this->assertSame('', $result);
-        $this->assertSame(2, $executions);
-        $fake->assertSent(Chat::class, 3);
-    }
-
-    #[Test]
-    public function without_a_tool_executor_a_tool_call_response_is_treated_as_the_final_result(): void
-    {
-        $fake = OpenAI::fake([
-            $this->response(null, [$this->toolCall('call_1', 'search_thing', ['query' => 'a'])]),
-        ]);
-
-        $result = app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Find it']], [
-            'tools' => [['type' => 'function', 'function' => ['name' => 'search_thing', 'parameters' => []]]],
-        ]);
-
-        $this->assertSame('', $result);
-        $fake->assertSent(Chat::class, 1);
+        $this->assertCount(2, $tool->received);
+        $this->assertCount(3, FakeOpenAi::requests());
     }
 
     #[Test]
     public function dotted_hyphenated_and_dated_reasoning_models_do_not_send_temperature(): void
     {
-        foreach (['gpt-5.1', 'gpt-5-mini-2026-08-01', 'o3-mini', 'o4-pro-2026-05-10'] as $model) {
+        $models = ['gpt-5.1', 'gpt-5-mini-2026-08-01', 'o3-mini', 'o4-pro-2026-05-10'];
+        FakeOpenAi::fake(array_map(fn () => FakeOpenAi::text('ok'), $models));
+
+        foreach ($models as $model) {
             config(['services.openai.models.reasoning' => $model]);
-            $fake = OpenAI::fake([$this->response('ok')]);
 
             app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Hi']], ['temperature' => 0.2]);
 
-            $fake->assertSent(Chat::class, fn ($method, $args) => ! array_key_exists('temperature', $args));
+            $request = FakeOpenAi::requests()->last();
+            $this->assertSame($model, $request['model']);
+            $this->assertArrayNotHasKey('temperature', $request->data());
         }
     }
 
     #[Test]
-    public function non_reasoning_models_keep_explicit_temperature(): void
+    public function non_reasoning_models_keep_explicit_temperature_and_token_limits(): void
     {
         config(['services.openai.models.reasoning' => 'gpt-4.1-mini']);
-        $fake = OpenAI::fake([$this->response('ok')]);
+        FakeOpenAi::fake([FakeOpenAi::text('ok')]);
 
-        app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Hi']], ['temperature' => 0.2]);
+        app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Hi']], [
+            'temperature' => 0.2,
+            'max_completion_tokens' => 300,
+        ]);
 
-        $fake->assertSent(Chat::class, fn ($method, $args) => $args['temperature'] === 0.2);
+        $request = FakeOpenAi::requests()[0];
+        $this->assertSame(0.2, $request['temperature']);
+        $this->assertSame(300, $request['max_output_tokens']);
+    }
+
+    #[Test]
+    public function usage_is_recorded_from_the_sdk_response(): void
+    {
+        $user = User::factory()->create();
+        $context = new AiUsageContext($user, 'chat');
+        $reservation = new AiUsageReservation('reservation', 'event', 'gpt-5.1', today()->toDateString(), $context);
+        $recorder = Mockery::mock(AiUsageRecorder::class);
+        $recorder->shouldReceive('reserve')->once()->andReturn($reservation);
+        $recorder->shouldReceive('complete')->once()->withArgs(
+            fn ($reserved, $usage, $requestId) => $usage->inputTokens === 30 && $usage->outputTokens === 7 && $requestId === 'resp_text'
+        );
+        $this->app->instance(AiUsageRecorder::class, $recorder);
+        FakeOpenAi::fake([FakeOpenAi::text('ok', ['input_tokens' => 30, 'output_tokens' => 7])]);
+
+        app(ChatClient::class)->text(AiModel::Reasoning, [['role' => 'user', 'content' => 'Hi']], ['usage_context' => $context]);
     }
 
     #[Test]
@@ -173,7 +159,7 @@ class ChatClientTest extends TestCase
         $recorder->shouldReceive('complete')->once()->andThrow(new RuntimeException('accounting unavailable'));
         $recorder->shouldNotReceive('fail');
         $this->app->instance(AiUsageRecorder::class, $recorder);
-        $fake = OpenAI::fake([$this->response('still succeeds')]);
+        FakeOpenAi::fake([FakeOpenAi::text('still succeeds')]);
 
         $result = app(ChatClient::class)->text(
             AiModel::Reasoning,
@@ -182,38 +168,6 @@ class ChatClientTest extends TestCase
         );
 
         $this->assertSame('still succeeds', $result);
-        $fake->assertSent(Chat::class, 1);
-    }
-
-    private function toolCall(string $id, string $name, array $arguments): array
-    {
-        return [
-            'id' => $id,
-            'type' => 'function',
-            'function' => [
-                'name' => $name,
-                'arguments' => json_encode($arguments),
-            ],
-        ];
-    }
-
-    private function response(?string $content, ?array $toolCalls = null): CreateResponse
-    {
-        $message = [
-            'role' => 'assistant',
-            'content' => $content,
-        ];
-
-        if ($toolCalls !== null) {
-            $message['tool_calls'] = $toolCalls;
-        }
-
-        return CreateResponse::fake([
-            'choices' => [
-                [
-                    'message' => $message,
-                ],
-            ],
-        ]);
+        $this->assertCount(1, FakeOpenAi::requests());
     }
 }

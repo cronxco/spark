@@ -13,10 +13,8 @@ use App\Services\TaskPipeline\TaskDefinition;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-use OpenAI\Laravel\Facades\OpenAI;
-use OpenAI\Resources\Chat;
-use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Fixtures\FakeOpenAi;
 use Tests\TestCase;
 
 class NewsletterGenerateSummariesTaskTest extends TestCase
@@ -26,7 +24,7 @@ class NewsletterGenerateSummariesTaskTest extends TestCase
     #[Test]
     public function it_generates_newsletter_summary_blocks_and_marks_success(): void
     {
-        $fake = OpenAI::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
+        FakeOpenAi::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
 
         [$event] = $this->newsletterEvent(content: 'Clean article text');
 
@@ -40,13 +38,13 @@ class NewsletterGenerateSummariesTaskTest extends TestCase
             'newsletter_tldr',
         ])->count());
         $this->assertSame('success', $event->refresh()->event_metadata['task_executions']['newsletter_generate_summaries']['last_attempt']['status']);
-        $fake->assertSent(Chat::class, 1);
+        $this->assertCount(1, FakeOpenAi::requests());
     }
 
     #[Test]
     public function it_summarises_the_issue_it_belongs_to_rather_than_the_latest_one(): void
     {
-        $fake = OpenAI::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
+        FakeOpenAi::fake([$this->openAiResponse(json_encode($this->summaryPayload()))]);
         [$event] = $this->newsletterEvent(content: 'A later issue of the same publication');
         $event->createBlock([
             'title' => 'Issue Content',
@@ -57,11 +55,11 @@ class NewsletterGenerateSummariesTaskTest extends TestCase
 
         (new NewsletterGenerateSummariesTask($event, $this->task()))->handle();
 
-        $fake->assertSent(Chat::class, function (string $method, array $parameters): bool {
-            $prompt = json_encode($parameters['messages']);
+        $this->assertTrue(FakeOpenAi::requests()->contains(function ($request): bool {
+            $prompt = json_encode($request['input']);
 
             return str_contains($prompt, 'This issue only') && ! str_contains($prompt, 'A later issue');
-        });
+        }));
     }
 
     #[Test]
@@ -142,17 +140,9 @@ class NewsletterGenerateSummariesTaskTest extends TestCase
         ];
     }
 
-    private function openAiResponse(string $content): CreateResponse
+    /** @return array<string, mixed> */
+    private function openAiResponse(string $content): array
     {
-        return CreateResponse::fake([
-            'choices' => [
-                [
-                    'message' => [
-                        'role' => 'assistant',
-                        'content' => $content,
-                    ],
-                ],
-            ],
-        ]);
+        return FakeOpenAi::text($content);
     }
 }

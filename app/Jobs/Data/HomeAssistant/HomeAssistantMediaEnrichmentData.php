@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Data\HomeAssistant;
 
+use App\Ai\Tools\SearchTmdb;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use App\Services\Ai\AiModel;
@@ -75,12 +76,8 @@ class HomeAssistantMediaEnrichmentData extends BaseProcessingJob
             }
         }
 
-        $toolExecutor = function (string $name, array $arguments) use (&$cache, $apiKey) {
-            if ($name !== 'search_tmdb') {
-                return ['results' => []];
-            }
-
-            $results = $this->searchTmdb($arguments['query'] ?? '', $apiKey);
+        $searchTmdb = new SearchTmdb(function (string $query) use (&$cache, $apiKey): array {
+            $results = $this->searchTmdb($query, $apiKey);
 
             foreach ($results as $result) {
                 if (isset($result['id'])) {
@@ -88,8 +85,8 @@ class HomeAssistantMediaEnrichmentData extends BaseProcessingJob
                 }
             }
 
-            return ['results' => $this->summarizeCandidates($results)];
-        };
+            return $this->summarizeCandidates($results);
+        });
 
         try {
             $response = app(ChatClient::class)->text(
@@ -102,8 +99,7 @@ class HomeAssistantMediaEnrichmentData extends BaseProcessingJob
                     'max_completion_tokens' => 300,
                     'temperature' => 0,
                     'retries' => 3,
-                    'tools' => $this->searchTmdbToolDefinition(),
-                    'tool_executor' => $toolExecutor,
+                    'tools' => [$searchTmdb],
                 ]
             );
         } catch (Throwable $e) {
@@ -149,27 +145,6 @@ class HomeAssistantMediaEnrichmentData extends BaseProcessingJob
     /**
      * @return array<int, array{type: string, function: array}>
      */
-    private function searchTmdbToolDefinition(): array
-    {
-        return [[
-            'type' => 'function',
-            'function' => [
-                'name' => 'search_tmdb',
-                'description' => 'Search TMDB (The Movie Database) for movies and TV shows by title. Use this to retry with a cleaned-up query if the initial results do not contain a confident match.',
-                'parameters' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'query' => [
-                            'type' => 'string',
-                            'description' => 'The search query to send to TMDB.',
-                        ],
-                    ],
-                    'required' => ['query'],
-                ],
-            ],
-        ]];
-    }
-
     /**
      * @return array<int, array>
      */

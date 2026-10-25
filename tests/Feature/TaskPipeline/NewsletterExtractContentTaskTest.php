@@ -12,10 +12,8 @@ use App\Services\TaskPipeline\TaskDefinition;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-use OpenAI\Laravel\Facades\OpenAI;
-use OpenAI\Resources\Chat;
-use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Fixtures\FakeOpenAi;
 use Tests\TestCase;
 
 class NewsletterExtractContentTaskTest extends TestCase
@@ -26,7 +24,7 @@ class NewsletterExtractContentTaskTest extends TestCase
     public function it_extracts_newsletter_content_and_marks_success(): void
     {
         Queue::fake([ProcessTaskPipelineJob::class]);
-        $fake = OpenAI::fake([$this->openAiResponse('# Clean Newsletter')]);
+        FakeOpenAi::fake([$this->openAiResponse('# Clean Newsletter')]);
 
         [$event, $publication] = $this->newsletterEvent(rawHtml: '<html>Raw newsletter</html>');
 
@@ -36,14 +34,14 @@ class NewsletterExtractContentTaskTest extends TestCase
         $this->assertNotEmpty($publication->metadata['extracted_at']);
         $this->assertSame('success', $event->refresh()->event_metadata['task_executions']['newsletter_extract_content']['last_attempt']['status']);
         Queue::assertPushed(ProcessTaskPipelineJob::class);
-        $fake->assertSent(Chat::class, 1);
+        $this->assertCount(1, FakeOpenAi::requests());
     }
 
     #[Test]
     public function it_keeps_each_issue_text_on_its_own_event(): void
     {
         Queue::fake([ProcessTaskPipelineJob::class]);
-        OpenAI::fake([$this->openAiResponse('# Monday issue'), $this->openAiResponse('# Tuesday issue')]);
+        FakeOpenAi::fake([$this->openAiResponse('# Monday issue'), $this->openAiResponse('# Tuesday issue')]);
 
         [$monday, $publication] = $this->newsletterEvent(rawHtml: '<html>Monday</html>');
         $monday->update(['time' => now()->subDay()]);
@@ -70,7 +68,7 @@ class NewsletterExtractContentTaskTest extends TestCase
     public function re_extracting_an_older_issue_leaves_the_publications_latest_text_alone(): void
     {
         Queue::fake([ProcessTaskPipelineJob::class]);
-        OpenAI::fake([$this->openAiResponse('# Monday issue')]);
+        FakeOpenAi::fake([$this->openAiResponse('# Monday issue')]);
 
         [$monday, $publication] = $this->newsletterEvent(rawHtml: '<html>Monday</html>');
         $monday->update(['time' => now()->subDay()]);
@@ -200,17 +198,9 @@ class NewsletterExtractContentTaskTest extends TestCase
         );
     }
 
-    private function openAiResponse(string $content): CreateResponse
+    /** @return array<string, mixed> */
+    private function openAiResponse(string $content): array
     {
-        return CreateResponse::fake([
-            'choices' => [
-                [
-                    'message' => [
-                        'role' => 'assistant',
-                        'content' => $content,
-                    ],
-                ],
-            ],
-        ]);
+        return FakeOpenAi::text($content);
     }
 }
