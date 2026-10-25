@@ -87,6 +87,22 @@ class JevClientTest extends TestCase
     }
 
     #[Test]
+    public function a_long_retry_after_never_waits_past_the_budget(): void
+    {
+        Http::fake([self::URL => Http::response('', 503, ['retry-after' => '10'])]);
+
+        $this->expectException(JevUnavailableException::class);
+
+        try {
+            app(JevClient::class)->ask('state', $this->questions(), 3.0);
+        } finally {
+            // One request per attempt: the SDK's own Retry-After retry is off.
+            Http::assertSentCount(3);
+            Sleep::assertSlept(fn ($duration): bool => $duration->totalSeconds >= 3, 0);
+        }
+    }
+
+    #[Test]
     public function it_does_not_start_an_attempt_without_budget(): void
     {
         Http::fake();
@@ -165,6 +181,18 @@ class JevClientTest extends TestCase
     {
         $body = $this->body();
         $body['model'] = 'jev-2.0.0';
+        Http::fake([self::URL => Http::response($body)]);
+
+        $this->expectException(JevResponseException::class);
+
+        app(JevClient::class)->ask('state', $this->questions(), 3.0);
+    }
+
+    #[Test]
+    public function it_rejects_a_response_that_names_no_model(): void
+    {
+        $body = $this->body();
+        unset($body['model']);
         Http::fake([self::URL => Http::response($body)]);
 
         $this->expectException(JevResponseException::class);

@@ -2,6 +2,7 @@
 
 namespace App\Services\Jev;
 
+use App\Ai\Gateways\JevGateway;
 use App\Services\Jev\Exceptions\JevResponseException;
 use App\Services\Jev\Exceptions\JevUnavailableException;
 use ErrorException;
@@ -13,6 +14,7 @@ use Laravel\Ai\Ai;
 use Laravel\Ai\Classification;
 use Laravel\Ai\Exceptions\FailoverableException;
 use Laravel\Ai\Exceptions\InsufficientCreditsException;
+use Laravel\Ai\Providers\TypeSafeProvider;
 use Laravel\Ai\Responses\ClassificationResponse;
 use Laravel\Ai\Responses\Data\BooleanAnswer;
 use Laravel\Ai\Responses\Data\ChoiceAnswer;
@@ -148,11 +150,17 @@ class JevClient
      */
     private function provider(): string
     {
-        return Ai::build(array_filter([
+        $provider = Ai::build(array_filter([
             'driver' => 'typesafe',
             'key' => (string) config('services.jev.api_key'),
             'url' => rtrim((string) config('services.jev.base_url', 'https://api.typesafe.ai'), '/') . '/v1',
-        ]))->name();
+        ]));
+
+        if ($provider instanceof TypeSafeProvider) {
+            $provider->useClassificationGateway(new JevGateway);
+        }
+
+        return $provider->name();
     }
 
     private function retryAfter(Throwable $e): ?string
