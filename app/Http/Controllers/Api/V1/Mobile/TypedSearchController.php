@@ -7,6 +7,7 @@ use App\Http\Resources\BlockResource;
 use App\Http\Resources\EventObjectResource;
 use App\Http\Resources\EventResource;
 use App\Services\Api\TypedSearchService;
+use App\Services\Search\LegacyAliasUsage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -60,10 +61,12 @@ class TypedSearchController extends Controller
     private function acceptIosParameters(Request $request): void
     {
         if (! $request->filled('query') && $request->filled('q')) {
+            LegacyAliasUsage::record('q');
             $request->merge(['query' => $request->input('q')]);
         }
 
         if (in_array($request->input('semantic'), ['true', 'false'], true)) {
+            LegacyAliasUsage::record('string_boolean');
             $request->merge(['semantic' => $request->input('semantic') === 'true']);
         }
     }

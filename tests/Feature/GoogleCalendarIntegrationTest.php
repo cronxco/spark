@@ -335,6 +335,42 @@ class GoogleCalendarIntegrationTest extends TestCase
     }
 
     #[Test]
+    public function process_event_data_stores_whole_minutes_for_durations_with_seconds(): void
+    {
+        $start = Carbon::now()->addDay()->setTime(17, 45);
+        $rawData = [
+            'events' => [
+                [
+                    'id' => 'travel_1',
+                    'summary' => 'Train to Glasgow',
+                    'status' => 'confirmed',
+                    'start' => ['dateTime' => $start->toIso8601String()],
+                    // 89 minutes 27 seconds, as Google Maps travel entries are
+                    'end' => ['dateTime' => $start->copy()->addSeconds(5367)->toIso8601String()],
+                ],
+                [
+                    'id' => 'event_after',
+                    'summary' => 'Dinner',
+                    'status' => 'confirmed',
+                    'start' => ['dateTime' => $start->copy()->addHours(3)->toIso8601String()],
+                    'end' => ['dateTime' => $start->copy()->addHours(4)->toIso8601String()],
+                ],
+            ],
+            'calendar_id' => 'primary',
+            'calendar_name' => 'Primary Calendar',
+        ];
+
+        (new GoogleCalendarPlugin)->processEventData($this->integration, $rawData);
+
+        $travel = Event::where('integration_id', $this->integration->id)
+            ->where('event_metadata->google_event_id', 'travel_1')
+            ->first();
+        $this->assertNotNull($travel);
+        $this->assertSame(89, (int) $travel->value);
+        $this->assertSame(2, Event::where('integration_id', $this->integration->id)->count());
+    }
+
+    #[Test]
     public function process_event_data_creates_all_day_event(): void
     {
         $now = Carbon::now();

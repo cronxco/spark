@@ -36,6 +36,7 @@ class ManualLogService
         'tv' => 'watched_episode',
         'cinema' => 'watched_at_cinema',
         'board_game' => 'played_board_game',
+        'reflection' => 'logged_reflection',
     ];
 
     private const MAX_SEASON_OPTIONS = 8;
@@ -60,8 +61,8 @@ class ManualLogService
             ? $this->logTv($integration, $data)
             : $this->logSimple($integration, $data);
 
-        if ($result['status'] === 'logged' && ! empty($data['with'])) {
-            $result['people'] = $this->tagPeople($user, $result['events'], $data['with']);
+        if ($result['status'] === 'logged' && (! empty($data['with']) || ! empty($data['with_ids']))) {
+            $result['people'] = $this->tagPeople($user, $result['events'], $data['with'] ?? [], $data['with_ids'] ?? []);
         }
 
         return $result;
@@ -152,17 +153,24 @@ class ManualLogService
     }
 
     /**
-     * Links each named person to the events with a `with` relationship, creating people not seen before.
+     * Links each person to the events with a `with` relationship. People the app already matched arrive by id and are
+     * never renamed or duplicated; named people are found by exact title, and created when not seen before.
      *
      * @param  array<int, Event>  $events
      * @param  array<int, string>  $names
+     * @param  array<int, string>  $ids  Person ids the app settled on; ids that are not this user's people are ignored
      * @return array<int, array{id: string, name: string, created: bool}>
      */
-    private function tagPeople(User $user, array $events, array $names): array
+    private function tagPeople(User $user, array $events, array $names, array $ids = []): array
     {
         $people = [];
+        $linked = [];
 
-        foreach (collect($names)->map(fn (string $name) => trim($name))->filter()->unique(fn (string $name) => Str::lower($name)) as $name) {
+        $matched = $ids === [] ? collect() : Person::query()->where('user_id', $user->id)->whereIn('id', $ids)->get();
+
+        $targets = $matched->map(fn (Person $person) => [$person, false])->all();
+
+        foreach (collect($names)->map(fn (string $name) => trim($name))->filter(fn (string $name) => $name !== '' && ! PersonMatcher::isReserved($name))->unique(fn (string $name) => Str::lower($name)) as $name) {
             $person = Person::query()
                 ->where('user_id', $user->id)
                 ->whereRaw('lower(title) = ?', [Str::lower($name)])
@@ -176,6 +184,15 @@ class ManualLogService
                 'time' => now(),
                 'metadata' => [],
             ]);
+
+            $targets[] = [$person, $created];
+        }
+
+        foreach ($targets as [$person, $created]) {
+            if (isset($linked[(string) $person->id])) {
+                continue;
+            }
+            $linked[(string) $person->id] = true;
 
             foreach ($events as $event) {
                 Relationship::createRelationship([
@@ -200,9 +217,14 @@ class ManualLogService
     private function logSimple(Integration $integration, array $data): array
     {
         $sourceId = $this->sourceId($data['idempotency_key']);
+        $reflection = $data['kind'] === 'reflection';
 
         if ($existing = $this->existing($integration, [$sourceId])) {
             return ['status' => 'logged', 'created' => false, 'events' => $existing];
+        }
+
+        if ($reflection) {
+            $data['title'] = $data['title'] ?? Str::limit(Str::before(trim($data['body']), "\n"), 80, '…');
         }
 
         try {
@@ -217,6 +239,7 @@ class ManualLogService
                     'source_id' => $sourceId,
                     'event_metadata' => $this->consumptionMetadata($data),
                     'match_url' => $data['match_url'] ?? null,
+                    'content' => $reflection ? $data['body'] : null,
                 ],
             );
         } catch (UniqueConstraintViolationException $e) {

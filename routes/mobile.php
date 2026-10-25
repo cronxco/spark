@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\CapturedBookmarksController;
+use App\Http\Controllers\Api\V1\Mobile\ActionsController;
 use App\Http\Controllers\Api\V1\Mobile\AnomaliesController;
 use App\Http\Controllers\Api\V1\Mobile\ApiTokensController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\Api\V1\Mobile\FlintTopicsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\InsightDiscoveryController;
 use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
+use App\Http\Controllers\Api\V1\Mobile\IntentsController;
 use App\Http\Controllers\Api\V1\Mobile\KnowledgeReprocessingController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\LocationsController;
@@ -110,6 +112,7 @@ Route::patch('events/{id}/note', [EventsController::class, 'updateNote'])
     ->middleware(['spark.ability:data:write', 'if-match:event'])
     ->name('events.note.update');
 Route::get('objects/{id}', [ObjectsController::class, 'show'])->middleware('spark.ability:data:read')->name('objects.show');
+Route::get('people/{id}/timeline', [ObjectsController::class, 'timeline'])->middleware('spark.ability:data:read')->name('people.timeline');
 
 /*
  * Soft delete takes the entity's If-Match like every destructive write.
@@ -326,6 +329,35 @@ Route::post('log', [LogController::class, 'store'])
     ->middleware('spark.ability:data:write')
     ->name('log.store');
 
+Route::post('log/intents/classify', [IntentsController::class, 'classify'])
+    ->middleware('spark.ability:data:write')
+    ->name('log.intents.classify');
+
+Route::post('log/intents', [IntentsController::class, 'commit'])
+    ->middleware('spark.ability:data:write')
+    ->name('log.intents.commit');
+
+/*
+ * Native Actions. The registry declares each action's capability, so these
+ * routes only require a mobile session; ActionsController checks the token
+ * against the action it is asked to list, run or undo.
+ */
+Route::get('actions', [ActionsController::class, 'index'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.index');
+Route::get('actions/resolve', [ActionsController::class, 'resolve'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.resolve');
+Route::get('actions/receipts/{id}', [ActionsController::class, 'receipt'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.receipts.show');
+Route::post('actions/receipts/{id}/undo', [ActionsController::class, 'undo'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.receipts.undo');
+Route::post('actions/{action}/run', [ActionsController::class, 'run'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.run');
+
 /*
 |--------------------------------------------------------------------------
 | API token management
@@ -431,6 +463,7 @@ Route::patch('flint/topics/{id}/tasks/{taskId}', [FlintTopicsController::class, 
 
 Route::get('flint/notes', [FlintNotesController::class, 'index'])->middleware('spark.ability:flint:read')->name('flint.notes.index');
 Route::post('flint/notes', [FlintNotesController::class, 'store'])->middleware('spark.ability:flint:write')->name('flint.notes.store');
+Route::post('flint/notes/acknowledge', [FlintNotesController::class, 'acknowledge'])->middleware('spark.ability:flint:write')->name('flint.notes.acknowledge');
 Route::delete('flint/notes/{id}', [FlintNotesController::class, 'destroy'])->middleware('spark.ability:flint:write')->name('flint.notes.destroy');
 
 Route::get('flint/routines/health', FlintRoutineHealthController::class)

@@ -2,15 +2,23 @@
 
 use App\Actions\DispatchIntegrationFetchJobs;
 use App\Models\Integration;
+use App\Services\Actions\ActionExecutor;
+use App\Services\Actions\ActionRegistry;
+use App\Services\Actions\ConfirmPolicy;
 use App\Services\Flint\FlintRunDispatcher;
 use App\Services\Notifications\NotificationArchiver;
 use App\Services\Notifications\NotificationFeedService;
+use App\Services\Actions\ActionStatus;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
+use Mary\Traits\Toast;
 
 new class extends Component
 {
+    use Toast;
+
     public array $feed = [];
 
     public function mount(): void
@@ -21,6 +29,41 @@ new class extends Component
     public function refreshFeed(): void
     {
         $this->feed = app(NotificationFeedService::class)->feed(Auth::user(), limit: 6);
+    }
+
+    /**
+     * Spotlight's commands: ">" mode on any page, and a page's own commands
+     * with the record they act on. Mounted in the app layout, so they work
+     * everywhere. Capabilities are a token concept; a signed-in web session
+     * runs what the registry offers it.
+     *
+     * @param  array<string, mixed>  $target
+     */
+    #[On('run-action')]
+    public function runAction(string $action, array $target = []): void
+    {
+        $definition = app(ActionRegistry::class)->forSurface('web')->get($action);
+
+        if ($definition === null || $definition->handler === null || $definition->confirm === ConfirmPolicy::Confirm) {
+            return;
+        }
+
+        if (! $definition->runsWithoutInput() && ! ($definition->isContextual() && $target !== [])) {
+            return;
+        }
+
+        try {
+            $receipt = app(ActionExecutor::class)->run(Auth::user(), $definition, $target);
+        } catch (ValidationException) {
+            return;
+        }
+
+        $receipt->status() === ActionStatus::Failed
+            ? $this->error($receipt->progress->error_message ?? $receipt->progress->message)
+            : $this->success($receipt->progress->message);
+
+        $this->dispatch('action-ran', action: $definition->id);
+        $this->refreshFeed();
     }
 
     #[On('run-flint-routine')]

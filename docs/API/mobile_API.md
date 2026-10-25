@@ -176,17 +176,17 @@ Day-scoped payloads also **render** in that zone: every timestamp inside `GET /b
 
 `GET /briefing/today?date=` for a date **after today** adds an `ahead` object alongside the usual (empty) sections. Everything is read at query time; nothing new is stored.
 
-| Field | Description |
-| --- | --- |
-| `headline` | Plain factual line: how much is on and when it starts, open tasks, birthdays, weather |
-| `digest_event_id` | The digest whose `flint_day_context` block is dated to this day (usually the evening digest), or `null` |
-| `weather` | `{location, condition, temp_high_c, rain_probability_pct}` from that block, or `null` |
-| `first_commitment` | `{title, start}` of the first timed entry, or `null` |
-| `calendar[]` | `{title, start, end, all_day, location, person, event_id}`. With a digest its list is authoritative (`person` is `will`, `dan` or `both`; a shared "Will · X"/"Dan · X" pair merges to `both`) and synced Google Calendar events only add `end`, `location` and `event_id`. Without one, synced events form the list and `person` is `null`. All-day items sort first. |
-| `birthdays[]` | `{title}`, from the digest, else all-day synced events whose title contains "birthday" |
-| `plan[]` | `{id, title, kind, done, topic_id, topic_title, url}`; `kind` is `day_note` (task blocks on that day's Outline day note, in note order), `topic_task` (Flint topic tasks with `due_on`/`review_on` that day) or `topic_review` (active topics whose `next_review_at` is that day) |
-| `day_note_url` | The day note in Outline, or `null` |
-| `sleep_target` | `{wake_by, bed_by, sleep_need_minutes, typical_wake, early_start, readiness_low_nights}`, only when the first commitment needs an earlier wake than the fortnight's median, or readiness has sat below its 30-day average for 3+ nights. `wake_by` is an hour before the first commitment; `bed_by` subtracts the median night's sleep plus 20 minutes. |
+| Field              | Description                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `headline`         | Plain factual line: how much is on and when it starts, open tasks, birthdays, weather                                                                                                                                                                                                                                                                                  |
+| `digest_event_id`  | The digest whose `flint_day_context` block is dated to this day (usually the evening digest), or `null`                                                                                                                                                                                                                                                                |
+| `weather`          | `{location, condition, temp_high_c, rain_probability_pct}` from that block, or `null`                                                                                                                                                                                                                                                                                  |
+| `first_commitment` | `{title, start}` of the first timed entry, or `null`                                                                                                                                                                                                                                                                                                                   |
+| `calendar[]`       | `{title, start, end, all_day, location, person, event_id}`. With a digest its list is authoritative (`person` is `will`, `dan` or `both`; a shared "Will · X"/"Dan · X" pair merges to `both`) and synced Google Calendar events only add `end`, `location` and `event_id`. Without one, synced events form the list and `person` is `null`. All-day items sort first. |
+| `birthdays[]`      | `{title}`, from the digest, else all-day synced events whose title contains "birthday"                                                                                                                                                                                                                                                                                 |
+| `plan[]`           | `{id, title, kind, done, topic_id, topic_title, url}`; `kind` is `day_note` (task blocks on that day's Outline day note, in note order), `topic_task` (Flint topic tasks with `due_on`/`review_on` that day) or `topic_review` (active topics whose `next_review_at` is that day)                                                                                      |
+| `day_note_url`     | The day note in Outline, or `null`                                                                                                                                                                                                                                                                                                                                     |
+| `sleep_target`     | `{wake_by, bed_by, sleep_need_minutes, typical_wake, early_start, readiness_low_nights}`, only when the first commitment needs an earlier wake than the fortnight's median, or readiness has sat below its 30-day average for 3+ nights. `wake_by` is an hour before the first commitment; `bed_by` subtracts the median night's sleep plus 20 minutes.                |
 
 ### Response Headers
 
@@ -665,7 +665,10 @@ evenly, keeping the first and last point. Accepts `ios:read` or `data:read`.
 
 ```json
 {
-    "points": [{ "lat": 51.5, "lng": -0.12 }, { "lat": 51.51, "lng": -0.13 }],
+    "points": [
+        { "lat": 51.5, "lng": -0.12 },
+        { "lat": 51.51, "lng": -0.13 }
+    ],
     "total_points": 2,
     "distance": 5.02,
     "distance_unit": "km",
@@ -908,6 +911,103 @@ Searches across events, objects, integrations, and metrics using one of five mod
 ```
 
 Empty collections are included as `[]`. An unknown `mode` returns `422`.
+
+#### Search contract v1
+
+Send `contract_version=1` to get the versioned contract. Without it you get the
+pre-v1 grouped response above, kept for shipped builds.
+
+| Parameter          | Type    | Default   | Description                                                                                                      |
+| ------------------ | ------- | --------- | ---------------------------------------------------------------------------------------------------------------- |
+| `contract_version` | integer | —         | Must be `1`. Any other value returns `422` with `supported_versions`                                             |
+| `query`            | string  | required  | Search text (max 500). May be empty. `q` is not accepted                                                         |
+| `mode`             | string  | `default` | Singular modes only: `default`, `semantic`, `tag`, `metric`, `integration`, `command`. Plural names return `422` |
+| `limit`            | integer | 20        | 1–50                                                                                                             |
+
+```json
+{
+    "schema_version": 1,
+    "query": "coffee",
+    "mode": "default",
+    "execution": { "status": "complete", "fallback_reason": null },
+    "results": [
+        {
+            "kind": "event",
+            "id": "…",
+            "title": "…",
+            "subtitle": "money",
+            "domain": "money"
+        }
+    ],
+    "meta": { "count": 1, "limit": 20 }
+}
+```
+
+- `results` is one flat list, ordered by family: `event`, `object`, `block`,
+  `metric`, `integration`, `place`, `tag`, `command`. `default` mode returns all
+  eight (at most five commands); `semantic` returns events and objects.
+- Every hit has `kind` (singular), `id`, `title` and `subtitle`, plus the keys
+  for its kind (`domain`, `concept`, `block_type`, `identifier`, `service`,
+  `name`/`type`/`count`, and for `command`: `icon`, `action_kind`, `confirm`).
+  Keys are always present, null when empty. A metric's
+  `id` is its `identifier`.
+- `execution.status` is `complete` or `degraded`. A semantic search that cannot
+  embed the query falls back to keyword matching and returns `degraded` with
+  `fallback_reason` `embedding_failed` (or `embeddings_unavailable`). Clients
+  should label degraded results "keyword matches".
+- A `command` hit is an action from the ActionRegistry that this token can run
+  (`id` is the action id for `POST /actions/{id}/run`); `mode=command` returns
+  commands only.
+- Clients must drop a `kind` they do not know and render the rest.
+- Fixtures for every shape live in `tests/Fixtures/search-contract/v1` and are
+  decoded by spark-ios. Change both together; bump `schema_version` for a
+  breaking change.
+
+The pre-v1 spellings (`q`, plural modes, `"true"`/`"false"`) are counted per day
+by `App\Services\Search\LegacyAliasUsage` (counts only, no query text) so they
+can be removed once no shipped build uses them.
+
+---
+
+### Actions
+
+Commands come from the ActionRegistry. `GET /actions?q=` lists the native
+actions this token can run; each carries `id`, `title`, `kind`
+(`navigation`, `safe` or `data`), `confirm` (`none`, `undo` or `confirm`) and
+the `target` fields it needs. A `navigation` action is run by the client:
+`destination.native` names the screen (`day`, `flint`, `knowledge`,
+`explore.health`, `explore.money`, `explore.metrics`, `explore.tags`,
+`explore.map`). A client skips a screen id it does not know.
+
+`POST /actions/{id}/run` takes `target` and `confirmed`; see the receipt and
+undo routes beside it.
+
+#### `GET /actions/resolve?q=sync monzo`
+
+Names a targeted action from a typed line, so the app never needs an id. The
+first word picks the action (`sync`, `refresh`, `pause`, `resume`, `delete`,
+`reprocess`, `tag`) and the rest names an integration or an event title from the
+last 90 days. `tag` also needs a `#tag`: `tag parkrun #fitness`.
+
+```json
+{
+    "contract_version": 1,
+    "data": {
+        "status": "matched",
+        "label": "Monzo",
+        "action": { "id": "integrations.sync", "...": "..." },
+        "target": { "integration_id": "…" }
+    }
+}
+```
+
+- `matched`: one match; send `action.id` and `target` to run. An exact name beats
+  longer ones (`monzo` over `Monzo Pot`).
+- `ambiguous`: `candidates` is a list of `{label, target}`; nothing is chosen.
+- `incomplete`: the verb is known but a name or `#tag` is missing; `message` says which.
+- `none`: no action, nothing matched, or the token cannot run the action.
+
+Matching is limited to the caller's own integrations and events.
 
 ---
 
