@@ -118,6 +118,23 @@ class SearchContractTest extends TestCase
     }
 
     #[Test]
+    public function default_matching_ignores_case(): void
+    {
+        $object = EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'Coffee Roasters', 'concept' => 'merchant']);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'monzo',
+            'action' => 'Coffee_Payment_To',
+        ]);
+
+        $kinds = collect($this->getJson('/api/v1/mobile/search?contract_version=1&query=coffee')->assertOk()->json('results'));
+
+        $this->assertTrue($kinds->where('kind', 'object')->pluck('id')->contains((string) $object->id));
+        $this->assertTrue($kinds->where('kind', 'event')->pluck('id')->contains((string) $event->id));
+    }
+
+    #[Test]
     public function commands_are_the_eighth_kind_and_match_the_registry(): void
     {
         $fixture = $this->fixture('complete');
