@@ -23,7 +23,7 @@ use Tests\TestCase;
  */
 class ActionRegistryCompletenessTest extends TestCase
 {
-    private const DOMAINS = ['navigation', 'integrations', 'flint', 'events', 'insights'];
+    private const DOMAINS = ['navigation', 'integrations', 'flint', 'events', 'insights', 'finance'];
 
     #[Test]
     public function the_registry_is_not_empty_and_ids_are_unique(): void
@@ -55,7 +55,7 @@ class ActionRegistryCompletenessTest extends TestCase
     public function every_action_that_runs_on_the_server_has_a_capability_and_a_handler(): void
     {
         foreach (ActionCatalogue::definitions() as $action) {
-            if ($action->kind === ActionKind::Navigation) {
+            if ($action->kind === ActionKind::Navigation || $action->isInterface()) {
                 continue;
             }
 
@@ -70,7 +70,7 @@ class ActionRegistryCompletenessTest extends TestCase
     public function a_native_action_is_one_the_mobile_session_may_run(): void
     {
         foreach (ActionCatalogue::definitions() as $action) {
-            if ($action->kind === ActionKind::Navigation || ! $action->on('native')) {
+            if ($action->kind === ActionKind::Navigation || $action->isInterface() || ! $action->on('native')) {
                 continue;
             }
 
@@ -90,8 +90,8 @@ class ActionRegistryCompletenessTest extends TestCase
                 $this->assertTrue(is_subclass_of($action->handler, Reversible::class), "{$action->id} offers Undo but its handler is not Reversible");
             }
 
-            if ($action->kind === ActionKind::Navigation) {
-                $this->assertSame(ConfirmPolicy::None, $action->confirm, "{$action->id} navigates, so it cannot confirm");
+            if ($action->kind === ActionKind::Navigation || $action->isInterface()) {
+                $this->assertSame(ConfirmPolicy::None, $action->confirm, "{$action->id} only opens something, so it cannot confirm");
             }
         }
     }
@@ -135,5 +135,55 @@ class ActionRegistryCompletenessTest extends TestCase
             $this->assertTrue($action->on('web'));
             $this->assertTrue($action->isNavigation() || $action->runsWithoutInput(), "{$action->id} needs input or confirmation, which \">\" mode cannot ask for");
         });
+    }
+
+    #[Test]
+    public function an_interface_action_names_the_event_its_page_listens_for(): void
+    {
+        $interface = collect(ActionCatalogue::definitions())->filter->isInterface();
+
+        $this->assertNotEmpty($interface);
+
+        foreach ($interface as $action) {
+            $this->assertNotNull($action->event, "{$action->id} names no event");
+            $this->assertNull($action->handler, "{$action->id} opens a page element, so the server has nothing to run");
+            $this->assertSame(['web'], $action->surfaces, "{$action->id} is web only");
+            $this->assertNotEmpty($action->contexts, "{$action->id} belongs to no page");
+        }
+    }
+
+    #[Test]
+    public function a_page_action_names_routes_that_exist_and_fields_it_targets(): void
+    {
+        foreach (ActionCatalogue::definitions() as $action) {
+            foreach ($action->contexts as $route => $map) {
+                $this->assertTrue(Route::has($route), "{$action->id} is offered on missing route {$route}");
+                $this->assertSame(array_keys($action->target), array_keys($map), "{$action->id} must supply every target field on {$route}");
+            }
+        }
+    }
+
+    #[Test]
+    public function every_event_a_page_action_dispatches_has_a_listener_on_its_page(): void
+    {
+        $pages = [
+            'metrics.show' => base_path('app/Livewire/MetricDetail.php'),
+            'money.show' => base_path('app/Livewire/FinancialAccountShow.php'),
+            'integrations.details' => base_path('app/Livewire/IntegrationDetails.php'),
+            'events.show' => resource_path('views/livewire/events/show.blade.php'),
+            'objects.show' => resource_path('views/livewire/objects/show.blade.php'),
+            'blocks.show' => resource_path('views/livewire/blocks/show.blade.php'),
+        ];
+
+        foreach (ActionCatalogue::definitions() as $action) {
+            if (! $action->isInterface()) {
+                continue;
+            }
+
+            foreach (array_keys($action->contexts) as $route) {
+                $this->assertArrayHasKey($route, $pages, "{$action->id} is offered on {$route}, which this test does not know");
+                $this->assertStringContainsString("'{$action->event}' =>", file_get_contents($pages[$route]), "{$action->id} dispatches {$action->event}, which {$route} does not listen for");
+            }
+        }
     }
 }

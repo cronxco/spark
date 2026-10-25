@@ -8,7 +8,6 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
-use App\Services\GoCardlessAccounts;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use Livewire\Component;
 use Mary\Traits\Toast;
@@ -126,17 +125,9 @@ class IntegrationDetails extends Component
         $this->success('Update triggered successfully!');
     }
 
-    public function toggleIntegrationPause(): void
+    public function reloadIntegration(): void
     {
-        if ($this->integration->service === 'gocardless') {
-            app(GoCardlessAccounts::class)->setPaused($this->integration, ! $this->integration->isPaused());
-        } else {
-            $config = $this->integration->configuration ?? [];
-            $config['paused'] = ! ($config['paused'] ?? false);
-            $this->integration->update(['configuration' => $config]);
-        }
-
-        $this->dispatch('integration-pause-toggled');
+        $this->integration->refresh();
     }
 
     public function reconnectIntegration(): void
@@ -433,9 +424,8 @@ class IntegrationDetails extends Component
     protected function getListeners(): array
     {
         return [
-            // Spotlight command events
-            'trigger-integration-update' => 'triggerIntegrationUpdate',
-            'toggle-integration-pause' => 'toggleIntegrationPause',
+            // Spotlight runs registry actions outside this component
+            'action-ran' => 'reloadIntegration',
             'open-configure-modal' => 'openConfigureModal',
         ];
     }

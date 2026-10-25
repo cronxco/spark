@@ -6,11 +6,20 @@ use App\Models\User;
 use App\Services\Actions\ActionFailed;
 use App\Services\Actions\ActionHandler;
 use App\Services\Actions\ActionOutcome;
+use App\Services\Actions\Applicable;
 use App\Services\Actions\Reversible;
 use App\Services\GoCardlessAccounts;
 
-class SetIntegrationPaused implements ActionHandler, Reversible
+class SetIntegrationPaused implements ActionHandler, Applicable, Reversible
 {
+    /** Offer Pause on a running integration and Resume on a paused one. */
+    public function applies(User $user, array $target): bool
+    {
+        $integration = $user->integrations()->find($target['integration_id']);
+
+        return $integration !== null && $integration->isPaused() !== (bool) $target['paused'];
+    }
+
     public function handle(User $user, array $target): ActionOutcome
     {
         $integration = $user->integrations()->find($target['integration_id']) ?? throw ActionFailed::notFound('Integration');
