@@ -369,6 +369,39 @@ class LogControllerTest extends TestCase
     }
 
     #[Test]
+    public function links_a_reflection_to_people_the_app_matched_by_id_without_creating_a_duplicate(): void
+    {
+        $daniel = Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => 'Daniel Smith', 'time' => now(), 'metadata' => []]);
+        $other = User::factory()->create();
+        $stranger = Person::create(['user_id' => $other->id, 'type' => 'person', 'title' => 'Eve', 'time' => now(), 'metadata' => []]);
+
+        $response = $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'reflection',
+            'idempotency_key' => 'ref-with-1',
+            'body' => 'coffee with @dan',
+            'with_ids' => [(string) $daniel->id, (string) $stranger->id],
+            'with' => ['Daniel Smith', 'Sam'],
+        ])->assertCreated()
+            ->assertJsonCount(2, 'people')
+            ->assertJsonPath('people.0.id', (string) $daniel->id)
+            ->assertJsonPath('people.0.created', false)
+            ->assertJsonPath('people.1.name', 'Sam');
+
+        $eventId = $response->json('events.0.id');
+        $this->assertSame(2, Relationship::where('type', 'with')->where('to_type', Event::class)->where('to_id', $eventId)->count());
+        $this->assertSame(0, Relationship::where('from_id', $stranger->id)->count());
+        $this->assertSame(2, Person::where('user_id', $this->user->id)->count());
+    }
+
+    #[Test]
+    public function rejects_people_ids_that_are_not_uuids(): void
+    {
+        $this->postJson('/api/v1/mobile/log', [
+            'kind' => 'reflection', 'idempotency_key' => 'ref-with-2', 'body' => 'hi', 'with_ids' => ['nope'],
+        ])->assertUnprocessable()->assertJsonValidationErrors('with_ids.0');
+    }
+
+    #[Test]
     public function tags_people_with_the_event_creating_new_ones_and_reusing_known_ones(): void
     {
         $dan = Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => 'Dan', 'time' => now(), 'metadata' => []]);
