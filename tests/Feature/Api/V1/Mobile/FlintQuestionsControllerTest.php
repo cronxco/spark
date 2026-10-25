@@ -104,6 +104,8 @@ class FlintQuestionsControllerTest extends TestCase
     #[Test]
     public function since_bounds_the_query_server_side(): void
     {
+        $this->freezeTime();
+
         $recent = $this->question(now()->subHours(10), ['answer' => 'Done', 'answered_at' => now()->toIso8601String()]);
         $this->question(now()->subDays(10), ['answer' => 'Done', 'answered_at' => now()->toIso8601String()]);
 

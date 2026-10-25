@@ -38,6 +38,8 @@ class IntegrationUpdateFrequencyTest extends TestCase
     #[Test]
     public function integration_needs_update_when_frequency_elapsed()
     {
+        $this->freezeTime();
+
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
@@ -52,6 +54,8 @@ class IntegrationUpdateFrequencyTest extends TestCase
     #[Test]
     public function integration_does_not_need_update_when_frequency_not_elapsed()
     {
+        $this->freezeTime();
+
         $user = User::factory()->create();
         $integration = Integration::factory()->create([
             'user_id' => $user->id,
