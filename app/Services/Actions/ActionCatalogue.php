@@ -5,6 +5,7 @@ namespace App\Services\Actions;
 use App\Services\Actions\Handlers\AcknowledgeAnomaly;
 use App\Services\Actions\Handlers\AddEventTag;
 use App\Services\Actions\Handlers\DeleteEvent;
+use App\Services\Actions\Handlers\LogReflection;
 use App\Services\Actions\Handlers\ReprocessEvent;
 use App\Services\Actions\Handlers\RunFlintRoutine;
 use App\Services\Actions\Handlers\SetIntegrationPaused;
@@ -136,6 +137,20 @@ final class ActionCatalogue
                 target: ['event_id' => ['type' => 'uuid']],
                 surfaces: ['native'],
                 verbs: ['delete', 'remove'],
+            ),
+            // Internal: `POST /log` writes the reflection and records the receipt
+            // that carries its Undo, so no surface lists or runs this.
+            new ActionDefinition(
+                id: 'events.log_reflection',
+                title: 'Log reflection',
+                subtitle: 'Write a line down',
+                icon: 'pencil',
+                domain: 'events',
+                kind: ActionKind::Data,
+                confirm: ConfirmPolicy::Undo,
+                capability: 'data:write',
+                handler: LogReflection::class,
+                surfaces: [],
             ),
             new ActionDefinition(
                 id: 'events.reprocess',

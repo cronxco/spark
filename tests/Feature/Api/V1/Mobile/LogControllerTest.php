@@ -666,6 +666,92 @@ class LogControllerTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    #[Test]
+    public function a_reflection_returns_a_receipt_that_undoes_it(): void
+    {
+        $payload = ['kind' => 'reflection', 'idempotency_key' => 'reflect-undo', 'body' => 'Quiet week.', 'with' => ['Dan']];
+
+        $response = $this->postJson('/api/v1/mobile/log', $payload)
+            ->assertCreated()
+            ->assertJsonPath('receipt.action_id', 'events.log_reflection')
+            ->assertJsonPath('receipt.status', 'succeeded')
+            ->assertJsonPath('receipt.undo.available', true);
+
+        $eventId = $response->json('events.0.id');
+        $event = Event::findOrFail($eventId);
+
+        $this->postJson('/api/v1/mobile/actions/receipts/' . $response->json('receipt.receipt_id') . '/undo')
+            ->assertOk()
+            ->assertJsonPath('undo.available', false)
+            ->assertJsonPath('undo.undone_at', fn ($at) => $at !== null);
+
+        $this->assertSoftDeleted('events', ['id' => $eventId]);
+        $this->assertSoftDeleted('objects', ['id' => $event->target_id]);
+        $this->assertSame(0, Relationship::where('to_id', $eventId)->count());
+        $this->assertSame(0, Person::where('title', 'Dan')->count(), 'A person the reflection created goes with it.');
+    }
+
+    #[Test]
+    public function undoing_a_reflection_keeps_a_person_who_was_already_known(): void
+    {
+        $dan = $this->person('Dan');
+
+        $response = $this->postJson('/api/v1/mobile/log', ['kind' => 'reflection', 'idempotency_key' => 'reflect-known', 'body' => 'Lunch.', 'with' => ['Dan']])
+            ->assertCreated();
+
+        $this->postJson('/api/v1/mobile/actions/receipts/' . $response->json('receipt.receipt_id') . '/undo')->assertOk();
+
+        $this->assertNotNull($dan->fresh());
+        $this->assertNull($dan->fresh()->deleted_at);
+    }
+
+    #[Test]
+    public function a_retried_reflection_returns_the_first_receipt_even_after_undo(): void
+    {
+        $payload = ['kind' => 'reflection', 'idempotency_key' => 'reflect-retry', 'body' => 'Quiet week.'];
+
+        $first = $this->postJson('/api/v1/mobile/log', $payload)->assertCreated();
+        $receiptId = $first->json('receipt.receipt_id');
+
+        $this->postJson('/api/v1/mobile/log', $payload)
+            ->assertOk()
+            ->assertJsonPath('receipt.receipt_id', $receiptId);
+
+        $this->postJson("/api/v1/mobile/actions/receipts/{$receiptId}/undo")->assertOk();
+
+        // A late retry must not bring the undone reflection back.
+        $this->postJson('/api/v1/mobile/log', $payload)
+            ->assertOk()
+            ->assertJsonPath('events', [])
+            ->assertJsonPath('receipt.receipt_id', $receiptId)
+            ->assertJsonPath('receipt.undo.available', false);
+
+        $this->assertSame(0, EventObject::where('type', 'reflection')->count());
+    }
+
+    #[Test]
+    public function other_logs_carry_no_receipt_and_a_preview_writes_none(): void
+    {
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'board_game', 'idempotency_key' => 'bg-1', 'title' => 'Catan'])
+            ->assertCreated()
+            ->assertJsonMissingPath('receipt');
+
+        $this->postJson('/api/v1/mobile/log', ['kind' => 'reflection', 'idempotency_key' => 'reflect-dry', 'body' => 'x', 'dry_run' => true])
+            ->assertOk()
+            ->assertJsonMissingPath('receipt');
+    }
+
+    #[Test]
+    public function another_user_cannot_undo_a_reflection(): void
+    {
+        $response = $this->postJson('/api/v1/mobile/log', ['kind' => 'reflection', 'idempotency_key' => 'reflect-own', 'body' => 'Mine.'])->assertCreated();
+
+        Sanctum::actingAs(User::factory()->create(), MobileSessionAbilities::with(['ios:read', 'data:write']));
+
+        $this->postJson('/api/v1/mobile/actions/receipts/' . $response->json('receipt.receipt_id') . '/undo')->assertNotFound();
+        $this->assertNull(Event::findOrFail($response->json('events.0.id'))->deleted_at);
+    }
+
     private function person(string $title): Person
     {
         return Person::create(['user_id' => $this->user->id, 'type' => 'person', 'title' => $title, 'time' => now(), 'metadata' => []]);
