@@ -268,6 +268,8 @@ class AmexStatementReconciliationTest extends TestCase
     public function the_plan_snapshot_that_feeds_mobile_and_flint_carries_the_reconciled_figures(): void
     {
         $this->seedStatement();
+        // PlanSnapshot reads the clock; every other test here pins 13 Oct 2026 through cover().
+        $this->travelTo(CarbonImmutable::parse('2026-10-13 12:00:00'));
 
         $snapshot = app(PlanSnapshot::class)->build($this->user->id);
 

@@ -4,6 +4,7 @@ namespace Tests\Feature\Api\V1\Mobile;
 
 use App\Models\ActionProgress;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
@@ -326,6 +327,125 @@ class ActionsControllerTest extends TestCase
         $this->assertSame(0, ActionProgress::query()->activity()->where('user_id', $this->user->id)->count());
     }
 
+    #[Test]
+    public function navigation_actions_name_the_app_screen_they_open(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $actions = collect($this->getJson('/api/v1/mobile/actions')->assertOk()->json('data'))->keyBy('id');
+
+        $this->assertSame('flint', $actions['nav.flint']['destination']['native']);
+        $this->assertSame('explore.health', $actions['nav.health']['destination']['native']);
+        $this->assertNull($actions['nav.health']['destination']['route']);
+        $this->assertArrayNotHasKey('nav.bookmarks', $actions->all(), 'the app has no bookmarks screen yet');
+    }
+
+    #[Test]
+    public function a_line_naming_an_integration_resolves_to_a_ready_to_run_target(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $this->integration->update(['name' => 'Monzo']);
+
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('sync monzo'))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'matched')
+            ->assertJsonPath('data.action.id', 'integrations.sync')
+            ->assertJsonPath('data.target.integration_id', $this->integration->id)
+            ->assertJsonPath('data.label', 'Monzo');
+    }
+
+    #[Test]
+    public function more_than_one_match_is_offered_as_a_choice_not_guessed(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $this->integration->update(['name' => 'Monzo Current']);
+        $other = $this->integrationFor($this->user);
+        $other->update(['name' => 'Monzo Pot']);
+
+        $data = $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('pause monzo'))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'ambiguous')
+            ->assertJsonCount(2, 'data.candidates')
+            ->json('data');
+
+        $this->assertArrayNotHasKey('target', $data);
+    }
+
+    #[Test]
+    public function an_exact_name_wins_over_longer_matches(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $this->integration->update(['name' => 'Monzo']);
+        $this->integrationFor($this->user)->update(['name' => 'Monzo Pot']);
+
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('resume Monzo'))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'matched')
+            ->assertJsonPath('data.action.id', 'integrations.resume')
+            ->assertJsonPath('data.target.integration_id', $this->integration->id);
+    }
+
+    #[Test]
+    public function an_event_is_found_by_its_title_and_never_across_users(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $event = $this->eventFor($this->integration);
+        $event->target()->associate(EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'Flat white at Pret']))->save();
+
+        $stranger = User::factory()->create();
+        $theirs = $this->eventFor($this->integrationFor($stranger));
+        $theirs->target()->associate(EventObject::factory()->create(['user_id' => $stranger->id, 'title' => 'Flat white at Pret']))->save();
+
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('delete flat white'))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'matched')
+            ->assertJsonPath('data.action.id', 'events.delete')
+            ->assertJsonPath('data.target.event_id', $event->id);
+    }
+
+    #[Test]
+    public function tagging_needs_a_tag_and_carries_it_in_the_target(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $event = $this->eventFor($this->integration);
+        $event->target()->associate(EventObject::factory()->create(['user_id' => $this->user->id, 'title' => 'Parkrun']))->save();
+
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('tag parkrun'))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'incomplete');
+
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('tag parkrun #fitness'))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'matched')
+            ->assertJsonPath('data.target.event_id', $event->id)
+            ->assertJsonPath('data.target.name', 'fitness');
+    }
+
+    #[Test]
+    public function a_session_that_cannot_run_the_action_gets_no_match(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+        $this->integration->update(['name' => 'Monzo']);
+
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('pause monzo'))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'none');
+    }
+
+    #[Test]
+    public function an_unknown_verb_or_subject_matches_nothing(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('juggle monzo'))
+            ->assertOk()->assertJsonPath('data.status', 'none');
+        $this->getJson('/api/v1/mobile/actions/resolve?q=' . urlencode('sync nothing-here'))
+            ->assertOk()->assertJsonPath('data.status', 'none');
+        $this->getJson('/api/v1/mobile/actions/resolve?q=pause')
+            ->assertOk()->assertJsonPath('data.status', 'incomplete');
+        $this->getJson('/api/v1/mobile/actions/resolve')->assertStatus(422);
+    }
+
     private function integrationFor(User $user): Integration
     {
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'spotify']);
@@ -335,6 +455,6 @@ class ActionsControllerTest extends TestCase
 
     private function eventFor(Integration $integration): Event
     {
-        return Event::factory()->create(['integration_id' => $integration->id, 'service' => 'spotify']);
+        return Event::factory()->create(['integration_id' => $integration->id, 'service' => 'spotify', 'time' => now()->subDay()]);
     }
 }

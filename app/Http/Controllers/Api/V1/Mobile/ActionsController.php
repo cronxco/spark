@@ -8,6 +8,7 @@ use App\Services\Actions\ActionExecutor;
 use App\Services\Actions\ActionFailed;
 use App\Services\Actions\ActionReceipt;
 use App\Services\Actions\ActionRegistry;
+use App\Services\Actions\ActionResolver;
 use App\Services\Actions\ActionStatus;
 use App\Services\Actions\ConfirmationRequired;
 use App\Support\SparkAbility;
@@ -24,6 +25,7 @@ class ActionsController extends Controller
     public function __construct(
         private ActionRegistry $registry,
         private ActionExecutor $executor,
+        private ActionResolver $resolver,
     ) {}
 
     /** GET /api/v1/mobile/actions?q= */
@@ -39,6 +41,29 @@ class ActionsController extends Controller
             ->values();
 
         return response()->json(['contract_version' => 1, 'data' => $actions]);
+    }
+
+    /**
+     * GET /api/v1/mobile/actions/resolve?q=sync monzo
+     *
+     * Names a targeted action from a typed line. `matched` carries the action
+     * and its target, ready to send to run; `ambiguous` lists candidates for
+     * the caller to pick from; `incomplete` and `none` carry a short message.
+     */
+    public function resolve(Request $request): JsonResponse
+    {
+        $request->validate(['q' => ['required', 'string', 'max:255']]);
+
+        $result = $this->resolver->resolve($request->user(), (string) $request->query('q'));
+
+        return response()->json(['contract_version' => 1, 'data' => array_filter([
+            'status' => $result['status'],
+            'message' => $result['message'] ?? null,
+            'action' => isset($result['action']) ? $result['action']->toArray() : null,
+            'target' => $result['target'] ?? null,
+            'label' => $result['label'] ?? null,
+            'candidates' => $result['candidates'] ?? null,
+        ], fn ($value): bool => $value !== null)]);
     }
 
     /**
