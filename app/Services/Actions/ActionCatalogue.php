@@ -30,28 +30,31 @@ final class ActionCatalogue
     /** @return array<int, ActionDefinition> */
     private static function navigation(): array
     {
-        $go = fn (string $id, string $title, string $icon, string $route, array $surfaces = ['web', 'native'], array $keywords = []) => new ActionDefinition(
+        $go = fn (string $id, string $title, string $icon, ?string $route, ?string $native, array $keywords = []) => new ActionDefinition(
             id: "nav.{$id}",
             title: $title,
             subtitle: 'Open',
             icon: $icon,
             domain: 'navigation',
             kind: ActionKind::Navigation,
-            surfaces: $surfaces,
-            destination: ['route' => $route],
+            surfaces: array_values(array_filter([$route !== null ? 'web' : null, $native !== null ? 'native' : null])),
+            destination: array_filter(['route' => $route, 'native' => $native]),
             keywords: $keywords,
         );
 
         return [
-            $go('today', 'Today', 'sun', 'dashboard'),
-            $go('flint', 'Flint', 'sparkles', 'flint.index'),
-            $go('metrics', 'Metrics', 'chart-bar', 'metrics.index', keywords: ['trends']),
-            $go('money', 'Money', 'currency-pound', 'money', keywords: ['finance']),
-            $go('tags', 'Tags', 'tag', 'tags.index'),
-            $go('bookmarks', 'Bookmarks', 'bookmark', 'bookmarks'),
-            $go('updates', 'Updates', 'arrow-path', 'updates.index', keywords: ['integrations']),
-            $go('notifications', 'Notifications', 'bell', 'notifications.index', keywords: ['activity']),
-            $go('activity', 'Recent activity', 'clock', 'admin.activity.index', ['web']),
+            $go('today', 'Today', 'sun', 'dashboard', 'day', ['day']),
+            $go('flint', 'Flint', 'sparkles', 'flint.index', 'flint'),
+            $go('knowledge', 'Knowledge', 'book-open', 'knowledge.tasks', 'knowledge', ['tasks', 'projects']),
+            $go('health', 'Health', 'heart', null, 'explore.health', ['sleep', 'activity']),
+            $go('metrics', 'Metrics', 'chart-bar', 'metrics.index', 'explore.metrics', ['trends']),
+            $go('money', 'Money', 'currency-pound', 'money', 'explore.money', ['finance']),
+            $go('tags', 'Tags', 'tag', 'tags.index', 'explore.tags'),
+            $go('map', 'Map', 'map-pin', 'map.index', 'explore.map', ['places']),
+            $go('bookmarks', 'Bookmarks', 'bookmark', 'bookmarks', null),
+            $go('updates', 'Updates', 'arrow-path', 'updates.index', null, ['integrations']),
+            $go('notifications', 'Notifications', 'bell', 'notifications.index', null, ['activity']),
+            $go('activity', 'Recent activity', 'clock', 'admin.activity.index', null),
         ];
     }
 
@@ -93,6 +96,7 @@ final class ActionCatalogue
                 handler: SyncIntegration::class,
                 target: ['integration_id' => ['type' => 'uuid']],
                 keywords: ['update', 'refresh'],
+                verbs: ['sync', 'refresh', 'update'],
             ),
             $flint('digest', 'Run Flint digest', "Generate today's digest", 'newspaper', 'spark-day-briefing-async'),
             $flint('topics', 'Run Flint topics', 'Review and update topics', 'map', 'flint-topics'),
@@ -117,6 +121,7 @@ final class ActionCatalogue
                 handler: AddEventTag::class,
                 target: ['event_id' => ['type' => 'uuid'], 'name' => ['type' => 'string']],
                 surfaces: ['native'],
+                verbs: ['tag'],
             ),
             new ActionDefinition(
                 id: 'events.delete',
@@ -130,6 +135,7 @@ final class ActionCatalogue
                 handler: DeleteEvent::class,
                 target: ['event_id' => ['type' => 'uuid']],
                 surfaces: ['native'],
+                verbs: ['delete', 'remove'],
             ),
             new ActionDefinition(
                 id: 'events.reprocess',
@@ -143,6 +149,7 @@ final class ActionCatalogue
                 handler: ReprocessEvent::class,
                 target: ['event_id' => ['type' => 'uuid']],
                 surfaces: ['native'],
+                verbs: ['reprocess'],
             ),
             new ActionDefinition(
                 id: 'integrations.pause',
@@ -156,6 +163,7 @@ final class ActionCatalogue
                 handler: SetIntegrationPaused::class,
                 target: ['integration_id' => ['type' => 'uuid']],
                 params: ['paused' => true],
+                verbs: ['pause'],
             ),
             new ActionDefinition(
                 id: 'integrations.resume',
@@ -169,6 +177,7 @@ final class ActionCatalogue
                 handler: SetIntegrationPaused::class,
                 target: ['integration_id' => ['type' => 'uuid']],
                 params: ['paused' => false],
+                verbs: ['resume', 'unpause'],
             ),
             new ActionDefinition(
                 id: 'insights.anomaly_acknowledge',

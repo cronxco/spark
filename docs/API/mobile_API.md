@@ -960,6 +960,45 @@ can be removed once no shipped build uses them.
 
 ---
 
+### Actions
+
+Commands come from the ActionRegistry. `GET /actions?q=` lists the native
+actions this token can run; each carries `id`, `title`, `kind`
+(`navigation`, `safe` or `data`), `confirm` (`none`, `undo` or `confirm`) and
+the `target` fields it needs. A `navigation` action is run by the client:
+`destination.native` names the screen (`day`, `flint`, `knowledge`,
+`explore.health`, `explore.money`, `explore.metrics`, `explore.tags`,
+`explore.map`). A client skips a screen id it does not know.
+
+`POST /actions/{id}/run` takes `target` and `confirmed`; see the receipt and
+undo routes beside it.
+
+#### `GET /actions/resolve?q=sync monzo`
+
+Names a targeted action from a typed line, so the app never needs an id. The
+first word picks the action (`sync`, `refresh`, `pause`, `resume`, `delete`,
+`reprocess`, `tag`) and the rest names an integration or an event title from the
+last 90 days. `tag` also needs a `#tag`: `tag parkrun #fitness`.
+
+```json
+{ "contract_version": 1, "data": {
+    "status": "matched",
+    "label": "Monzo",
+    "action": { "id": "integrations.sync", "...": "..." },
+    "target": { "integration_id": "…" }
+} }
+```
+
+- `matched`: one match; send `action.id` and `target` to run. An exact name beats
+  longer ones (`monzo` over `Monzo Pot`).
+- `ambiguous`: `candidates` is a list of `{label, target}`; nothing is chosen.
+- `incomplete`: the verb is known but a name or `#tag` is missing; `message` says which.
+- `none`: no action, nothing matched, or the token cannot run the action.
+
+Matching is limited to the caller's own integrations and events.
+
+---
+
 ### `GET /integrations`
 
 Returns all integrations for the authenticated user, ordered by service name.

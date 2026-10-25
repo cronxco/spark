@@ -22,6 +22,8 @@ class CheckIntegrationUpdatesJobTest extends TestCase
     #[Test]
     public function job_dispatches_pipeline_task_for_integrations_that_need_updating()
     {
+        $this->freezeTime();
+
         Queue::fake();
 
         $user = User::factory()->create();
