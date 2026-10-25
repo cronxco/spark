@@ -170,7 +170,7 @@ class LogIntentsControllerTest extends TestCase
             'idempotency_key' => 'k1',
             'text' => '@flint stop asking about sleep',
             'intent' => 'flint_note',
-            'occurred_at' => now()->subMinute()->toIso8601String(),
+            'occurred_at' => '2026-10-24T09:59:00+00:00',
             ...$overrides,
         ]);
     }
