@@ -12,8 +12,10 @@ use App\Notifications\IntegrationAuthenticationFailed;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Session;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
@@ -260,6 +262,67 @@ class GoogleCalendarIntegrationTest extends TestCase
         // Verify syncToken was cleared and new one stored
         $this->integration->refresh();
         $this->assertEquals('new_sync_token', $this->integration->configuration['sync_token']);
+    }
+
+    #[Test]
+    public function oauth_callback_accepts_a_reconnect_started_outside_the_browser_session(): void
+    {
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'access_token' => 'new_access_token',
+                'refresh_token' => 'new_refresh_token',
+                'expires_in' => 3600,
+            ]),
+            'https://www.googleapis.com/calendar/v3/calendars/primary' => Http::response(['id' => 'test@example.com']),
+        ]);
+
+        $plugin = new GoogleCalendarPlugin;
+        parse_str((string) parse_url($plugin->getOAuthUrl($this->group), PHP_URL_QUERY), $query);
+
+        // The app starts the flow over the API; the browser finishing consent has another session
+        Session::flush();
+        $request = Request::create('/integrations/google-calendar/callback', 'GET', ['code' => 'auth_code', 'state' => $query['state']]);
+
+        $plugin->handleOAuthCallback($request, $this->group->fresh());
+
+        $group = $this->group->fresh();
+        $this->assertSame('new_access_token', $group->access_token);
+        $this->assertSame('new_refresh_token', $group->refresh_token);
+        $this->assertArrayNotHasKey('oauth_csrf_hash', $group->auth_metadata ?? []);
+
+        $this->expectExceptionMessage('Invalid CSRF token');
+        $plugin->handleOAuthCallback($request, $group);
+    }
+
+    #[Test]
+    public function oauth_callback_rejects_a_state_whose_token_was_never_issued(): void
+    {
+        $plugin = new GoogleCalendarPlugin;
+        $plugin->getOAuthUrl($this->group);
+        Session::flush();
+
+        $state = encrypt(['group_id' => $this->group->id, 'csrf_token' => 'forged', 'code_verifier' => 'verifier']);
+        $request = Request::create('/integrations/google-calendar/callback', 'GET', ['code' => 'auth_code', 'state' => $state]);
+
+        $this->expectExceptionMessage('Invalid CSRF token');
+        $plugin->handleOAuthCallback($request, $this->group->fresh());
+    }
+
+    #[Test]
+    public function failed_mobile_reconnect_clears_the_mobile_flag(): void
+    {
+        $this->group->update(['auth_metadata' => [
+            'mobile_reauth_origin' => true,
+            'mobile_reauth_attempt_id' => 'attempt-1',
+        ]]);
+        $state = encrypt(['group_id' => $this->group->id, 'csrf_token' => 'forged', 'code_verifier' => 'verifier']);
+
+        $this->actingAs($this->user)->get(route('integrations.oauth.callback', [
+            'service' => 'google-calendar', 'code' => 'auth_code', 'state' => $state,
+        ]))->assertRedirect('spark://integrations/reauth-complete?status=error&attempt_id=attempt-1');
+
+        $this->assertArrayNotHasKey('mobile_reauth_origin', $this->group->fresh()->auth_metadata ?? []);
+        $this->assertSame('test_access_token', $this->group->fresh()->access_token);
     }
 
     #[Test]
