@@ -8,13 +8,13 @@ Both endpoints sit under `/api/v1/mobile`, need `data:write`, and are covered by
 
 ## Intents
 
-| `intent` | Meaning | Written by the server? |
-|----------|---------|------------------------|
-| `log` | Something that happened. Structured drafts (wine, beer, TV) go to `POST /log`; any other line goes there as `kind: reflection` | No. The client calls `POST /log` |
-| `flint_note` | A note for Flint | Yes, on commit |
-| `command` | An action from the registry | No. The client runs the action |
-| `search` | Open search | No |
-| `unsure` | Not decided. Classify only; never committed | No |
+| `intent`     | Meaning                                                                                                                        | Written by the server?           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| `log`        | Something that happened. Structured drafts (wine, beer, TV) go to `POST /log`; any other line goes there as `kind: reflection` | No. The client calls `POST /log` |
+| `flint_note` | A note for Flint                                                                                                               | Yes, on commit                   |
+| `command`    | An action from the registry                                                                                                    | No. The client runs the action   |
+| `search`     | Open search                                                                                                                    | No                               |
+| `unsure`     | Not decided. Classify only; never committed                                                                                    | No                               |
 
 ## Rules the server decides
 
@@ -36,13 +36,19 @@ Writes nothing. Safe to call on every pause in typing.
 
 ```json
 {
-  "intent": "log",
-  "confidence": 0.92,
-  "needs_choice": false,
-  "reason": "client_hint",
-  "candidates": [],
-  "text": "coffee with @dan",
-  "people": [{ "name": "dan", "state": "likely", "matches": [{ "id": "…", "name": "Daniel" }] }]
+    "intent": "log",
+    "confidence": 0.92,
+    "needs_choice": false,
+    "reason": "client_hint",
+    "candidates": [],
+    "text": "coffee with @dan",
+    "people": [
+        {
+            "name": "dan",
+            "state": "likely",
+            "matches": [{ "id": "…", "name": "Daniel" }]
+        }
+    ]
 }
 ```
 
@@ -57,12 +63,12 @@ Commits the intent the user settled on.
 
 ```json
 {
-  "idempotency_key": "2f1c…",
-  "text": "@flint stop asking about sleep",
-  "intent": "flint_note",
-  "suggested_intent": "flint_note",
-  "confidence": 1,
-  "occurred_at": "2026-10-24T11:30:00Z"
+    "idempotency_key": "2f1c…",
+    "text": "@flint stop asking about sleep",
+    "intent": "flint_note",
+    "suggested_intent": "flint_note",
+    "confidence": 1,
+    "occurred_at": "2026-10-24T11:30:00Z"
 }
 ```
 
@@ -85,7 +91,13 @@ Every commit (a replayed note excepted) logs `quick_log.intent` with: `suggested
 A `log` line that PCC cannot turn into wine, beer, TV, cinema or a board game is sent to `POST /log` as a reflection:
 
 ```json
-{ "kind": "reflection", "idempotency_key": "…", "body": "coffee with Dan, good chat about the move", "with": ["Dan"], "occurred_at": "…" }
+{
+    "kind": "reflection",
+    "idempotency_key": "…",
+    "body": "coffee with Dan, good chat about the move",
+    "with": ["Dan"],
+    "occurred_at": "…"
+}
 ```
 
 It creates a `reflection` document object (the text is its content) and a `logged_reflection` event ("Logged a Reflection", domain `knowledge`). `title` is optional and defaults to the first line, cut to 80 characters. `body` is required (max 10000) and only valid for this kind. `with`, `occurred_at`, `idempotency_key` and `dry_run` behave as for the other kinds. Nothing is queued for enrichment.

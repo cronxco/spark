@@ -12,4 +12,7 @@ enum ActionKind: string
 
     /** Changes the user's data. */
     case Data = 'data';
+
+    /** Opens a modal or panel on the page the user is already on. Web only; the page runs it. */
+    case Interface = 'interface';
 }
