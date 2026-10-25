@@ -105,7 +105,10 @@ class ActionRegistryCompletenessTest extends TestCase
             }
 
             $this->assertNull($action->handler, "{$action->id} navigates, so it has no handler");
-            $this->assertTrue(Route::has($action->destination['route']), "{$action->id} points at a missing route");
+            $this->assertTrue(isset($action->destination['route']) || isset($action->destination['native']), "{$action->id} has nowhere to go");
+            if (isset($action->destination['route'])) {
+                $this->assertTrue(Route::has($action->destination['route']), "{$action->id} points at a missing route");
+            }
         }
     }
 
