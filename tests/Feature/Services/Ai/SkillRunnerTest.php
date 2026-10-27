@@ -108,6 +108,29 @@ class SkillRunnerTest extends TestCase
     }
 
     #[Test]
+    public function a_failed_optional_tool_goes_back_to_the_model_and_the_run_carries_on(): void
+    {
+        $tools = $this->fakeTools(remote: [self::CRONXTOOLS => [
+            'docs__fetch' => 'MCP tool error: Error: Saved location "home" not found.',
+        ]]);
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['docs__fetch', ['id' => 'style']]]),
+            FakeOpenAi::toolCalls([['spark__create-flint-digest', ['title' => 'News']]]),
+            FakeOpenAi::text('Done.'),
+        ]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        $result = app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+
+        $this->assertSame('evt-created', $result->eventId);
+        $this->assertSame(['docs__fetch', 'spark__create-flint-digest'], $tools->calledTools());
+
+        $handedBack = collect(FakeOpenAi::requests()[1]['input'])->firstWhere('type', 'function_call_output')['output'];
+        $this->assertStringContainsString('docs__fetch failed', $handedBack);
+        $this->assertStringContainsString('Saved location "home" not found', $handedBack);
+    }
+
+    #[Test]
     public function a_call_to_a_tool_the_manifest_does_not_allow_fails_the_run_without_running_it(): void
     {
         $tools = $this->fakeTools(remote: [self::CRONXTOOLS => ['docs__fetch' => '{}', 'komodo__deploy_stack' => 'deployed']]);
