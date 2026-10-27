@@ -711,8 +711,14 @@ format ("today's issue covers…"). Never use "you received" or "you saved" fram
 
 ## Step 6: Weather — standard summary, conditional hourly detail
 
-For the contextually correct location, call `weather__get_weather_summary`, normally
-including current + forecast + alerts for 2–3 days in metric units.
+Call `weather__get_weather_summary` with `city_name: "Croydon, London, UK"`, normally
+including current + forecast + alerts for 2–3 days in metric units. Croydon is home
+and the default for every run. Use a different `city_name` only when the day context
+(calendar, day note, acknowledged travel timezone) grounds Will somewhere else for
+that day. Always pass a `city_name`; never guess a `location_name` alias.
+
+If the weather call fails, leave the weather line out rather than guessing, and carry
+on with the rest of the briefing.
 
 Interpret rain using:
 

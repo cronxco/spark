@@ -4,6 +4,8 @@ namespace App\Ai\Tools\Skills;
 
 use App\Services\Ai\SkillRunner;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use RuntimeException;
@@ -15,8 +17,10 @@ use RuntimeException;
  * Wraps the MCP tool that does the work, whether it runs in-process (Spark's
  * own tools) or on a remote MCP server, and records every call in the run's
  * {@see SkillToolLedger}. In a dry run, a write is recorded and declined
- * instead of run. A failed call ends the run: an unattended skill must not
- * write a confident digest over a tool that did not answer.
+ * instead of run. A failed write, or a failed call to a tool the skill must
+ * succeed with, ends the run. Any other failed call is logged and handed back
+ * to the model, which leaves out what depended on it: one optional source
+ * that did not answer should not cost the whole digest.
  */
 class SkillTool implements Tool
 {
@@ -24,6 +28,7 @@ class SkillTool implements Tool
         private string $name,
         private Tool $tool,
         private SkillToolLedger $ledger,
+        private bool $mustSucceed = true,
     ) {}
 
     public function name(): string
@@ -59,7 +64,17 @@ class SkillTool implements Tool
         $output = (string) $this->tool->handle($request);
 
         if (SkillRunner::isApplicationError($output)) {
-            throw new RuntimeException("Tool {$this->name} failed.");
+            $error = Str::limit(redact_sensitive_urls($output), 500);
+            Log::warning('Flint skill tool failed', ['tool' => $this->name, 'error' => $error]);
+
+            if ($this->mustSucceed) {
+                throw new RuntimeException("Tool {$this->name} failed: {$error}");
+            }
+
+            $this->ledger->failed[] = $this->name;
+            $this->ledger->progress('tool_failed', "{$this->name} failed", 70, ['tool' => $this->name]);
+
+            return "{$this->name} failed: {$error}\nLeave out anything that depended on it and carry on.";
         }
 
         $this->ledger->succeeded[] = $this->name;

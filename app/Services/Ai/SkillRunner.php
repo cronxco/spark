@@ -11,6 +11,7 @@ use App\Models\User;
 use Closure;
 use Exception;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Ai\Contracts\Tool;
 use Laravel\Sanctum\Sanctum;
 use RuntimeException;
 
@@ -205,6 +206,7 @@ class SkillRunner
             $ledger->progress('completed', 'Flint routine completed', 100, [
                 'tool_calls' => count($result->toolsCalled),
                 'tools_called' => array_values(array_unique($result->toolsCalled)),
+                'tools_failed' => array_values(array_unique($ledger->failed)),
                 'response_id' => $result->responseId,
             ]);
 
@@ -248,14 +250,14 @@ class SkillRunner
         $sparkTools = $local === [] ? [] : $this->toolSource->spark();
         foreach ($local as $name) {
             if ($tool = $sparkTools[$this->unqualified($name)] ?? null) {
-                $tools[$name] = new SkillTool($name, $tool, $ledger);
+                $tools[$name] = $this->skillTool($skill, $name, $tool, $ledger);
             }
         }
 
         // CronxTools serves every namespaced tool under its own name.
         if ($cronxTools !== []) {
             foreach ($this->toolSource->remote($cronxToolsUrl, $cronxTools) as $name => $tool) {
-                $tools[$name] = new SkillTool($name, $tool, $ledger);
+                $tools[$name] = $this->skillTool($skill, $name, $tool, $ledger);
             }
         }
 
@@ -267,7 +269,7 @@ class SkillRunner
             $youKey = config('services.flint_routine.you_mcp_key');
             $remote = $this->toolSource->remote($youUrl, array_map($this->unqualified(...), $you), is_string($youKey) ? $youKey : null);
             foreach ($remote as $name => $tool) {
-                $tools[self::YOU_NAMESPACE . '__' . $name] = new SkillTool(self::YOU_NAMESPACE . '__' . $name, $tool, $ledger);
+                $tools[self::YOU_NAMESPACE . '__' . $name] = $this->skillTool($skill, self::YOU_NAMESPACE . '__' . $name, $tool, $ledger);
             }
         }
 
@@ -281,6 +283,18 @@ class SkillRunner
         }
 
         return array_values($tools);
+    }
+
+    /**
+     * Writes and the tools a skill must succeed with end the run when they
+     * fail; any other tool's failure goes back to the model.
+     */
+    private function skillTool(SkillDefinition $skill, string $name, Tool $tool, SkillToolLedger $ledger): SkillTool
+    {
+        $mustSucceed = in_array($name, self::WRITE_TOOLS, true)
+            || in_array($name, $skill->requiredSuccessTools, true);
+
+        return new SkillTool($name, $tool, $ledger, $mustSucceed);
     }
 
     private function unqualified(string $tool): string
