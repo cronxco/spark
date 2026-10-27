@@ -17,18 +17,21 @@ use RuntimeException;
  * Wraps the MCP tool that does the work, whether it runs in-process (Spark's
  * own tools) or on a remote MCP server, and records every call in the run's
  * {@see SkillToolLedger}. In a dry run, a write is recorded and declined
- * instead of run. A failed write, or a failed call to a tool the skill must
- * succeed with, ends the run. Any other failed call is logged and handed back
- * to the model, which leaves out what depended on it: one optional source
- * that did not answer should not cost the whole digest.
+ * instead of run. A failed call is logged and handled by its
+ * {@see ToolFailurePolicy}: an optional source that did not answer should not
+ * cost the whole digest, and a rejected required write should get a chance to
+ * be corrected.
  */
 class SkillTool implements Tool
 {
+    /** How many times a required tool's failure goes back to the model before the run ends. */
+    public const MAX_RETRIES = 2;
+
     public function __construct(
         private string $name,
         private Tool $tool,
         private SkillToolLedger $ledger,
-        private bool $mustSucceed = true,
+        private ToolFailurePolicy $onFailure = ToolFailurePolicy::EndRun,
     ) {}
 
     public function name(): string
@@ -67,14 +70,18 @@ class SkillTool implements Tool
             $error = Str::limit(redact_sensitive_urls($output), 500);
             Log::warning('Flint skill tool failed', ['tool' => $this->name, 'error' => $error]);
 
-            if ($this->mustSucceed) {
+            $retries = count(array_keys($this->ledger->failed, $this->name, true));
+            if ($this->onFailure === ToolFailurePolicy::EndRun
+                || ($this->onFailure === ToolFailurePolicy::Retry && $retries >= self::MAX_RETRIES)) {
                 throw new RuntimeException("Tool {$this->name} failed: {$error}");
             }
 
             $this->ledger->failed[] = $this->name;
             $this->ledger->progress('tool_failed', "{$this->name} failed", 70, ['tool' => $this->name]);
 
-            return "{$this->name} failed: {$error}\nLeave out anything that depended on it and carry on.";
+            return $this->onFailure === ToolFailurePolicy::Retry
+                ? "{$this->name} failed: {$error}\nCorrect the call and make it again."
+                : "{$this->name} failed: {$error}\nLeave out anything that depended on it and carry on.";
         }
 
         $this->ledger->succeeded[] = $this->name;

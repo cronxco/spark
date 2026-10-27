@@ -16,7 +16,7 @@ class SkillToolLedger
     /** @var array<int, string> */
     public array $succeeded = [];
 
-    /** @var array<int, string> Optional tools that failed and were handed back to the model. */
+    /** @var array<int, string> Tools that failed and were handed back to the model, once per failure. */
     public array $failed = [];
 
     /** @var array<int, array{tool: string, arguments: mixed}> */
