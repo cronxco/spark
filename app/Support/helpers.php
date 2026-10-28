@@ -267,6 +267,20 @@ if (! function_exists('format_duration')) {
     }
 }
 
+if (! function_exists('format_money')) {
+    /**
+     * An amount in its own currency: `£24.80`, `$3.00`, `CHF 12.50`. Block
+     * layouts used to hard-code the pound sign whatever the currency was.
+     */
+    function format_money(float|int $amount, ?string $currency = null, int $decimals = 2): string
+    {
+        $currency = strtoupper($currency ?: 'GBP');
+        $symbol = ['GBP' => '£', 'USD' => '$', 'EUR' => '€', 'JPY' => '¥'][$currency] ?? $currency . ' ';
+
+        return $symbol . number_format($amount, $decimals);
+    }
+}
+
 if (! function_exists('format_block_value_display')) {
     /**
      * Format a block's value for display with improved unit formatting.
