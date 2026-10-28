@@ -9,6 +9,7 @@ use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Services\Flint\FlintLinkedEventCards;
 use App\Services\MetricPresentation;
 use App\Support\FlintDigestDay;
 use App\Support\FlintDigestKind;
@@ -163,7 +164,9 @@ class UpToSpeedController extends Controller
             ->orderBy('id', 'desc')
             ->get();
 
-        return $events->map(function (Event $event): array {
+        $linkedEvents = app(FlintLinkedEventCards::class)->forDigests($events, $integrationIds, $user->id);
+
+        return $events->map(function (Event $event) use ($linkedEvents): array {
             $meta = $event->event_metadata ?? [];
 
             return [
@@ -182,6 +185,9 @@ class UpToSpeedController extends Controller
                     'unanswered_question_count' => $event->blocks->filter(
                         fn (Block $b) => FlintQuestion::isOpen($b)
                     )->count(),
+                    // Cards for the metric events the summary links to, in
+                    // the order it mentions them. See FlintLinkedEventCards.
+                    'linked_events' => $linkedEvents[$event->id] ?? [],
                 ],
             ];
         })->all();

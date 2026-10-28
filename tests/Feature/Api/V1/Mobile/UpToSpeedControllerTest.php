@@ -1130,6 +1130,159 @@ class UpToSpeedControllerTest extends TestCase
         $this->assertEmpty($items->where('type', 'flint_digest'));
     }
 
+    #[Test]
+    public function flint_digest_carries_cards_for_linked_metric_events_in_mention_order(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 66, 'percent');
+        $sleep = $this->ouraEvent($oura, 'slept_for', 28500, 'seconds');
+        $article = $this->ouraEvent($oura, 'had_note', null, null);
+
+        $otherUser = User::factory()->create();
+        $otherIntegration = Integration::factory()->create(['user_id' => $otherUser->id, 'service' => 'oura']);
+        $foreign = $this->ouraEvent($otherIntegration, 'had_readiness_score', 88, 'percent');
+
+        $this->digestLinking(
+            "[7h55 of sleep](https://spark.cronx.co/events/{$sleep->id}), a [sleep score of 66](https://spark.cronx.co/events/{$score->id}), "
+            . "[a note](https://spark.cronx.co/events/{$article->id}), [readiness at 88](https://spark.cronx.co/events/{$foreign->id}) "
+            . "and [the score again](https://spark.cronx.co/event/{$score->id})."
+        );
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $linked = $this->digestPayload()['linked_events'];
+
+        $this->assertSame([$sleep->id, $score->id], array_column(array_column($linked, 'event'), 'id'));
+        $this->assertSame('oura.slept_for', $linked[0]['kind']);
+        $this->assertSame('oura.had_sleep_score', $linked[1]['kind']);
+        $this->assertNull($linked[1]['at_digest']);
+    }
+
+    #[Test]
+    public function linked_event_card_reports_the_value_the_digest_saw_when_it_has_since_changed(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 66, 'percent');
+
+        Carbon::setTestNow(now()->subMinutes(5));
+        $this->digestLinking("a [sleep score of 66](https://spark.cronx.co/events/{$score->id})");
+        Carbon::setTestNow();
+
+        $score->update(['value' => 80]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertEquals(80, $card['event']['value']);
+        $this->assertEquals(66, $card['at_digest']['value']);
+        $this->assertNotEmpty($card['at_digest']['display_value']);
+    }
+
+    #[Test]
+    public function linked_event_card_ignores_changes_made_before_the_digest_was_written(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 60, 'percent');
+
+        Carbon::setTestNow(now()->subMinutes(10));
+        $score->update(['value' => 66]);
+        Carbon::setTestNow(now()->addMinutes(5));
+        $this->digestLinking("a [sleep score of 66](https://spark.cronx.co/events/{$score->id})");
+        Carbon::setTestNow();
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->assertNull($this->digestPayload()['linked_events'][0]['at_digest']);
+    }
+
+    #[Test]
+    public function linked_event_card_compares_with_the_usual(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 66, 'percent');
+
+        MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_sleep_score',
+            'value_unit' => 'percent',
+            'event_count' => 30,
+            'mean_value' => 78,
+            'stddev_value' => 4,
+            'normal_lower_bound' => 70,
+            'normal_upper_bound' => 86,
+            'baseline_window_days' => 30,
+        ]);
+
+        $this->digestLinking("a [sleep score of 66](https://spark.cronx.co/events/{$score->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $context = $this->digestPayload()['linked_events'][0]['context'];
+
+        $this->assertSame('down', $context['direction']);
+        $this->assertFalse($context['within_usual_range']);
+        $this->assertStringContainsString('below your 30-day usual', $context['text']);
+    }
+
+    #[Test]
+    public function flint_digest_without_links_has_no_linked_events(): void
+    {
+        $this->digestLinking('Nothing linked today.');
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->assertSame([], $this->digestPayload()['linked_events']);
+    }
+
+    private function ouraIntegration(): Integration
+    {
+        return Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'oura',
+        ]);
+    }
+
+    private function ouraEvent(Integration $integration, string $action, ?int $value, ?string $unit): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'oura',
+            'domain' => 'health',
+            'action' => $action,
+            'value' => $value,
+            'value_multiplier' => 1,
+            'value_unit' => $unit,
+            'time' => now(),
+        ]);
+    }
+
+    private function digestLinking(string $summary): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+            'event_metadata' => ['period' => 'morning', 'title' => 'Morning Digest', 'summary' => $summary],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function digestPayload(): array
+    {
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $digest = $items->firstWhere('type', 'flint_digest');
+
+        $this->assertNotNull($digest, 'expected a flint_digest item in the feed');
+
+        return $digest['payload'];
+    }
+
     /**
      * @return array<string, mixed>
      */

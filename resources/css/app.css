@@ -38,6 +38,19 @@
     --color-warning-content: #0c0407;
     --color-error: #e26969;
     --color-error-content: #120404;
+    /* Domain tints (design language §3.2): fill for glyphs and rings, ink for tinted text */
+    --domain-health: #7abaa1;
+    --domain-health-ink: oklch(26% 0.051 172.552);
+    --domain-activity: #f79129;
+    --domain-activity-ink: #a75706;
+    --domain-money: #ffbf00;
+    --domain-money-ink: #664d00;
+    --domain-media: #ee6352;
+    --domain-media-ink: #b02411;
+    --domain-knowledge: #3f88c5;
+    --domain-knowledge-ink: #316ea1;
+    --domain-online: color-mix(in oklab, #011627 60%, transparent);
+    --domain-online-ink: #011627;
     --radius-selector: 0.25rem;
     --radius-field: 0.25rem;
     --radius-box: 0.5rem;
@@ -73,6 +86,18 @@
     --color-warning-content: #01111e;
     --color-error: #e26969;
     --color-error-content: #01111e;
+    --domain-health: #7abaa1;
+    --domain-health-ink: #b3d8c9;
+    --domain-activity: #f79129;
+    --domain-activity-ink: #f79129;
+    --domain-money: #ffbf00;
+    --domain-money-ink: #ffbf00;
+    --domain-media: #ee6352;
+    --domain-media-ink: #ee6352;
+    --domain-knowledge: #3f88c5;
+    --domain-knowledge-ink: #8db9dd;
+    --domain-online: color-mix(in oklab, #fcfcfc 60%, transparent);
+    --domain-online-ink: #fcfcfc;
     --radius-selector: 0.25rem;
     --radius-field: 0.25rem;
     --radius-box: 0.5rem;
@@ -101,6 +126,22 @@
     --font-display: "Comfortaa", "Nunito", sans-serif;
     --font-sans: "Nunito", sans-serif;
     --font-mono: "PT Mono", monospace;
+}
+
+/* Domain tint utilities (text-domain-health, bg-domain-money-ink, …), resolved per daisyUI theme */
+@theme inline {
+    --color-domain-health: var(--domain-health);
+    --color-domain-health-ink: var(--domain-health-ink);
+    --color-domain-activity: var(--domain-activity);
+    --color-domain-activity-ink: var(--domain-activity-ink);
+    --color-domain-money: var(--domain-money);
+    --color-domain-money-ink: var(--domain-money-ink);
+    --color-domain-media: var(--domain-media);
+    --color-domain-media-ink: var(--domain-media-ink);
+    --color-domain-knowledge: var(--domain-knowledge);
+    --color-domain-knowledge-ink: var(--domain-knowledge-ink);
+    --color-domain-online: var(--domain-online);
+    --color-domain-online-ink: var(--domain-online-ink);
 }
 
 [x-cloak] {
