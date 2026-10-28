@@ -1,5 +1,7 @@
 ## Block Card Display System
 
+> **Read [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md) first.** It is the shared web and iOS design language and wins where this guide differs, notably on hero colours, card shadows, per-card menus and domain tints.
+
 Spark uses a flexible card-based system for displaying blocks throughout the application. Blocks are automatically rendered using smart defaults with support for custom layouts.
 
 ### Overview

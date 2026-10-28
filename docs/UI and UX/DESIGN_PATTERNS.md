@@ -1,5 +1,7 @@
 # Design Patterns & UI Consistency Guide
 
+> **Read [DESIGN_LANGUAGE.md](DESIGN_LANGUAGE.md) first.** It is the shared web and iOS design language and wins where this guide differs, notably on hero colours, card shadows, per-card menus and domain tints.
+
 This document defines the visual design patterns and UI consistency standards for the Spark application.
 
 ## Reference Implementation

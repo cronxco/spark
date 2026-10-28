@@ -165,6 +165,11 @@ Available variables: `$value` (after value_multiplier), `$unit`
 
 ### UI & Display Systems
 
+**Design language**
+
+- Spark web and Spark iOS share one design language: colour roles, domain tints, glyphs, card anatomy and the visual patterns for blocks and events
+- Follow [DESIGN_LANGUAGE.md](docs/UI%20and%20UX/DESIGN_LANGUAGE.md) for any UI work; it wins over DESIGN_PATTERNS.md where they differ
+
 **Spotlight Command Palette**
 
 - Keyboard-driven navigation: `Cmd+K` / `Ctrl+K`
