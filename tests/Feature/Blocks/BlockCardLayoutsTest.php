@@ -24,7 +24,7 @@ class BlockCardLayoutsTest extends TestCase
 
     public static function layouts(): array
     {
-        return collect(glob(dirname(__DIR__, 3).'/resources/views/blocks/types/*.blade.php'))
+        return collect(glob(dirname(__DIR__, 3) . '/resources/views/blocks/types/*.blade.php'))
             ->map(fn (string $path) => basename($path, '.blade.php'))
             ->mapWithKeys(fn (string $type) => [$type => [$type]])
             ->all();
