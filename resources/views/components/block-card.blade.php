@@ -46,7 +46,7 @@ if (!$isValueBlock) {
 
 @if ($isValueBlock)
     <x-block-card.shell :block="$block">
-        <div class="text-3xl font-bold tabular-nums">
+        <div class="font-display text-5xl font-bold tabular-nums text-hero">
             {{ format_block_value_display($block->formatted_value, $block->value_unit, $block->value_multiplier) }}
         </div>
         @if (filled($block->title))

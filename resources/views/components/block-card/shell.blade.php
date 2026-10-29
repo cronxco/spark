@@ -45,6 +45,9 @@
         'anomaly' => 'text-domain-anomaly',
         default => 'text-domain-knowledge',
     };
+    $heroInk = in_array($presentation->domain, \App\Support\BlockPresentation::DOMAINS, true)
+        ? "--hero-ink: var(--domain-{$presentation->domain}-ink)"
+        : null;
 @endphp
 
 <article {{ $attributes->class([
@@ -53,7 +56,7 @@
     'bg-base-200' => ! $presentation->aiWritten,
     // Generated text sits on the generated surface (§3.5).
     'surface-generated' => $presentation->aiWritten,
-]) }}>
+])->merge(array_filter(['style' => $heroInk])) }}>
     <div class="card-body p-4 gap-3">
         <div class="flex items-center gap-2 text-xs font-semibold text-base-content/70">
             <span class="shrink-0 {{ $glyphClass }}" aria-hidden="true"><x-icon :name="$icon" class="w-3.5 h-3.5" /></span>

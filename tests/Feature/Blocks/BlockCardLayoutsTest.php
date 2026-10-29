@@ -111,8 +111,17 @@ class BlockCardLayoutsTest extends TestCase
         $html = Blade::render('<x-block-card.value value="7h 55m" unit="sleep" />');
 
         $this->assertStringContainsString('font-display', $html);
-        $this->assertMatchesRegularExpression('/text-5xl[^>]*>7h 55m/', $html);
+        $this->assertMatchesRegularExpression('/text-5xl[^"]*text-hero[^>]*>7h 55m/', $html);
         $this->assertMatchesRegularExpression('/text-2xl[^>]*>sleep/', $html);
+    }
+
+    #[Test]
+    public function the_card_hands_its_domain_ink_to_the_hero_value(): void
+    {
+        $html = Blade::render('<x-block-card :block="$block" />', ['block' => $this->makeBlock('some_unlisted_type')]);
+
+        $this->assertStringContainsString('--hero-ink: var(--domain-money-ink)', $html);
+        $this->assertMatchesRegularExpression('/font-display text-5xl font-bold tabular-nums text-hero/', $html);
     }
 
     #[Test]

@@ -29,7 +29,7 @@
             @endif
         </svg>
         <div class="absolute inset-0 flex items-center justify-center">
-            <span class="text-3xl font-bold tabular-nums">{{ $value }}</span>
+            <span class="text-3xl font-bold tabular-nums text-hero">{{ $value }}</span>
             <span class="sr-only">out of {{ $max }}</span>
         </div>
     </div>

@@ -50,8 +50,8 @@
     --domain-media-ink: #b02411;
     --domain-knowledge: #3f88c5;
     --domain-knowledge-ink: #316ea1;
-    --domain-online: color-mix(in oklab, #011627 60%, transparent);
-    --domain-online-ink: #011627;
+    --domain-online: #244f83;
+    --domain-online-ink: #244f83;
     --domain-anomaly: #b16c89;
     --domain-anomaly-ink: #011627;
     /* Generated surface (DESIGN_LANGUAGE.md §3.5): the Flint avatar's
@@ -105,14 +105,16 @@
     --domain-media-ink: #ee6352;
     --domain-knowledge: #3f88c5;
     --domain-knowledge-ink: #8db9dd;
-    --domain-online: color-mix(in oklab, #fcfcfc 60%, transparent);
-    --domain-online-ink: #fcfcfc;
+    --domain-online: #8db9dd;
+    --domain-online-ink: #8db9dd;
     --domain-anomaly: #b16c89;
     --domain-anomaly-ink: #d2abbb;
     --color-spark: #ffbf00;
     --color-ember: #f79129;
     --generated-spark: 10%;
     --generated-ember: 22%;
+    /* Hero values are amber in dark mode, whatever the domain (§3.6). */
+    --color-hero: var(--color-primary);
     --radius-selector: 0.25rem;
     --radius-field: 0.25rem;
     --radius-box: 0.5rem;
@@ -188,6 +190,13 @@
     .surface-generated {
         border-color: var(--color-ember);
     }
+}
+
+/* The hero value colour (DESIGN_LANGUAGE.md §3.6): the card's domain ink
+   (`--hero-ink`, set by the card shell) in light mode, falling back to
+   base-content; the dark theme sets `--color-hero` to amber. */
+@utility text-hero {
+    color: var(--color-hero, var(--hero-ink, var(--color-base-content)));
 }
 
 [x-cloak] {
