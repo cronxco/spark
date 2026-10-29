@@ -85,6 +85,15 @@ class BlockCardLayoutsTest extends TestCase
     }
 
     #[Test]
+    public function scores_out_of_100_are_a_ring_with_the_excellent_tick(): void
+    {
+        $html = Blade::render('<x-block-card :block="$block" />', ['block' => $this->makeBlock('contributor')]);
+
+        $this->assertStringContainsString('out of 100', $html);
+        $this->assertStringContainsString('<line', $html);
+    }
+
+    #[Test]
     public function the_generic_value_card_no_longer_lists_raw_metadata(): void
     {
         $html = Blade::render('<x-block-card :block="$block" />', ['block' => $this->makeBlock('some_unlisted_type')]);
