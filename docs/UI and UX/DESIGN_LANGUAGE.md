@@ -197,7 +197,11 @@ Every block and event card is built from the same four slots, top to bottom. Onl
 3. **Body**: one visual pattern from [section 8](#8-visual-patterns-for-blocks-and-events), or up to three lines of text.
 4. **Context**: one line, `secondary`. A comparison ("9 below your usual"), a source ("Oura"), or a count ("+3 more").
 
-The whole card is one tap target and goes to the block or event detail. There are no per-card action menus, footer badges or "View" buttons. Secondary actions live in a context menu (iOS long press, web overflow on the detail page only).
+The whole card is one tap target and goes to the block or event detail. There are no footer badges or "View" buttons. Secondary actions (open the event, open the block, open the source URL, copy) sit in one menu with the same items on both platforms:
+
+- **Web**: a `⋮` button at the trailing end of the eyebrow, after the time, in `base-content/70`, with a 24 × 24px minimum target. The card is a link through a stretched title link, and the menu button sits above it, so the button never nests inside a link. `row` and `compact` sizes leave it out; `card` and `full` show it.
+- **iOS**: a long press on the card opens a `.contextMenu` with a preview of the card. There is no visible button. Every size gets it.
+- The menu never holds the card's main action. A tap still opens the detail.
 
 ### 7.2 Sizes
 
@@ -269,7 +273,7 @@ From the web block and event layouts (`resources/views/blocks/types/*.blade.php`
 | Remove | Found in | Replace with |
 |---|---|---|
 | `shadow` + `hover:shadow-lg transition-all` on every card | 64 of 64 layouts | Flat `bg-base-200`, `hover:bg-base-300` when the card is a link |
-| Per-card footer: type badge + `⋮` menu with "View Block" / "View Event" | 64 of 64 | The whole card links to the detail page; the eyebrow names the type |
+| Per-card footer: type badge + `⋮` menu with "View Block" / "View Event" | 64 of 64 | The whole card links to the detail page, the eyebrow names the type, and the `⋮` moves into the eyebrow after the time (7.1) |
 | Domain colour via daisyUI status colours (`warning` for money, `info` for media) | 9 `$domainColors` / `$badgeColorMap` arrays | `domain-*` tokens from 3.2 |
 | The `warning`-coloured AI gradient, model-name and word-count footers | 11 AI layouts with `from-warning/5 to-warning/25` | The generated surface in 3.5, which keeps a gradient in the Flint hues |
 | `animate-pulse` heart | `heart_rate.blade.php` | Static glyph in the eyebrow |
