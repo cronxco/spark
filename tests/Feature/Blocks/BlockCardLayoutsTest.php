@@ -94,6 +94,28 @@ class BlockCardLayoutsTest extends TestCase
     }
 
     #[Test]
+    public function the_stat_grid_fits_up_to_eight_fields_and_skips_empty_ones(): void
+    {
+        $stats = ['Sets' => '18', 'Reps' => '142', 'Volume' => '8,400 kg', 'Time' => '1h 05m', 'PRs' => '2', 'Calories' => '410', 'Avg HR' => '128', 'Max HR' => '171', 'Empty' => null];
+
+        $html = Blade::render('<x-block-card.stats :stats="$stats" />', ['stats' => $stats]);
+
+        $this->assertStringContainsString('grid-cols-[repeat(auto-fit,minmax(4rem,1fr))]', $html);
+        $this->assertSame(8, substr_count($html, '<dt'));
+        $this->assertStringNotContainsString('Empty', $html);
+    }
+
+    #[Test]
+    public function the_hero_value_is_display_size_with_its_unit_at_about_half(): void
+    {
+        $html = Blade::render('<x-block-card.value value="7h 55m" unit="sleep" />');
+
+        $this->assertStringContainsString('font-display', $html);
+        $this->assertMatchesRegularExpression('/text-5xl[^>]*>7h 55m/', $html);
+        $this->assertMatchesRegularExpression('/text-2xl[^>]*>sleep/', $html);
+    }
+
+    #[Test]
     public function the_generic_value_card_no_longer_lists_raw_metadata(): void
     {
         $html = Blade::render('<x-block-card :block="$block" />', ['block' => $this->makeBlock('some_unlisted_type')]);
