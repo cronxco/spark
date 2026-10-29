@@ -66,6 +66,9 @@ Written 28 October 2026 from a read of iOS `main` @ `539f651` and web `dev` @ `f
 | Status line | `StatusPill` (dot, finding, count) | Text with a status glyph |
 | Status chip (action needed) | A capsule in the status fill with its `-content` text | `badge badge-error` / `badge-warning` |
 | Domain filter chip | `DomainChip` | `btn btn-sm rounded-full` with a domain wash |
+| Tag | `TagChip` | `<x-tag-ref>` |
+| Reference (integration, object, block, event, place) | `EntityRefChip` | `<x-integration-ref>`, `<x-object-ref>`, `<x-block-ref>`, `<x-event-ref>`, `<x-place-ref>` and the other `x-*-ref` components |
+| Peek card (a tag's or reference's summary) | `.popover` with `.presentationCompactAdaptation(.popover)` | The `x-*-ref` popover card |
 | Empty state | `EmptyState` | Centred block (see 12.8) |
 
 ## 3. Colour
@@ -308,6 +311,7 @@ Unless a card has its own controls (`linked: false`, below), the whole card is o
 
 | Size | Where | Shows | Layout |
 |---|---|---|---|
+| `ref` | Inline in prose, event and object detail, relationship lists, the actor and target of an event | Glyph, title, and an optional service label | The smallest view of any integration, object, block or event. See 7.5 |
 | `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value (with an against-the-mean bar for durations and counts) or a 64pt ring for scores, one context line | Minimum height, 2 or 3 across. At accessibility text sizes, one column with variable height so nothing clips. No body. |
 | `row` | Event detail, Knowledge item, timelines, lists inside a section | Glyph chip, label, value or title, trailing time | One line, 44pt minimum height |
 | `card` | Web grids, iOS block lists that need a body | All four slots | Full width on phone, grid on the web (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3`) |
@@ -340,6 +344,25 @@ Each platform has one registry from type to layout, and one fallback.
 The shell takes a `title`, a `context` slot, `linked` and `menu`. With `linked` true (the default) the shell provides the one card-wide detail link. With `linked` false it provides none, for cards with their own controls where a card-wide link would swallow clicks; those controls stay individually reachable. Links and buttons inside the slot need `relative z-10` to sit above the card-wide link. No layout adds its own `card`, `card-body`, shadow, badge, header, footer or gradient.
 
 Block cards appear on event detail pages (`/events/{event}`, every block linked to the event), object pages (`/objects/{object}`, blocks related through relationships) and anywhere `<x-block-card>` is used. The admin blocks table (`/admin/blocks`) stays a table.
+
+### 7.5 References and tags
+
+The current web `x-*-ref` and `<x-tag-ref>` components are the primary design for both platforms. iOS follows them.
+
+**A reference** is the smallest view of an integration, object, block or event: a pill with a leading glyph, the title, and an optional service label (an object or event ref names its integration, e.g. "Had Physical Effort · Apple Health"). On the web it is `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium` with the tint at 10% fill and 20% border, the glyph at `size-3` and 70% opacity, and the title truncated at about 200px. On iOS it is `EntityRefChip`. Use a reference wherever a card would be too much: in prose, in relationship and "linked" lists, for an event's actor and target, and for the integration behind an item.
+
+**A tag** is a pill in the same shape, with the tag type's glyph (`fas.microphone` for an artist, `fas.compact-disc` for an album, `fab.spotify` for a Spotify context; `fas.tag` otherwise) and the tag name, truncated at a word boundary near 20 characters. On the web it is `<x-tag-ref>`; on iOS, `TagChip`. An item can show all its tags; they wrap.
+
+**Both open a peek card, then link onwards.**
+
+- **Web, pointer:** hovering for 200ms opens the peek card under the pill; it stays open while the pointer is over the card and closes 150ms after the pointer leaves. Clicking the pill goes straight to the detail page (`wire:navigate`).
+- **Web, touch** (under `md`), and **iOS:** a tap opens the peek card, and the card's button goes to the detail page. A second tap or a tap outside closes it. On iOS this is a `.popover` adapted to stay a popover on iPhone. A long press keeps the context-menu preview (7.1).
+- Only one peek card is open at a time, and Escape closes it.
+- **The peek card** is a transient surface (10.3): `bg-base-100` with `shadow-xl` and a 30% tinted border. It shows a header with a rounded-square glyph chip, the type in the eyebrow style (e.g. "MUSIC ALBUM"), and the title. Below are a few facts (counts, last update, status) and one full-width button to the destination ("View Tagged Items", "Configure", "View Event").
+- A tag or reference that has no destination still opens its peek card, which says so in a single line of text.
+- **Accessibility:** the pill is a link on the web (a button on touch) whose accessible name is the title plus the service, e.g. "Had Physical Effort, Apple Health". The peek card's button is reachable by keyboard. On iOS, the chip is one element with the `.isButton` trait.
+
+Tags and references are links, so they are exempt from the "chips mean action" rule in 12.9.
 
 ## 8. Visual patterns for blocks and events
 
@@ -563,9 +586,10 @@ Centred: a `size-12` glyph in `base-content/70`, an h3 (`text-lg font-medium`), 
 A chip means "this state needs you". Everything else is text.
 
 - **Status chips** (`badge badge-error`, `badge-warning`, `badge-info` on the web; a capsule in the status fill on iOS) appear only for a state the reader must act on: failed, needs update, pending approval. Pair the colour with words.
-- **No badges** for entity type (the eyebrow names it), category ("Current account" is metadata text), counts (write "(5)" in the heading), durations, timestamps, service names or implementation details.
-- **Domain and tag chips** are filters or links, not labels: `DomainChip` and `TagChip` on iOS, `rounded-full` pills on the web.
-- One chip per item at most.
+- **No badges** for entity type (the eyebrow names it), category ("Current account" is metadata text), counts (write "(5)" in the heading), durations, timestamps or implementation details. A service name appears as text, or as a reference pill when it links to the integration (7.5).
+- **Tags and references** are links, not labels. They follow 7.5, and an item can carry several.
+- **Domain chips** are filters: `DomainChip` on iOS, `rounded-full` pills on the web.
+- At most one status chip per item.
 
 ### 12.10 Responsive web layout
 
@@ -618,6 +642,7 @@ Things in the current code that break these rules, for the convergence threads t
 6. **`Block.mediaUrl` is decoded and stored but never drawn.** The image-led pattern needs it.
 7. **Raw durations**: the compact API sends `formatted_value` unchanged for `sleep_stage` and `duration`, so iOS can show seconds. Format on the client (9).
 8. **Web custom layouts draw the whole card** on `dev`. spark#1284 moves all 64 onto `<x-block-card.shell>` (7.4); until it merges, the old chrome is still live. That PR also sets `online` to neutral, which changes to ocean (3.2).
+9. **iOS references and tags have no peek card.** `EntityRefChip` and `TagChip` either navigate on tap or show only a context menu, and `EntityRefChip` sits on glass. Add the tap-to-peek popover and use the reference shape from 7.5.
 
 ## 15. Checklist for a new screen
 
