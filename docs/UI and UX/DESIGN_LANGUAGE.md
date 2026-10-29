@@ -37,7 +37,8 @@ Written 28 October 2026 from a read of iOS `main` @ `539f651` and web `dev` @ `f
 6. **Show the essentials, disclose the rest.** The main view holds what the reader came for. Technical detail (raw metadata, activity logs, IDs) is one tap away in a drawer or inspector, never in the way.
 7. **Say what the data can and cannot tell you.** Show freshness, partial days and missing values honestly. A gap is shown as a gap, never as zero.
 8. **Accessible by construction.** Contrast, Dynamic Type, Reduce Motion and Reduce Transparency are design inputs, not checks at the end.
-9. **Quiet at rest, responsive to touch, rewarding at completion.** Interaction feedback is immediate, spatially coherent and restrained.\n10. **Less is more.** When in doubt, remove a badge, border or colour rather than add one.
+9. **Quiet at rest, responsive to touch, rewarding at completion.** Interaction feedback is immediate, spatially coherent and restrained.
+10. **Less is more.** When in doubt, remove a badge, border or colour rather than add one.
 
 ## 2. Platform mapping
 
@@ -347,7 +348,7 @@ Pick one pattern per card. Each has one implementation per platform, shared acro
 | Pattern | Use for | iOS | Web | Rules |
 |---|---|---|---|---|
 | **Value** | Any single number | Hero `Text` + unit | `font-display text-5xl font-bold text-hero` + unit `text-2xl` | Glyph in the eyebrow, not beside the number. Format per [9](#9-writing-data). |
-| **Ring** | A ratio with a known maximum: scores out of 100, energy out of 5 | A hero-sized ring view (`Gauge(.accessoryCircularCapacity)` only in widgets and complications) | `<x-block-card.ring>` | The ring is the hero: centred, about 128pt on a card (64pt compact), with the number inside at hero size. Track at 15% fill. Every score out of 100 (sleep, readiness, activity) uses Ring at every size, with a short tick at the provider's "excellent" threshold (85 for Oura). Never a ring without a maximum. |
+| **Ring** | A ratio with a known maximum: scores out of 100, energy out of 5 | A hero-sized ring view (`Gauge(.accessoryCircularCapacity)` only in widgets and complications) | `<x-block-card.ring>` | The ring is the hero: centred, about 128pt on a card (64pt compact), with the number inside at hero size. Track at 15% fill. Every score out of 100 (sleep, readiness, activity) uses Ring at `compact` and `card` size, with a short tick at the provider's "excellent" threshold (85 for Oura). Never a ring without a maximum. In a `row`, the score is plain text (`66`), since a one-line row has no room for a ring. |
 | **Bar** | Progress or share: reading progress, contributors, popularity | `ProgressView` / `Gauge(.linearCapacity)` | `<x-block-card.bar>` | Label and value as text too. **Against the mean** variant for values with no fixed maximum (sleep duration, steps, spend): a vertical marker labelled "Avg" sits at the 30-day mean, the track runs to about 1.5× the mean, and the difference is stated in text ("↑ 35m above 30d avg", in the 3.4 shape). |
 | **Stat grid** | 2–8 related fields of one record: set, reps, weight, RPE, rest | `StatGrid` (adaptive `Grid` or `ViewThatFits`) | `<x-block-card.stats>`: `grid grid-cols-[repeat(auto-fit,minmax(4rem,1fr))]` | Each cell centre-aligned, label above value, tabular figures, no dividers. One row when the fields fit; otherwise wrap to a second row (never more than two). Never shrink the type to fit. |
 | **Flow** | Money or values moving: transfers, FX, before → after, actor → target | `HStack` with `arrow.right` | `flex flex-col sm:flex-row` with `fas.arrow-down` / `fas.arrow-right` | Amounts in UI face, masked numbers as `••1234`. On a phone-width web layout the flow stacks and the arrow points down. |
@@ -542,7 +543,7 @@ Descriptions under toggles and radios use `text-xs text-base-content/70`, not `/
 
 - **Tables** (web): `overflow-x-auto` around `table table-zebra`. The first column holds the main information in `font-medium` with metadata below in `text-sm text-base-content/70`. Actions are right-aligned `btn-ghost btn-sm` glyph buttons with an `aria-label`. No badges for categories; write them as text.
 - **Lists** (iOS): `List` with `row` cards, or a `LazyVStack` of rows on a content surface.
-- **View modes** (cards, table, list) of the same data use `<x-tabs>` with a label and glyph on each tab and `wire:model` so the choice survives a refresh. On iOS, a segmented `Picker`. Tabs never navigate between different pages.
+- **View modes** (cards, table, list) of the same data use `<x-tabs>` with a label and glyph on each tab bound with `wire:model` to a property marked `#[Url]` (or `#[Session]`), so the choice survives a refresh. On iOS, a segmented `Picker`. Tabs never navigate between different pages.
 
 ### 12.7 Status lists
 
