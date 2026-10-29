@@ -62,7 +62,8 @@ Written 28 October 2026 from a read of iOS `main` @ `539f651` and web `dev` @ `f
 | Page header | `.navigationTitle` + `.toolbar` | `<x-header>` |
 | Technical detail | Inspector sheet of `InspectorRow`s | `<x-drawer>` of `<x-collapse>` sections |
 | Section heading | `SparkSectionHeader`, `SectionLabel` | `h3.text-lg.font-semibold` |
-| Status chip | `StatusPill` | `badge` with a status colour |
+| Status line | `StatusPill` (dot, finding, count) | Text with a status glyph |
+| Status chip (action needed) | A capsule in the status fill with its `-content` text | `badge badge-error` / `badge-warning` |
 | Domain filter chip | `DomainChip` | `btn btn-sm rounded-full` with a domain wash |
 | Empty state | `EmptyState` | Centred block (see 12.8) |
 
@@ -133,7 +134,7 @@ The hero value (the big number on a card or detail page) is the one place amber 
 - **Light mode**: the card's domain ink (3.2), or `base-content` when the card has no domain or its domain has no ink step.
 - **Dark mode**: spark amber (`primary` in the dark theme), whatever the domain.
 - The unit and any secondary values stay `secondary` in both modes. Rings keep their domain fill for the stroke; only the number inside follows this rule.
-- On the web this is a `--color-hero` theme variable, used as `text-hero`. `<x-block-card>` and detail pages set it to the domain ink in the light theme; the dark theme sets it to `primary`. On iOS it is `Color.sparkHero(domain:)`, which resolves the same way.
+- On the web this is the `text-hero` utility, which resolves to `var(--color-hero, var(--hero-ink, base-content))`. The card shell and detail pages set `--hero-ink` to the domain ink, and the dark theme sets `--color-hero` to `primary`. On iOS it is `Color.sparkHero(domain:)`, which resolves the same way from `Color.domainInk(for:)`.
 
 ## 4. Type
 
@@ -163,7 +164,7 @@ Web scale:
 | Body | `text-sm` in cards, `text-base` on pages |
 | Meta, eyebrow | `text-xs text-base-content/70` (`font-semibold` for an eyebrow) |
 
-On iOS the detail page hero is `SparkTypography.heroXL`, larger than the card hero, so the full view is always the loudest.
+iOS adds three display styles for values, all Comfortaa bold and scaling with Dynamic Type: `heroDetail` (56pt, relative to `.largeTitle`) for the detail page, `heroCard` (44pt) for cards and `heroCompact` (24pt) for compact cards, each with a unit style at about 55%. The existing `heroXL`, `hero` and `heroSmall` stay for titles. The full view is always the loudest.
 
 ## 5. Space, shape and surfaces
 
@@ -212,7 +213,7 @@ Elevation is shown by surface change, not shadows. No card, filter panel or nest
 
 ## 6. Glyphs
 
-- **One concept, one glyph, one map.** iOS resolves glyphs only in `EntityPresentation`. The web has the same lookup in PHP (`App\Support\BlockPresentation`), and Blade files stop hard-coding icons. The tables below are the contract.
+- **One concept, one glyph, one map.** iOS resolves glyphs only in `EntityPresentation`. The web resolves them in PHP through `App\Support\BlockPresentation` (its `KIND_ICONS`, then the plugin's icon, then the domain glyph), and Blade files stop hard-coding icons. The tables below are the contract.
 - Solid glyphs on both platforms. Font Awesome solid (`fas.`) on the web; brands (`fab.`) only for service logos and payment cards. Heroicons (`o-`, 158 uses) are not used in new work; `config/icons.php` maps each Heroicon to its Font Awesome replacement.
 - **Colour**: a domain glyph takes its domain fill (3.2). A neutral glyph (action, navigation, section heading) inherits `base-content`, or `base-content/70` when secondary. A status glyph takes its status colour (`fas.circle-check` in `success`). Never colour a glyph for decoration, and never use a status colour for a domain.
 - **Glyph chip**: the glyph in its domain fill on a 12% tint of the same fill, in a **rounded square**, the same shape and size on both platforms. A neutral glyph chip uses `base-content` on `base-300`.
@@ -321,7 +322,7 @@ When Flint prose mentions a metric that has an event behind it (sleep duration, 
 Each platform has one registry from type to layout, and one fallback.
 
 - **iOS**: add a case to `BlockKind` (or `EventKind`) with its glyph, domain and pattern. `BlockCard` and `EventCard` switch on the kind, never on substrings of `block_type` or `action`.
-- **Web**: add `resources/views/blocks/types/{block_type}.blade.php` (for example `fetch_key_takeaways.blade.php`), and give the type its glyph, label and domain in `App\Support\BlockPresentation`. `<x-block-card>` includes `$block->getCustomCardLayoutPath()` (`blocks.types.{type}`) when `$block->hasCustomCardLayout()`, and otherwise falls back to the generic value card (blocks with a value) or content card (blocks without). `Block::getBlockTypesWithCustomLayouts()` lists the types that have one.
+- **Web**: add `resources/views/blocks/types/{block_type}.blade.php` (for example `fetch_key_takeaways.blade.php`), and give the type a `display_name` and a `fas.` icon in the plugin's `getBlockTypes()`. The label comes from that `display_name`, and the domain from the plugin's `getDomain()` (falling back to knowledge). The glyph comes from `App\Support\BlockPresentation::KIND_ICONS` first, then the plugin's icon, then the domain glyph, so add a `KIND_ICONS` entry only when the glyph should differ from the plugin's. `<x-block-card>` includes `$block->getCustomCardLayoutPath()` (`blocks.types.{type}`) when `$block->hasCustomCardLayout()`, and otherwise falls back to the generic value card (blocks with a value) or content card (blocks without). `Block::getBlockTypesWithCustomLayouts()` lists the types that have one.
 
 **A type's layout draws the hero and body only.** It wraps them in `<x-block-card.shell>`, which draws the surface, eyebrow (glyph, label, time, `⋮`), optional title, context line and tap target, and switches to the generated surface (3.5) for AI-written blocks. The body uses the shared pattern components (`<x-block-card.value>`, `.ring`, `.bar`, `.stats`, `.takeaways`, `.summary`) rather than its own markup, so layouts cannot drift:
 
@@ -496,7 +497,7 @@ Pages that monitor many things (Updates, integrations) sort and collapse by need
 - **Sort by need**: items with issues first (error, then warning, then in progress), most issues first, then healthy items alphabetically.
 - **Collapsed by default**, with the summary in the heading: the name, a count in text ("12 instances"), and a status chip only when something needs action ("3 need update" in `badge-error`, "2 pending" in `badge-warning`). Healthy groups show nothing extra, or a `fas.circle-check` in `success` with the words "Up to date".
 - Status is text with a glyph, plus a chip when the reader must act. Never a coloured left border (13).
-- On iOS: `DisclosureGroup` rows with a `StatusPill` for the same states.
+- On iOS: `DisclosureGroup` rows, with the summary as a `StatusPill` line and a status chip only for the states that need action.
 
 ### 12.8 Empty states
 
@@ -506,7 +507,7 @@ Centred: a `size-12` glyph in `base-content/70`, an h3 (`text-lg font-medium`), 
 
 A chip means "this state needs you". Everything else is text.
 
-- **Status chips** (`badge badge-error`, `badge-warning`, `badge-info`; `StatusPill` on iOS) appear only for a state the reader must act on: failed, needs update, pending approval. Pair the colour with words.
+- **Status chips** (`badge badge-error`, `badge-warning`, `badge-info` on the web; a capsule in the status fill on iOS) appear only for a state the reader must act on: failed, needs update, pending approval. Pair the colour with words.
 - **No badges** for entity type (the eyebrow names it), category ("Current account" is metadata text), counts (write "(5)" in the heading), durations, timestamps, service names or implementation details.
 - **Domain and tag chips** are filters or links, not labels: `DomainChip` and `TagChip` on iOS, `rounded-full` pills on the web.
 - One chip per item at most.
