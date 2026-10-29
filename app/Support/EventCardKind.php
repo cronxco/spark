@@ -109,6 +109,11 @@ final class EventCardKind
         return $minutes === 0 ? "{$hours}h" : "{$hours}h {$minutes}m";
     }
 
+    public static function isRegistered(string $kind): bool
+    {
+        return isset(self::KINDS[$kind]);
+    }
+
     private static function seconds(float $value, ?string $unit): float
     {
         return match (strtolower((string) $unit)) {
@@ -117,10 +122,5 @@ final class EventCardKind
             'h', 'hr', 'hrs', 'hour', 'hours' => $value * 3600,
             default => $value,
         };
-    }
-
-    public static function isRegistered(string $kind): bool
-    {
-        return isset(self::KINDS[$kind]);
     }
 }

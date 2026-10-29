@@ -140,7 +140,7 @@ class FlintLinkedEventCards
 
         $mean = (float) $statistic->mean_value;
         $window = $statistic->baseline_window_days ? "{$statistic->baseline_window_days}d " : '';
-        $baseline = $window.($pattern === 'bar' ? 'avg' : 'trend');
+        $baseline = $window . ($pattern === 'bar' ? 'avg' : 'trend');
         $withinUsualRange = ! $this->presentation->isAnomalous($statistic, $value);
         $difference = round(abs($value - $mean));
         $context = ['mean' => round($mean, 2)];
