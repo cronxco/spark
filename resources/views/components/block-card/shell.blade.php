@@ -17,6 +17,8 @@
     // False for cards with their own controls (Flint's answer form), where a
     // card-wide link would swallow the clicks.
     'linked' => true,
+    // The secondary-action menu at the end of the eyebrow (§7.1).
+    'menu' => true,
 ])
 
 @php
@@ -30,6 +32,10 @@
     $external = ! str_starts_with($href, url('/'));
     $linkAttributes = $external ? 'target="_blank" rel="noopener noreferrer"' : 'wire:navigate';
     $icon ??= $presentation->icon;
+    $sourceUrl = filled($block->url) ? $block->url : null;
+    $copyText = $block->value !== null
+        ? format_block_value_display($block->formatted_value, $block->value_unit)
+        : (trim(strip_tags((string) $block->getContent())) ?: (string) $block->title);
     $glyphClass = match ($presentation->domain) {
         'health' => 'text-domain-health',
         'activity' => 'text-domain-activity',
@@ -45,8 +51,8 @@
     'card relative transition-colors',
     'hover:bg-base-300' => $linked,
     'bg-base-200' => ! $presentation->aiWritten,
-    // Generated text: a 6% primary wash on the card ground (§3.4).
-    'bg-[color-mix(in_oklab,var(--color-primary)_6%,var(--color-base-200))]' => $presentation->aiWritten,
+    // Generated text sits on the generated surface (§3.5).
+    'surface-generated' => $presentation->aiWritten,
 ]) }}>
     <div class="card-body p-4 gap-3">
         <div class="flex items-center gap-2 text-xs font-semibold text-base-content/70">
@@ -54,6 +60,25 @@
             <span class="truncate">{{ $label }}</span>
             @if ($block->time)
                 <x-relative-time :time="$block->time" class="ms-auto shrink-0 font-normal" />
+            @endif
+            @if ($menu)
+                <div data-block-menu @class(['dropdown dropdown-end relative z-10 shrink-0', 'ms-auto' => ! $block->time])>
+                    <button type="button" tabindex="0" class="btn btn-ghost btn-xs btn-square min-h-6 min-w-6 text-base-content/70" aria-label="More actions">
+                        <x-icon name="fas.ellipsis-vertical" class="w-3.5 h-3.5" />
+                    </button>
+                    <ul tabindex="0" class="dropdown-content menu z-20 mt-1 w-48 rounded-box bg-base-100 p-1 font-normal text-sm shadow">
+                        @if ($block->event)
+                            <li><a href="{{ route('events.show', $block->event) }}" wire:navigate>Open event</a></li>
+                        @endif
+                        <li><a href="{{ route('blocks.show', $block) }}" wire:navigate>Open block</a></li>
+                        @if ($sourceUrl)
+                            <li><a href="{{ $sourceUrl }}" target="_blank" rel="noopener noreferrer">Open source</a></li>
+                        @endif
+                        @if (filled($copyText))
+                            <li><button type="button" x-data x-on:click="$dispatch('copy-to-clipboard', { url: {{ \Illuminate\Support\Js::from($copyText) }} })">Copy</button></li>
+                        @endif
+                    </ul>
+                </div>
             @endif
         </div>
 

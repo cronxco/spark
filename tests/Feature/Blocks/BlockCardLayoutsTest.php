@@ -43,7 +43,7 @@ class BlockCardLayoutsTest extends TestCase
             str_contains($html, route('blocks.show', $block)) || str_contains($html, 'href="https://example.com/article"'),
             'The card links to the block, or to its source for reading picks'
         );
-        $this->assertStringNotContainsString('dropdown-content', $html);
+        $this->assertSame(1, substr_count($html, 'data-block-menu'), 'One menu, from the shared shell');
         $this->assertStringNotContainsString('hover:shadow-lg', $html);
         $this->assertStringNotContainsString('animate-pulse', $html);
         $this->assertStringNotContainsString('bg-gradient', $html);
@@ -60,6 +60,28 @@ class BlockCardLayoutsTest extends TestCase
 
         $this->assertStringContainsString('Summary', $html);
         $this->assertStringNotContainsString('words', $html);
+    }
+
+    #[Test]
+    public function generated_text_sits_on_the_generated_surface(): void
+    {
+        $generated = Blade::render('<x-block-card :block="$block" />', ['block' => $this->makeBlock('fetch_key_takeaways')]);
+        $source = Blade::render('<x-block-card :block="$block" />', ['block' => $this->makeBlock('bookmark_metadata')]);
+
+        $this->assertStringContainsString('surface-generated', $generated);
+        $this->assertStringNotContainsString('surface-generated', $source);
+    }
+
+    #[Test]
+    public function the_menu_opens_the_event_the_block_and_its_source(): void
+    {
+        $block = $this->makeBlock('some_unlisted_type');
+
+        $html = Blade::render('<x-block-card :block="$block" />', ['block' => $block]);
+
+        $this->assertStringContainsString(route('events.show', $block->event), $html);
+        $this->assertStringContainsString('Open source', $html);
+        $this->assertStringContainsString('Copy', $html);
     }
 
     #[Test]

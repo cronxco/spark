@@ -54,6 +54,12 @@
     --domain-online-ink: #011627;
     --domain-anomaly: #b16c89;
     --domain-anomaly-ink: #011627;
+    /* Generated surface (DESIGN_LANGUAGE.md §3.5): the Flint avatar's
+       spark-to-ember pairing. */
+    --color-spark: #ffbf00;
+    --color-ember: #f79129;
+    --generated-spark: 6%;
+    --generated-ember: 16%;
     --radius-selector: 0.25rem;
     --radius-field: 0.25rem;
     --radius-box: 0.5rem;
@@ -103,6 +109,10 @@
     --domain-online-ink: #fcfcfc;
     --domain-anomaly: #b16c89;
     --domain-anomaly-ink: #d2abbb;
+    --color-spark: #ffbf00;
+    --color-ember: #f79129;
+    --generated-spark: 10%;
+    --generated-ember: 22%;
     --radius-selector: 0.25rem;
     --radius-field: 0.25rem;
     --radius-box: 0.5rem;
@@ -150,6 +160,34 @@
     --color-domain-online-ink: var(--domain-online-ink);
     --color-domain-anomaly: var(--domain-anomaly);
     --color-domain-anomaly-ink: var(--domain-anomaly-ink);
+}
+
+/* Anything a model wrote sits on the generated surface (DESIGN_LANGUAGE.md
+   §3.5): a diagonal spark-to-ember wash over the card ground with an ember
+   hairline. Text on it stays base-content. One per card; rows inside stay
+   plain. */
+.surface-generated {
+    background-color: var(--color-base-200);
+    background-image: linear-gradient(
+        to bottom right,
+        color-mix(
+            in oklab,
+            var(--color-spark) var(--generated-spark),
+            transparent
+        ),
+        color-mix(
+            in oklab,
+            var(--color-ember) var(--generated-ember),
+            transparent
+        )
+    );
+    border: 1px solid color-mix(in oklab, var(--color-ember) 30%, transparent);
+}
+
+@media (prefers-contrast: more) {
+    .surface-generated {
+        border-color: var(--color-ember);
+    }
 }
 
 [x-cloak] {
