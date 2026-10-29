@@ -1223,7 +1223,7 @@ class UpToSpeedControllerTest extends TestCase
 
         $this->assertSame('down', $context['direction']);
         $this->assertFalse($context['within_usual_range']);
-        $this->assertStringContainsString('below your 30-day usual', $context['text']);
+        $this->assertStringContainsString('below your 30d trend', $context['text']);
     }
 
     #[Test]

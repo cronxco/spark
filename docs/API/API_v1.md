@@ -372,7 +372,7 @@ resolve to nothing. Each entry has:
   blocks.
 - `context` — `null`, or `{direction, valence, within_usual_range, text}`
   comparing the live value with the metric's baseline, e.g. `"12 below your
-  30-day usual"`. `direction` is `up`, `down` or `flat`; a reading inside the
+  30d trend"`. `direction` is `up`, `down` or `flat`; a reading inside the
   usual range has `valence: "neutral"`.
 - `at_digest` — `null`, or `{value, display_value}` when the event's value
   changed after the digest was written (Oura revises scores through the
@@ -383,7 +383,7 @@ resolve to nothing. Each entry has:
     {
         "kind": "oura.had_sleep_score",
         "event": { "id": "uuid", "service": "oura", "action": "had_sleep_score", "value": 80, "unit": "percent", "display_value": "80", "display_name": "Sleep Score", "...": "..." },
-        "context": { "direction": "down", "valence": "neutral", "within_usual_range": true, "text": "3 below your 30-day usual" },
+        "context": { "direction": "down", "valence": "neutral", "within_usual_range": true, "text": "3 below your 30d trend" },
         "at_digest": { "value": 66, "display_value": "66" }
     }
 ]

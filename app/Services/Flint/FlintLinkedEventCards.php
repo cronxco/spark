@@ -119,8 +119,8 @@ class FlintLinkedEventCards
     }
 
     /**
-     * One line against the reader's usual, naming the baseline as the design
-     * language asks ("12 below your 30-day usual"). A reading inside the
+     * One line against the reader's trend, naming the baseline as the design
+     * language asks ("12 below your 30d trend"). A reading inside the
      * normal range is neutral: the client draws a flat arrow and no colour,
      * whatever the metric's polarity.
      *
@@ -134,8 +134,8 @@ class FlintLinkedEventCards
 
         $mean = (float) $statistic->mean_value;
         $usual = $statistic->baseline_window_days
-            ? "your {$statistic->baseline_window_days}-day usual"
-            : 'your usual';
+            ? "your {$statistic->baseline_window_days}d trend"
+            : 'your trend';
         $withinUsualRange = ! $this->presentation->isAnomalous($statistic, $value);
         $difference = round(abs($value - $mean));
 
