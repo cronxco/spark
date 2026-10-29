@@ -6,6 +6,7 @@ use App\Ai\Agents\FlintSkillAgent;
 use App\Ai\Tools\Skills\SkillTool;
 use App\Ai\Tools\Skills\SkillToolLedger;
 use App\Ai\Tools\Skills\SkillToolSource;
+use App\Ai\Tools\Skills\ToolFailurePolicy;
 use App\Models\ActionProgress;
 use App\Models\User;
 use Closure;
@@ -286,15 +287,19 @@ class SkillRunner
     }
 
     /**
-     * Writes and the tools a skill must succeed with end the run when they
-     * fail; any other tool's failure goes back to the model.
+     * A tool the skill must succeed with gets its failure back to correct and
+     * retry, and the run still fails if it never succeeds; any other write
+     * ends the run; anything else is optional.
      */
     private function skillTool(SkillDefinition $skill, string $name, Tool $tool, SkillToolLedger $ledger): SkillTool
     {
-        $mustSucceed = in_array($name, self::WRITE_TOOLS, true)
-            || in_array($name, $skill->requiredSuccessTools, true);
+        $onFailure = match (true) {
+            in_array($name, $skill->requiredSuccessTools, true) => ToolFailurePolicy::Retry,
+            in_array($name, self::WRITE_TOOLS, true) => ToolFailurePolicy::EndRun,
+            default => ToolFailurePolicy::CarryOn,
+        };
 
-        return new SkillTool($name, $tool, $ledger, $mustSucceed);
+        return new SkillTool($name, $tool, $ledger, $onFailure);
     }
 
     private function unqualified(string $tool): string

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Services\Ai;
 
+use App\Ai\Tools\Skills\SkillTool;
 use App\Ai\Tools\Skills\SkillToolSource;
 use App\Models\ActionProgress;
 use App\Models\User;
@@ -128,6 +129,52 @@ class SkillRunnerTest extends TestCase
         $handedBack = collect(FakeOpenAi::requests()[1]['input'])->firstWhere('type', 'function_call_output')['output'];
         $this->assertStringContainsString('docs__fetch failed', $handedBack);
         $this->assertStringContainsString('Saved location "home" not found', $handedBack);
+    }
+
+    #[Test]
+    public function a_rejected_required_write_goes_back_to_the_model_to_correct_and_retry(): void
+    {
+        $attempts = 0;
+        $this->fakeTools(['create-flint-digest' => function () use (&$attempts): string {
+            return ++$attempts === 1
+                ? 'MCP tool error: Routine block type/title pairs must be unique so one block cannot overwrite another.'
+                : json_encode(['event_id' => 'evt-created']);
+        }]);
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['spark__create-flint-digest', ['title' => 'News']]]),
+            FakeOpenAi::toolCalls([['spark__create-flint-digest', ['title' => 'News, corrected']]]),
+            FakeOpenAi::text('Done.'),
+        ]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        $result = app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+
+        $this->assertSame('evt-created', $result->eventId);
+        $this->assertSame(2, $attempts);
+
+        $handedBack = collect(FakeOpenAi::requests()[1]['input'])->firstWhere('type', 'function_call_output')['output'];
+        $this->assertStringContainsString('must be unique', $handedBack);
+        $this->assertStringContainsString('Correct the call and make it again', $handedBack);
+    }
+
+    #[Test]
+    public function a_required_write_that_keeps_failing_ends_the_run(): void
+    {
+        $tools = $this->fakeTools(['create-flint-digest' => 'MCP tool error: Routine block type/title pairs must be unique.']);
+        FakeOpenAi::fake(array_merge(
+            array_fill(0, SkillTool::MAX_RETRIES + 1, FakeOpenAi::toolCalls([['spark__create-flint-digest', []]])),
+            [FakeOpenAi::text('Done.')],
+        ));
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        try {
+            app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+            $this->fail('A write that never succeeded was accepted.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('spark__create-flint-digest failed', $e->getMessage());
+        }
+
+        $this->assertCount(SkillTool::MAX_RETRIES + 1, $tools->calls);
     }
 
     #[Test]
