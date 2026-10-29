@@ -19,14 +19,17 @@ final class EventCardKind
      * rounded number, `duration` is "7h 55m", `count` uses grouping
      * separators, and `display` keeps the plugin's own formatter.
      *
-     * @var array<string, array{pattern: string, format: string, glyph: string, label: string, max?: int}>
+     * `unit` follows the hero in the display face at about 55% of its size
+     * (§4); durations carry their own units.
+     *
+     * @var array<string, array{pattern: string, format: string, glyph: string, label: string, max?: int, unit?: string}>
      */
     private const KINDS = [
         'oura.had_sleep_score' => ['pattern' => 'ring', 'format' => 'score', 'max' => 100, 'glyph' => 'fas.moon', 'label' => 'Sleep score'],
         'oura.had_readiness_score' => ['pattern' => 'ring', 'format' => 'score', 'max' => 100, 'glyph' => 'fas.gauge-high', 'label' => 'Readiness'],
         'oura.had_activity_score' => ['pattern' => 'ring', 'format' => 'score', 'max' => 100, 'glyph' => 'fas.person-running', 'label' => 'Activity score'],
         'oura.slept_for' => ['pattern' => 'bar', 'format' => 'duration', 'glyph' => 'fas.moon', 'label' => 'Sleep'],
-        'apple_health.had_step_count' => ['pattern' => 'bar', 'format' => 'count', 'glyph' => 'fas.person-walking', 'label' => 'Steps'],
+        'apple_health.had_step_count' => ['pattern' => 'bar', 'format' => 'count', 'unit' => 'steps', 'glyph' => 'fas.person-walking', 'label' => 'Steps'],
         'apple_health.had_apple_exercise_time' => ['pattern' => 'bar', 'format' => 'duration', 'glyph' => 'fas.clock', 'label' => 'Exercise'],
     ];
 
@@ -46,14 +49,14 @@ final class EventCardKind
      * The layout for a kind, or the generic value card named after the
      * action's own display name.
      *
-     * @return array{pattern: string, format: string, glyph: string, label: string, max: int|null}
+     * @return array{pattern: string, format: string, glyph: string, label: string, max: int|null, unit: string|null}
      */
     public static function for(string $kind, ?string $domain, ?string $displayName): array
     {
         $layout = self::KINDS[$kind] ?? null;
 
         if ($layout !== null) {
-            return $layout + ['max' => null];
+            return $layout + ['max' => null, 'unit' => null];
         }
 
         return [
@@ -62,6 +65,7 @@ final class EventCardKind
             'glyph' => self::DOMAIN_GLYPHS[$domain] ?? 'fas.circle-dot',
             'label' => $displayName ?: 'Event',
             'max' => null,
+            'unit' => null,
         ];
     }
 

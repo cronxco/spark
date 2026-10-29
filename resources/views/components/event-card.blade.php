@@ -57,7 +57,8 @@
         $arrowTone = 'text-base-content/60';
     }
 
-    $label = implode(', ', array_filter([$layout['label'], $display, $contextText]));
+    $heroLabel = trim($display.' '.($numeric !== null ? $layout['unit'] : ''));
+    $label = implode(', ', array_filter([$layout['label'], $heroLabel, $contextText]));
 @endphp
 
 <a href="{{ route('events.show', $event['id']) }}" wire:navigate
@@ -80,7 +81,11 @@
         </svg>
     @else
         <div aria-hidden="true">
-            <span class="text-2xl font-bold tabular-nums leading-none">{{ $display }}</span>
+            {{-- §4: a 24px hero with its unit at about 55%, in the same face. --}}
+            <span class="font-display text-2xl font-bold tabular-nums leading-none">{{ $display }}</span>
+            @if ($layout['unit'] && $numeric !== null)
+                <span class="font-display text-[13px] font-medium text-base-content/70">{{ $layout['unit'] }}</span>
+            @endif
             @if ($barShare !== null)
                 {{-- §8 "against the mean": the track runs to 1.5× the 30d average, so the Avg marker sits at two thirds. --}}
                 <div class="relative mt-6">
