@@ -232,7 +232,7 @@ These extend the Design System's content rules.
 - **Scores** read as a bare number (`88`), with "out of 100" only in VoiceOver.
 - **Counts** use grouping separators: `8,412 steps`.
 - **Missing values** show `—` with the reason one tap away, never `0`. A partial day says so: "So far today".
-- **Freshness**: when data is older than its TTL, the context line says "Synced 3h ago" in `secondary`, and the hero does not change colour.
+- **Freshness**: when data is older than its TTL, the context line says "From 3h ago" in `secondary`, and the hero does not change colour.
 - **Comparisons** name the baseline: "9 below your 30d trend", not "-9". The default baseline is the 30-day trend, written "30d trend".
 - **Labels** come from the backend `display_name`. Clients don't guess labels from `block_type` strings.
 
