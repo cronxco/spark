@@ -37,7 +37,7 @@ Written 28 October 2026 from a read of iOS `main` @ `539f651` and web `dev` @ `f
 6. **Show the essentials, disclose the rest.** The main view holds what the reader came for. Technical detail (raw metadata, activity logs, IDs) is one tap away in a drawer or inspector, never in the way.
 7. **Say what the data can and cannot tell you.** Show freshness, partial days and missing values honestly. A gap is shown as a gap, never as zero.
 8. **Accessible by construction.** Contrast, Dynamic Type, Reduce Motion and Reduce Transparency are design inputs, not checks at the end.
-9. **Less is more.** When in doubt, remove a badge, border or colour rather than add one.
+9. **Quiet at rest, responsive to touch, rewarding at completion.** Interaction feedback is immediate, spatially coherent and restrained.\n10. **Less is more.** When in doubt, remove a badge, border or colour rather than add one.
 
 ## 2. Platform mapping
 
@@ -56,7 +56,7 @@ Written 28 October 2026 from a read of iOS `main` @ `539f651` and web `dev` @ `f
 | Reading face | `SparkTypography.longForm*` (New York) | `font-serif` = `ui-serif, Georgia, serif` |
 | Spacing | `SparkSpacing.*` (4pt grid) | Tailwind spacing (4px grid) |
 | Radius | `SparkRadii.*` | `rounded-box` (8px), `rounded-field` (4px), `rounded-full` |
-| Glyph | SF Symbols, via `EntityPresentation` | Font Awesome solid, via a PHP map (see 6) |
+| Glyph | Font Awesome Solid, via `SparkIcon` and `EntityPresentation` | Font Awesome Solid, via a PHP map (see 6) |
 | Glyph chip | `DomainGlyph` | Rounded-square `div` with a 12% domain wash (see 6) |
 | Card registry | `BlockKind` / `EventKind` → `BlockCard` / `EventCard` | `blocks/types/{type}.blade.php` → `<x-block-card>` |
 | Page header | `.navigationTitle` + `.toolbar` | `<x-header>` |
@@ -89,15 +89,15 @@ Plugin accent colours (`getAccentColor()`) are never used for UI. A Spotify bloc
 
 The platforms disagree today. iOS uses palette steps (money is amber, media is coral). The web maps domains onto daisyUI status colours in nine separate Blade files (money is `warning`, which is mauve; media is `info`, which is blue). Status colours mean "act on this", so borrowing them for domains makes every money card look like a warning. **Both platforms adopt the iOS mapping**, plus an ink step for text and an `online` entry iOS lacks.
 
-| Domain | Glyph (iOS / web) | Fill | Ink, light | Ink, dark |
+| Domain | Shared Font Awesome glyph | Fill | Ink, light | Ink, dark |
 |---|---|---|---|---|
-| health | `heart.text.square.fill` / `fas.heart-pulse` | success `#7abaa1` | `success-content` | success-dark `#b3d8c9` |
-| activity | `figure.run` / `fas.person-running` | ember-5 `#F79129` | ember-7 `#A75706` (5.1:1) | ember-5 (7.9:1) |
-| money | `sterlingsign.circle.fill` / `fas.sterling-sign` | spark-5 `#FFBF00` | spark-8 `#664D00` (7.8:1) | spark-5 (11.1:1) |
-| media | `play.circle.fill` / `fas.circle-play` | flame-5 `#EE6352` | flame-7 `#B02411` (6.6:1) | flame-5 (5.7:1) |
-| knowledge | `book.fill` / `fas.book` | sky-5 `#3f88c5` | sky-6 `#316ea1` (5.3:1) | sky-3 `#8db9dd` (8.8:1) |
-| online | `globe` / `fas.globe` | ocean-5 `#244f83` in light, sky-3 `#8db9dd` in dark (the `accent` token) | ocean-5 (8.1:1) | sky-3 (8.8:1) |
-| anomaly | `exclamationmark.triangle.fill` / `fas.triangle-exclamation` | warning `#b16c89` | `base-content` (no step clears 4.5:1) | warning-dark `#d2abbb` |
+| health | `fas.heart-pulse` | success `#7abaa1` | `success-content` | success-dark `#b3d8c9` |
+| activity | `fas.person-running` | ember-5 `#F79129` | ember-7 `#A75706` (5.1:1) | ember-5 (7.9:1) |
+| money | `fas.sterling-sign` | spark-5 `#FFBF00` | spark-8 `#664D00` (7.8:1) | spark-5 (11.1:1) |
+| media | `fas.circle-play` | flame-5 `#EE6352` | flame-7 `#B02411` (6.6:1) | flame-5 (5.7:1) |
+| knowledge | `fas.book` | sky-5 `#3f88c5` | sky-6 `#316ea1` (5.3:1) | sky-3 `#8db9dd` (8.8:1) |
+| online | `fas.globe` | ocean-5 `#244f83` in light, sky-3 `#8db9dd` in dark (the `accent` token) | ocean-5 (8.1:1) | sky-3 (8.8:1) |
+| anomaly | `fas.triangle-exclamation` | warning `#b16c89` | `base-content` (no step clears 4.5:1) | warning-dark `#d2abbb` |
 
 Contrast figures are against `ash-1` in light and `slate-5` in dark. Online shares the `accent` hue with links, so an online glyph or chip is always paired with its `globe` glyph and a label, never shown as a bare blue word.
 
@@ -213,12 +213,13 @@ Elevation is shown by surface change, not shadows. No card, filter panel or nest
 
 ## 6. Glyphs
 
-- **One concept, one glyph, one map.** iOS resolves glyphs only in `EntityPresentation`. The web resolves them in PHP through `App\Support\BlockPresentation` (its `KIND_ICONS`, then the plugin's icon, then the domain glyph), and Blade files stop hard-coding icons. The tables below are the contract.
-- Solid glyphs on both platforms. Font Awesome solid (`fas.`) on the web; brands (`fab.`) only for service logos and payment cards. Heroicons (`o-`, 158 uses) are not used in new work; `config/icons.php` maps each Heroicon to its Font Awesome replacement.
+- **One concept, one Font Awesome glyph, one semantic manifest.** Both platforms resolve named Spark concepts through a single version-pinned manifest (for example `sleep: moon`, `task: circle-check`, `flint: wand-magic-sparkles`). Generate or validate the Swift enum and PHP mapping from it; neither platform guesses glyphs from labels. iOS uses `SparkIcon` through `EntityPresentation`; web uses `App\\Support\\BlockPresentation`. Bundle only required, licensed Font Awesome assets (prefer vector asset-catalog images on iOS) and test for missing glyphs.
+- **Font Awesome Solid is the default on web and iOS.** Brand glyphs (`fab.`) are for genuine service/network marks only. Native platform-owned controls, such as back navigation, switches or standard disclosure controls, may retain their system iconography when substitution harms usability or accessibility. Do not introduce new Heroicons or SF Symbols for Spark-specific semantic content.
+- **Licensing and accessibility:** Verify the version and redistribution permissions of bundled assets (Free SVGs, fonts and Pro assets have different terms). Decorative glyphs are hidden from assistive technology when adjacent text conveys their meaning. Interactive glyphs require accessible labels.
 - **Colour**: a domain glyph takes its domain fill (3.2). A neutral glyph (action, navigation, section heading) inherits `base-content`, or `base-content/70` when secondary. A status glyph takes its status colour (`fas.circle-check` in `success`). Never colour a glyph for decoration, and never use a status colour for a domain.
 - **Glyph chip**: the glyph in its domain fill on a 12% tint of the same fill, in a **rounded square**, the same shape and size on both platforms. A neutral glyph chip uses `base-content` on `base-300`.
 
-| Use | iOS | Web container | Web glyph |
+| Use | iOS | Web container | Font Awesome glyph |
 |---|---|---|---|
 | Inline with caption text | 12–14pt, no chip | — | `size-3` to `size-3.5` |
 | Eyebrow, button, inline with body | 16–20pt, no chip | — | `size-4` (`size-5` in a section title) |
@@ -231,58 +232,58 @@ Elevation is shown by surface change, not shadows. No card, filter panel or nest
 
 Block and event kinds (domains are in [3.2](#32-domain-tints)):
 
-| Kind | iOS | Web |
+| Kind | Shared Font Awesome glyph |
 |---|---|---|
-| Sleep, sleep stage | `moon.zzz.fill` | `fas.moon` |
-| Heart rate | `heart.fill` | `fas.heart` |
-| HRV | `waveform.path.ecg` | `fas.wave-square` |
-| Readiness, score | `gauge.with.needle` | `fas.gauge-high` |
-| Steps | `figure.walk` | `fas.person-walking` |
-| Energy, calories | `flame.fill` | `fas.fire` |
-| Intensity | `bolt.fill` | `fas.bolt` |
-| Duration | `clock` | `fas.clock` |
-| Distance | `point.topleft.down.to.point.bottomright.curvepath` | `fas.route` |
-| Workout set | `dumbbell.fill` | `fas.dumbbell` |
-| Track, album | `music.note` | `fas.music` |
-| Book | `book.closed.fill` | `fas.book` |
-| Article, bookmark | `doc.text` | `fas.file-lines` |
-| Payment, receipt | `receipt` | `fas.receipt` |
-| Transfer | `arrow.left.arrow.right` | `fas.money-bill-transfer` |
-| Balance | `sterlingsign.circle.fill` | `fas.sterling-sign` |
-| Savings pot | `banknote` | `fas.piggy-bank` |
-| Budget | `wallet.bifold` | `fas.wallet` |
-| Income | `arrow.down.circle` | `fas.hand-holding-dollar` |
-| Invoice | `doc.text.fill` | `fas.file-invoice-dollar` |
-| Task | `checkmark.circle` | `fas.circle-check` |
-| Place | `mappin.circle.fill` | `fas.location-dot` |
-| Person | `person.fill` | `fas.user` |
-| Calendar event | `calendar` | `fas.calendar` |
-| Tag | `tag` | `fas.tag` |
-| Link | `link` | `fas.link` |
-| Generated summary | `sparkles` | `fas.wand-magic-sparkles` |
-| Photo | `photo` | `fas.image` |
+| Sleep, sleep stage | `fas.moon` |
+| Heart rate | `fas.heart` |
+| HRV | `fas.wave-square` |
+| Readiness, score | `fas.gauge-high` |
+| Steps | `fas.person-walking` |
+| Energy, calories | `fas.fire` |
+| Intensity | `fas.bolt` |
+| Duration | `fas.clock` |
+| Distance | `fas.route` |
+| Workout set | `fas.dumbbell` |
+| Track, album | `fas.music` |
+| Book | `fas.book` |
+| Article, bookmark | `fas.file-lines` |
+| Payment, receipt | `fas.receipt` |
+| Transfer | `fas.money-bill-transfer` |
+| Balance | `fas.sterling-sign` |
+| Savings pot | `fas.piggy-bank` |
+| Budget | `fas.wallet` |
+| Income | `fas.hand-holding-dollar` |
+| Invoice | `fas.file-invoice-dollar` |
+| Task | `fas.circle-check` |
+| Place | `fas.location-dot` |
+| Person | `fas.user` |
+| Calendar event | `fas.calendar` |
+| Tag | `fas.tag` |
+| Link | `fas.link` |
+| Generated summary | `fas.wand-magic-sparkles` |
+| Photo | `fas.image` |
 
 Interface glyphs:
 
-| Meaning | iOS | Web |
+| Meaning | Shared Font Awesome glyph |
 |---|---|---|
-| Add, create | `plus` | `fas.plus` |
-| Edit | `pencil` | `fas.pen` |
-| Delete | `trash` | `fas.trash` |
-| Search | `magnifyingglass` | `fas.magnifying-glass` |
-| Filter | `line.3.horizontal.decrease` | `fas.filter` |
-| Settings | `gearshape` | `fas.gear` |
-| More (card and page menus) | `ellipsis.circle` | `fas.ellipsis-vertical` |
+| Add, create | `fas.plus` |
+| Edit | `fas.pen` |
+| Delete | `fas.trash` |
+| Search | `fas.magnifying-glass` |
+| Filter | `fas.filter` |
+| Settings | `fas.gear` |
+| More (card and page menus) | `fas.ellipsis-vertical` |
 | Back, forward | `chevron.left`, `chevron.right` | `fas.arrow-left`, `fas.chevron-right` |
 | Expand, collapse | `chevron.down`, `chevron.up` | `fas.chevron-down`, `fas.chevron-up` |
-| Open externally | `arrow.up.right.square` | `fas.arrow-up-right-from-square` |
-| Show technical detail | `info.circle` | `fas.sliders` |
-| Success, complete | `checkmark.circle.fill` | `fas.circle-check` |
-| Error, failed | `xmark.circle.fill` | `fas.circle-xmark` |
-| Warning, attention | `exclamationmark.triangle.fill` | `fas.triangle-exclamation` |
-| Info | `info.circle.fill` | `fas.circle-info` |
-| Pending | `clock` | `fas.clock` |
-| Payment card | `creditcard` | `fas.credit-card`, or `fab.cc-visa`, `fab.cc-mastercard`, `fab.cc-amex`, `fab.cc-apple-pay`, `fab.cc-paypal` for a known network |
+| Open externally | `fas.arrow-up-right-from-square` |
+| Show technical detail | `fas.sliders` |
+| Success, complete | `fas.circle-check` |
+| Error, failed | `fas.circle-xmark` |
+| Warning, attention | `fas.triangle-exclamation` |
+| Info | `fas.circle-info` |
+| Pending | `fas.clock` |
+| Payment card | `fas.credit-card`, or `fab.cc-visa`, `fab.cc-mastercard`, `fab.cc-amex`, `fab.cc-apple-pay`, `fab.cc-paypal` for a known network |
 | Chart, list, grid view | `chart.bar`, `list.bullet`, `square.grid.2x2` | `fas.chart-simple`, `fas.list`, `fas.grip` |
 
 ## 7. Cards
@@ -370,14 +371,67 @@ These extend the Design System's content rules.
 - **Metadata** is text, joined with ` · `: "Monzo · Current account · 2h ago". It is never a row of badges.
 - **No implementation detail** in the interface: no "OAuth", "Webhook" or "API key" labels, no model names.
 
-## 10. Interaction and motion
+## 10. Interaction, motion, depth and haptics
 
-- **Targets**: 44 × 44pt on iOS, 24 × 24px minimum on the web (WCAG 2.5.8), 44px for primary actions.
-- **One primary action per screen**: `btn-primary` on the web, a prominent `PillButton` or `.borderedProminent` on iOS. Everything else is outline or ghost (web) or plain (iOS).
-- **Motion** explains a change of state (a card expanding, a value updating) and nothing else. No looping or pulsing animation. Under Reduce Motion, use cross-fades instead of movement.
-- **Hover** on the web changes the background (`hover:bg-base-300`). It does not lift, scale or shadow.
-- **Loading** uses the shape of the content (skeleton rows at the card's real size, `LoadingShimmer` on iOS), not spinners in cards.
-- **Haptics** on iOS only confirm a commit (check-in saved, task done).
+**Principle: Quiet at rest, responsive to touch, rewarding at completion.** Spark feels personal through consistent feedback, spatial continuity and meaningful acknowledgement—not decorative animation.
+
+### 10.1 Targets and hierarchy
+
+- Targets: at least 44 × 44pt on iOS; WCAG 2.5.8's 24 × 24 CSS px minimum on web (subject to its spacing and other exceptions). Prefer 44 × 44 CSS px for touch actions; preserve a visible keyboard focus indicator.
+- One *dominant* primary action per interaction context: `btn-primary` on web, `PillButton` or `.borderedProminent` on iOS. Do not artificially limit a long screen to one actionable operation.
+- Feedback is immediate even when an asynchronous operation has yet to commit. Pending, successful, failed and disabled states are visually distinguishable.
+
+### 10.2 Motion
+
+Motion has four jobs: **response** (press/selection), **continuity** (disclosure/navigation), **confirmation** (completion), and **focus** (foreground sheets and menus).
+
+| Motion token | Starting range | Use |
+|---|---|---|
+| `motion.micro` | 100–150ms | Press and immediate selection feedback |
+| `motion.state` | 180–240ms | Disclosure, selection and status changes |
+| `motion.spatial` | 250–350ms | Custom card expansion and meaningful layout changes |
+
+- These are proposed testing ranges, not overrides of native system timing. Prefer iOS system navigation and spring behaviour for gesture-driven transitions; gesture motion follows the finger and remains interruptible.
+- Animate only the relevant properties. Avoid `transition-all`, unrelated layout movement, repeated entrance effects, loops, pulses, confetti and decorative parallax.
+- Motion never delays the next action. Under Reduce Motion / `prefers-reduced-motion`, replace spatial travel with a restrained cross-fade or immediate change as appropriate; avoid making opacity changes mandatory.
+
+### 10.3 Depth and surfaces
+
+Spark has three persistent visual levels and one temporary level:
+
+1. **Ground:** page background and the iOS ambient time-of-day wash.
+2. **Content:** opaque cards and grouped rows; no persistent shadows or hover lift.
+3. **Floating controls:** navigation and toolbars, native Liquid Glass on supported iOS surfaces and solid elevated surfaces on web.
+4. **Transient:** sheets, menus, drag previews and popovers. Restrained shadows, scrims or elevation are permitted *only* where they clarify temporary focus.
+
+- On web, hover changes background (`hover:bg-base-300`), not elevation, scale or shadow. Pressed controls may briefly compress; keyboard activation receives equivalent visual feedback.
+- Depth communicates interaction hierarchy, not a domain's importance or status. Avoid glass-on-glass. Reduce Transparency and Increase Contrast use opaque surfaces and visible edges.
+
+### 10.4 iOS haptics
+
+Centralise semantic feedback in `SparkHaptics`, using SwiftUI `.sensoryFeedback` and UIKit feedback generators only where appropriate.
+
+| Event | Feedback | Timing |
+|---|---|---|
+| Discrete selection in a custom selector | Selection | At selection change |
+| Occasional custom tactile impact | Light impact | Synchronised to the physical-feeling gesture |
+| Completed task, saved check-in or reflection | Success | Only after confirmed persistence |
+| Significant recoverable failure | Error / warning | With visible explanatory feedback |
+| Explicit start/stop of a timed activity | Start / stop | At the actual transition |
+| Navigation, scrolling, background refresh, passive reading | None | Never automatically vibrate |
+
+- Prefer built-in system control feedback and never duplicate it. Do not add a haptic to every tap, or use vibration as the only feedback channel.
+- Support a setting to disable Spark-specific haptics. Respect OS behaviour and accessibility settings.
+
+### 10.5 Loading and completion
+
+- Initial loading uses skeletons at the content's real dimensions (`LoadingShimmer` on iOS). Preserve existing content on ordinary background refresh rather than re-skeletonising it.
+- Progress indicators are allowed when they meaningfully communicate an ongoing operation; avoid spinners in each card. Preserve layout to prevent shifts.
+- Success is ordinarily expressed by the resulting state, not a toast. On optimistic failure, roll back clearly and offer retry. Never animate passive live values continuously.
+
+### 10.6 Verification
+
+Check touch, keyboard and VoiceOver/screen reader behaviour; light/dark themes; Dynamic Type; Increase Contrast; Reduce Transparency; Reduce Motion; rapid repeated input; failed requests; cancellation; animation interruption; and absence of duplicated haptics. Icon semantics and accessible labels must match across platforms.
 
 ## 11. Accessibility checks
 
