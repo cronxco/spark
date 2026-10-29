@@ -96,6 +96,8 @@ Facts that Flint or a summary picks out inside running text (in Up to Speed, dig
 
 A delta is good or bad according to the metric, not its direction. Lower spend, lower resting heart rate and fewer awake minutes are good. Each metric declares its polarity (`higherIsBetter`), and the arrow glyph takes `success` or `error` from that. The number itself stays `base-content`. A neutral change (inside the usual range) is `secondary` with a flat arrow.
 
+Every comparison line has one shape: arrow, amount, direction word, baseline. `↓ 4 below 30d trend`, `↑ £9 above 7d trend`. The arrow shows direction and carries the polarity colour; the amount takes the metric's unit; the baseline is the window (`30d`, `7d`, `12w`) followed by "trend". No "your", no metric name repeated.
+
 ### 3.5 Generated text
 
 Anything a model wrote sits on a **generated surface** so it can be told apart from source content at a glance:
@@ -195,7 +197,7 @@ Every block and event card is built from the same four slots, top to bottom. Onl
 1. **Eyebrow**: glyph, a label (the type's `display_name`, never the raw `block_type`) and, trailing, a relative time. `captionStrong` / `text-xs font-semibold`, `secondary`.
 2. **Hero**: either a value with its unit, or a title for text-led cards.
 3. **Body**: one visual pattern from [section 8](#8-visual-patterns-for-blocks-and-events), or up to three lines of text.
-4. **Context**: one line, `secondary`. A comparison ("9 below your usual"), a source ("Oura"), or a count ("+3 more").
+4. **Context**: one line, `secondary`. A comparison ("↓ 9 below 30d trend", see 3.4), a source ("Oura"), or a count ("+3 more").
 
 The whole card is one tap target and goes to the block or event detail. There are no footer badges or "View" buttons. Secondary actions (open the event, open the block, open the source URL, copy) sit in one menu with the same items on both platforms:
 
@@ -226,7 +228,7 @@ Pick one pattern per card. Each has one implementation per platform, shared acro
 |---|---|---|---|---|
 | **Value** | Any single number | Hero `Text` + unit | `text-3xl font-bold` + unit | Glyph in the eyebrow, not beside the number. Format per [9](#9-writing-data). |
 | **Ring** | A ratio with a known maximum: scores out of 100, energy out of 5 | A hero-sized ring view (`Gauge(.accessoryCircularCapacity)` only in widgets and complications) | SVG ring component (`<x-ring>`) | The ring is the hero: centred, about 128pt on a card (64pt compact), with the number inside at hero size. Track at 15% fill. Every score out of 100 (sleep, readiness, activity) uses Ring at every size, with a short tick at the provider's "excellent" threshold (85 for Oura). Never a ring without a maximum. |
-| **Bar** | Progress or share: reading progress, contributors, popularity | `ProgressView` / `Gauge(.linearCapacity)` | `<progress class="progress">` | Label and value as text too. **Against the mean** variant for values with no fixed maximum (sleep duration, steps, spend): a vertical marker labelled "Avg" sits at the 30-day mean, the track runs to about 1.5× the mean, and the difference is stated in text ("35m above your 30d average"). |
+| **Bar** | Progress or share: reading progress, contributors, popularity | `ProgressView` / `Gauge(.linearCapacity)` | `<progress class="progress">` | Label and value as text too. **Against the mean** variant for values with no fixed maximum (sleep duration, steps, spend): a vertical marker labelled "Avg" sits at the 30-day mean, the track runs to about 1.5× the mean, and the difference is stated in text ("↑ 35m above 30d avg", in the 3.4 shape). |
 | **Stat grid** | 2–4 related fields of one record: set, reps, weight, RPE | `StatGrid` (`Grid`) | `grid grid-cols-2 sm:grid-cols-4` | Each cell centre-aligned, label above value, tabular figures, no dividers. |
 | **Flow** | Money or values moving: transfers, FX, before → after | `HStack` with `arrow.right` | `flex` with `fas.arrow-right` | Amounts in UI face, masked numbers as `••1234`. |
 | **List** | Takeaways, receipt lines, checklists | `VStack` of rows | `ul` with `space-y-1` | Up to 5 in `card`, then "+N more". Real checkboxes only for tasks. |
@@ -244,7 +246,7 @@ These extend the Design System's content rules.
 - **Counts** use grouping separators: `8,412 steps`.
 - **Missing values** show `—` with the reason one tap away, never `0`. A partial day says so: "So far today".
 - **Freshness**: when data is older than its TTL, the context line says "From 3h ago" in `secondary`, and the hero does not change colour.
-- **Comparisons** name the baseline: "9 below your 30d trend", not "-9". The default baseline is the 30-day trend, written "30d trend".
+- **Comparisons** name the baseline: "↓ 9 below 30d trend", not "-9". The default baseline is the 30-day trend, written "30d trend"; other windows follow the same form ("7d trend"). The arrow takes the polarity colour (3.4).
 - **Labels** come from the backend `display_name`. Clients don't guess labels from `block_type` strings.
 
 ## 10. Interaction and motion
@@ -261,7 +263,7 @@ Run these on every new card or layout before merging.
 
 - Text is 4.5:1 against its surface in both themes (3:1 at 24pt bold and above). Glyphs and ring strokes are 3:1, unless a number beside them carries the same information. Focus indicators are always 3:1.
 - Nothing is told apart by hue alone. Domain tints are always paired with a glyph and a label, and deltas with an arrow.
-- The card is one accessible element on both platforms, announced as "Sleep score, 66 out of 100, 12 below your 30d trend, 7:40 am". On iOS it is one VoiceOver element. On the web it is one link with that accessible name, reached with Tab and opened with Enter; the ⋮ menu is a separate button after it. Decorative glyphs are hidden.
+- The card is one accessible element on both platforms, announced as "Sleep score, 66 out of 100, 12 below 30-day trend, 7:40 am". On iOS it is one VoiceOver element. On the web it is one link with that accessible name, reached with Tab and opened with Enter; the ⋮ menu is a separate button after it. Decorative glyphs are hidden.
 - Works at the largest accessibility text size (iOS) and at 200% zoom (web) without clipping a number.
 - Works under Reduce Transparency, Increase Contrast and Reduce Motion.
 - Tested with empty, missing, very long and very large values (a £12,450.00 payment, a 90-character track title).
