@@ -96,7 +96,7 @@ Facts that Flint or a summary picks out inside running text (in Up to Speed, dig
 
 A delta is good or bad according to the metric, not its direction. Lower spend, lower resting heart rate and fewer awake minutes are good. Each metric declares its polarity (`higherIsBetter`), and the arrow glyph takes `success` or `error` from that. The number itself stays `base-content`. A neutral change (inside the usual range) is `secondary` with a flat arrow.
 
-Every comparison line has one shape: arrow, amount, direction word, baseline. `↓ 4 below 30d trend`, `↑ £9 above 7d trend`. The arrow shows direction and carries the polarity colour; the amount takes the metric's unit; the baseline is the window (`30d`, `7d`, `12w`) followed by "trend". No "your", no metric name repeated.
+Every comparison line has one shape: arrow, amount, direction word, baseline. `↓ 4bpm below 30d trend`, `↑ £9 above 7d trend`, `↓ 12 below 30d trend` for a score. The arrow shows direction and carries the polarity colour; the amount always carries the metric's unit, unspaced (`4bpm`, `35m`), and only unitless scores go bare; the baseline is the window (`30d`, `7d`, `12w`) followed by "trend". No "your", no metric name repeated.
 
 ### 3.5 Generated text
 
