@@ -119,10 +119,10 @@ Anything a model wrote sits on a **generated surface** so it can be told apart f
 | Mono | PT Mono | IDs, hex, code, raw technical values | Ordinary timestamps (use UI face, `secondary`) |
 
 - **Numbers in rows and grids use tabular figures** (`.monospacedDigit()`, `tabular-nums`) so columns line up and values don't jitter on refresh.
-- **Units are smaller and secondary**: the value at the hero size, the unit at body size, baseline-aligned. `7h 55m` is the exception; it is one string at one size.
+- **Units scale with the value**: the unit is about 55% of the value's size, in the same face, `secondary`, baseline-aligned. At the card hero (44pt) that is 24pt; at compact (24pt), 13pt. `7h 55m` is the exception; it is one string at one size.
 - **Sentence case everywhere.** No all-caps eyebrows. Section labels use `captionStrong` (iOS) or `text-xs font-semibold` (web).
 - iOS uses text styles so Dynamic Type works. A layout that cannot hold a value at accessibility sizes stacks vertically rather than truncating the number.
-- Web scale for cards: hero value `text-3xl font-bold`, card title `text-base font-semibold`, body `text-sm`, meta `text-xs text-base-content/70`.
+- Web scale for cards: hero value `text-5xl font-bold` with its unit `text-2xl`, card title `text-base font-semibold`, body `text-sm`, meta `text-xs text-base-content/70`.
 
 ## 5. Space, shape and surfaces
 
