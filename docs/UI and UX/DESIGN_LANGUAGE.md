@@ -227,7 +227,7 @@ Pick one pattern per card. Each has one implementation per platform, shared acro
 | **Value** | Any single number | Hero `Text` + unit | `text-3xl font-bold` + unit | Glyph in the eyebrow, not beside the number. Format per [9](#9-writing-data). |
 | **Ring** | A ratio with a known maximum: scores out of 100, energy out of 5 | `Gauge(.accessoryCircularCapacity)` | SVG ring component (`<x-ring>`) | The number sits inside or beside. Track at 15% fill. Never a ring without a maximum. |
 | **Bar** | Progress or share: reading progress, contributors, popularity | `ProgressView` / `Gauge(.linearCapacity)` | `<progress class="progress">` | Label and value as text too. |
-| **Stat grid** | 2–4 related fields of one record: set, reps, weight, RPE | `StatGrid` (`Grid`) | `grid grid-cols-2 sm:grid-cols-4` | Label above value, tabular figures, no dividers. |
+| **Stat grid** | 2–4 related fields of one record: set, reps, weight, RPE | `StatGrid` (`Grid`) | `grid grid-cols-2 sm:grid-cols-4` | Each cell centre-aligned, label above value, tabular figures, no dividers. |
 | **Flow** | Money or values moving: transfers, FX, before → after | `HStack` with `arrow.right` | `flex` with `fas.arrow-right` | Amounts in UI face, masked numbers as `••1234`. |
 | **List** | Takeaways, receipt lines, checklists | `VStack` of rows | `ul` with `space-y-1` | Up to 5 in `card`, then "+N more". Real checkboxes only for tasks. |
 | **Image-led** | Album art (1:1), book cover (2:3), photo, bookmark hero (16:9) | `AsyncImage` in the body slot | `img` with `aspect-*` and `object-cover` | Aspect ratio comes from the kind. Placeholder is the kind's glyph on a 12% tint. Never tint artwork. |
