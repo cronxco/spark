@@ -234,7 +234,7 @@ Pick one pattern per card. Each has one implementation per platform, shared acro
 | **List** | Takeaways, receipt lines, checklists | `VStack` of rows | `ul` with `space-y-1` | Up to 5 in `card`, then "+N more". Real checkboxes only for tasks. |
 | **Image-led** | Album art (1:1), book cover (2:3), photo, bookmark hero (16:9) | `AsyncImage` in the body slot | `img` with `aspect-*` and `object-cover` | Aspect ratio comes from the kind. Placeholder is the kind's glyph on a 12% tint. Never tint artwork. |
 | **Text** | Summaries, notes, quotes | `body` or `longFormBodySmall`, 3–5 lines | `text-sm line-clamp-5` | Generated text sits on the generated surface in [3.5](#35-generated-text). |
-| **Trend** | A value over time, on `full` cards only | Swift Charts | Chart.js | Show the usual range as a band. Label the latest point. No gridlines beyond a baseline. |
+| **Trend** | A value over time, on `full` cards only | Swift Charts | Chart.js | Show the usual range as a band. Label the latest point. No gridlines beyond a baseline. A line for scores and continuous readings; **bars** for daily totals (sleep duration, steps, spend): one bar per day from zero, the usual range as a band drawn over them, earlier bars at 50% fill, the latest at full fill and labelled. |
 
 ## 9. Writing data
 
