@@ -201,7 +201,7 @@ Nested corners are concentric: an inner radius equals the outer radius minus the
 Three layers, top to bottom:
 
 1. **Controls**: tab bar, toolbars, floating buttons, the Up to Speed header. Liquid Glass on iOS. Never put glass on glass.
-2. **Content**: cards and grouped rows. An opaque surface (`sparkElevated`, or a standard material at most) with no shadow on iOS. `bg-base-200` with no shadow on the web. Simple timeline rows can sit straight on the page with no container.
+2. **Content**: cards and grouped rows. An opaque surface (`sparkElevated`) with no shadow on iOS. `bg-base-200` with no shadow on the web. Simple timeline rows can sit straight on the page with no container.
 3. **Ground**: the page, with the time-of-day wash on iOS. The web stays flat.
 
 This follows Apple's guidance that Liquid Glass belongs to the navigation layer above content, and finding 8 of the 6 September iOS review. It reverses part of the 3 October iOS change that moved Flint cards onto glass. iOS adds one modifier, `.sparkContentSurface(radius:tint:)`, and `GlassCard` switches to it. Reduce Transparency and Increase Contrast keep today's fallback: opaque fill and a visible edge.
@@ -298,9 +298,9 @@ Every block and event card is built from the same four slots, top to bottom. Onl
 3. **Body**: one visual pattern from [section 8](#8-visual-patterns-for-blocks-and-events), or up to three lines of text.
 4. **Context**: one line, `secondary`. A comparison ("↓ 9 below 30d trend", see 3.4), a source ("Oura"), or a count ("+3 more").
 
-The whole card is one tap target and goes to the block or event detail. There are no footer badges, type badges or "View" buttons; the eyebrow names the type. Secondary actions (open the event, open the block, open the source URL, copy) sit in one menu with the same items on both platforms:
+Unless a card has its own controls (`linked: false`, below), the whole card is one tap target and goes to the block or event detail. There are no footer badges, type badges or "View" buttons; the eyebrow names the type. Secondary actions (open the event, open the block, open the source URL, copy) sit in one menu with the same items on both platforms:
 
-- **Web**: a `⋮` button at the trailing end of the eyebrow, after the time, in `base-content/70`, with a 24 × 24px minimum target. The card is a link through a stretched title link, and the menu button sits above it, so the button never nests inside a link. `row` and `compact` sizes leave it out; `card` and `full` show it.
+- **Web**: a `⋮` button at the trailing end of the eyebrow, after the time, in `base-content/70`, with a 24 × 24px minimum target. The card is a link stretched over the title, or over the hero value when the card has no title, and the menu button sits above it, so the button never nests inside a link. `row` and `compact` sizes leave it out; `card` and `full` show it.
 - **iOS**: a long press on the card opens a `.contextMenu` with a preview of the card. There is no visible button. Every size gets it.
 - The menu never holds the card's main action. A tap still opens the detail.
 
@@ -337,7 +337,7 @@ Each platform has one registry from type to layout, and one fallback.
 </x-block-card.shell>
 ```
 
-The shell takes a `title`, a `context` slot, `linked` (false for cards with their own controls, where a card-wide link would swallow clicks) and `menu`. Links and buttons inside the slot need `relative z-10` to sit above the card-wide link. No layout adds its own `card`, `card-body`, shadow, badge, header, footer or gradient.
+The shell takes a `title`, a `context` slot, `linked` and `menu`. With `linked` true (the default) the shell provides the one card-wide detail link. With `linked` false it provides none, for cards with their own controls where a card-wide link would swallow clicks; those controls stay individually reachable. Links and buttons inside the slot need `relative z-10` to sit above the card-wide link. No layout adds its own `card`, `card-body`, shadow, badge, header, footer or gradient.
 
 Block cards appear on event detail pages (`/events/{event}`, every block linked to the event), object pages (`/objects/{object}`, blocks related through relationships) and anywhere `<x-block-card>` is used. The admin blocks table (`/admin/blocks`) stays a table.
 
@@ -349,7 +349,7 @@ Pick one pattern per card. Each has one implementation per platform, shared acro
 |---|---|---|---|---|
 | **Value** | Any single number | Hero `Text` + unit | `font-display text-5xl font-bold text-hero` + unit `text-2xl` | Glyph in the eyebrow, not beside the number. Format per [9](#9-writing-data). |
 | **Ring** | A ratio with a known maximum: scores out of 100, energy out of 5 | A hero-sized ring view (`Gauge(.accessoryCircularCapacity)` only in widgets and complications) | `<x-block-card.ring>` | The ring is the hero: centred, about 128pt on a card (64pt compact), with the number inside at hero size. Track at 15% fill. Every score out of 100 (sleep, readiness, activity) uses Ring at `compact` and `card` size, with a short tick at the provider's "excellent" threshold (85 for Oura). Never a ring without a maximum. In a `row`, the score is plain text (`66`), since a one-line row has no room for a ring. |
-| **Bar** | Progress or share: reading progress, contributors, popularity | `ProgressView` / `Gauge(.linearCapacity)` | `<x-block-card.bar>` | Label and value as text too. **Against the mean** variant for values with no fixed maximum (sleep duration, steps, spend): a vertical marker labelled "Avg" sits at the 30-day mean, the track runs to about 1.5× the mean, and the difference is stated in text ("↑ 35m above 30d avg", in the 3.4 shape). |
+| **Bar** | Progress or share: reading progress, contributors, popularity | `ProgressView` / `Gauge(.linearCapacity)` | `<x-block-card.bar>` | Label and value as text too. **Against the mean** variant for values with no fixed maximum (sleep duration, steps, spend): a vertical marker labelled "Avg" sits at the 30-day mean, the track runs to about 1.5× the mean, and the difference is stated in text ("↑ 35m above 30d trend", in the 3.4 shape). |
 | **Stat grid** | 2–8 related fields of one record: set, reps, weight, RPE, rest | `StatGrid` (adaptive `Grid` or `ViewThatFits`) | `<x-block-card.stats>`: `grid grid-cols-[repeat(auto-fit,minmax(4rem,1fr))]` | Each cell centre-aligned, label above value, tabular figures, no dividers. One row when the fields fit; otherwise wrap to a second row (never more than two). Never shrink the type to fit. |
 | **Flow** | Money or values moving: transfers, FX, before → after, actor → target | `HStack` with `arrow.right` | `flex flex-col sm:flex-row` with `fas.arrow-down` / `fas.arrow-right` | Amounts in UI face, masked numbers as `••1234`. On a phone-width web layout the flow stacks and the arrow points down. |
 | **List** | Takeaways, receipt lines, checklists | `VStack` of rows | `ul` with `space-y-1` | Up to 5 in `card`, then "+N more". Real checkboxes only for tasks. |
@@ -440,7 +440,7 @@ Run these on every new card or layout before merging.
 
 - Text is 4.5:1 against its surface in both themes (3:1 at 24pt bold and above). No text below `base-content/70`. Glyphs and ring strokes are 3:1, unless a number beside them carries the same information. Focus indicators are always 3:1.
 - Nothing is told apart by hue alone. Domain tints are always paired with a glyph and a label, and deltas with an arrow.
-- The card is one accessible element on both platforms, announced as "Sleep score, 66 out of 100, 12 below 30-day trend, 7:40 am". On iOS it is one VoiceOver element. On the web it is one link with that accessible name, reached with Tab and opened with Enter; the ⋮ menu is a separate button after it. Decorative glyphs are hidden.
+- The card is one accessible element on both platforms, announced as "Sleep score, 66 out of 100, 12 below 30-day trend, 7:40 am". On iOS it is one VoiceOver element. On the web it is one link with that accessible name, reached with Tab and opened with Enter; the ⋮ menu is a separate button after it. A `linked: false` card has no card-wide link; its controls are reached one by one. Decorative glyphs are hidden.
 - Every form control has a visible label.
 - Works at the largest accessibility text size (iOS) and at 200% zoom (web) without clipping a number.
 - Works under Reduce Transparency, Increase Contrast and Reduce Motion.
@@ -612,7 +612,7 @@ Things in the current code that break these rules, for the convergence threads t
 
 1. **Amber text on light grounds.** Flint prose highlights (`SparkLongFormContentView(tint: .sparkAccent)` in `RecapScreen` and `FlintDigestScreen`) set spark-5 text on the light wash at about 1.6:1. The Up to Speed briefing is the visible case. Use the `highlight` token from 3.3: ocean-5 in light, spark-5 in dark.
 2. **`MetricCard.Trend` colours by direction**: up is always green and down is always red, so lower spend shows red. Add polarity (3.4).
-3. **Media glyph differs within iOS**: `EntityPresentation.icon` returns `iphone` for media, `integrationIcon` returns `play.circle.fill`. Use `play.circle.fill`.
+3. **Media glyph differs within iOS**: `EntityPresentation.icon` currently returns `iphone` for media and `integrationIcon` returns `play.circle.fill`. Both should use the shared `fas.circle-play` glyph through `EntityPresentation` (3.2, 6).
 4. **No `online` tint on iOS**: it falls through to `sparkAccent`, so calendar and email events look like money. Add ocean (3.2).
 5. **`DomainChip`** uses system colours for its tints, sets the unselected label in the tint (1.6:1 for money), and sits on glass. Use the domain fill, the domain ink for the label, and a content surface (12.4).
 6. **`Block.mediaUrl` is decoded and stored but never drawn.** The image-led pattern needs it.
