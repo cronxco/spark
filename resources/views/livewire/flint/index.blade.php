@@ -524,7 +524,7 @@ new class extends Component
                                 @if ($paragraphs = $this->summaryParagraphs($digest))
                                     <div class="space-y-4">
                                         @foreach ($paragraphs as $paragraph)
-                                            <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90">
+                                            <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90 prose-a:text-highlight prose-a:font-semibold prose-a:no-underline hover:prose-a:underline">
                                                 {!! render_markdown($paragraph['markdown']) !!}
                                             </div>
                                             @if ($paragraph['cards'])

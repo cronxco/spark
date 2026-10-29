@@ -38,6 +38,8 @@
     --color-warning-content: #0c0407;
     --color-error: #e26969;
     --color-error-content: #120404;
+    /* Highlighted facts in Flint and summary prose (design language §3.3) */
+    --highlight: #244f83;
     /* Domain tints (design language §3.2): fill for glyphs and rings, ink for tinted text */
     --domain-health: #7abaa1;
     --domain-health-ink: oklch(26% 0.051 172.552);
@@ -86,6 +88,7 @@
     --color-warning-content: #01111e;
     --color-error: #e26969;
     --color-error-content: #01111e;
+    --highlight: #ffbf00;
     --domain-health: #7abaa1;
     --domain-health-ink: #b3d8c9;
     --domain-activity: #f79129;
@@ -128,8 +131,9 @@
     --font-mono: "PT Mono", monospace;
 }
 
-/* Domain tint utilities (text-domain-health, bg-domain-money-ink, …), resolved per daisyUI theme */
+/* Highlight and domain tint utilities (text-highlight, text-domain-health, …), resolved per daisyUI theme */
 @theme inline {
+    --color-highlight: var(--highlight);
     --color-domain-health: var(--domain-health);
     --color-domain-health-ink: var(--domain-health-ink);
     --color-domain-activity: var(--domain-activity);
