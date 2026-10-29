@@ -98,7 +98,14 @@ A delta is good or bad according to the metric, not its direction. Lower spend, 
 
 ### 3.5 Generated text
 
-Anything a model wrote carries a marker: the `sparkles` glyph (`fas.wand-magic-sparkles` on the web) and the word "Summary" or "Flint" in the eyebrow. The marker is text plus glyph, never the glyph alone. The card may carry a 6–8% `primary` tint. No gradients, model names or word counts.
+Anything a model wrote sits on a **generated surface** so it can be told apart from source content at a glance:
+
+- A diagonal gradient from spark-5 at 6% to ember-5 at 16% (top-leading to bottom-trailing), laid over the normal content surface, with a 1px hairline of ember-5 at 30%. In dark mode the same hues run from 10% to 22%. This is the Flint avatar's amber-to-ember pairing, so generated text reads as Flint's voice. It replaces the web's `from-warning/5 to-warning/25` panel, because `warning` means "act on this".
+- The eyebrow carries the `sparkles` glyph (`fas.wand-magic-sparkles` on the web) and the word "Summary" or "Flint". Never use the glyph alone, and never put it beside text a person wrote.
+- Text on the surface stays `base-content`. The gradient is the only tint.
+- One generated surface per card. Inside a list of generated items (takeaways, key points), the card carries the surface and the rows stay plain.
+- No model names, word counts or character counts.
+- On iOS this is `.sparkGeneratedSurface(radius:)` in SparkUI/Materials. It is opaque content, not glass, and under Increase Contrast it keeps the hairline at full strength. On the web it is a `.surface-generated` class in `app.css`, built from `--color-spark` and `--color-ember` tokens.
 
 ## 4. Type
 
@@ -220,7 +227,7 @@ Pick one pattern per card. Each has one implementation per platform, shared acro
 | **Flow** | Money or values moving: transfers, FX, before → after | `HStack` with `arrow.right` | `flex` with `fas.arrow-right` | Amounts in UI face, masked numbers as `••1234`. |
 | **List** | Takeaways, receipt lines, checklists | `VStack` of rows | `ul` with `space-y-1` | Up to 5 in `card`, then "+N more". Real checkboxes only for tasks. |
 | **Image-led** | Album art (1:1), book cover (2:3), photo, bookmark hero (16:9) | `AsyncImage` in the body slot | `img` with `aspect-*` and `object-cover` | Aspect ratio comes from the kind. Placeholder is the kind's glyph on a 12% tint. Never tint artwork. |
-| **Text** | Summaries, notes, quotes | `body` or `longFormBodySmall`, 3–5 lines | `text-sm line-clamp-5` | Generated text gets the marker in [3.5](#35-generated-text). |
+| **Text** | Summaries, notes, quotes | `body` or `longFormBodySmall`, 3–5 lines | `text-sm line-clamp-5` | Generated text sits on the generated surface in [3.5](#35-generated-text). |
 | **Trend** | A value over time, on `full` cards only | Swift Charts | Chart.js | Show the usual range as a band. Label the latest point. No gridlines beyond a baseline. |
 
 ## 9. Writing data
@@ -264,7 +271,7 @@ From the web block and event layouts (`resources/views/blocks/types/*.blade.php`
 | `shadow` + `hover:shadow-lg transition-all` on every card | 64 of 64 layouts | Flat `bg-base-200`, `hover:bg-base-300` when the card is a link |
 | Per-card footer: type badge + `⋮` menu with "View Block" / "View Event" | 64 of 64 | The whole card links to the detail page; the eyebrow names the type |
 | Domain colour via daisyUI status colours (`warning` for money, `info` for media) | 9 `$domainColors` / `$badgeColorMap` arrays | `domain-*` tokens from 3.2 |
-| Gradient AI panels and model-name / word-count footers | 12 layouts with `bg-gradient` | The marker in 3.5 |
+| The `warning`-coloured AI gradient, model-name and word-count footers | 11 AI layouts with `from-warning/5 to-warning/25` | The generated surface in 3.5, which keeps a gradient in the Flint hues |
 | `animate-pulse` heart | `heart_rate.blade.php` | Static glyph in the eyebrow |
 | Raw metadata preview ("Key: value" for the first three keys) in the generic value card | `block-card.blade.php` | The context line, or nothing |
 | Hero value in `text-{domain}` amber or green on a light ground | 9 layouts with `text-primary`, plus the value card | `base-content`, or the domain ink |
