@@ -207,7 +207,7 @@ The whole card is one tap target and goes to the block or event detail. There ar
 
 | Size | Where | Shows | Layout |
 |---|---|---|---|
-| `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value or a 64pt ring for scores, one context line | Minimum height, 2 or 3 across. At accessibility text sizes, one column with variable height so nothing clips. No body. |
+| `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value (with an against-the-mean bar for durations and counts) or a 64pt ring for scores, one context line | Minimum height, 2 or 3 across. At accessibility text sizes, one column with variable height so nothing clips. No body. |
 | `row` | Event detail, Knowledge item, timelines | Glyph chip, label, value or title, trailing time | One line, 44pt minimum height |
 | `card` | Web grids, iOS block lists that need a body | All four slots | Full width on phone, grid on the web |
 | `full` | Block or event detail screen | Hero at display size, body large, context and source below | Whole screen |
@@ -216,7 +216,7 @@ One component renders every size: `BlockCard(block, size:)` and `EventCard(event
 
 ### 7.3 Event cards in Up to Speed
 
-When Flint prose mentions a metric that has an event behind it (sleep duration, sleep score, readiness, activity score), show those events as `compact` cards under the paragraph. Put up to three in a row, ordered as the prose mentions them. Highlighted phrases in the prose use the `highlight` token (3.3), and each card's glyph carries its domain tint. Scores (sleep score, readiness, activity score) show as a ring, durations as a value. Tapping a card opens the event. With more than three, the third card reads "+N more" and opens a list.
+When Flint prose mentions a metric that has an event behind it (sleep duration, sleep score, readiness, activity score), show those events as `compact` cards under the paragraph. Put up to three in a row, ordered as the prose mentions them. Highlighted phrases in the prose use the `highlight` token (3.3), and each card's glyph carries its domain tint. Scores (sleep score, readiness, activity score) show as a ring. Durations and counts (sleep, steps) show as the value over a thin against-the-mean bar (§8, Bar) with its Avg marker. Tapping a card opens the event. With more than three, the third card reads "+N more" and opens a list.
 
 ## 8. Visual patterns for blocks and events
 
