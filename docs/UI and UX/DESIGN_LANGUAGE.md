@@ -349,7 +349,7 @@ Block cards appear on event detail pages (`/events/{event}`, every block linked 
 
 The current web `x-*-ref` and `<x-tag-ref>` components are the primary design for both platforms. iOS follows them.
 
-**A reference** is the smallest view of an integration, object, block or event: a pill with a leading glyph, the title, and an optional service label (an object or event ref names its integration, e.g. "Had Physical Effort · Apple Health"). On the web it is `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium` with the tint at 10% fill and 20% border, the glyph at `size-3` and 70% opacity, and the title truncated at about 200px. On iOS it is `EntityRefChip`. Use a reference wherever a card would be too much: in prose, in relationship and "linked" lists, for an event's actor and target, and for the integration behind an item.
+**A reference** is the smallest view of an integration, object, block or event: a pill with a leading glyph, the title, and an optional service label (an object or event ref names its integration, e.g. "Had Physical Effort · Apple Health"). On the web it is `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium` with its colour at 10% fill and 20% border, the glyph at `size-3` and 70% opacity, and the title truncated at about 200px. On iOS it is `EntityRefChip`. Use a reference wherever a card would be too much: in prose, in relationship and "linked" lists, for an event's actor and target, and for the integration behind an item.
 
 **A tag** is a pill in the same shape, with the tag type's glyph (`fas.microphone` for an artist, `fas.compact-disc` for an album, `fab.spotify` for a Spotify context; `fas.tag` otherwise) and the tag name, truncated at a word boundary near 20 characters. On the web it is `<x-tag-ref>`; on iOS, `TagChip`. An item can show all its tags; they wrap.
 
@@ -361,6 +361,13 @@ The current web `x-*-ref` and `<x-tag-ref>` components are the primary design fo
 - **The peek card** is a transient surface (10.3): `bg-base-100` with `shadow-xl` and a 30% tinted border. It shows a header with a rounded-square glyph chip, the type in the eyebrow style (e.g. "MUSIC ALBUM"), and the title. Below are a few facts (counts, last update, status) and one full-width button to the destination ("View Tagged Items", "Configure", "View Event").
 - A tag or reference that has no destination still opens its peek card, which says so in a single line of text.
 - **Accessibility:** the pill is a link on the web (a button on touch) whose accessible name is the title plus the service, e.g. "Had Physical Effort, Apple Health". The peek card's button is reachable by keyboard. On iOS, the chip is one element with the `.isButton` trait.
+
+**Colour (Will, 2026-10-29): tags and references keep their current per-type colours**, an exception to the domain-tint rule in 3.2 and 6:
+
+- **Tags** colour by tag type, as in `<x-tag-ref>`: money tags (category, type, status, scheme, currency, balance, card) `warning`; decline reason `error`; merchant country and category `info`; music artist and person `secondary`; music album `accent`; Spotify context `success`; emoji `warning`; Spark `primary`; anything else `info`.
+- **Integration references** use the plugin's accent colour (`getAccentColor()`). **Object references** colour by concept (person and user `secondary`, account and money `warning`, media `info`, bookmark and document `primary`, day `accent`, otherwise `secondary`). **Block and event references** use their integration's domain mapped to the same daisyUI colours.
+- iOS uses the same role names from SparkUI (`success`, `warning`, `error`, `info`, `primary`, `secondary`, `accent`), so a tag is the same colour on both platforms.
+- These colours sit only on the pill and its peek card. Glyph chips, cards and heroes still use domain tints.
 
 Tags and references are links, so they are exempt from the "chips mean action" rule in 12.9.
 
@@ -609,7 +616,7 @@ From the web block and event layouts (`resources/views/blocks/types/*.blade.php`
 | `shadow` and `shadow-sm` on filter panels and nested items | Pages following the old guide | Flat surfaces (5.3) |
 | Per-card footer: type badge + `⋮` menu with "View Block" / "View Event" | 64 of 64 | The whole card links to the detail page, the eyebrow names the type, and the `⋮` moves into the eyebrow after the time (7.1) |
 | Layouts that draw their own card, header and footer | 64 of 64 | Hero and body only, inside the shared card (7.4) |
-| Domain colour via daisyUI status colours (`warning` for money, `info` for media) | 9 `$domainColors` / `$badgeColorMap` arrays | `domain-*` tokens from 3.2 |
+| Domain colour via daisyUI status colours (`warning` for money, `info` for media) | 9 `$domainColors` / `$badgeColorMap` arrays | `domain-*` tokens from 3.2. Tag and reference pills are the exception and keep their per-type colours (7.5) |
 | Status colours on non-status glyphs (`text-warning` section icons, `text-success` piggy bank) | Detail pages | Neutral or domain colour (6) |
 | Round `bg-primary/10` glyph circles | Detail heroes and list rows | Rounded-square glyph chips in the domain tint (6) |
 | The `warning`-coloured AI gradient, model-name and word-count footers | 11 AI layouts with `from-warning/5 to-warning/25` | The generated surface in 3.5, which keeps a gradient in the Flint hues |
