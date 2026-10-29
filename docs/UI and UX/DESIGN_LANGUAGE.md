@@ -1,6 +1,6 @@
 # Spark design language
 
-The rules Spark web (`cronxco/spark`) and Spark iOS (`cronxco/spark-ios`) both follow, so a sleep score, a Monzo payment or an AI summary reads as the same thing on either platform. This file exists in both repositories with the same text: `docs/design-language.md` on iOS and `docs/UI and UX/DESIGN_LANGUAGE.md` on the web. Change both in the same pair of pull requests.
+The rules Spark web (`cronxco/spark`) and Spark iOS (`cronxco/spark-ios`) both follow, so a sleep score, a Monzo payment or an AI summary reads as the same thing on either platform. It is added to both repositories with the same text, in paired pull requests (spark-ios#69 and spark#1283): `docs/design-language.md` on iOS and `docs/UI and UX/DESIGN_LANGUAGE.md` on the web. Change both in the same pair of pull requests.
 
 **How this relates to the other design documents.** The [Spark Design System](https://claude.ai/artifact/GbFZoNjtnLwNpKNrJ5SsuN) holds the token values: colour ramps, type scale, spacing, radii. This document says how to use them, and adds the card, block and event rules both platforms share. The web's `DESIGN_PATTERNS.md` keeps the web implementation detail (forms, tables, filters). Where they disagree, this document wins and the other is updated.
 
@@ -207,7 +207,7 @@ The whole card is one tap target and goes to the block or event detail. There ar
 
 | Size | Where | Shows | Layout |
 |---|---|---|---|
-| `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value or a 64pt ring for scores, one context line | Fixed height, 2 or 3 across. No body. |
+| `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value or a 64pt ring for scores, one context line | Minimum height, 2 or 3 across. At accessibility text sizes, one column with variable height so nothing clips. No body. |
 | `row` | Event detail, Knowledge item, timelines | Glyph chip, label, value or title, trailing time | One line, 44pt minimum height |
 | `card` | Web grids, iOS block lists that need a body | All four slots | Full width on phone, grid on the web |
 | `full` | Block or event detail screen | Hero at display size, body large, context and source below | Whole screen |
@@ -240,7 +240,7 @@ These extend the Design System's content rules.
 
 - **Durations** read `7h 55m`, `42m` or `1m 05s`. They are always formatted on the client from seconds or minutes, never shown as raw values.
 - **Money** reads `£24.80` (symbol, two decimals) and `£1,240` in compact cards above £1,000. Outgoings have no minus sign in a context that already says "spent". Incomings show `+£`.
-- **Scores** read as a bare number (`88`), with "out of 100" only in VoiceOver.
+- **Scores** read as a bare number (`88`). "Out of 100" is in the accessible label on both platforms: the VoiceOver label on iOS, the `aria-label` on the web.
 - **Counts** use grouping separators: `8,412 steps`.
 - **Missing values** show `—` with the reason one tap away, never `0`. A partial day says so: "So far today".
 - **Freshness**: when data is older than its TTL, the context line says "From 3h ago" in `secondary`, and the hero does not change colour.
@@ -259,9 +259,9 @@ These extend the Design System's content rules.
 
 Run these on every new card or layout before merging.
 
-- Text is 4.5:1 against its surface in both themes (3:1 at 24pt bold and above). Glyphs, ring strokes and focus rings are 3:1, or a number is right beside them.
+- Text is 4.5:1 against its surface in both themes (3:1 at 24pt bold and above). Glyphs and ring strokes are 3:1, unless a number beside them carries the same information. Focus indicators are always 3:1.
 - Nothing is told apart by hue alone. Domain tints are always paired with a glyph and a label, and deltas with an arrow.
-- The card reads as one VoiceOver element: "Sleep score, 66, 12 below your usual, 7:40 am". Decorative glyphs are hidden.
+- The card is one accessible element on both platforms, announced as "Sleep score, 66 out of 100, 12 below your 30d trend, 7:40 am". On iOS it is one VoiceOver element. On the web it is one link with that accessible name, reached with Tab and opened with Enter; the ⋮ menu is a separate button after it. Decorative glyphs are hidden.
 - Works at the largest accessibility text size (iOS) and at 200% zoom (web) without clipping a number.
 - Works under Reduce Transparency, Increase Contrast and Reduce Motion.
 - Tested with empty, missing, very long and very large values (a £12,450.00 payment, a 90-character track title).
@@ -292,7 +292,7 @@ From iOS:
 
 ## 13. Known deviations
 
-Things in the current code that break these rules, for the convergence threads to fix:
+Things in the current code that break these rules, for the convergence threads to fix. The list is not exhaustive; anything else that breaks a rule above is a deviation too.
 
 1. **Amber text on light grounds.** Flint prose highlights (`SparkLongFormContentView(tint: .sparkAccent)` in `RecapScreen` and `FlintDigestScreen`) set spark-5 text on the light wash at about 1.6:1. The Up to Speed briefing is the visible case. Use the `highlight` token from 3.3: ocean-5 in light, spark-5 in dark.
 2. **`MetricCard.Trend` colours by direction**: up is always green and down is always red, so lower spend shows red. Add polarity (3.4).
