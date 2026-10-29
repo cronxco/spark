@@ -207,7 +207,7 @@ The whole card is one tap target and goes to the block or event detail. There ar
 
 | Size | Where | Shows | Layout |
 |---|---|---|---|
-| `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value, one context line | Fixed height, 2 or 3 across. No body. |
+| `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value or a 64pt ring for scores, one context line | Fixed height, 2 or 3 across. No body. |
 | `row` | Event detail, Knowledge item, timelines | Glyph chip, label, value or title, trailing time | One line, 44pt minimum height |
 | `card` | Web grids, iOS block lists that need a body | All four slots | Full width on phone, grid on the web |
 | `full` | Block or event detail screen | Hero at display size, body large, context and source below | Whole screen |
@@ -216,7 +216,7 @@ One component renders every size: `BlockCard(block, size:)` and `EventCard(event
 
 ### 7.3 Event cards in Up to Speed
 
-When Flint prose mentions a metric that has an event behind it (sleep duration, sleep score, readiness, activity score), show those events as `compact` cards under the paragraph. Put up to three in a row, ordered as the prose mentions them. Highlighted phrases in the prose use the `highlight` token (3.3), and each card's glyph carries its domain tint. Tapping a card opens the event. With more than three, the third card reads "+N more" and opens a list.
+When Flint prose mentions a metric that has an event behind it (sleep duration, sleep score, readiness, activity score), show those events as `compact` cards under the paragraph. Put up to three in a row, ordered as the prose mentions them. Highlighted phrases in the prose use the `highlight` token (3.3), and each card's glyph carries its domain tint. Scores (sleep score, readiness, activity score) show as a ring, durations as a value. Tapping a card opens the event. With more than three, the third card reads "+N more" and opens a list.
 
 ## 8. Visual patterns for blocks and events
 
@@ -225,7 +225,7 @@ Pick one pattern per card. Each has one implementation per platform, shared acro
 | Pattern | Use for | iOS | Web | Rules |
 |---|---|---|---|---|
 | **Value** | Any single number | Hero `Text` + unit | `text-3xl font-bold` + unit | Glyph in the eyebrow, not beside the number. Format per [9](#9-writing-data). |
-| **Ring** | A ratio with a known maximum: scores out of 100, energy out of 5 | A hero-sized ring view (`Gauge(.accessoryCircularCapacity)` only in widgets and complications) | SVG ring component (`<x-ring>`) | The ring is the hero: centred, about 128pt on a card (64pt compact), with the number inside at hero size. Track at 15% fill. Never a ring without a maximum. |
+| **Ring** | A ratio with a known maximum: scores out of 100, energy out of 5 | A hero-sized ring view (`Gauge(.accessoryCircularCapacity)` only in widgets and complications) | SVG ring component (`<x-ring>`) | The ring is the hero: centred, about 128pt on a card (64pt compact), with the number inside at hero size. Track at 15% fill. Every score out of 100 (sleep, readiness, activity) uses Ring at every size, with a short tick at the provider's "excellent" threshold (85 for Oura). Never a ring without a maximum. |
 | **Bar** | Progress or share: reading progress, contributors, popularity | `ProgressView` / `Gauge(.linearCapacity)` | `<progress class="progress">` | Label and value as text too. **Against the mean** variant for values with no fixed maximum (sleep duration, steps, spend): a vertical marker labelled "Avg" sits at the 30-day mean, the track runs to about 1.5× the mean, and the difference is stated in text ("35m above your 30d average"). |
 | **Stat grid** | 2–4 related fields of one record: set, reps, weight, RPE | `StatGrid` (`Grid`) | `grid grid-cols-2 sm:grid-cols-4` | Each cell centre-aligned, label above value, tabular figures, no dividers. |
 | **Flow** | Money or values moving: transfers, FX, before → after | `HStack` with `arrow.right` | `flex` with `fas.arrow-right` | Amounts in UI face, masked numbers as `••1234`. |
