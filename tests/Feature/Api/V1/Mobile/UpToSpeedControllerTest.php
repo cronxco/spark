@@ -1223,7 +1223,40 @@ class UpToSpeedControllerTest extends TestCase
 
         $this->assertSame('down', $context['direction']);
         $this->assertFalse($context['within_usual_range']);
-        $this->assertStringContainsString('below your 30d trend', $context['text']);
+        $this->assertStringEndsWith('below 30d trend', $context['text']);
+        $this->assertEquals(78, $context['mean']);
+    }
+
+    #[Test]
+    public function linked_duration_card_compares_with_the_average_its_bar_marks(): void
+    {
+        $oura = $this->ouraIntegration();
+        $sleep = $this->ouraEvent($oura, 'slept_for', 28500, 'seconds');
+
+        MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'slept_for',
+            'value_unit' => 'seconds',
+            'event_count' => 30,
+            'mean_value' => 26400,
+            'stddev_value' => 1800,
+            'normal_lower_bound' => 22800,
+            'normal_upper_bound' => 30000,
+            'baseline_window_days' => 30,
+        ]);
+
+        $this->digestLinking("[7h55 of sleep](https://spark.cronx.co/events/{$sleep->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $context = $this->digestPayload()['linked_events'][0]['context'];
+
+        $this->assertSame('up', $context['direction']);
+        $this->assertTrue($context['within_usual_range']);
+        $this->assertSame('neutral', $context['valence']);
+        $this->assertStringEndsWith('above 30d avg', $context['text']);
+        $this->assertEquals(26400, $context['mean']);
     }
 
     #[Test]

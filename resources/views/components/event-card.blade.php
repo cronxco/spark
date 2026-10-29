@@ -22,15 +22,29 @@
     $ringShare = $layout['pattern'] === 'ring' && $numeric !== null && $layout['max']
         ? max(0, min(1, $numeric / $layout['max']))
         : null;
+    $ringTick = $layout['max'] ? 85 / $layout['max'] * 360 : null;
+
+    $context = $card['context'] ?? null;
+    $mean = is_numeric($context['mean'] ?? null) ? (float) $context['mean'] : null;
+    $barShare = $layout['pattern'] === 'bar' && $numeric !== null && $mean > 0
+        ? max(0, min(1, $numeric / ($mean * 1.5)))
+        : null;
+    $domainFill = match ($event['domain'] ?? null) {
+        'health' => 'bg-domain-health',
+        'activity' => 'bg-domain-activity',
+        'money' => 'bg-domain-money',
+        'media' => 'bg-domain-media',
+        'knowledge' => 'bg-domain-knowledge',
+        default => 'bg-domain-online',
+    };
 
     $atDigest = $card['at_digest'] ?? null;
-    $context = $card['context'] ?? null;
     $contextText = $atDigest
         ? __('Updated from :value', ['value' => \App\Support\EventCardKind::heroValue($layout, $atDigest['value'], $event['unit'] ?? null, $atDigest['display_value'])])
         : ($context['text'] ?? null);
     $arrow = match (true) {
         $atDigest !== null => 'fas.clock-rotate-left',
-        ($context['within_usual_range'] ?? true) || ($context['direction'] ?? 'flat') === 'flat' => 'fas.arrow-right',
+        ($context['direction'] ?? 'flat') === 'flat' => 'fas.arrow-right',
         $context['direction'] === 'up' => 'fas.arrow-up',
         default => 'fas.arrow-down',
     };
@@ -54,16 +68,32 @@
         <span class="truncate">{{ $layout['label'] }}</span>
     </div>
 
-    <div class="flex items-center gap-3" aria-hidden="true">
-        @if ($ringShare !== null)
-            <svg viewBox="0 0 36 36" class="h-9 w-9 shrink-0 -rotate-90 {{ $domainTint }}">
-                <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-opacity="0.15" stroke-width="4" />
-                <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"
-                    pathLength="100" stroke-dasharray="{{ round($ringShare * 100, 1) }} 100" />
-            </svg>
-        @endif
-        <span class="text-3xl font-bold tabular-nums leading-none">{{ $display }}</span>
-    </div>
+    @if ($ringShare !== null)
+        {{-- §7.3: a 64px ring with the number inside and a tick at 85, Oura's "excellent". --}}
+        <svg viewBox="0 0 84 84" class="mx-auto h-16 w-16 {{ $domainTint }}" aria-hidden="true">
+            <circle cx="42" cy="42" r="36" fill="none" stroke="currentColor" stroke-opacity="0.18" stroke-width="8" />
+            <circle cx="42" cy="42" r="36" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"
+                stroke-dasharray="{{ round($ringShare * 226.2, 1) }} 226.2" transform="rotate(-90 42 42)" />
+            <line x1="42" y1="1" x2="42" y2="11" class="stroke-base-content" stroke-width="2" stroke-linecap="round"
+                transform="rotate({{ round($ringTick, 1) }} 42 42)" />
+            <text x="42" y="50" text-anchor="middle" font-size="24" font-weight="700" class="fill-base-content tabular-nums">{{ $display }}</text>
+        </svg>
+    @else
+        <div aria-hidden="true">
+            <span class="text-2xl font-bold tabular-nums leading-none">{{ $display }}</span>
+            @if ($barShare !== null)
+                {{-- §8 "against the mean": the track runs to 1.5× the 30d average, so the Avg marker sits at two thirds. --}}
+                <div class="relative mt-6">
+                    <div class="h-1.5 overflow-hidden rounded-full bg-base-content/10">
+                        <div class="h-full rounded-full {{ $domainFill }}" style="width: {{ round($barShare * 100, 1) }}%"></div>
+                    </div>
+                    <div class="absolute -top-3 -bottom-1 left-2/3 -ml-px w-0.5 rounded-full bg-base-content">
+                        <span class="absolute bottom-full left-1/2 -translate-x-1/2 text-[11px] font-semibold leading-none text-base-content/70">{{ __('Avg') }}</span>
+                    </div>
+                </div>
+            @endif
+        </div>
+    @endif
 
     @if ($contextText)
         <div class="flex items-center gap-1 text-xs text-base-content/70" aria-hidden="true">

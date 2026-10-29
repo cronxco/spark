@@ -370,10 +370,12 @@ resolve to nothing. Each entry has:
   use to pick a card layout, falling back to a generic value card.
 - `event` — the compact event, as returned by `GET /events/{id}` but without
   blocks.
-- `context` — `null`, or `{direction, valence, within_usual_range, text}`
-  comparing the live value with the metric's baseline, e.g. `"12 below your
-  30d trend"`. `direction` is `up`, `down` or `flat`; a reading inside the
-  usual range has `valence: "neutral"`.
+- `context` — `null`, or `{direction, valence, within_usual_range, text, mean}`
+  comparing the live value with the metric's 30d baseline. `text` is
+  `"12 below 30d trend"` for scores and bare values, and `"35m above 30d avg"`
+  for durations and counts, whose cards draw the value as a bar against
+  `mean` (in the event's own unit). `direction` is `up`, `down` or `flat`; a
+  reading inside the usual range has `valence: "neutral"`.
 - `at_digest` — `null`, or `{value, display_value}` when the event's value
   changed after the digest was written (Oura revises scores through the
   morning). Cards show the live value and use this to say "updated from 66".
@@ -383,7 +385,7 @@ resolve to nothing. Each entry has:
     {
         "kind": "oura.had_sleep_score",
         "event": { "id": "uuid", "service": "oura", "action": "had_sleep_score", "value": 80, "unit": "percent", "display_value": "80", "display_name": "Sleep Score", "...": "..." },
-        "context": { "direction": "down", "valence": "neutral", "within_usual_range": true, "text": "3 below your 30d trend" },
+        "context": { "direction": "down", "valence": "neutral", "within_usual_range": true, "text": "3 below 30d trend", "mean": 83 },
         "at_digest": { "value": 66, "display_value": "66" }
     }
 ]

@@ -13,7 +13,9 @@ namespace App\Support;
 final class EventCardKind
 {
     /**
-     * `format` is how the hero reads (design language §9): `score` is a bare
+     * `pattern` is the hero's shape (design language §8): `ring` for a score
+     * out of `max`, `bar` for a value drawn against the reader's 30d average,
+     * and `value` for a bare number. `format` is how the hero reads (design language §9): `score` is a bare
      * rounded number, `duration` is "7h 55m", `count` uses grouping
      * separators, and `display` keeps the plugin's own formatter.
      *
@@ -23,9 +25,9 @@ final class EventCardKind
         'oura.had_sleep_score' => ['pattern' => 'ring', 'format' => 'score', 'max' => 100, 'glyph' => 'fas.moon', 'label' => 'Sleep score'],
         'oura.had_readiness_score' => ['pattern' => 'ring', 'format' => 'score', 'max' => 100, 'glyph' => 'fas.gauge-high', 'label' => 'Readiness'],
         'oura.had_activity_score' => ['pattern' => 'ring', 'format' => 'score', 'max' => 100, 'glyph' => 'fas.person-running', 'label' => 'Activity score'],
-        'oura.slept_for' => ['pattern' => 'value', 'format' => 'duration', 'glyph' => 'fas.moon', 'label' => 'Sleep'],
-        'apple_health.had_step_count' => ['pattern' => 'value', 'format' => 'count', 'glyph' => 'fas.person-walking', 'label' => 'Steps'],
-        'apple_health.had_apple_exercise_time' => ['pattern' => 'value', 'format' => 'duration', 'glyph' => 'fas.clock', 'label' => 'Exercise'],
+        'oura.slept_for' => ['pattern' => 'bar', 'format' => 'duration', 'glyph' => 'fas.moon', 'label' => 'Sleep'],
+        'apple_health.had_step_count' => ['pattern' => 'bar', 'format' => 'count', 'glyph' => 'fas.person-walking', 'label' => 'Steps'],
+        'apple_health.had_apple_exercise_time' => ['pattern' => 'bar', 'format' => 'duration', 'glyph' => 'fas.clock', 'label' => 'Exercise'],
     ];
 
     /**

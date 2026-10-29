@@ -6,6 +6,7 @@ use App\Http\Resources\Compact\CompactEventResource;
 use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Services\MetricPresentation;
+use App\Support\EventCardKind;
 use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 
@@ -110,47 +111,52 @@ class FlintLinkedEventCards
      */
     private function card(Event $event, ?MetricStatistic $statistic, ?array $atDigest): array
     {
+        $kind = "{$event->service}.{$event->action}";
+        $pattern = EventCardKind::for($kind, null, null)['pattern'];
+
         return [
-            'kind' => "{$event->service}.{$event->action}",
+            'kind' => $kind,
             'event' => CompactEventResource::make($event)->resolve(request()),
-            'context' => $statistic ? $this->context($statistic, (float) $event->formatted_value) : null,
+            'context' => $statistic ? $this->context($statistic, (float) $event->formatted_value, $pattern) : null,
             'at_digest' => $atDigest,
         ];
     }
 
     /**
-     * One line against the reader's trend, naming the baseline as the design
-     * language asks ("12 below your 30d trend"). A reading inside the
-     * normal range is neutral: the client draws a flat arrow and no colour,
-     * whatever the metric's polarity.
+     * One line against the reader's 30d baseline, in the compact card's own
+     * words (design language §7.3): "12 below 30d trend" under a ring or a
+     * bare value, "35m above 30d avg" under a bar, which also needs the mean
+     * to place its Avg marker. A reading inside the normal range is neutral:
+     * the client draws a flat arrow and no colour, whatever the metric's
+     * polarity.
      *
-     * @return array{direction: string, valence: string, within_usual_range: bool, text: string}|null
+     * @return array{direction: string, valence: string, within_usual_range: bool, text: string, mean: float}|null
      */
-    private function context(MetricStatistic $statistic, float $value): ?array
+    private function context(MetricStatistic $statistic, float $value, string $pattern): ?array
     {
         if (! $statistic->hasValidStatistics() || $this->presentation->isOrdinal($statistic)) {
             return null;
         }
 
         $mean = (float) $statistic->mean_value;
-        $usual = $statistic->baseline_window_days
-            ? "your {$statistic->baseline_window_days}d trend"
-            : 'your trend';
+        $window = $statistic->baseline_window_days ? "{$statistic->baseline_window_days}d " : '';
+        $baseline = $window.($pattern === 'bar' ? 'avg' : 'trend');
         $withinUsualRange = ! $this->presentation->isAnomalous($statistic, $value);
         $difference = round(abs($value - $mean));
+        $context = ['mean' => round($mean, 2)];
 
         if ($difference == 0) {
-            return ['direction' => 'flat', 'valence' => 'neutral', 'within_usual_range' => true, 'text' => "Around {$usual}"];
+            return $context + ['direction' => 'flat', 'valence' => 'neutral', 'within_usual_range' => true, 'text' => "Around {$baseline}"];
         }
 
         $direction = $value > $mean ? 'up' : 'down';
         $formattedDifference = $this->presentation->formatValue($statistic, $difference);
 
-        return [
+        return $context + [
             'direction' => $direction,
             'valence' => $withinUsualRange ? 'neutral' : $this->presentation->valence($statistic, $direction),
             'within_usual_range' => $withinUsualRange,
-            'text' => sprintf('%s %s %s', $formattedDifference, $direction === 'up' ? 'above' : 'below', $usual),
+            'text' => sprintf('%s %s %s', $formattedDifference, $direction === 'up' ? 'above' : 'below', $baseline),
         ];
     }
 
