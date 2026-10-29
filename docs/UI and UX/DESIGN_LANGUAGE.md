@@ -84,15 +84,19 @@ The platforms disagree today. iOS uses palette steps (money is amber, media is c
 Contrast figures are against `ash-1` in light and `slate-5` in dark.
 
 - **Fill** is for glyph chips, ring and bar strokes, chart marks and 10–15% tinted backgrounds. Fills do not need 4.5:1 because a number or label always sits next to them.
-- **Ink** is for tinted text: an inline highlight, a hero value that should carry its domain. If a domain has no ink step, the text stays `base-content` and the glyph carries the hue.
+- **Ink** is for tinted text, such as a hero value that should carry its domain. If a domain has no ink step, the text stays `base-content` and the glyph carries the hue.
 - **Plugin accent colours** (`getAccentColor()`) are not used for UI. A Spotify block is a media block.
 - On the web, add `--color-domain-{name}` and `--color-domain-{name}-ink` to both daisyUI themes in `resources/css/app.css`, and replace the nine `$domainColors` arrays with one helper.
 
-### 3.3 Change and comparison
+### 3.3 Highlights in prose
+
+Facts that Flint or a summary picks out inside running text (in Up to Speed, digests and recaps) take one `highlight` token, whatever their domain: ocean-5 `#244f83` in light (8.1:1 on ash-1) and spark-5 `#FFBF00` in dark (11.1:1 on slate-5), at semibold weight. On iOS this is `Color.sparkHighlight`, which replaces `.sparkAccent` as the tint passed to `SparkLongFormContentView`. On the web it is `--color-highlight` in both daisyUI themes. Never use spark-5 as text on a light ground.
+
+### 3.4 Change and comparison
 
 A delta is good or bad according to the metric, not its direction. Lower spend, lower resting heart rate and fewer awake minutes are good. Each metric declares its polarity (`higherIsBetter`), and the arrow glyph takes `success` or `error` from that. The number itself stays `base-content`. A neutral change (inside the usual range) is `secondary` with a flat arrow.
 
-### 3.4 Generated text
+### 3.5 Generated text
 
 Anything a model wrote carries a marker: the `sparkles` glyph (`fas.wand-magic-sparkles` on the web) and the word "Summary" or "Flint" in the eyebrow. The marker is text plus glyph, never the glyph alone. The card may carry a 6–8% `primary` tint. No gradients, model names or word counts.
 
@@ -201,7 +205,7 @@ One component renders every size: `BlockCard(block, size:)` and `EventCard(event
 
 ### 7.3 Event cards in Up to Speed
 
-When Flint prose mentions a metric that has an event behind it (sleep duration, sleep score, readiness, activity score), show those events as `compact` cards under the paragraph. Put up to three in a row, ordered as the prose mentions them. The highlighted phrase in the prose and its card share the domain ink, so the eye can link them. Tapping a card opens the event. With more than three, the third card reads "+N more" and opens a list.
+When Flint prose mentions a metric that has an event behind it (sleep duration, sleep score, readiness, activity score), show those events as `compact` cards under the paragraph. Put up to three in a row, ordered as the prose mentions them. Highlighted phrases in the prose use the `highlight` token (3.3), and each card's glyph carries its domain tint. Tapping a card opens the event. With more than three, the third card reads "+N more" and opens a list.
 
 ## 8. Visual patterns for blocks and events
 
@@ -216,7 +220,7 @@ Pick one pattern per card. Each has one implementation per platform, shared acro
 | **Flow** | Money or values moving: transfers, FX, before → after | `HStack` with `arrow.right` | `flex` with `fas.arrow-right` | Amounts in UI face, masked numbers as `••1234`. |
 | **List** | Takeaways, receipt lines, checklists | `VStack` of rows | `ul` with `space-y-1` | Up to 5 in `card`, then "+N more". Real checkboxes only for tasks. |
 | **Image-led** | Album art (1:1), book cover (2:3), photo, bookmark hero (16:9) | `AsyncImage` in the body slot | `img` with `aspect-*` and `object-cover` | Aspect ratio comes from the kind. Placeholder is the kind's glyph on a 12% tint. Never tint artwork. |
-| **Text** | Summaries, notes, quotes | `body` or `longFormBodySmall`, 3–5 lines | `text-sm line-clamp-5` | Generated text gets the marker in [3.4](#34-generated-text). |
+| **Text** | Summaries, notes, quotes | `body` or `longFormBodySmall`, 3–5 lines | `text-sm line-clamp-5` | Generated text gets the marker in [3.5](#35-generated-text). |
 | **Trend** | A value over time, on `full` cards only | Swift Charts | Chart.js | Show the usual range as a band. Label the latest point. No gridlines beyond a baseline. |
 
 ## 9. Writing data
@@ -260,7 +264,7 @@ From the web block and event layouts (`resources/views/blocks/types/*.blade.php`
 | `shadow` + `hover:shadow-lg transition-all` on every card | 64 of 64 layouts | Flat `bg-base-200`, `hover:bg-base-300` when the card is a link |
 | Per-card footer: type badge + `⋮` menu with "View Block" / "View Event" | 64 of 64 | The whole card links to the detail page; the eyebrow names the type |
 | Domain colour via daisyUI status colours (`warning` for money, `info` for media) | 9 `$domainColors` / `$badgeColorMap` arrays | `domain-*` tokens from 3.2 |
-| Gradient AI panels and model-name / word-count footers | 12 layouts with `bg-gradient` | The marker in 3.4 |
+| Gradient AI panels and model-name / word-count footers | 12 layouts with `bg-gradient` | The marker in 3.5 |
 | `animate-pulse` heart | `heart_rate.blade.php` | Static glyph in the eyebrow |
 | Raw metadata preview ("Key: value" for the first three keys) in the generic value card | `block-card.blade.php` | The context line, or nothing |
 | Hero value in `text-{domain}` amber or green on a light ground | 9 layouts with `text-primary`, plus the value card | `base-content`, or the domain ink |
@@ -279,8 +283,8 @@ From iOS:
 
 Things in the current code that break these rules, for the convergence threads to fix:
 
-1. **Amber text on light grounds.** Flint prose highlights (`SparkLongFormContentView(tint: .sparkAccent)` in `RecapScreen` and `FlintDigestScreen`) set spark-5 text on the light wash at about 1.6:1. The Up to Speed briefing is the visible case. Use the domain ink (spark-8 for amber, 7.8:1), or `primary` as a marker-style background behind `base-content` text.
-2. **`MetricCard.Trend` colours by direction**: up is always green and down is always red, so lower spend shows red. Add polarity (3.3).
+1. **Amber text on light grounds.** Flint prose highlights (`SparkLongFormContentView(tint: .sparkAccent)` in `RecapScreen` and `FlintDigestScreen`) set spark-5 text on the light wash at about 1.6:1. The Up to Speed briefing is the visible case. Use the `highlight` token from 3.3: ocean-5 in light, spark-5 in dark.
+2. **`MetricCard.Trend` colours by direction**: up is always green and down is always red, so lower spend shows red. Add polarity (3.4).
 3. **Media glyph differs within iOS**: `EntityPresentation.icon` returns `iphone` for media, `integrationIcon` returns `play.circle.fill`. Use `play.circle.fill`.
 4. **No `online` tint on iOS**: it falls through to `sparkAccent`, so calendar and email events look like money.
 5. **`Block.mediaUrl` is decoded and stored but never drawn.** The image-led pattern needs it.
