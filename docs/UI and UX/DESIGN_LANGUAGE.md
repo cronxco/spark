@@ -213,13 +213,13 @@ Elevation is shown by surface change, not shadows. No card, filter panel or nest
 
 ## 6. Glyphs
 
-- **One concept, one Font Awesome glyph, one semantic manifest.** Both platforms resolve named Spark concepts through a single version-pinned manifest (for example `sleep: moon`, `task: circle-check`, `flint: wand-magic-sparkles`). Generate or validate the Swift enum and PHP mapping from it; neither platform guesses glyphs from labels. iOS uses `SparkIcon` through `EntityPresentation`; web uses `App\\Support\\BlockPresentation`. Bundle only required, licensed Font Awesome assets (prefer vector asset-catalog images on iOS) and test for missing glyphs.
+- **One concept, one Font Awesome glyph, one semantic manifest.** Both platforms resolve named Spark concepts through a single version-pinned manifest (for example `sleep: moon`, `task: circle-check`, `flint: wand-magic-sparkles`). Generate or validate the Swift enum and PHP mapping from it; neither platform guesses glyphs from labels. iOS uses `SparkIcon` through `EntityPresentation`; web uses `App\Support\BlockPresentation`. Bundle only required, licensed Font Awesome assets (prefer vector asset-catalog images on iOS) and test for missing glyphs.
 - **Font Awesome Solid is the default on web and iOS.** Brand glyphs (`fab.`) are for genuine service/network marks only. Native platform-owned controls, such as back navigation, switches or standard disclosure controls, may retain their system iconography when substitution harms usability or accessibility. Do not introduce new Heroicons or SF Symbols for Spark-specific semantic content.
 - **Licensing and accessibility:** Verify the version and redistribution permissions of bundled assets (Free SVGs, fonts and Pro assets have different terms). Decorative glyphs are hidden from assistive technology when adjacent text conveys their meaning. Interactive glyphs require accessible labels.
 - **Colour**: a domain glyph takes its domain fill (3.2). A neutral glyph (action, navigation, section heading) inherits `base-content`, or `base-content/70` when secondary. A status glyph takes its status colour (`fas.circle-check` in `success`). Never colour a glyph for decoration, and never use a status colour for a domain.
 - **Glyph chip**: the glyph in its domain fill on a 12% tint of the same fill, in a **rounded square**, the same shape and size on both platforms. A neutral glyph chip uses `base-content` on `base-300`.
 
-| Use | iOS | Web container | Font Awesome glyph |
+| Use | iOS | Web container | Web glyph size |
 |---|---|---|---|
 | Inline with caption text | 12–14pt, no chip | — | `size-3` to `size-3.5` |
 | Eyebrow, button, inline with body | 16–20pt, no chip | — | `size-4` (`size-5` in a section title) |
@@ -274,8 +274,8 @@ Interface glyphs:
 | Filter | `fas.filter` |
 | Settings | `fas.gear` |
 | More (card and page menus) | `fas.ellipsis-vertical` |
-| Back, forward | `chevron.left`, `chevron.right` | `fas.arrow-left`, `fas.chevron-right` |
-| Expand, collapse | `chevron.down`, `chevron.up` | `fas.chevron-down`, `fas.chevron-up` |
+| Back, forward | `fas.arrow-left`, `fas.chevron-right` |
+| Expand, collapse | `fas.chevron-down`, `fas.chevron-up` |
 | Open externally | `fas.arrow-up-right-from-square` |
 | Show technical detail | `fas.sliders` |
 | Success, complete | `fas.circle-check` |
@@ -284,7 +284,7 @@ Interface glyphs:
 | Info | `fas.circle-info` |
 | Pending | `fas.clock` |
 | Payment card | `fas.credit-card`, or `fab.cc-visa`, `fab.cc-mastercard`, `fab.cc-amex`, `fab.cc-apple-pay`, `fab.cc-paypal` for a known network |
-| Chart, list, grid view | `chart.bar`, `list.bullet`, `square.grid.2x2` | `fas.chart-simple`, `fas.list`, `fas.grip` |
+| Chart, list, grid view | `fas.chart-simple`, `fas.list`, `fas.grip` |
 
 ## 7. Cards
 
