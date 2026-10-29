@@ -225,7 +225,7 @@ Pick one pattern per card. Each has one implementation per platform, shared acro
 | Pattern | Use for | iOS | Web | Rules |
 |---|---|---|---|---|
 | **Value** | Any single number | Hero `Text` + unit | `text-3xl font-bold` + unit | Glyph in the eyebrow, not beside the number. Format per [9](#9-writing-data). |
-| **Ring** | A ratio with a known maximum: scores out of 100, energy out of 5 | `Gauge(.accessoryCircularCapacity)` | SVG ring component (`<x-ring>`) | The number sits inside or beside. Track at 15% fill. Never a ring without a maximum. |
+| **Ring** | A ratio with a known maximum: scores out of 100, energy out of 5 | A hero-sized ring view (`Gauge(.accessoryCircularCapacity)` only in widgets and complications) | SVG ring component (`<x-ring>`) | The ring is the hero: centred, about 128pt on a card (64pt compact), with the number inside at hero size. Track at 15% fill. Never a ring without a maximum. |
 | **Bar** | Progress or share: reading progress, contributors, popularity | `ProgressView` / `Gauge(.linearCapacity)` | `<progress class="progress">` | Label and value as text too. |
 | **Stat grid** | 2–4 related fields of one record: set, reps, weight, RPE | `StatGrid` (`Grid`) | `grid grid-cols-2 sm:grid-cols-4` | Each cell centre-aligned, label above value, tabular figures, no dividers. |
 | **Flow** | Money or values moving: transfers, FX, before → after | `HStack` with `arrow.right` | `flex` with `fas.arrow-right` | Amounts in UI face, masked numbers as `••1234`. |
