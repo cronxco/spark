@@ -128,8 +128,9 @@ Anything a model wrote sits on a **generated surface** so it can be told apart f
 - The eyebrow carries the `sparkles` glyph (`fas.wand-magic-sparkles` on the web) and the word "Summary" or "Flint". Never use the glyph alone, and never put it beside text a person wrote.
 - Text on the surface stays `base-content`. The gradient is the only tint.
 - One generated surface per card. Inside a list of generated items (takeaways, key points), the card carries the surface and the rows stay plain.
+- **Full-width band (Will, 2026-10-30).** On reading pages with a lot of generated text, such as a news article with its summary, key points and takeaways, the surface can run the full width of the page as a band instead of sitting in a card. The band has the same gradient, no corner radius, and the 1px ember-5 hairline along the top and bottom only, with no side borders. The two rules match in colour and weight, so this is not a one-sided edge (5.3). Text inside keeps the page's side gutter, and the eyebrow rule above still applies. Use the card where generated text sits among other cards in a grid or feed, and the band where it is part of the reading flow. Never nest one in the other, and keep section spacing (5.1) between two bands so they never touch.
 - No model names, word counts or character counts.
-- On iOS this is `.sparkGeneratedSurface(radius:)` in SparkUI/Materials. It is opaque content, not glass, and under Increase Contrast it keeps the hairline at full strength. On the web it is a `.surface-generated` class in `app.css`, built from `--color-spark` and `--color-ember` tokens.
+- On iOS this is `.sparkGeneratedSurface(radius:)` in SparkUI/Materials. It is opaque content, not glass, and under Increase Contrast it keeps the hairline at full strength. On the web it is a `.surface-generated` class in `app.css`, built from `--color-spark` and `--color-ember` tokens. The band is `.surface-generated-band` on the web (the same background with `border-y`, no radius, breaking out of the page container) and `.sparkGeneratedBand()` on iOS (the background ignores the horizontal safe area; the content does not).
 
 ### 3.6 Hero values
 
@@ -213,7 +214,7 @@ Elevation is shown by surface change, not shadows. No card, filter panel or nest
 
 **Featured sections** are the one exception to "no borders". A section that deserves emphasis on a detail page (linked blocks, the actor → target flow) keeps a coloured border: `bg-base-200/50 border-2 border-info/10` on the web, and the content surface with a 2pt `info` stroke at 10% on iOS. Items nested inside a featured section use `border-2 border-info/30 bg-base-100/80`. Use at most one featured section per page, and never on a card in a grid.
 
-**No single coloured edges (Will, 2026-10-30).** No card, peek card, popover, list row or section carries a coloured stripe on one side: no top accent bar or gradient strip, no `border-l-4` or `border-t-4`, no leading colour rule on iOS. Where a surface has a border it runs evenly all round (the featured section above, the peek card's tinted border). Colour belongs to the glyph chip, the hero and the text.
+**No single coloured edges (Will, 2026-10-30).** No card, peek card, popover, list row or section carries a coloured stripe on one side: no top accent bar or gradient strip, no `border-l-4` or `border-t-4`, no leading colour rule on iOS. Where a surface has a border it runs evenly all round (the featured section above, the peek card's tinted border), or, for the full-width generated band (3.5), evenly along the top and bottom. Colour belongs to the glyph chip, the hero and the text.
 
 **Nested items** inside an ordinary card sit on the page colour to step back down: `rounded-box bg-base-100 p-3` with `hover:bg-base-300` when they link somewhere. No border is needed, because the surface change separates them.
 
