@@ -400,7 +400,7 @@ These extend the Design System's content rules.
 - **Comparisons** name the baseline: "↓ 9 below 30d trend", not "-9". The default baseline is the 30-day trend, written "30d trend"; other windows follow the same form ("7d trend"). The arrow takes the polarity colour (3.4).
 - **Labels** come from the backend `display_name`. Clients don't guess labels from `block_type` strings.
 - **Metadata** is plain text: separate items side by side, spaced by a gap (`gap-x-3` on the web, `SparkSpacing.md` on iOS), wrapping onto a new line when they run out of room. "Monzo", "Current account" and "2h ago" sit next to each other with nothing between them. Where items must run together as one string (an accessible name, a notification, a share sheet), join them with commas. It is never a row of badges.
-- **No glyph dividers.** Never use `·` or `§` as dividers or separators, in the UI or in copy, and do not swap in `•` or `|` instead. Use space, a line break, or commas. Refer to a section as "section 8", not "§8".
+- **No glyph dividers.** Never use `·` or `§` as dividers or separators, in the UI or in copy, and do not swap in `•` or `|` instead. Use space, a line break, or commas. Refer to a section as "section 8", not `§8`.
 - **No implementation detail** in the interface: no "OAuth", "Webhook" or "API key" labels, no model names.
 
 ## 10. Interaction, motion, depth and haptics
