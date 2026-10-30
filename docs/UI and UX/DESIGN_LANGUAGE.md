@@ -213,6 +213,8 @@ Elevation is shown by surface change, not shadows. No card, filter panel or nest
 
 **Featured sections** are the one exception to "no borders". A section that deserves emphasis on a detail page (linked blocks, the actor → target flow) keeps a coloured border: `bg-base-200/50 border-2 border-info/10` on the web, and the content surface with a 2pt `info` stroke at 10% on iOS. Items nested inside a featured section use `border-2 border-info/30 bg-base-100/80`. Use at most one featured section per page, and never on a card in a grid.
 
+**No single coloured edges (Will, 2026-10-30).** No card, peek card, popover, list row or section carries a coloured stripe on one side: no top accent bar or gradient strip, no `border-l-4` or `border-t-4`, no leading colour rule on iOS. Where a surface has a border it runs evenly all round (the featured section above, the peek card's tinted border). Colour belongs to the glyph chip, the hero and the text.
+
 **Nested items** inside an ordinary card sit on the page colour to step back down: `rounded-box bg-base-100 p-3` with `hover:bg-base-300` when they link somewhere. No border is needed, because the surface change separates them.
 
 ## 6. Glyphs
@@ -311,7 +313,7 @@ Unless a card has its own controls (`linked: false`, below), the whole card is o
 
 | Size | Where | Shows | Layout |
 |---|---|---|---|
-| `ref` | Inline in prose, event and object detail, relationship lists, the actor and target of an event | Glyph, title, and an optional service label | The smallest view of any integration, object, block or event. See 7.5 |
+| `ref` | Inline in prose, event and object detail, relationship lists, the actor and target of an event | Glyph and title, plus a service label only when the context asks for it | The smallest view of any integration, object, block or event. See 7.5 |
 | `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value (with an against-the-mean bar for durations and counts) or a 64pt ring for scores, one context line | Minimum height, 2 or 3 across. At accessibility text sizes, one column with variable height so nothing clips. No body. |
 | `row` | Event detail, Knowledge item, timelines, lists inside a section | Glyph chip, label, value or title, trailing time | One line, 44pt minimum height |
 | `card` | Web grids, iOS block lists that need a body | All four slots | Full width on phone, grid on the web (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3`) |
@@ -349,7 +351,7 @@ Block cards appear on event detail pages (`/events/{event}`, every block linked 
 
 The current web `x-*-ref` and `<x-tag-ref>` components are the primary design for both platforms. iOS follows them.
 
-**A reference** is the smallest view of an integration, object, block or event: a pill with a leading glyph, the title, and an optional service label (an object or event ref names its integration: "Had Physical Effort" with "Apple Health" as a smaller label inside the pill). On the web it is `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium` with its colour at 10% fill and 20% border, the glyph at `size-3` and 70% opacity, and the title truncated at about 200px. On iOS it is `EntityRefChip`. Use a reference wherever a card would be too much: in prose, in relationship and "linked" lists, for an event's actor and target, and for the integration behind an item.
+**A reference** is the smallest view of an integration, object, block or event: a pill with a leading glyph, and the title. **The service label is opt-in (Will, 2026-10-30):** by default an object or event reference shows only its title, and a screen adds the integration ("Had Physical Effort" with "Apple Health" as a smaller label inside the pill) only where the reader could not otherwise tell which integration it came from, such as a cross-integration list. The peek card always names the integration in its facts, so nothing is lost. On the web it is `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium` with its colour at 10% fill and 20% border, the glyph at `size-3` and 70% opacity, and the title truncated at about 200px. On iOS it is `EntityRefChip`. Use a reference wherever a card would be too much: in prose, in relationship and "linked" lists, for an event's actor and target, and for the integration behind an item.
 
 **A tag** is a fully rounded outline badge (`badge badge-outline badge-{colour}` on the web): the border and text in its colour, no fill, with the tag type's glyph at 70% opacity (`fas.microphone` for an artist, `fas.compact-disc` for an album, `fab.spotify` for a Spotify context; `fas.tag` otherwise) and the tag name, truncated at a word boundary near 20 characters. On the web it is `<x-tag-ref>`; on iOS, `TagChip`. An item can show all its tags; they wrap.
 
@@ -358,16 +360,16 @@ The current web `x-*-ref` and `<x-tag-ref>` components are the primary design fo
 - **Web, pointer:** hovering for 200ms opens the peek card under the pill; it stays open while the pointer is over the card and closes 150ms after the pointer leaves. Clicking the pill goes straight to the detail page (`wire:navigate`).
 - **Web, touch** (under `md`), and **iOS:** a tap opens the peek card, and the card's button goes to the detail page. A second tap or a tap outside closes it. On iOS this is a `.popover` adapted to stay a popover on iPhone. A long press keeps the context-menu preview (7.1).
 - Only one peek card is open at a time, and Escape closes it.
-- **The peek card** is a transient surface (10.3): `bg-base-100` with `shadow-xl` and a 30% tinted border. It shows a header with a rounded-square glyph chip, the type in the eyebrow style, in sentence case ("Music album"; the web's uppercase label changes to match section 4), and the title. Below are a few facts (counts, last update, status) and one full-width button to the destination ("View Tagged Items", "Configure", "View Event").
+- **The peek card** is a transient surface (10.3): `bg-base-100` with `shadow-xl` and a 30% tinted border all round, and no accent bar or coloured edge (5.3). It shows a header with a rounded-square glyph chip, the type in the eyebrow style, in sentence case ("Music album"; the web's uppercase label changes to match section 4), and the title. Below are a few facts (counts, last update, status) and one full-width button to the destination ("View Tagged Items", "Configure", "View Event").
 - A tag or reference that has no destination still opens its peek card, which says so in a single line of text.
-- **Accessibility:** the pill is a link on the web (a button on touch) whose accessible name is the title plus the service, e.g. "Had Physical Effort, Apple Health". The peek card's button is reachable by keyboard. On iOS, the chip is one element with the `.isButton` trait.
+- **Accessibility:** the pill is a link on the web (a button on touch) whose accessible name is the title, plus the service when the pill shows it, e.g. "Had Physical Effort, Apple Health". The peek card's button is reachable by keyboard. On iOS, the chip is one element with the `.isButton` trait.
 
 **Colour (Will, 2026-10-29): tags and references keep their current per-type colours**, an exception to the domain-tint rule in 3.2 and 6:
 
 - **Tags** colour by tag type, as in `<x-tag-ref>`: money tags (`transaction_category`, `transaction_type`, `transaction_status`, `transaction_scheme`, `transaction_currency`, `balance_type`, `card_pan`) `warning`; `decline_reason` `error`; `merchant_country` and `merchant_category` `info`; music artist and person `secondary`; music album `accent`; Spotify context `success`; emoji `warning`; Spark `primary`; anything else `info`.
 - **Integration references** use the plugin's accent colour (`getAccentColor()`). **Object references** colour by concept (person and user `secondary`, account and money `warning`, media `info`, bookmark and document `primary`, day `accent`, otherwise `secondary`). **Block and event references** use their integration's domain mapped to the same daisyUI colours.
 - iOS uses the same role names from SparkUI (`success`, `warning`, `error`, `info`, `primary`, `secondary`, `accent`), so a tag is the same colour on both platforms.
-- **Text in light mode uses the ink step of the same hue (Will, 2026-10-30).** The fill, border, peek-card accent bar and button keep the daisyUI colour; the pill's text and glyph (and an outline tag's text) take an ink that clears 4.5:1 on its tint, including the hover tint: `primary` spark-8 `#664D00`, `secondary` ember-8 `#713B04`, `accent` ocean-5 `#244F83`, `info` sky-7 `#255379`, `success` `success-content`, `warning` `warning-content` (no mauve step clears 4.5:1), `error` flame-7 `#B02411`. In dark mode the text stays the role colour, which already clears 5:1. On the web this is a `text-{colour}-ink` utility per role in `app.css`; on iOS, `Color.sparkRoleInk(_:)`.
+- **Text in light mode uses the ink step of the same hue (Will, 2026-10-30).** The fill, border and peek-card button keep the daisyUI colour; the pill's text and glyph (and an outline tag's text) take an ink that clears 4.5:1 on its tint, including the hover tint: `primary` spark-8 `#664D00`, `secondary` ember-8 `#713B04`, `accent` ocean-5 `#244F83`, `info` sky-7 `#255379`, `success` `success-content`, `warning` `warning-content` (no mauve step clears 4.5:1), `error` flame-7 `#B02411`. In dark mode the text stays the role colour, which already clears 5:1. On the web this is a `text-{colour}-ink` utility per role in `app.css`; on iOS, `Color.sparkRoleInk(_:)`.
 - These colours sit only on the pill and its peek card. Glyph chips, cards and heroes still use domain tints.
 
 Tags and references are links, so they are exempt from the "chips mean action" rule in 12.9.
@@ -583,7 +585,7 @@ Pages that monitor many things (Updates, integrations) sort and collapse by need
 
 - **Sort by need**: items with issues first (error, then warning, then in progress), most issues first, then healthy items alphabetically.
 - **Collapsed by default**, with the summary in the heading: the name, a count in text ("12 instances"), and a status chip only when something needs action ("3 need update" in `badge-error`, "2 pending" in `badge-warning`). Healthy groups show nothing extra, or a `fas.circle-check` in `success` with the words "Up to date".
-- Status is text with a glyph, plus a chip when the reader must act. Never a coloured left border (13).
+- Status is text with a glyph, plus a chip when the reader must act. Never a coloured edge on one side (5.3, 13).
 - On iOS: `DisclosureGroup` rows, with the summary as a `StatusPill` line and a status chip only for the states that need action.
 
 ### 12.8 Empty states
@@ -630,7 +632,9 @@ From the web block and event layouts (`resources/views/blocks/types/*.blade.php`
 | Entity-type, category, count and metadata badges (`badge-outline`, `badge-xs`, `badge-info` counts) | Layouts and pages | Eyebrow, text and "(N)" (12.9) |
 | Text at `base-content/60`, `/50` or `/40` | Toggle descriptions, metadata | `base-content/70` (3.1) |
 | Heroicons (`o-*`) | 38 of 64 layouts, 158 uses app-wide | Font Awesome solid per 6 |
-| Left-border status cards (`border-l-4`) | 2 uses | Status in text, with a chip when action is needed |
+| Left-border status cards (`border-l-4`, `border-t-4`) | 2 uses | Status in text, with a chip when action is needed (5.3) |
+| The `h-1 bg-gradient-to-r` accent bar across the top of ref peek cards | 14 views: the `*-ref` components and `<x-tag-ref>` | Nothing; the peek card keeps its tinted border all round (5.3, 7.5) |
+| `showService => true` as the default on `<x-event-ref>` | `event-ref.blade.php`; callers that want the label pass `:showService="true"` | Default to `false`, matching `object-ref` and `action-ref`. On iOS, `EntityRefChip` shows the service only when given `showsService: true` (7.5) |
 | `hover:bg-base-50` | Old nested-item examples | `hover:bg-base-300` (`base-50` is not a daisyUI colour) |
 
 From iOS:
@@ -661,7 +665,8 @@ Things in the current code that break these rules, for the convergence threads t
 - [ ] Web: `<x-header>` with a one-sentence subtitle. iOS: navigation title and toolbar.
 - [ ] Detail pages keep technical detail in a drawer or inspector (12.2), and the hero centres on phones.
 - [ ] Hero value uses the detail or card scale (4) and `text-hero` / `sparkHero` (3.6). Units at about 55%.
-- [ ] Cards are flat content surfaces: no shadows, no lift, no borders except one featured section (5.3).
+- [ ] Cards are flat content surfaces: no shadows, no lift, no borders except one featured section, and never a coloured edge on one side (5.3).
+- [ ] References show the title only; the service label is added only where the context needs it (7.5).
 - [ ] Every card comes from the registry and a shared card component (7.4). No per-card footers or type badges.
 - [ ] Glyphs come from the map (6), in rounded-square chips, in their domain tint or neutral.
 - [ ] Colour means a domain or a status, never decoration. No raw palette or system colours.
