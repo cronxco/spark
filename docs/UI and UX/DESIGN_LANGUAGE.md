@@ -321,7 +321,7 @@ One component renders every size: `BlockCard(block, size:)` and `EventCard(event
 
 ### 7.3 Event cards in Up to Speed
 
-When Flint prose mentions a metric that has an event behind it (sleep duration, sleep score, readiness, activity score), show those events as `compact` cards under the paragraph. Put up to three in a row, ordered as the prose mentions them. Highlighted phrases in the prose use the `highlight` token (3.3), and each card's glyph carries its domain tint. Scores (sleep score, readiness, activity score) show as a ring. Durations and counts (sleep, steps) show as the value over a thin against-the-mean bar (§8, Bar) with its Avg marker. Tapping a card opens the event. With more than three, the third card reads "+N more" and opens a list.
+When Flint prose mentions a metric that has an event behind it (sleep duration, sleep score, readiness, activity score), show those events as `compact` cards under the paragraph. Put up to three in a row, ordered as the prose mentions them. Highlighted phrases in the prose use the `highlight` token (3.3), and each card's glyph carries its domain tint. Scores (sleep score, readiness, activity score) show as a ring. Durations and counts (sleep, steps) show as the value over a thin against-the-mean bar (section 8, Bar) with its Avg marker. Tapping a card opens the event. With more than three, the third card reads "+N more" and opens a list.
 
 ### 7.4 Adding a card type
 
@@ -349,7 +349,7 @@ Block cards appear on event detail pages (`/events/{event}`, every block linked 
 
 The current web `x-*-ref` and `<x-tag-ref>` components are the primary design for both platforms. iOS follows them.
 
-**A reference** is the smallest view of an integration, object, block or event: a pill with a leading glyph, the title, and an optional service label (an object or event ref names its integration, e.g. "Had Physical Effort · Apple Health"). On the web it is `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium` with its colour at 10% fill and 20% border, the glyph at `size-3` and 70% opacity, and the title truncated at about 200px. On iOS it is `EntityRefChip`. Use a reference wherever a card would be too much: in prose, in relationship and "linked" lists, for an event's actor and target, and for the integration behind an item.
+**A reference** is the smallest view of an integration, object, block or event: a pill with a leading glyph, the title, and an optional service label (an object or event ref names its integration: "Had Physical Effort" with "Apple Health" as a smaller label inside the pill). On the web it is `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium` with its colour at 10% fill and 20% border, the glyph at `size-3` and 70% opacity, and the title truncated at about 200px. On iOS it is `EntityRefChip`. Use a reference wherever a card would be too much: in prose, in relationship and "linked" lists, for an event's actor and target, and for the integration behind an item.
 
 **A tag** is a pill in the same shape, with the tag type's glyph (`fas.microphone` for an artist, `fas.compact-disc` for an album, `fab.spotify` for a Spotify context; `fas.tag` otherwise) and the tag name, truncated at a word boundary near 20 characters. On the web it is `<x-tag-ref>`; on iOS, `TagChip`. An item can show all its tags; they wrap.
 
@@ -399,7 +399,8 @@ These extend the Design System's content rules.
 - **Freshness**: when data is older than its TTL, the context line says "From 3h ago" in `secondary`, and the hero does not change colour.
 - **Comparisons** name the baseline: "↓ 9 below 30d trend", not "-9". The default baseline is the 30-day trend, written "30d trend"; other windows follow the same form ("7d trend"). The arrow takes the polarity colour (3.4).
 - **Labels** come from the backend `display_name`. Clients don't guess labels from `block_type` strings.
-- **Metadata** is text, joined with ` · `: "Monzo · Current account · 2h ago". It is never a row of badges.
+- **Metadata** is plain text: separate items side by side, spaced by a gap (`gap-x-3` on the web, `SparkSpacing.md` on iOS), wrapping onto a new line when they run out of room. "Monzo", "Current account" and "2h ago" sit next to each other with nothing between them. Where items must run together as one string (an accessible name, a notification, a share sheet), join them with commas. It is never a row of badges.
+- **No glyph dividers.** Never use `·` or `§` as dividers or separators, in the UI or in copy, and do not swap in `•` or `|` instead. Use space, a line break, or commas. Refer to a section as "section 8", not "§8".
 - **No implementation detail** in the interface: no "OAuth", "Webhook" or "API key" labels, no model names.
 
 ## 10. Interaction, motion, depth and haptics
@@ -519,8 +520,8 @@ A detail page (an event, object, block or integration) shows what the reader cam
                     <div class="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-hero tabular-nums">
                         52<span class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content/70">bpm</span>
                     </div>
-                    <div class="mt-2 flex flex-wrap items-center justify-center sm:justify-start gap-x-2 text-sm text-base-content/70">
-                        <span>Oura</span><span aria-hidden="true">·</span><span>7:40 am</span>
+                    <div class="mt-2 flex flex-wrap items-center justify-center sm:justify-start gap-x-3 text-sm text-base-content/70">
+                        <span>Oura</span><span>7:40 am</span>
                     </div>
                 </div>
             </div>
@@ -602,7 +603,7 @@ A chip means "this state needs you". Everything else is text.
 
 - Design for the phone first, then add `sm:` (640px) and `lg:` (1024px) enhancements.
 - Stacks become rows at `sm`: `flex flex-col sm:flex-row`. Directional arrows follow: `fas.arrow-down` with `sm:hidden`, `fas.arrow-right` with `hidden sm:block`.
-- Inline metadata separators (`·`) are `hidden sm:inline`, and a `sm:hidden w-full` spacer forces the line break on phones.
+- Inline metadata wraps on its own gap (9). There are no separators to hide.
 - Drawers are `w-11/12` on phones and `lg:w-1/3` wider.
 - Card grids: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`.
 
@@ -612,6 +613,7 @@ From the web block and event layouts (`resources/views/blocks/types/*.blade.php`
 
 | Remove | Found in | Replace with |
 |---|---|---|
+| `·` and `§` dividers in metadata and copy | About 76 uses in 24 web files, 62 in 34 iOS files | Items spaced by a gap, or joined with commas (9) |
 | `shadow` + `hover:shadow-lg transition-all` on every card | 64 of 64 layouts, most pages | Flat `bg-base-200`, `hover:bg-base-300` when the card is a link |
 | `shadow` and `shadow-sm` on filter panels and nested items | Pages following the old guide | Flat surfaces (5.3) |
 | Per-card footer: type badge + `⋮` menu with "View Block" / "View Event" | 64 of 64 | The whole card links to the detail page, the eyebrow names the type, and the `⋮` moves into the eyebrow after the time (7.1) |
@@ -663,6 +665,7 @@ Things in the current code that break these rules, for the convergence threads t
 - [ ] Colour means a domain or a status, never decoration. No raw palette or system colours.
 - [ ] No text fainter than `base-content/70` / `.secondary`.
 - [ ] Chips only for states that need action (12.9).
+- [ ] No `·` or `§` dividers (9).
 - [ ] Spacing from the 5.1 table, headings in order (h2 → h3).
 - [ ] Filters collapse on phones and stay open on desktop (12.4). Form controls have visible labels (12.5).
 - [ ] Empty, loading, missing and very large values all designed (9, 10, 12.8).
