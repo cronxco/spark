@@ -70,25 +70,6 @@ class TagsController extends Controller
         return response()->json($response);
     }
 
-    /**
-     * One entry per tag type: how many tags it has and how often they are used.
-     *
-     * @return array<int, array{type: string, tags_count: int, total_count: int}>
-     */
-    private function typeTotals(Collection $tags): array
-    {
-        return $tags
-            ->groupBy(fn (Tag $tag) => $tag->type ?? self::UNTYPED)
-            ->map(fn (Collection $group, string $type) => [
-                'type' => $type,
-                'tags_count' => $group->count(),
-                'total_count' => (int) $group->sum('total_count'),
-            ])
-            ->sortBy([['total_count', 'desc'], ['type', 'asc']])
-            ->values()
-            ->all();
-    }
-
     public function show(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
@@ -193,6 +174,25 @@ class TagsController extends Controller
         }
 
         return $this->detach($object, $tagId);
+    }
+
+    /**
+     * One entry per tag type: how many tags it has and how often they are used.
+     *
+     * @return array<int, array{type: string, tags_count: int, total_count: int}>
+     */
+    private function typeTotals(Collection $tags): array
+    {
+        return $tags
+            ->groupBy(fn (Tag $tag) => $tag->type ?? self::UNTYPED)
+            ->map(fn (Collection $group, string $type) => [
+                'type' => $type,
+                'tags_count' => $group->count(),
+                'total_count' => (int) $group->sum('total_count'),
+            ])
+            ->sortBy([['total_count', 'desc'], ['type', 'asc']])
+            ->values()
+            ->all();
     }
 
     private function attach(Request $request, Event|EventObject $entity): JsonResponse
