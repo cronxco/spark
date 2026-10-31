@@ -10,6 +10,7 @@ use App\Services\EffectiveTimezoneResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class MapController extends Controller
 {
@@ -285,7 +286,7 @@ class MapController extends Controller
 
         try {
             return CarbonImmutable::parse($value)->toIso8601String();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }
