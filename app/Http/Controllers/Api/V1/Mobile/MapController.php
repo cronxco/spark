@@ -221,7 +221,7 @@ class MapController extends Controller
     }
 
     /**
-     * @return array{id: string, kind: string, lat: float, lng: float, title: string, subtitle: string|null, time: string|null, service: string|null}|null
+     * @return array{id: string, kind: string, lat: float, lng: float, title: string, subtitle: string|null, time: string|null, service: string|null, domain: string|null, address: string|null}|null
      */
     protected function eventMarker(Event $event): ?array
     {
@@ -240,11 +240,16 @@ class MapController extends Controller
             'subtitle' => $this->eventSubtitle($event),
             'time' => $event->time?->toIso8601String(),
             'service' => $event->service,
+            'domain' => $event->domain,
+            'address' => $event->location_address ?? $event->target?->location_address,
         ];
     }
 
     /**
-     * @return array{id: string, kind: string, lat: float, lng: float, title: string, subtitle: null, time: null, service: null}|null
+     * Places carry their visit summary so the app can place a visit on the
+     * day it happened. Only the most recent visit is stored.
+     *
+     * @return array{id: string, kind: string, lat: float, lng: float, title: string, subtitle: null, time: null, service: null, address: string|null, visit_count: int|null, last_visit_at: string|null, category: string|null}|null
      */
     protected function placeMarker(EventObject $place): ?array
     {
@@ -253,6 +258,8 @@ class MapController extends Controller
         if ($coordinates === null) {
             return null;
         }
+
+        $metadata = is_array($place->metadata) ? $place->metadata : [];
 
         return [
             'id' => $place->id,
@@ -263,7 +270,24 @@ class MapController extends Controller
             'subtitle' => null,
             'time' => null,
             'service' => null,
+            'address' => $place->location_address,
+            'visit_count' => isset($metadata['visit_count']) ? (int) $metadata['visit_count'] : null,
+            'last_visit_at' => $this->isoTime($metadata['last_visit_at'] ?? null),
+            'category' => $metadata['category'] ?? null,
         ];
+    }
+
+    protected function isoTime(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($value)->toIso8601String();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
