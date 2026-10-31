@@ -361,6 +361,36 @@ via `POST /up-to-speed/unmark`.
 `news_roundup` or `reading_list`, resolved server-side so clients need not
 infer a digest's role from its title.
 
+`flint_digest` payloads also carry `linked_events`: a card for each event with
+a value that the `summary` links to (`/events/{id}`), in the order the prose
+first mentions them. Links to events outside the reader's own integrations
+resolve to nothing. Each entry has:
+
+- `kind` — `{service}.{action}` (e.g. `oura.had_sleep_score`), the key clients
+  use to pick a card layout, falling back to a generic value card.
+- `event` — the compact event, as returned by `GET /events/{id}` but without
+  blocks.
+- `context` — `null`, or `{direction, valence, within_usual_range, text, mean}`
+  comparing the live value with the metric's 30d baseline. `text` is
+  `"12 below 30d trend"` for scores and bare values, and `"35m above 30d avg"`
+  for durations and counts, whose cards draw the value as a bar against
+  `mean` (in the event's own unit). `direction` is `up`, `down` or `flat`; a
+  reading inside the usual range has `valence: "neutral"`.
+- `at_digest` — `null`, or `{value, display_value}` when the event's value
+  changed after the digest was written (Oura revises scores through the
+  morning). Cards show the live value and use this to say "updated from 66".
+
+```json
+"linked_events": [
+    {
+        "kind": "oura.had_sleep_score",
+        "event": { "id": "uuid", "service": "oura", "action": "had_sleep_score", "value": 80, "unit": "percent", "display_value": "80", "display_name": "Sleep Score", "...": "..." },
+        "context": { "direction": "down", "valence": "neutral", "within_usual_range": true, "text": "3 below 30d trend", "mean": 83 },
+        "at_digest": { "value": 66, "display_value": "66" }
+    }
+]
+```
+
 `anomaly` payloads include `metric`, `display_name`, `domain`, `service`,
 `unit`, `type`, `direction`, `valence`, `is_ordinal`, `current_value`,
 `baseline_value`, `current_display`, `baseline_display`, `deviation`,

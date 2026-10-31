@@ -4,6 +4,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Services\AgentWorkingMemoryService;
 use App\Services\Ai\AiUsageSummary;
+use App\Services\Flint\FlintLinkedEventCards;
 use App\Services\Flint\FlintScheduleSettings;
 use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\FlintTopicService;
@@ -172,6 +173,38 @@ new class extends Component
                 ->sortBy('time')
                 ->values(),
         ];
+    }
+
+    /**
+     * The digest summary split into paragraphs, each with cards for the metric
+     * events it links to — the same cards Up to Speed shows on iOS.
+     *
+     * @return array<int, array{markdown: string, cards: array<int, array<string, mixed>>}>
+     */
+    public function summaryParagraphs(Event $digest): array
+    {
+        $summary = $digest->event_metadata['summary'] ?? null;
+
+        if (! is_string($summary) || trim($summary) === '') {
+            return [];
+        }
+
+        $cards = collect(app(FlintLinkedEventCards::class)->forDigests(
+            collect([$digest]),
+            Auth::user()->integrations()->pluck('id'),
+            Auth::id(),
+        )[$digest->id] ?? [])->keyBy(fn (array $card): string => strtolower($card['event']['id']));
+
+        return collect(preg_split('/\n\s*\n/', trim($summary)))
+            ->map(fn (string $paragraph): array => [
+                'markdown' => $paragraph,
+                'cards' => collect(FlintLinkedEventCards::linkedIds($paragraph))
+                    ->map(fn (string $id): ?array => $cards->get($id))
+                    ->filter()
+                    ->values()
+                    ->all(),
+            ])
+            ->all();
     }
 
     /**
@@ -488,9 +521,35 @@ new class extends Component
                                     {{ $digest->event_metadata['title'] ?? __('Daily digest') }}
                                 </h2>
 
-                                @if ($summary = $digest->event_metadata['summary'] ?? null)
-                                    <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90">
-                                        {!! render_markdown($summary) !!}
+                                @if ($paragraphs = $this->summaryParagraphs($digest))
+                                    <div class="space-y-4">
+                                        @foreach ($paragraphs as $paragraph)
+                                            <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90 prose-a:text-highlight prose-a:font-semibold prose-a:no-underline hover:prose-a:underline">
+                                                {!! render_markdown($paragraph['markdown']) !!}
+                                            </div>
+                                            @if ($paragraph['cards'])
+                                                {{-- Up to three across, as the prose orders them; the rest behind "+N more" (design language §7.3) --}}
+                                                @php
+                                                    $cards = $paragraph['cards'];
+                                                    $overflow = count($cards) > 3 ? array_slice($cards, 2) : [];
+                                                    $shown = $overflow ? array_slice($cards, 0, 2) : $cards;
+                                                @endphp
+                                                <div x-data="{ expanded: false }" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                    @foreach ($shown as $card)
+                                                        <x-event-card :card="$card" wire:key="linked-{{ $loop->parent->index }}-{{ $card['event']['id'] }}" />
+                                                    @endforeach
+                                                    @if ($overflow)
+                                                        <button type="button" x-show="! expanded" x-on:click="expanded = true"
+                                                            class="flex min-h-28 items-center justify-center rounded-box bg-base-100 p-4 text-sm font-semibold text-base-content/70 transition-colors hover:bg-base-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+                                                            {{ __('+:count more', ['count' => count($overflow)]) }}
+                                                        </button>
+                                                        @foreach ($overflow as $card)
+                                                            <x-event-card :card="$card" x-show="expanded" x-cloak wire:key="linked-more-{{ $loop->parent->index }}-{{ $card['event']['id'] }}" />
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        @endforeach
                                     </div>
                                 @endif
 
