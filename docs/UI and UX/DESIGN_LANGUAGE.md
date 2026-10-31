@@ -475,7 +475,7 @@ Run these on every new card or layout before merging.
 
 - Text is 4.5:1 against its surface in both themes (3:1 at 24pt bold and above). No text below `base-content/70`. Glyphs and ring strokes are 3:1, unless a number beside them carries the same information. Focus indicators are always 3:1.
 - Nothing is told apart by hue alone. Domain tints are always paired with a glyph and a label, and deltas with an arrow.
-- The card is one accessible element on both platforms, announced as "Sleep score, 66 out of 100, 12 below 30-day trend, 7:40 am". On iOS it is one VoiceOver element. On the web it is one link with that accessible name, reached with Tab and opened with Enter; the ⋮ menu is a separate button after it. A `linked: false` card has no card-wide link; its controls are reached one by one. Decorative glyphs are hidden.
+- The card is one accessible element on both platforms, announced as "Sleep score, 66 out of 100, 12 below 30-day trend, 07:40". On iOS it is one VoiceOver element. On the web it is one link with that accessible name, reached with Tab and opened with Enter; the ⋮ menu is a separate button after it. A `linked: false` card has no card-wide link; its controls are reached one by one. Decorative glyphs are hidden.
 - Every form control has a visible label.
 - Works at the largest accessibility text size (iOS) and at 200% zoom (web) without clipping a number.
 - Works under Reduce Transparency, Increase Contrast and Reduce Motion.
@@ -497,9 +497,10 @@ A detail page (an event, object, block or integration) shows what the reader cam
 
 | Main view | Drawer (web) / inspector (iOS) |
 |---|---|
-| The hero: title, value, glyph chip, key metadata | Tags and comments |
+| The hero: title, value, glyph chip, key metadata | Comments |
 | The flow (actor → action → target) | Activity timeline |
 | Linked and related items | Technical metadata (raw values, JSON, IDs in mono) |
+| Tags | |
 | Anything the reader acts on | Actor and target properties, system information |
 
 ```blade
@@ -525,7 +526,7 @@ A detail page (an event, object, block or integration) shows what the reader cam
                         52<span class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content/70">bpm</span>
                     </div>
                     <div class="mt-2 flex flex-wrap items-center justify-center sm:justify-start gap-x-3 text-sm text-base-content/70">
-                        <span>Oura</span><span>7:40 am</span>
+                        <span>Oura</span><span>2 hours ago</span>
                     </div>
                 </div>
             </div>
@@ -536,7 +537,6 @@ A detail page (an event, object, block or integration) shows what the reader cam
 
     <x-drawer wire:model="showSidebar" right title="Details" separator with-close-button class="w-11/12 lg:w-1/3">
         <div class="space-y-4 lg:space-y-6">
-            <x-card class="!p-2">{{-- Tags --}}</x-card>
             <x-collapse wire:model="activityOpen">{{-- Activity, open by default --}}</x-collapse>
             <x-collapse wire:model="metadataOpen">{{-- Technical metadata, closed by default --}}</x-collapse>
         </div>
@@ -547,7 +547,10 @@ A detail page (an event, object, block or integration) shows what the reader cam
 - The **detail hero centres on phones** and is leading-aligned from `sm` up (`text-center sm:text-left`, `items-center sm:items-start`, `justify-center sm:justify-start`). On iOS the detail hero centres in a compact horizontal size class and is leading-aligned in regular. Cards elsewhere stay leading-aligned (7.1).
 - The title sits above the value. The value uses the detail scale from 4 and the hero colour from 3.6.
 - The drawer is closed by default (`$showSidebar = false`). In it, the activity timeline is open and technical metadata is closed.
-- On iOS the same split is a scroll view of content surfaces, with an inspector sheet of `InspectorRow`s opened from `info.circle` in the toolbar.
+- On iOS the same split is a scroll view of content surfaces, with an inspector sheet of `InspectorRow`s opened from `SparkIcon.technicalDetail` (`fas.sliders`) in the toolbar, the same glyph as the web's drawer button.
+- **Tags stay on the page (Will, 2026-10-31).** They are links the reader acts on (7.5), so they sit in the main view after related items, not in the drawer or inspector.
+- **The toolbar (Will, 2026-10-31).** Back on its own; Details (sliders) and More (⋮) share one glass group; Share is the one prominent action, on its own. Edit is an item in More, not a toolbar button.
+- **Times read relative first (Will, 2026-10-31).** The hero's time says "2 hours ago"; a tap shows the 24-hour time ("07:40", or "Tue 14:05" on another day) and a second tap goes back. On iOS this is `SparkTimeText`. Exact times are always 24-hour, never "7:40 am".
 
 ### 12.3 Sections inside a page
 
