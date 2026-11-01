@@ -21,6 +21,11 @@ class UpcomingBills
 {
     private const LOOKBACK_DAYS = 130;
 
+    private static function fold(string $name): string
+    {
+        return (string) preg_replace('/[^a-z0-9]/', '', strtolower($name));
+    }
+
     /**
      * @return array{payday: string, payday_known: bool, total: int, bills: list<array{payee: string, amount: int, due: string}>, card_payments: list<array{payee: string, amount: int, due: string}>}
      */
@@ -102,11 +107,6 @@ class UpcomingBills
         }
 
         return false;
-    }
-
-    private static function fold(string $name): string
-    {
-        return (string) preg_replace('/[^a-z0-9]/', '', strtolower($name));
     }
 
     /**
