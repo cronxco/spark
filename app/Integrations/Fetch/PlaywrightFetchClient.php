@@ -405,7 +405,7 @@ class PlaywrightFetchClient
             $playwrightCookies[] = [
                 'name' => (string) $cookie['name'],
                 'value' => (string) $cookie['value'],
-                'domain' => $cookie['domain'] ?: ('.'.$domain),
+                'domain' => $cookie['domain'] ?: ('.' . $domain),
                 'path' => $cookie['path'] ?: '/',
                 'secure' => (bool) $cookie['secure'],
                 'httpOnly' => (bool) $cookie['httpOnly'],
@@ -425,11 +425,11 @@ class PlaywrightFetchClient
         $incoming = [];
         foreach ($newCookies as $cookie) {
             $cookieDomain = ltrim($cookie['domain'] ?? '', '.');
-            if ($cookieDomain === $domain || str_ends_with($cookieDomain, '.'.$domain)) {
+            if ($cookieDomain === $domain || str_ends_with($cookieDomain, '.' . $domain)) {
                 $incoming[] = [
                     'name' => $cookie['name'],
                     'value' => $cookie['value'],
-                    'domain' => $cookie['domain'] ?? ('.'.$domain),
+                    'domain' => $cookie['domain'] ?? ('.' . $domain),
                     'path' => $cookie['path'] ?? '/',
                     'secure' => (bool) ($cookie['secure'] ?? true),
                     'httpOnly' => (bool) ($cookie['httpOnly'] ?? true),
@@ -449,7 +449,7 @@ class PlaywrightFetchClient
 
         $merged = [];
         foreach (array_merge($existing, $incoming) as $cookie) {
-            $key = $cookie['name'].'|'.$cookie['domain'].'|'.$cookie['path'];
+            $key = $cookie['name'] . '|' . $cookie['domain'] . '|' . $cookie['path'];
             $merged[$key] = $cookie; // incoming entries (later) win
         }
         $merged = array_values($merged);
@@ -505,11 +505,11 @@ class PlaywrightFetchClient
         }
 
         try {
-            $dir = storage_path('logs/fetch/'.($userId ?? 'unknown'));
+            $dir = storage_path('logs/fetch/' . ($userId ?? 'unknown'));
             if (! is_dir($dir)) {
                 mkdir($dir, 0750, true);
             }
-            $logPath = $dir.'/playwright_last.json';
+            $logPath = $dir . '/playwright_last.json';
 
             $debugData = [
                 'timestamp' => now()->toIso8601String(),

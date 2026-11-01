@@ -55,7 +55,7 @@ class FetchWebpageHtmlTool extends Tool
         $result = app(PlaywrightFetchClient::class)->fetchForMcp($url, $fetchGroup);
 
         if (! $result['success']) {
-            return Response::error('Playwright fetch failed: '.$result['error']);
+            return Response::error('Playwright fetch failed: ' . $result['error']);
         }
 
         return Response::text(json_encode([
