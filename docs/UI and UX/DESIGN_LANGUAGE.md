@@ -489,7 +489,7 @@ How whole screens are put together. The web examples use maryUI components; the 
 
 Every web page starts with `<x-header title subtitle separator>`. The subtitle is one sentence. Actions sit in its `actions` slot: at most one `btn-primary`, the rest `btn-outline` or `btn-ghost`. Below `sm`, more than one action collapses into an `<x-dropdown>` behind a `btn-ghost btn-sm` with `fas.ellipsis-vertical`.
 
-On iOS the header is `.navigationTitle` with a `.toolbar`: at most one prominent action, the rest in a `Menu` behind `ellipsis.circle`.
+On iOS the header is `.navigationTitle` with a `.toolbar`: at most one prominent action, the rest in a `Menu` behind `fas.ellipsis-vertical`, the same More glyph as the web (Will, 2026-10-31).
 
 ### 12.2 Detail pages and progressive disclosure
 
