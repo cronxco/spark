@@ -356,9 +356,15 @@ class HealthDashboardService
             return [];
         }
 
+        // Every contributor, lowest first: the low ones are what hold a
+        // score back, and the blocks relation has no order of its own. The
+        // title breaks ties so the order is stable.
         return $event->blocks
             ->where('block_type', 'contributor')
-            ->take(4)
+            ->sortBy([
+                fn (Block $a, Block $b) => (float) $a->formatted_value <=> (float) $b->formatted_value,
+                fn (Block $a, Block $b) => strcmp((string) $a->title, (string) $b->title),
+            ])
             ->map(fn (Block $block) => [
                 'label' => $block->title,
                 'value' => $this->rounded($block->formatted_value),
