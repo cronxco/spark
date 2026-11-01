@@ -295,40 +295,53 @@ class ImmichPlugin extends ManualPlugin
     public function pullPhotoData(Integration $integration, string $serverUrl, string $apiKey, ?string $afterDate = null): array
     {
         $assets = [];
-        $body = [
-            'size' => 250,
-            'page' => 1,
-            'withExif' => true,
-            'withPeople' => true,
-        ];
-
-        if ($afterDate) {
-            $body['updatedAfter'] = $afterDate;
-        }
+        $page = 1;
+        $cursor = null;
 
         do {
+            $params = [
+                'size' => 250,
+                'page' => $page,
+                'withExif' => true,
+                'withPeople' => true,
+            ];
+
+            if ($cursor !== null) {
+                unset($params['page']);
+                $params['cursor'] = $cursor;
+            }
+
+            if ($afterDate) {
+                $params['takenAfter'] = $afterDate;
+            }
+
             $response = $this->makeRequest(
                 'POST',
-                "{$serverUrl}/api/search/metadata",
+                rtrim($serverUrl, '/') . '/api/search/metadata',
                 $apiKey,
-                $body,
+                $params,
                 $integration->id
             );
 
-            $result = $response['assets'] ?? [];
-            $assets = array_merge($assets, $result['items'] ?? []);
-
-            // Newer Immich paginates with an opaque cursor; older versions return a page number
-            $nextCursor = $result['nextCursor'] ?? null;
-            $nextPage = $result['nextPage'] ?? null;
-
-            if ($nextCursor) {
-                unset($body['page']);
-                $body['cursor'] = $nextCursor;
-            } elseif ($nextPage) {
-                $body['page'] = (int) $nextPage;
+            if (! isset($response['assets']['items']) || ! is_array($response['assets']['items'])) {
+                throw new Exception('Immich returned an invalid asset search response');
             }
-        } while ($nextCursor || $nextPage);
+
+            $assets = array_merge($assets, $response['assets']['items']);
+            $nextCursor = $response['assets']['nextCursor'] ?? null;
+            if ($nextCursor !== null && $nextCursor === $cursor) {
+                throw new Exception('Immich returned an invalid next cursor');
+            }
+
+            $cursor = $nextCursor;
+            $nextPage = $response['assets']['nextPage'] ?? null;
+
+            if ($nextPage !== null && (int) $nextPage <= $page) {
+                throw new Exception('Immich returned an invalid next page');
+            }
+
+            $page = $nextPage === null ? null : (int) $nextPage;
+        } while ($cursor !== null || $page !== null);
 
         return [
             'assets' => $assets,
@@ -348,7 +361,7 @@ class ImmichPlugin extends ManualPlugin
             // Immich validates query booleans as the strings "true"/"false"
             $response = $this->makeRequest(
                 'GET',
-                "{$serverUrl}/api/people",
+                rtrim($serverUrl, '/') . '/api/people',
                 $apiKey,
                 ['withHidden' => 'true', 'page' => $page, 'size' => 500],
                 $integration->id

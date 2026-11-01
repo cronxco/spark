@@ -208,7 +208,8 @@ class ImmichPluginTest extends TestCase
         [$first] = $requests[0];
         $this->assertInstanceOf(Request::class, $first);
         $this->assertEquals('POST', $first->method());
-        $this->assertEquals('2026-10-01T00:00:00+00:00', $first['updatedAfter']);
+        $this->assertEquals('2026-10-01T00:00:00+00:00', $first['takenAfter']);
+        $this->assertArrayNotHasKey('updatedAfter', $first->data());
         $this->assertTrue($first['withExif']);
         $this->assertTrue($first['withPeople']);
         $this->assertEquals(1, $first['page']);
