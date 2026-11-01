@@ -317,7 +317,7 @@ class ImmichPlugin extends ManualPlugin
 
             $response = $this->makeRequest(
                 'POST',
-                rtrim($serverUrl, '/').'/api/search/metadata',
+                rtrim($serverUrl, '/') . '/api/search/metadata',
                 $apiKey,
                 $params,
                 $integration->id
@@ -361,7 +361,7 @@ class ImmichPlugin extends ManualPlugin
             // Immich validates query booleans as the strings "true"/"false"
             $response = $this->makeRequest(
                 'GET',
-                rtrim($serverUrl, '/').'/api/people',
+                rtrim($serverUrl, '/') . '/api/people',
                 $apiKey,
                 ['withHidden' => 'true', 'page' => $page, 'size' => 500],
                 $integration->id

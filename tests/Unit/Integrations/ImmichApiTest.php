@@ -10,23 +10,6 @@ use PHPUnit\Framework\TestCase;
 
 class ImmichApiTest extends TestCase
 {
-    private function plugin(array $responses): ImmichPlugin
-    {
-        return new class($responses) extends ImmichPlugin
-        {
-            public array $requests = [];
-
-            public function __construct(private array $responses) {}
-
-            protected function makeRequest(string $method, string $url, string $apiKey, array $params = [], ?string $integrationId = null): array
-            {
-                $this->requests[] = compact('method', 'url', 'apiKey', 'params');
-
-                return array_shift($this->responses);
-            }
-        };
-    }
-
     #[Test]
     public function it_searches_assets_and_follows_the_next_page_even_for_short_batches(): void
     {
@@ -118,5 +101,27 @@ class ImmichApiTest extends TestCase
         $this->assertSame([['id' => 'first'], ['id' => 'second']], $result['people']);
         $this->assertSame('https://photos.example.com/api/people', $plugin->requests[0]['url']);
         $this->assertSame(['withHidden' => 'true', 'page' => 2, 'size' => 500], $plugin->requests[1]['params']);
+    }
+
+    private function plugin(array $responses): ImmichPlugin
+    {
+        return new class($responses) extends ImmichPlugin
+        {
+            public array $requests = [];
+
+            public function __construct(private array $responses) {}
+
+            protected function makeRequest(string $method, string $url, string $apiKey, array $params = [], ?string $integrationId = null): array
+            {
+                $this->requests[] = [
+                    'method' => $method,
+                    'url' => $url,
+                    'apiKey' => $apiKey,
+                    'params' => $params,
+                ];
+
+                return array_shift($this->responses);
+            }
+        };
     }
 }
