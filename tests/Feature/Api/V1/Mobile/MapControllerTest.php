@@ -139,6 +139,83 @@ class MapControllerTest extends TestCase
     }
 
     #[Test]
+    public function event_markers_carry_their_domain_and_address(): void
+    {
+        $integration = Integration::factory()->create(['user_id' => $this->user->id]);
+        $target = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'counterparty',
+            'title' => 'Kaffateria',
+            'location' => Point::makeGeodetic(51.5, 0.0),
+            'location_address' => '5 Dundas Street, Glasgow, G1 2AH, United Kingdom',
+        ]);
+
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'target_id' => $target->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'card_payment_to',
+            'location' => null,
+            'location_address' => null,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->getJson('/api/v1/mobile/map/data?bbox=51.0,-0.5,52.0,0.5')
+            ->assertOk()
+            ->assertJsonPath('markers.events.0.domain', 'money')
+            ->assertJsonPath('markers.events.0.address', '5 Dundas Street, Glasgow, G1 2AH, United Kingdom');
+    }
+
+    #[Test]
+    public function place_markers_carry_their_visit_summary(): void
+    {
+        EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'place',
+            'type' => 'discovered_place',
+            'title' => '27 Gilmour Road, Edinburgh',
+            'location' => Point::makeGeodetic(51.5, 0.0),
+            'location_address' => '27 Gilmour Road, Edinburgh, EH16 5NS, United Kingdom',
+            'metadata' => [
+                'visit_count' => 2,
+                'last_visit_at' => '2026-10-30T14:45:42+00:00',
+                'category' => 'home',
+            ],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->getJson('/api/v1/mobile/map/data?bbox=51.0,-0.5,52.0,0.5')
+            ->assertOk()
+            ->assertJsonPath('markers.places.0.visit_count', 2)
+            ->assertJsonPath('markers.places.0.last_visit_at', '2026-10-30T14:45:42+00:00')
+            ->assertJsonPath('markers.places.0.category', 'home')
+            ->assertJsonPath('markers.places.0.address', '27 Gilmour Road, Edinburgh, EH16 5NS, United Kingdom');
+    }
+
+    #[Test]
+    public function place_markers_without_visits_send_nulls(): void
+    {
+        EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'place',
+            'title' => 'Liverpool Street',
+            'location' => Point::makeGeodetic(51.5, 0.0),
+            'metadata' => ['last_visit_at' => 'not a date'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->getJson('/api/v1/mobile/map/data?bbox=51.0,-0.5,52.0,0.5')
+            ->assertOk()
+            ->assertJsonPath('markers.places.0.visit_count', null)
+            ->assertJsonPath('markers.places.0.last_visit_at', null)
+            ->assertJsonPath('markers.places.0.category', null);
+    }
+
+    #[Test]
     public function maps_event_kind_from_domain_and_action(): void
     {
         $integration = Integration::factory()->create(['user_id' => $this->user->id]);
