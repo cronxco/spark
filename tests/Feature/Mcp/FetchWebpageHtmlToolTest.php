@@ -27,6 +27,7 @@ class FetchWebpageHtmlToolTest extends TestCase
             'fetch.url_safety.allowed_hosts' => ['example.com'],
             'services.playwright.worker_url' => 'http://playwright-worker:3000',
             'services.playwright.mcp_max_html_bytes' => 1048576,
+            'services.playwright.use_default_context' => true,
         ]);
     }
 
@@ -66,6 +67,7 @@ class FetchWebpageHtmlToolTest extends TestCase
     #[Test]
     public function it_uses_and_persists_matching_saved_cookies(): void
     {
+        config(['services.playwright.use_default_context' => false]);
         $group = IntegrationGroup::factory()->create([
             'user_id' => $this->user->id,
             'service' => 'fetch',
@@ -91,8 +93,57 @@ class FetchWebpageHtmlToolTest extends TestCase
         $response->assertSee('"used_saved_cookies": true');
         $response->assertSee('"cookie_store_updated": true');
 
+        Http::assertSent(fn (HttpRequest $request): bool => $request->url() === 'http://playwright-worker:3000/fetch'
+            && $request['useDefaultContext'] === false
+            && $request['cookies'][0]['value'] === 'old');
+
         $group->refresh();
         $this->assertSame('new', $group->auth_metadata['domains']['example.com']['cookies'][0]['value']);
+    }
+
+    #[Test]
+    public function it_reuses_the_live_browser_without_overwriting_its_login_with_saved_cookies(): void
+    {
+        $group = IntegrationGroup::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'fetch',
+            'auth_metadata' => ['domains' => ['example.com' => ['cookies' => [
+                ['name' => 'session', 'value' => 'stale', 'domain' => '.example.com', 'path' => '/'],
+            ]]]],
+        ]);
+        $this->fakeWorker([
+            ['name' => 'session', 'value' => 'live', 'domain' => '.example.com', 'path' => '/'],
+            ['name' => 'other_session', 'value' => 'unrelated', 'domain' => '.other.com', 'path' => '/'],
+        ]);
+
+        SparkServer::actingAs($this->user)->tool(FetchWebpageHtmlTool::class, [
+            'url' => 'https://example.com/account',
+        ])->assertOk();
+
+        Http::assertSent(fn (HttpRequest $request): bool => $request->url() === 'http://playwright-worker:3000/fetch'
+            && $request['useDefaultContext'] === true
+            && $request['cookies'] === []);
+
+        $group->refresh();
+        $cookies = $group->auth_metadata['domains']['example.com']['cookies'];
+        $this->assertCount(1, $cookies);
+        $this->assertSame('live', $cookies[0]['value']);
+        $this->assertArrayNotHasKey('other.com', $group->auth_metadata['domains']);
+    }
+
+    #[Test]
+    public function it_does_not_use_another_users_fetch_integration_to_access_the_browser(): void
+    {
+        IntegrationGroup::factory()->create(['service' => 'fetch']);
+        $this->fakeWorker();
+
+        SparkServer::actingAs($this->user)->tool(FetchWebpageHtmlTool::class, [
+            'url' => 'https://example.com',
+        ])->assertOk();
+
+        Http::assertSent(fn (HttpRequest $request): bool => $request->url() === 'http://playwright-worker:3000/fetch'
+            && $request['useDefaultContext'] === false
+            && $request['cookies'] === []);
     }
 
     #[Test]
