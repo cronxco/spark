@@ -3,11 +3,13 @@
 namespace App\Http\Resources\Compact;
 
 use App\Integrations\PluginRegistry;
+use App\Models\Block;
 use App\Models\Event;
 use App\Services\Mobile\EventRoute;
 use App\Support\MoneyDirection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Str;
 
 /**
  * @mixin Event
@@ -24,6 +26,12 @@ class CompactEventResource extends JsonResource
      * EventsController::updateNote, which writes/clears this block.
      */
     public const NOTE_BLOCK_TYPE = 'note';
+
+    /**
+     * How many block pills a list row shows before "+N", matching the web
+     * day timeline (`livewire/day.blade.php`).
+     */
+    public const BLOCK_REF_LIMIT = 3;
 
     /**
      * @return array<string, mixed>
@@ -89,6 +97,16 @@ class CompactEventResource extends JsonResource
             ];
         }
 
+        // The integration instance the event came from ("F1", "Receipts"),
+        // drawn as the first pill on a timeline row, as on the web.
+        if ($this->relationLoaded('integration') && $this->integration) {
+            $data['integration'] = [
+                'id' => $this->integration->id,
+                'name' => $this->integration->name,
+                'service' => $this->integration->service,
+            ];
+        }
+
         if ($this->relationLoaded('tags')) {
             $data['tags'] = $this->tags->map(fn ($tag) => [
                 'id' => (string) $tag->id,
@@ -126,6 +144,18 @@ class CompactEventResource extends JsonResource
                     fn ($block) => $block->block_type === self::NOTE_BLOCK_TYPE,
                 );
                 $data['blocks'] = CompactBlockResource::collection($blocks)->resolve($request);
+            } else {
+                // List mode: a light pill per block for the timeline row, the
+                // first few only, with the total so the client can say "+N".
+                $visible = $this->blocks
+                    ->filter(fn (Block $block) => $block->deleted_at === null && $block->block_type !== self::NOTE_BLOCK_TYPE)
+                    ->values();
+
+                $data['block_refs'] = $visible
+                    ->take(self::BLOCK_REF_LIMIT)
+                    ->map(fn (Block $block) => $this->blockRef($block))
+                    ->all();
+                $data['block_refs_total'] = $visible->count();
             }
         }
 
@@ -139,6 +169,42 @@ class CompactEventResource extends JsonResource
         $data['hidden'] = (bool) ($actionConfig['hidden'] ?? false);
 
         return $data;
+    }
+
+    /**
+     * @return array{id: string, block_type: string, title: string, display_value?: string}
+     */
+    private function blockRef(Block $block): array
+    {
+        $ref = [
+            'id' => (string) $block->id,
+            'block_type' => $block->block_type,
+            'title' => $block->title ?: $this->blockTypeDisplayName((string) $block->block_type),
+        ];
+
+        if ($block->value !== null) {
+            $ref['display_value'] = format_block_value_display(
+                $block->formatted_value,
+                $block->value_unit,
+                $block->value_multiplier,
+            );
+        }
+
+        return $ref;
+    }
+
+    private function blockTypeDisplayName(string $blockType): string
+    {
+        foreach ($this->pluginLookupKeys() as $service) {
+            $pluginClass = PluginRegistry::getPlugin($service);
+            $name = $pluginClass ? ($pluginClass::getBlockTypes()[$blockType]['display_name'] ?? null) : null;
+
+            if (is_string($name) && $name !== '') {
+                return $name;
+            }
+        }
+
+        return Str::headline($blockType);
     }
 
     /**
