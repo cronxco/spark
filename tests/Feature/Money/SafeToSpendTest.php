@@ -72,6 +72,28 @@ class SafeToSpendTest extends TestCase
     }
 
     #[Test]
+    public function a_direct_debit_that_pays_a_credit_card_is_not_counted_twice(): void
+    {
+        $this->account('Current', 100000, '2026-10-11');
+        $this->salary('2026-09-28');
+        EventObject::create([
+            'user_id' => $this->user->id, 'concept' => 'account', 'type' => 'bank_account', 'title' => 'British Airways Premium Plus',
+            'metadata' => ['account_type' => 'credit_card', 'provider' => 'American Express'],
+        ]);
+        $this->debit('AMERICAN EXPRESS', 40000, '2026-08-21');
+        $this->debit('AMERICAN EXPRESS', 50000, '2026-09-21');
+        $this->debit('Council tax', 15000, '2026-08-20');
+        $this->debit('Council tax', 15000, '2026-09-20');
+
+        $plan = app(PlanSnapshot::class)->build((string) $this->user->id)['safe_to_spend'];
+
+        $this->assertSame(15000, $plan['upcoming_bills']);
+        $this->assertSame(['Council tax'], array_column($plan['bills'], 'payee'));
+        $this->assertSame([['payee' => 'American Express', 'amount' => 50000, 'due' => '2026-10-21']], $plan['card_payments']);
+        $this->assertSame(100000 - $plan['owed_on_cards'] - 15000, $plan['amount']);
+    }
+
+    #[Test]
     public function several_current_accounts_are_summed(): void
     {
         $this->account('Current', 60000, '2026-10-11');

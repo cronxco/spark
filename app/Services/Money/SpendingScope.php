@@ -5,6 +5,7 @@ namespace App\Services\Money;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Relationship;
+use App\Support\MerchantName;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -297,7 +298,7 @@ class SpendingScope
             'id' => (string) $event->id,
             'time' => $event->time,
             'amount' => $refund ? -$amount : $amount,
-            'merchant' => (string) ($event->target?->title ?: ($meta['description'] ?? 'Unknown')),
+            'merchant' => MerchantName::display((string) ($event->target?->title ?: ($meta['description'] ?? 'Unknown'))),
             'category' => $category ? $this->normaliseCategory((string) $category) : 'uncategorised',
             'account_id' => (string) $event->actor_id,
             'account' => (string) ($event->actor?->title ?? ''),
