@@ -35,56 +35,6 @@ class GoodreadsPageDataTest extends TestCase
         $this->mock(MediaDownloadHelper::class)->shouldReceive('downloadAndAttachMedia')->andReturnNull();
     }
 
-    private function shelfItem(string $shelf = 'read'): array
-    {
-        $html = file_get_contents(__DIR__.'/../../Fixtures/Goodreads/shelf.html');
-        $item = (new GoodreadsPageParser)->shelf($html, '42', $shelf, 1, 'America/Los_Angeles')['items'][0];
-        if ($shelf === 'currently-reading') {
-            $item['reading_sessions'][0]['finished_at'] = null;
-        }
-
-        return $item;
-    }
-
-    private function progress(int $value, string $id, string $date = '2026-10-17T22:06:00+00:00'): array
-    {
-        return [
-            'guid' => 'UserStatus'.$id, 'status_id' => $id, 'type' => 'progress', 'book_id' => '123',
-            'title' => 'Example Book (Example Series, #2)', 'user_name' => 'Alex', 'user_id' => '42',
-            'progress_percentage' => $value, 'pubDate' => $date, 'source_date' => $date,
-            'source_timezone' => 'America/Los_Angeles', 'time_precision' => 'minute',
-        ];
-    }
-
-    private function import(string $kind, array $items, array $extra = []): void
-    {
-        (new GoodreadsPageData($this->integration, [
-            'kind' => $kind, 'items' => $items, 'observed_at' => now()->addSeconds(++$this->poll)->toIso8601String(), ...$extra,
-        ]))->handle();
-    }
-
-    private function book(): EventObject
-    {
-        return EventObject::where('user_id', $this->integration->user_id)->where('type', 'goodreads_book')->firstOrFail();
-    }
-
-    private function legacyEvent(string $action, string $guid, string $date, ?int $value = null): Event
-    {
-        $book = EventObject::firstOrCreate([
-            'user_id' => $this->integration->user_id, 'concept' => 'document', 'type' => 'goodreads_book', 'title' => 'Example Book',
-        ], ['metadata' => ['book_id' => '123', 'preserve_me' => true], 'time' => $date]);
-        $actor = EventObject::firstOrCreate([
-            'user_id' => $this->integration->user_id, 'concept' => 'user', 'type' => 'goodreads_user', 'title' => 'Alex',
-        ], ['time' => $date]);
-
-        return Event::create([
-            'integration_id' => $this->integration->id, 'actor_id' => $actor->id, 'target_id' => $book->id,
-            'source_id' => 'goodreads_'.($action === 'is_reading' && str_starts_with($guid, 'UserStatus') ? $value : $action).'_'.md5($guid),
-            'service' => 'goodreads', 'domain' => 'media', 'action' => $action, 'time' => $date,
-            'value' => $value, 'value_unit' => $action === 'is_reading' ? '%' : '/5', 'event_metadata' => ['guid' => $guid],
-        ]);
-    }
-
     #[Test]
     public function imports_rereads_book_blocks_author_tags_and_series_idempotently(): void
     {
@@ -193,7 +143,7 @@ class GoodreadsPageDataTest extends TestCase
     {
         $legacy = $this->legacyEvent('is_reading', 'UserStatus103', '2026-10-17T22:06:22+00:00', 63);
         $this->import('shelf', [$this->shelfItem('currently-reading')]);
-        $activity = (new GoodreadsPageParser)->activity(file_get_contents(__DIR__.'/../../Fixtures/Goodreads/activity.html'), '42', 'America/Los_Angeles');
+        $activity = (new GoodreadsPageParser)->activity(file_get_contents(__DIR__ . '/../../Fixtures/Goodreads/activity.html'), '42', 'America/Los_Angeles');
         $this->import('progress', [$activity[1]]);
 
         $this->assertSame(2, Event::count());
@@ -221,7 +171,7 @@ class GoodreadsPageDataTest extends TestCase
     public function book_enrichment_updates_objects_and_blocks_without_creating_more_events(): void
     {
         $this->import('shelf', [$this->shelfItem()]);
-        $book = (new GoodreadsPageParser)->book(file_get_contents(__DIR__.'/../../Fixtures/Goodreads/book.html'), '123');
+        $book = (new GoodreadsPageParser)->book(file_get_contents(__DIR__ . '/../../Fixtures/Goodreads/book.html'), '123');
         $this->import('book', [[...$book, 'details_fetched_at' => '2026-11-01T19:00:00+00:00']]);
         $this->assertSame(2, Event::count());
         $this->assertSame(1, EventObject::where('type', 'goodreads_book')->count());
@@ -270,7 +220,7 @@ class GoodreadsPageDataTest extends TestCase
     #[Test]
     public function later_day_only_snapshots_do_not_downgrade_a_precise_activity_timestamp(): void
     {
-        $activity = (new GoodreadsPageParser)->activity(file_get_contents(__DIR__.'/../../Fixtures/Goodreads/activity.html'), '42', 'America/Los_Angeles');
+        $activity = (new GoodreadsPageParser)->activity(file_get_contents(__DIR__ . '/../../Fixtures/Goodreads/activity.html'), '42', 'America/Los_Angeles');
         $this->import('shelf', [$this->shelfItem()], ['activity' => $activity]);
         $this->import('shelf', [$this->shelfItem()]);
         $event = Event::where('event_metadata->goodreads_session_id', 'amzn1grreading_sessionv1second')->firstOrFail();
@@ -283,7 +233,7 @@ class GoodreadsPageDataTest extends TestCase
     {
         $item = $this->shelfItem();
         $item['reading_sessions'][0]['finished_at'] = null;
-        $activity = (new GoodreadsPageParser)->activity(file_get_contents(__DIR__.'/../../Fixtures/Goodreads/activity.html'), '42', 'America/Los_Angeles');
+        $activity = (new GoodreadsPageParser)->activity(file_get_contents(__DIR__ . '/../../Fixtures/Goodreads/activity.html'), '42', 'America/Los_Angeles');
         $this->import('shelf', [$item], ['activity' => $activity]);
         $event = Event::where('event_metadata->goodreads_session_id', 'amzn1grreading_sessionv1second')->firstOrFail();
         $this->assertSame('2026-10-19 21:25:00', $event->time->utc()->format('Y-m-d H:i:s'));
@@ -300,7 +250,7 @@ class GoodreadsPageDataTest extends TestCase
             ->with('https://images.example.com/large.jpg', Mockery::type(EventObject::class), 'downloaded_images', Mockery::type('array'))
             ->andReturn(new Media);
         $this->import('shelf', [$this->shelfItem()]);
-        $details = (new GoodreadsPageParser)->book(file_get_contents(__DIR__.'/../../Fixtures/Goodreads/book.html'), '123');
+        $details = (new GoodreadsPageParser)->book(file_get_contents(__DIR__ . '/../../Fixtures/Goodreads/book.html'), '123');
         $this->import('book', [[...$details, 'details_fetched_at' => now()->toIso8601String()]]);
         $this->import('shelf', [$this->shelfItem()]);
         $this->assertSame('https://images.example.com/large.jpg', $this->book()->metadata['cover_downloaded_url']);
@@ -330,5 +280,55 @@ class GoodreadsPageDataTest extends TestCase
         $this->assertSame(3, Event::count());
         $newBook = EventObject::where('type', 'goodreads_book')->where('metadata->book_id', '456')->firstOrFail();
         $this->assertSame(3, Event::where('target_id', $newBook->id)->count());
+    }
+
+    private function shelfItem(string $shelf = 'read'): array
+    {
+        $html = file_get_contents(__DIR__ . '/../../Fixtures/Goodreads/shelf.html');
+        $item = (new GoodreadsPageParser)->shelf($html, '42', $shelf, 1, 'America/Los_Angeles')['items'][0];
+        if ($shelf === 'currently-reading') {
+            $item['reading_sessions'][0]['finished_at'] = null;
+        }
+
+        return $item;
+    }
+
+    private function progress(int $value, string $id, string $date = '2026-10-17T22:06:00+00:00'): array
+    {
+        return [
+            'guid' => 'UserStatus' . $id, 'status_id' => $id, 'type' => 'progress', 'book_id' => '123',
+            'title' => 'Example Book (Example Series, #2)', 'user_name' => 'Alex', 'user_id' => '42',
+            'progress_percentage' => $value, 'pubDate' => $date, 'source_date' => $date,
+            'source_timezone' => 'America/Los_Angeles', 'time_precision' => 'minute',
+        ];
+    }
+
+    private function import(string $kind, array $items, array $extra = []): void
+    {
+        (new GoodreadsPageData($this->integration, [
+            'kind' => $kind, 'items' => $items, 'observed_at' => now()->addSeconds(++$this->poll)->toIso8601String(), ...$extra,
+        ]))->handle();
+    }
+
+    private function book(): EventObject
+    {
+        return EventObject::where('user_id', $this->integration->user_id)->where('type', 'goodreads_book')->firstOrFail();
+    }
+
+    private function legacyEvent(string $action, string $guid, string $date, ?int $value = null): Event
+    {
+        $book = EventObject::firstOrCreate([
+            'user_id' => $this->integration->user_id, 'concept' => 'document', 'type' => 'goodreads_book', 'title' => 'Example Book',
+        ], ['metadata' => ['book_id' => '123', 'preserve_me' => true], 'time' => $date]);
+        $actor = EventObject::firstOrCreate([
+            'user_id' => $this->integration->user_id, 'concept' => 'user', 'type' => 'goodreads_user', 'title' => 'Alex',
+        ], ['time' => $date]);
+
+        return Event::create([
+            'integration_id' => $this->integration->id, 'actor_id' => $actor->id, 'target_id' => $book->id,
+            'source_id' => 'goodreads_' . ($action === 'is_reading' && str_starts_with($guid, 'UserStatus') ? $value : $action) . '_' . md5($guid),
+            'service' => 'goodreads', 'domain' => 'media', 'action' => $action, 'time' => $date,
+            'value' => $value, 'value_unit' => $action === 'is_reading' ? '%' : '/5', 'event_metadata' => ['guid' => $guid],
+        ]);
     }
 }

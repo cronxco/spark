@@ -42,23 +42,17 @@ class GoodreadsScraperTest extends TestCase
         $this->fetchGroup = IntegrationGroup::factory()->create(['user_id' => $user->id, 'service' => 'fetch']);
     }
 
-    private function fixture(string $name): string
+    public static function failedResponses(): array
     {
-        return file_get_contents(__DIR__.'/../../Fixtures/Goodreads/'.$name.'.html');
-    }
-
-    private function browser(array $pages): PlaywrightFetchClient
-    {
-        $browser = Mockery::mock(PlaywrightFetchClient::class);
-        $browser->shouldReceive('fetchForMcp')->andReturnUsing(function (string $url, IntegrationGroup $group) use ($pages) {
-            $this->assertSame($this->fetchGroup->id, $group->id);
-            $this->assertArrayHasKey($url, $pages);
-
-            return ['success' => true, 'html' => $pages[$url], 'url' => $url, 'status' => 200, 'html_truncated' => false];
-        });
-        $this->app->instance(PlaywrightFetchClient::class, $browser);
-
-        return $browser;
+        return [
+            [['success' => false, 'error' => 'Browser unavailable']],
+            [['html_truncated' => true]],
+            [['status' => 429]],
+            [['status' => 403]],
+            [['url' => 'https://www.goodreads.com/user/sign_in']],
+            [['url' => 'https://www.goodreads.com/review/list/999']],
+            [['url' => 'https://evil.example/review/list/42']],
+        ];
     }
 
     #[Test]
@@ -104,19 +98,6 @@ class GoodreadsScraperTest extends TestCase
         ], $response));
         $this->expectException(RuntimeException::class);
         (new GoodreadsScraper($browser, new GoodreadsPageParser))->shelf($this->integration, 'read', 1);
-    }
-
-    public static function failedResponses(): array
-    {
-        return [
-            [['success' => false, 'error' => 'Browser unavailable']],
-            [['html_truncated' => true]],
-            [['status' => 429]],
-            [['status' => 403]],
-            [['url' => 'https://www.goodreads.com/user/sign_in']],
-            [['url' => 'https://www.goodreads.com/review/list/999']],
-            [['url' => 'https://evil.example/review/list/42']],
-        ];
     }
 
     #[Test]
@@ -185,5 +166,24 @@ class GoodreadsScraperTest extends TestCase
         }
         Queue::assertNothingPushed();
         $this->assertEquals($before, $this->integration->fresh()->last_sync_at);
+    }
+
+    private function fixture(string $name): string
+    {
+        return file_get_contents(__DIR__ . '/../../Fixtures/Goodreads/' . $name . '.html');
+    }
+
+    private function browser(array $pages): PlaywrightFetchClient
+    {
+        $browser = Mockery::mock(PlaywrightFetchClient::class);
+        $browser->shouldReceive('fetchForMcp')->andReturnUsing(function (string $url, IntegrationGroup $group) use ($pages) {
+            $this->assertSame($this->fetchGroup->id, $group->id);
+            $this->assertArrayHasKey($url, $pages);
+
+            return ['success' => true, 'html' => $pages[$url], 'url' => $url, 'status' => 200, 'html_truncated' => false];
+        });
+        $this->app->instance(PlaywrightFetchClient::class, $browser);
+
+        return $browser;
     }
 }

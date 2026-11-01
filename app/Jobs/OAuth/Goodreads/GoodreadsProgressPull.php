@@ -17,6 +17,11 @@ class GoodreadsProgressPull extends BaseFetchJob
         $this->page = $page;
     }
 
+    public function uniqueId(): string
+    {
+        return parent::uniqueId() . '_page_' . $this->page;
+    }
+
     protected function getServiceName(): string
     {
         return 'goodreads';
@@ -25,11 +30,6 @@ class GoodreadsProgressPull extends BaseFetchJob
     protected function getJobType(): string
     {
         return 'progress';
-    }
-
-    public function uniqueId(): string
-    {
-        return parent::uniqueId().'_page_'.$this->page;
     }
 
     protected function fetchData(): array

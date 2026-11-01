@@ -27,7 +27,7 @@ class GoodreadsPageData extends BaseProcessingJob
 
     protected function process(): void
     {
-        Cache::lock('goodreads:import:'.$this->integration->user_id, 300)->block(10, function () {
+        Cache::lock('goodreads:import:' . $this->integration->user_id, 300)->block(10, function () {
             $items = $this->rawData['items'];
             if ($this->rawData['kind'] === 'progress') {
                 usort($items, fn ($a, $b) => strcmp($a['pubDate'], $b['pubDate']));
@@ -48,8 +48,8 @@ class GoodreadsPageData extends BaseProcessingJob
                 } else {
                     $value = $item['type'] === 'start_reading' ? 0 : $item['progress_percentage'];
                     $sourceId = $item['type'] === 'start_reading'
-                        ? 'goodreads_is_reading_'.md5($item['guid'])
-                        : 'goodreads_'.$value.'_'.md5($item['guid']);
+                        ? 'goodreads_is_reading_' . md5($item['guid'])
+                        : 'goodreads_' . $value . '_' . md5($item['guid']);
                     $this->importEvent($book, $item, [...$item, 'action' => 'is_reading', 'value' => $value, 'source_id' => $sourceId]);
                 }
                 $this->refreshProgress($book->refresh());
@@ -57,6 +57,18 @@ class GoodreadsPageData extends BaseProcessingJob
                 $this->cover($book);
             }
         });
+    }
+
+    protected function createOrUpdateObject(array $objectData): EventObject
+    {
+        $query = EventObject::where('user_id', $this->integration->user_id)->where('type', $objectData['type']);
+        if ($objectData['type'] === 'goodreads_book') {
+            $id = $objectData['metadata']['book_id'];
+
+            return $query->where(fn ($q) => $q->where('metadata->book_id', $id)->orWhere('metadata->book_id', (int) $id))->firstOrFail();
+        }
+
+        return $query->where('metadata->goodreads_user_id', $objectData['metadata']['goodreads_user_id'])->firstOrFail();
     }
 
     private function book(array $item, bool $snapshot): EventObject
@@ -74,7 +86,7 @@ class GoodreadsPageData extends BaseProcessingJob
         }
         if (EventObject::where('user_id', $this->integration->user_id)->where('concept', 'document')->where('type', 'goodreads_book')
             ->where('title', $title)->when($book, fn ($query) => $query->whereKeyNot($book->id))->exists()) {
-            $title .= ' [Goodreads '.$bookId.']';
+            $title .= ' [Goodreads ' . $bookId . ']';
         }
         $fields = [
             'author_name' => 'author', 'author_url' => 'author_url', 'isbn' => 'isbn', 'isbn13' => 'isbn13',
@@ -114,7 +126,7 @@ class GoodreadsPageData extends BaseProcessingJob
             'concept' => 'document', 'type' => 'goodreads_book', 'title' => $title,
             'content' => ($item['book_description'] ?? null) ?: $book?->content,
             'metadata' => $metadata,
-            'url' => $book?->url ?? $item['link'] ?? 'https://www.goodreads.com/book/show/'.$bookId,
+            'url' => $book?->url ?? $item['link'] ?? 'https://www.goodreads.com/book/show/' . $bookId,
             'media_url' => isset($item['details_fetched_at'])
                 ? (($item['book_large_image_url'] ?? null) ?: $book?->media_url)
                 : ($book?->media_url ?: ($item['book_large_image_url'] ?? null)),
@@ -172,7 +184,7 @@ class GoodreadsPageData extends BaseProcessingJob
             $entries[] = [
                 'action' => $action,
                 'value' => $action === 'is_reading' ? 0 : ($action === 'finished_reading' ? $item['user_rating'] : null),
-                'source_id' => 'goodreads_'.$action.'_'.md5($item['guid'].($session['id'] ? ':'.$session['id'] : '')),
+                'source_id' => 'goodreads_' . $action . '_' . md5($item['guid'] . ($session['id'] ? ':' . $session['id'] : '')),
                 'session_id' => $session['id'],
                 ...$time,
             ];
@@ -186,14 +198,14 @@ class GoodreadsPageData extends BaseProcessingJob
         $reviewId = $item['review_id'];
         $claimed = [];
         foreach ($this->accountEvents()->where(fn ($query) => $query->where('event_metadata->goodreads_review_id', $reviewId)
-            ->orWhere('event_metadata->guid', 'like', '%/review/show/'.$reviewId.'%')->orWhere('event_metadata->link', 'like', '%/review/show/'.$reviewId.'%'))->orderBy('time')->get() as $event) {
+            ->orWhere('event_metadata->guid', 'like', '%/review/show/' . $reviewId . '%')->orWhere('event_metadata->link', 'like', '%/review/show/' . $reviewId . '%'))->orderBy('time')->get() as $event) {
             $metadata = $event->event_metadata ?? [];
             if (isset($metadata['goodreads_session_id']) || ($metadata['source_format'] ?? null) === 'html') {
                 continue;
             }
             $guid = $metadata['guid'] ?? '';
             $link = $metadata['link'] ?? '';
-            if (! preg_match('~/review/show/'.preg_quote($reviewId, '~').'(?:\D|$)~', $guid.' '.$link)) {
+            if (! preg_match('~/review/show/' . preg_quote($reviewId, '~') . '(?:\D|$)~', $guid . ' ' . $link)) {
                 continue;
             }
             $candidates = [];
@@ -328,18 +340,6 @@ class GoodreadsPageData extends BaseProcessingJob
         }
     }
 
-    protected function createOrUpdateObject(array $objectData): EventObject
-    {
-        $query = EventObject::where('user_id', $this->integration->user_id)->where('type', $objectData['type']);
-        if ($objectData['type'] === 'goodreads_book') {
-            $id = $objectData['metadata']['book_id'];
-
-            return $query->where(fn ($q) => $q->where('metadata->book_id', $id)->orWhere('metadata->book_id', (int) $id))->firstOrFail();
-        }
-
-        return $query->where('metadata->goodreads_user_id', $objectData['metadata']['goodreads_user_id'])->firstOrFail();
-    }
-
     private function actor(array $item): EventObject
     {
         $id = (string) ($item['user_id'] ?? $this->integration->group->auth_metadata['user_id']);
@@ -349,7 +349,7 @@ class GoodreadsPageData extends BaseProcessingJob
             ?? (clone $query)->where('title', $name)->whereNull('metadata->goodreads_user_id')->first();
         if (! $actor) {
             if ((clone $query)->where('title', $name)->exists()) {
-                $name .= ' [Goodreads '.$id.']';
+                $name .= ' [Goodreads ' . $id . ']';
             }
 
             return EventObject::create([

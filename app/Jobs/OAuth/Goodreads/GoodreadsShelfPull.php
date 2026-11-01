@@ -19,6 +19,11 @@ class GoodreadsShelfPull extends BaseFetchJob
         $this->page = $page;
     }
 
+    public function uniqueId(): string
+    {
+        return parent::uniqueId() . '_page_' . $this->page;
+    }
+
     protected function getServiceName(): string
     {
         return 'goodreads';
@@ -27,11 +32,6 @@ class GoodreadsShelfPull extends BaseFetchJob
     protected function getJobType(): string
     {
         return 'shelf';
-    }
-
-    public function uniqueId(): string
-    {
-        return parent::uniqueId().'_page_'.$this->page;
     }
 
     protected function fetchData(): array

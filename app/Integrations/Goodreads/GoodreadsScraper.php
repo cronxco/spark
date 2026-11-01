@@ -31,9 +31,9 @@ class GoodreadsScraper
         $data = $this->parser->statuses($this->html($integration, $url), $userId, $page, $timezone);
         foreach ($data['items'] as &$item) {
             if ($item['progress_percentage'] === null && $item['progress_pages'] === null) {
-                $status = $this->html($integration, 'https://www.goodreads.com/user_status/show/'.$item['status_id']);
+                $status = $this->html($integration, 'https://www.goodreads.com/user_status/show/' . $item['status_id']);
                 $reviewId = $this->parser->reviewId($status);
-                $review = $this->html($integration, 'https://www.goodreads.com/review/show/'.$reviewId);
+                $review = $this->html($integration, 'https://www.goodreads.com/review/show/' . $reviewId);
                 $item['progress_percentage'] = $this->parser->reviewPercentage($review, $item['status_id']);
                 $item['review_id'] = $reviewId;
             }
@@ -61,8 +61,8 @@ class GoodreadsScraper
             throw new RuntimeException('Invalid Goodreads book ID.');
         }
 
-        return Cache::remember('goodreads:book:'.$integration->user_id.':'.$bookId, now()->addDay(), function () use ($integration, $bookId) {
-            return [...$this->parser->book($this->html($integration, 'https://www.goodreads.com/book/show/'.$bookId), $bookId), 'details_fetched_at' => now()->toIso8601String()];
+        return Cache::remember('goodreads:book:' . $integration->user_id . ':' . $bookId, now()->addDay(), function () use ($integration, $bookId) {
+            return [...$this->parser->book($this->html($integration, 'https://www.goodreads.com/book/show/' . $bookId), $bookId), 'details_fetched_at' => now()->toIso8601String()];
         });
     }
 
@@ -79,8 +79,8 @@ class GoodreadsScraper
     {
         [$userId, $timezone] = $this->settings($integration);
 
-        return Cache::remember('goodreads:activity:'.$integration->user_id.':'.$userId.':'.$timezone, now()->addMinutes(5), function () use ($integration, $userId, $timezone) {
-            return $this->parser->activity($this->html($integration, 'https://www.goodreads.com/user/show/'.$userId), $userId, $timezone);
+        return Cache::remember('goodreads:activity:' . $integration->user_id . ':' . $userId . ':' . $timezone, now()->addMinutes(5), function () use ($integration, $userId, $timezone) {
+            return $this->parser->activity($this->html($integration, 'https://www.goodreads.com/user/show/' . $userId), $userId, $timezone);
         });
     }
 
@@ -99,7 +99,7 @@ class GoodreadsScraper
     private function html(Integration $integration, string $url): string
     {
         $group = $integration->user->integrationGroups()->where('service', 'fetch')->first() ?? $integration->group;
-        $key = 'goodreads:requests:'.$integration->user_id;
+        $key = 'goodreads:requests:' . $integration->user_id;
         if (RateLimiter::tooManyAttempts($key, 30)) {
             throw new RuntimeException('Goodreads request limit reached; the job will retry with backoff.');
         }
@@ -110,9 +110,9 @@ class GoodreadsScraper
         $status = $result['status'] ?? 200;
         if (! ($result['success'] ?? false) || ($result['html_truncated'] ?? false)
             || $status >= 400 || ! in_array($final['host'] ?? '', ['www.goodreads.com', 'goodreads.com'], true)
-            || ! preg_match('~^'.preg_quote($expectedPath, '~').'(?:[-.][^/]*)?$~', $final['path'] ?? '')
+            || ! preg_match('~^' . preg_quote($expectedPath, '~') . '(?:[-.][^/]*)?$~', $final['path'] ?? '')
             || preg_match('~^/(?:user/sign_in|ap/signin|user/new)~', $final['path'] ?? '')) {
-            throw new RuntimeException('Goodreads page fetch failed, was truncated, or requires a browser login. '.($result['error'] ?? ''));
+            throw new RuntimeException('Goodreads page fetch failed, was truncated, or requires a browser login. ' . ($result['error'] ?? ''));
         }
 
         return $result['html'];

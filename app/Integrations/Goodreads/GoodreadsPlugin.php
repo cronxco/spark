@@ -184,14 +184,14 @@ class GoodreadsPlugin extends ManualPlugin
 
     public static function buildShelfPageUrl(string $userId, string $shelf, int $page = 1): string
     {
-        return 'https://www.goodreads.com/review/list/'.rawurlencode($userId).'?'.http_build_query([
+        return 'https://www.goodreads.com/review/list/' . rawurlencode($userId) . '?' . http_build_query([
             'shelf' => $shelf, 'sort' => 'date_updated', 'order' => 'd', 'view' => 'table', 'per_page' => 50, 'page' => $page,
         ]);
     }
 
     public static function buildStatusPageUrl(string $userId, int $page = 1): string
     {
-        return 'https://www.goodreads.com/user_status/list/'.rawurlencode($userId).'?page='.$page;
+        return 'https://www.goodreads.com/user_status/list/' . rawurlencode($userId) . '?page=' . $page;
     }
 
     /**

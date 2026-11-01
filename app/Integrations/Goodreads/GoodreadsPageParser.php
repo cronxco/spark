@@ -40,11 +40,11 @@ class GoodreadsPageParser
             $authorLink = './/td[contains(@class," author")]//a';
             $items[] = [
                 'review_id' => $reviewId,
-                'guid' => 'https://www.goodreads.com/review/show/'.$reviewId,
-                'link' => 'https://www.goodreads.com/review/show/'.$reviewId,
+                'guid' => 'https://www.goodreads.com/review/show/' . $reviewId,
+                'link' => 'https://www.goodreads.com/review/show/' . $reviewId,
                 'book_id' => $bookId,
                 'title' => $bookTitle,
-                'book_url' => 'https://www.goodreads.com/book/show/'.$bookId,
+                'book_url' => 'https://www.goodreads.com/book/show/' . $bookId,
                 'book_large_image_url' => $this->attribute('.//td[contains(@class," cover")]//img', 'src', $row),
                 'author_name' => $this->authorName($this->text($authorLink, $row)),
                 'author_url' => $this->absolute($this->attribute($authorLink, 'href', $row)),
@@ -62,7 +62,7 @@ class GoodreadsPageParser
                 'source_timezone' => $timezone,
             ];
         }
-        $next = $this->nextPage('/review/list/'.$userId, $page, ['shelf' => $shelf]);
+        $next = $this->nextPage('/review/list/' . $userId, $page, ['shelf' => $shelf]);
         $expected = min(50, max(0, $total - ($page - 1) * 50));
         if (count($items) !== $expected || count(array_unique(array_column($items, 'review_id'))) !== count($items)
             || ($total > $page * 50 && $next === null) || ($total <= $page * 50 && $next !== null)) {
@@ -76,7 +76,7 @@ class GoodreadsPageParser
     {
         $this->document($html);
         $title = $this->text('//title');
-        if (! preg_match('/(?:Showing\s+([\d,]+)[–-]([\d,]+)\s+of\s+([\d,]+)|No Status Updates|No status updates)/u', $title.' '.$this->text('//h1'), $count)) {
+        if (! preg_match('/(?:Showing\s+([\d,]+)[–-]([\d,]+)\s+of\s+([\d,]+)|No Status Updates|No status updates)/u', $title . ' ' . $this->text('//h1'), $count)) {
             throw new RuntimeException('Goodreads status history is missing or unrecognised.');
         }
         $total = isset($count[3]) ? (int) str_replace(',', '', $count[3]) : 0;
@@ -85,7 +85,7 @@ class GoodreadsPageParser
             $id = substr($row->getAttribute('id'), 12);
             $headerPath = './/span[contains(@class,"user_status_header")]';
             $header = $this->text($headerPath, $row);
-            $bookId = $this->id($this->attribute($headerPath.'//a[contains(@href,"/book/show/")]', 'href', $row), 'book/show');
+            $bookId = $this->id($this->attribute($headerPath . '//a[contains(@href,"/book/show/")]', 'href', $row), 'book/show');
             $date = $this->text('.//a[contains(@class,"greyText") and contains(@href,"/user_status/show/")]', $row);
             $progress = null;
             $pages = null;
@@ -100,13 +100,13 @@ class GoodreadsPageParser
                 throw new RuntimeException('Goodreads returned an incomplete reading update.');
             }
             $items[] = [
-                'guid' => 'UserStatus'.$id,
+                'guid' => 'UserStatus' . $id,
                 'status_id' => $id,
                 'type' => 'progress',
                 'book_id' => $bookId,
-                'title' => $this->text($headerPath.'//a[contains(@href,"/book/show/")]', $row),
+                'title' => $this->text($headerPath . '//a[contains(@href,"/book/show/")]', $row),
                 'book_large_image_url' => $this->attribute('.//div[contains(@class,"bookCover")]//img', 'src', $row),
-                'user_name' => $this->text($headerPath.'//a[contains(@href,"/user/show/")]', $row),
+                'user_name' => $this->text($headerPath . '//a[contains(@href,"/user/show/")]', $row),
                 'user_id' => $userId,
                 'progress_percentage' => $progress,
                 'progress_pages' => $pages,
@@ -114,7 +114,7 @@ class GoodreadsPageParser
             ];
         }
         $rows = count($this->nodes('//div[starts-with(@id,"user_status_")]'));
-        $next = $this->nextPage('/user_status/list/'.$userId, $page);
+        $next = $this->nextPage('/user_status/list/' . $userId, $page);
         $statusIds = array_map(fn ($node) => $node->getAttribute('id'), $this->nodes('//div[starts-with(@id,"user_status_")]'));
         if ($rows !== min(30, max(0, $total - ($page - 1) * 30)) || count(array_unique($statusIds)) !== $rows
             || ($total > $page * 30 && $next === null) || ($total <= $page * 30 && $next !== null)) {
@@ -127,7 +127,7 @@ class GoodreadsPageParser
     public function activity(string $html, string $userId, string $timezone): array
     {
         $this->document($html);
-        if (! $this->nodes('//a[contains(@href,"/review/list/'.$userId.'")]')) {
+        if (! $this->nodes('//a[contains(@href,"/review/list/' . $userId . '")]')) {
             throw new RuntimeException('Goodreads profile is private or unrecognised; check the browser login.');
         }
         $items = [];
@@ -153,12 +153,12 @@ class GoodreadsPageParser
                 throw new RuntimeException('Goodreads activity is missing a book or timestamp.');
             }
             $items[] = [
-                'guid' => 'ReadStatus'.$statusId,
+                'guid' => 'ReadStatus' . $statusId,
                 'type' => $type,
                 'book_id' => $bookId,
                 'title' => $this->text('.//a[contains(concat(" ",@class," ")," bookTitle ")]', $row)
                     ?: $this->text('.//a[contains(@href,"/book/show/") and normalize-space(.)!=""]', $row),
-                'user_name' => $this->text('.//a[contains(@href,"/user/show/'.$userId.'")]', $row),
+                'user_name' => $this->text('.//a[contains(@href,"/user/show/' . $userId . '")]', $row),
                 'user_id' => $userId,
                 ...$this->timestamp($date, $timezone, 'minute'),
             ];
@@ -232,7 +232,7 @@ class GoodreadsPageParser
     public function reviewPercentage(string $html, string $statusId): int
     {
         $this->document($html);
-        $value = $this->text('//*[contains(@class,"readingTimeline")]//a[contains(@href,"/user_status/show/'.$statusId.'")]');
+        $value = $this->text('//*[contains(@class,"readingTimeline")]//a[contains(@href,"/user_status/show/' . $statusId . '")]');
         if (! preg_match('/^(\d+(?:\.\d+)?)%$/', $value, $matches) || (float) $matches[1] > 100) {
             throw new RuntimeException('Cannot resolve the percentage of a Goodreads starting update.');
         }
@@ -262,7 +262,7 @@ class GoodreadsPageParser
         $document = new DOMDocument;
         $previous = libxml_use_internal_errors(true);
         try {
-            $document->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+            $document->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
         } finally {
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
@@ -292,16 +292,16 @@ class GoodreadsPageParser
 
     private function field(string $name, DOMNode $row): string
     {
-        return $this->text('.//td[contains(concat(" ",@class," ")," '.$name.' ")]//div[@class="value"]', $row);
+        return $this->text('.//td[contains(concat(" ",@class," ")," ' . $name . ' ")]//div[@class="value"]', $row);
     }
 
     private function sessions(DOMNode $row): array
     {
         $sessions = [];
         foreach (['date_started' => 'started_at', 'date_read' => 'finished_at'] as $field => $key) {
-            foreach ($this->nodes('.//td[contains(@class," '.$field.'")]//div[contains(@class,"editable_date")]', $row) as $index => $date) {
-                preg_match('/'.preg_quote($field, '/').'_([^\s]+)/', $date->getAttribute('class'), $matches);
-                $id = $matches[1] ?? 'row_'.$index;
+            foreach ($this->nodes('.//td[contains(@class," ' . $field . '")]//div[contains(@class,"editable_date")]', $row) as $index => $date) {
+                preg_match('/' . preg_quote($field, '/') . '_([^\s]+)/', $date->getAttribute('class'), $matches);
+                $id = $matches[1] ?? 'row_' . $index;
                 $sessions[$id] ??= ['id' => $id, 'started_at' => null, 'finished_at' => null];
                 $sessions[$id][$key] = $this->calendarDate($this->text('.//span[1]', $date));
             }
@@ -330,17 +330,17 @@ class GoodreadsPageParser
     {
         $parts = explode(',', $name, 2);
 
-        return count($parts) === 2 ? trim($parts[1]).' '.trim($parts[0]) : $name;
+        return count($parts) === 2 ? trim($parts[1]) . ' ' . trim($parts[0]) : $name;
     }
 
     private function id(string $url, string $path): ?string
     {
-        return preg_match('~^/(?:'.preg_quote($path, '~').')/(\d+)(?:[^\d/].*)?$~', parse_url($url, PHP_URL_PATH) ?? '', $m) ? $m[1] : null;
+        return preg_match('~^/(?:' . preg_quote($path, '~') . ')/(\d+)(?:[^\d/].*)?$~', parse_url($url, PHP_URL_PATH) ?? '', $m) ? $m[1] : null;
     }
 
     private function absolute(string $url): ?string
     {
-        return $url !== '' ? (str_starts_with($url, '/') ? 'https://www.goodreads.com'.$url : $url) : null;
+        return $url !== '' ? (str_starts_with($url, '/') ? 'https://www.goodreads.com' . $url : $url) : null;
     }
 
     private function nextPage(string $path, int $page, array $filters = []): ?int
@@ -352,7 +352,7 @@ class GoodreadsPageParser
         $parts = parse_url($url);
         parse_str($parts['query'] ?? '', $query);
         if ((isset($parts['host']) && $parts['host'] !== 'www.goodreads.com')
-            || ! preg_match('~^'.preg_quote($path, '~').'(?:-[^/]*)?$~', $parts['path'] ?? '')
+            || ! preg_match('~^' . preg_quote($path, '~') . '(?:-[^/]*)?$~', $parts['path'] ?? '')
             || (int) ($query['page'] ?? 0) !== $page + 1
             || array_diff_assoc($filters, $query) !== []) {
             throw new RuntimeException('Goodreads returned an invalid pagination link.');

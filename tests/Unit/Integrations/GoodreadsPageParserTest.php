@@ -10,9 +10,14 @@ use RuntimeException;
 
 class GoodreadsPageParserTest extends TestCase
 {
-    private function fixture(string $name): string
+    public static function invalidPages(): array
     {
-        return file_get_contents(__DIR__.'/../../Fixtures/Goodreads/'.$name.'.html');
+        return [
+            ['<html><head><title>Sign in</title></head><body>Sign in to Goodreads</body></html>'],
+            ['<html><head><title>Page not found</title></head><body>Error</body></html>'],
+            ['<html><head><title>Alex’s books (1 book)</title></head><body><table>'],
+            ['<html><head><title>Unexpected layout</title></head><body></body></html>'],
+        ];
     }
 
     #[Test]
@@ -43,9 +48,9 @@ class GoodreadsPageParserTest extends TestCase
         preg_match('/<tr id="review_9001"[\s\S]*?<\/tr>/', $this->fixture('shelf'), $row);
         $rows = '';
         for ($id = 1; $id <= 50; $id++) {
-            $rows .= str_replace('review_9001', 'review_'.$id, $row[0]);
+            $rows .= str_replace('review_9001', 'review_' . $id, $row[0]);
         }
-        $html = '<html><head><title>Alex’s books (51 books)</title></head><body><table>'.$rows.'</table><a class="next_page" href="/review/list/42?per_page=50&amp;shelf=read&amp;page=2">next</a></body></html>';
+        $html = '<html><head><title>Alex’s books (51 books)</title></head><body><table>' . $rows . '</table><a class="next_page" href="/review/list/42?per_page=50&amp;shelf=read&amp;page=2">next</a></body></html>';
         $this->assertSame(2, (new GoodreadsPageParser)->shelf($html, '42', 'read', 1, 'Europe/London')['next_page']);
         $this->expectException(RuntimeException::class);
         (new GoodreadsPageParser)->shelf(str_replace('/review/list/42?', 'https://evil.example/review/list/42?', $html), '42', 'read', 1, 'Europe/London');
@@ -65,7 +70,7 @@ class GoodreadsPageParserTest extends TestCase
     {
         $html = $this->fixture('shelf');
         preg_match('/<tr id="review_9001"[\s\S]*?<\/tr>/', $html, $row);
-        $html = str_replace(['(1 book)', '</tbody>'], ['(2 books)', $row[0].'</tbody>'], $html);
+        $html = str_replace(['(1 book)', '</tbody>'], ['(2 books)', $row[0] . '</tbody>'], $html);
         $this->expectException(RuntimeException::class);
         (new GoodreadsPageParser)->shelf($html, '42', 'read', 1, 'Europe/London');
     }
@@ -136,13 +141,8 @@ class GoodreadsPageParserTest extends TestCase
         (new GoodreadsPageParser)->shelf($html, '42', 'read', 1, 'Europe/London');
     }
 
-    public static function invalidPages(): array
+    private function fixture(string $name): string
     {
-        return [
-            ['<html><head><title>Sign in</title></head><body>Sign in to Goodreads</body></html>'],
-            ['<html><head><title>Page not found</title></head><body>Error</body></html>'],
-            ['<html><head><title>Alex’s books (1 book)</title></head><body><table>'],
-            ['<html><head><title>Unexpected layout</title></head><body></body></html>'],
-        ];
+        return file_get_contents(__DIR__ . '/../../Fixtures/Goodreads/' . $name . '.html');
     }
 }
