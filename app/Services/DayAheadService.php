@@ -386,7 +386,9 @@ class DayAheadService
      * When to be in bed tonight to arrive rested for tomorrow's first
      * commitment. Only returned when there is a reason to say it: tomorrow
      * starts earlier than Will usually wakes, or readiness has been below
-     * its recent average for three nights running.
+     * its recent average for three nights running. Will wakes at the usual
+     * time unless the first commitment needs an earlier start, so a late
+     * first commitment never pushes the bedtime into the small hours.
      *
      * @param  array<string, mixed>|null  $firstCommitment
      * @return array{wake_by: string, bed_by: string, sleep_need_minutes: int, typical_wake: string|null, early_start: bool, readiness_low_nights: int}|null
@@ -420,16 +422,17 @@ class DayAheadService
 
         $readinessLowNights = $this->readinessLowNights($user, $localDate);
 
-        if ($firstCommitment) {
-            $wakeBy = Carbon::parse($firstCommitment['start'])->setTimezone($this->timezone)->subMinutes(self::WAKE_BUFFER_MINUTES);
-        } elseif ($typicalWakeMinutes !== null) {
-            $wakeBy = $localDate->copy()->addMinutes($typicalWakeMinutes);
-        } else {
+        $usualWake = $typicalWakeMinutes !== null ? $localDate->copy()->addMinutes($typicalWakeMinutes) : null;
+        $commitmentWake = $firstCommitment
+            ? Carbon::parse($firstCommitment['start'])->setTimezone($this->timezone)->subMinutes(self::WAKE_BUFFER_MINUTES)
+            : null;
+
+        $earlyStart = $usualWake !== null && $commitmentWake !== null && $commitmentWake->lt($usualWake);
+        $wakeBy = $earlyStart ? $commitmentWake : ($usualWake ?? $commitmentWake);
+
+        if ($wakeBy === null) {
             return null;
         }
-
-        $wakeByMinutes = (int) $localDate->diffInMinutes($wakeBy);
-        $earlyStart = $typicalWakeMinutes !== null && $wakeByMinutes < $typicalWakeMinutes;
 
         if (! $earlyStart && $readinessLowNights < 3) {
             return null;
