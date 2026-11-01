@@ -67,6 +67,45 @@ class TagsControllerTest extends TestCase
     }
 
     #[Test]
+    public function browse_filters_by_type_and_totals_each_type_on_the_first_page(): void
+    {
+        $artist = Tag::findOrCreate('RAYE', 'music_artist');
+        $otherArtist = Tag::findOrCreate('Judah Earl', 'music_artist');
+        $category = Tag::findOrCreate('bills', 'transaction_category');
+        $untyped = Tag::findOrCreate('loose', null);
+
+        $this->createEvent('Play one')->attachTags([$artist, $category]);
+        $this->createEvent('Play two')->attachTags([$artist, $otherArtist]);
+        $this->createEvent('Untyped')->attachTag($untyped);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/tags?type=music_artist')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', (string) $artist->id)
+            ->assertJsonPath('data.1.id', (string) $otherArtist->id)
+            ->assertJsonPath('types.0', ['type' => 'music_artist', 'tags_count' => 2, 'total_count' => 3])
+            ->assertJsonCount(3, 'types');
+
+        $this->getJson('/api/v1/mobile/tags?type=untyped')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', (string) $untyped->id);
+
+        $this->getJson('/api/v1/mobile/tags?type=music_artist&limit=1')
+            ->assertOk()
+            ->assertJsonPath('has_more', true);
+
+        $cursor = $this->getJson('/api/v1/mobile/tags?type=music_artist&limit=1')->json('next_cursor');
+
+        $this->getJson('/api/v1/mobile/tags?type=music_artist&limit=1&cursor=' . urlencode($cursor))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', (string) $otherArtist->id)
+            ->assertJsonMissingPath('types');
+    }
+
+    #[Test]
     public function detail_returns_only_items_actually_tagged(): void
     {
         $tag = Tag::findOrCreate('coffee', 'spark');

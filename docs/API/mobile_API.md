@@ -1299,8 +1299,13 @@ semantic mode.
 Cursor-paginated list of the user's tags with usage counts, ordered by
 total usage then ID.
 
-**Query Parameters**: `q` (string, optional filter, max 255), `cursor`,
-`limit` (default 30, max 100).
+**Query Parameters**: `q` (string, optional filter, max 255), `type`
+(optional, one tag type such as `music_artist`; `untyped` lists tags with no
+type), `cursor`, `limit` (default 30, max 100).
+
+The first page (no `cursor`) also carries `types`: one entry per tag type among
+the tags matching `q`, ignoring `type`, with how many tags it has and their
+combined usage, ordered by usage. Tags with no type are listed as `untyped`.
 
 **Response `200`**
 
@@ -1317,7 +1322,10 @@ total usage then ID.
         }
     ],
     "next_cursor": "MjA=",
-    "has_more": false
+    "has_more": false,
+    "types": [
+        { "type": "spark", "tags_count": 8, "total_count": 120 }
+    ]
 }
 ```
 
