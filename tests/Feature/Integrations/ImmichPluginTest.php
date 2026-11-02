@@ -3,9 +3,13 @@
 namespace Tests\Feature\Integrations;
 
 use App\Integrations\Immich\ImmichPlugin;
+use App\Jobs\OAuth\Immich\PhotosPull;
 use App\Models\Integration;
+use App\Models\IntegrationGroup;
+use Exception;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -17,6 +21,20 @@ class ImmichPluginTest extends TestCase
     {
         parent::setUp();
         $this->plugin = new ImmichPlugin;
+    }
+
+    public static function syncModes(): array
+    {
+        return [
+            'recent' => ['recent', true],
+            'legacy recent integer' => [0, true],
+            'legacy recent string' => ['0', true],
+            'default recent' => [null, true],
+            'full' => ['full', false],
+            'legacy full integer' => [1, false],
+            'legacy full string' => ['1', false],
+            'invalid mode' => ['unexpected', null],
+        ];
     }
 
     #[Test]
@@ -173,7 +191,7 @@ class ImmichPluginTest extends TestCase
         $configSchema = $this->plugin->getConfigurationSchema();
 
         $this->assertArrayHasKey('options', $configSchema['sync_mode']);
-        $this->assertEquals(['recent', 'full'], $configSchema['sync_mode']['options']);
+        $this->assertEquals(['recent' => 'Recent (last 30 days)', 'full' => 'Full history'], $configSchema['sync_mode']['options']);
     }
 
     #[Test]
@@ -208,7 +226,8 @@ class ImmichPluginTest extends TestCase
         [$first] = $requests[0];
         $this->assertInstanceOf(Request::class, $first);
         $this->assertEquals('POST', $first->method());
-        $this->assertEquals('2026-10-01T00:00:00+00:00', $first['updatedAfter']);
+        $this->assertEquals('2026-10-01T00:00:00+00:00', $first['takenAfter']);
+        $this->assertArrayNotHasKey('updatedAfter', $first->data());
         $this->assertTrue($first['withExif']);
         $this->assertTrue($first['withPeople']);
         $this->assertEquals(1, $first['page']);
@@ -251,5 +270,43 @@ class ImmichPluginTest extends TestCase
         Http::assertSent(fn (Request $request) => str_contains($request->url(), 'withHidden=true')
             && str_contains($request->url(), 'page=1'));
         Http::assertSent(fn (Request $request) => str_contains($request->url(), 'page=2'));
+    }
+
+    #[Test]
+    #[DataProvider('syncModes')]
+    public function it_applies_the_saved_sync_mode_when_the_photo_job_fetches(mixed $mode, ?bool $recent): void
+    {
+        $this->freezeTime();
+        Http::preventStrayRequests();
+        Http::fake([
+            'immich.test/api/search/metadata' => Http::response(['assets' => ['items' => [], 'nextPage' => null]]),
+        ]);
+
+        $integration = new Integration(['service' => 'immich', 'configuration' => ['sync_mode' => $mode]]);
+        $integration->setRelation('group', new IntegrationGroup(['auth_metadata' => [
+            'server_url' => 'https://immich.test', 'api_key' => 'test-key',
+        ]]));
+
+        $job = new class($integration) extends PhotosPull
+        {
+            public function fetchForTest(): array
+            {
+                return $this->fetchData();
+            }
+        };
+        if ($recent === null) {
+            $this->expectException(Exception::class);
+            $this->expectExceptionMessage('Invalid Immich sync mode');
+        }
+
+        $job->fetchForTest();
+
+        Http::assertSentCount(1);
+        $request = Http::recorded()[0][0];
+        if ($recent) {
+            $this->assertSame(now()->subDays(30)->toIso8601String(), $request['takenAfter']);
+        } else {
+            $this->assertArrayNotHasKey('takenAfter', $request->data());
+        }
     }
 }

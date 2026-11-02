@@ -18,7 +18,7 @@ class ImmichUrlBuilder
      */
     public function getThumbnailUrl(string $serverUrl, string $assetId, string $size = 'preview'): string
     {
-        return rtrim($serverUrl, '/') . "/api/asset/thumbnail/{$assetId}?size={$size}";
+        return rtrim($serverUrl, '/') . "/api/assets/{$assetId}/thumbnail?size={$size}";
     }
 
     /**
