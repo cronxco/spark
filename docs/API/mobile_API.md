@@ -186,7 +186,7 @@ Day-scoped payloads also **render** in that zone: every timestamp inside `GET /b
 | `birthdays[]`      | `{title}`, from the digest, else all-day synced events whose title contains "birthday"                                                                                                                                                                                                                                                                                 |
 | `plan[]`           | `{id, title, kind, done, topic_id, topic_title, url}`; `kind` is `day_note` (task blocks on that day's Outline day note, in note order), `topic_task` (Flint topic tasks with `due_on`/`review_on` that day) or `topic_review` (active topics whose `next_review_at` is that day)                                                                                      |
 | `day_note_url`     | The day note in Outline, or `null`                                                                                                                                                                                                                                                                                                                                     |
-| `sleep_target`     | `{wake_by, bed_by, sleep_need_minutes, typical_wake, early_start, readiness_low_nights}`, only when the first commitment needs an earlier wake than the fortnight's median, or readiness has sat below its 30-day average for 3+ nights. `wake_by` is an hour before the first commitment; `bed_by` subtracts the median night's sleep plus 20 minutes.                |
+| `sleep_target`     | `{wake_by, bed_by, sleep_need_minutes, typical_wake, early_start, readiness_low_nights}`, only when the first commitment needs an earlier wake than the fortnight's median, or readiness has sat below its 30-day average for 3+ nights. `wake_by` is an hour before the first commitment when that is earlier than the usual wake time, and the usual wake time otherwise; `bed_by` subtracts the median night's sleep plus 20 minutes.                |
 
 ### Response Headers
 
@@ -599,7 +599,7 @@ Cursor-paginated reverse-chronological feed of the user's events.
 
 **Response `422`** — Invalid domain value or malformed `date` parameter.
 
-See [CompactEvent](#compactevent) for the item schema. Feed items include `tags`, `blocks_count`, and `tldr` (when a `*_tldr` block exists), but do **not** embed the full `blocks` array — tap through to `GET /events/{id}` to retrieve that.
+See [CompactEvent](#compactevent) for the item schema. Feed items include `integration`, `tags`, `blocks_count`, `block_refs`, `block_refs_total` and `tldr` (when a `*_tldr` block exists), but do **not** embed the full `blocks` array — tap through to `GET /events/{id}` to retrieve that.
 
 ---
 
@@ -2996,7 +2996,12 @@ shapes.
         { "name": "running", "type": null }
     ],
     "tldr": "Optional single-sentence summary from any *_tldr block.",
+    "integration": { "id": "uuid", "name": "Current Account", "service": "monzo" },
     "blocks_count": 3,
+    "block_refs": [
+        { "id": "uuid", "block_type": "tax_summary", "title": "Tax Summary", "display_value": "£1.20" }
+    ],
+    "block_refs_total": 3,
     "blocks": [ CompactBlock, ... ]
 }
 ```
@@ -3020,6 +3025,9 @@ shapes.
 | `tags`                | Yes            | Always an array (empty when no tags); each item has `name` and `type`                                                                                                                                                                                                       |
 | `blocks_count`        | Feed only      | Integer count of attached blocks; present in `/feed`, absent in `/events/id`                                                                                                                                                                                                |
 | `blocks`              | Detail only    | Full block array; present in `GET /events/{id}`, absent in `/feed`                                                                                                                                                                                                          |
+| `integration`         | No             | The integration instance the event came from (`id`, `name`, `service`); the first pill on a timeline row |
+| `block_refs`          | Feed only      | Up to 3 blocks as light pills: `id`, `block_type`, `title` (the block type's display name when untitled) and `display_value` when the block has a value. Notes and deleted blocks are left out |
+| `block_refs_total`    | Feed only      | How many blocks `block_refs` was taken from, so the client can show "+N" |
 
 ### CompactObject
 

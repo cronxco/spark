@@ -207,6 +207,36 @@ class BriefingAheadTest extends TestCase
             ->assertJsonPath('ahead.sleep_target', null);
     }
 
+    #[Test]
+    public function a_late_first_commitment_keeps_the_usual_wake_time(): void
+    {
+        $oura = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'oura']);
+        foreach (range(1, 7) as $daysAgo) {
+            $bedtime = Carbon::parse('2026-10-10 22:30:00', 'Europe/London')->subDays($daysAgo);
+            Event::factory()->create([
+                'integration_id' => $oura->id, 'service' => 'oura', 'action' => 'slept_for',
+                'time' => $bedtime->copy()->utc(), 'value' => 8 * 3600, 'value_multiplier' => 1,
+                'event_metadata' => ['end' => $bedtime->copy()->addHours(8)->addMinutes(30)->toIso8601String()],
+            ]);
+        }
+        foreach (range(1, 10) as $daysAgo) {
+            Event::factory()->create([
+                'integration_id' => $oura->id, 'service' => 'oura', 'action' => 'had_readiness_score',
+                'time' => Carbon::parse('2026-10-10 07:00:00', 'Europe/London')->subDays($daysAgo - 1)->utc(),
+                'value' => $daysAgo <= 3 ? 60 : 85, 'value_multiplier' => 1,
+            ]);
+        }
+        $calendar = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'google-calendar']);
+        $this->calendarEvent($calendar, 'Train to London', '2026-10-11 12:00:00', 270);
+
+        $this->getJson('/api/v1/mobile/briefing/today?date=tomorrow')
+            ->assertOk()
+            ->assertJsonPath('ahead.sleep_target.wake_by', '2026-10-11T07:00:00+01:00')
+            ->assertJsonPath('ahead.sleep_target.bed_by', '2026-10-10T22:40:00+01:00')
+            ->assertJsonPath('ahead.sleep_target.early_start', false)
+            ->assertJsonPath('ahead.sleep_target.readiness_low_nights', 3);
+    }
+
     private function calendarEvent(Integration $integration, string $title, string $utcStart, ?int $minutes, ?string $location = null): Event
     {
         return Event::factory()->create([
