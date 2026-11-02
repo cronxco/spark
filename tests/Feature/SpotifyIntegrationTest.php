@@ -164,12 +164,18 @@ class SpotifyIntegrationTest extends TestCase
         $albumArtBlock = $blocks->where('title', 'Album Art')->first();
         $this->assertNotNull($albumArtBlock);
         $this->assertEquals('https://example.com/album.jpg', $albumArtBlock->media_url);
+        // An image has no reading, so no "300 pixels" value.
+        $this->assertNull($albumArtBlock->value);
 
         $trackDetailsBlock = $blocks->where('title', 'Track Details')->first();
         $this->assertNotNull($trackDetailsBlock);
         $this->assertIsArray($trackDetailsBlock->metadata);
         $this->assertEquals('Test Track', $trackDetailsBlock->metadata['track'] ?? null);
         $this->assertStringContainsString('Test Artist', $trackDetailsBlock->metadata['artists'] ?? '');
+        // Popularity moves into the text; the first line is the row's summary.
+        $this->assertNull($trackDetailsBlock->value);
+        $this->assertEquals(85, $trackDetailsBlock->metadata['popularity'] ?? null);
+        $this->assertEquals("3:00, Test Album\n\nPopularity 85 out of 100", $trackDetailsBlock->getContent());
 
         // Verify tags were attached (typed)
         $tags = $event->tags;
