@@ -80,7 +80,7 @@ class ImmichPlugin extends ManualPlugin
                     'label' => 'Sync Mode',
                     'required' => false,
                     'default' => 'recent',
-                    'options' => ['recent', 'full'],
+                    'options' => ['recent' => 'Recent (last 30 days)', 'full' => 'Full history'],
                     'description' => 'Recent (last 30 days) or Full history',
                 ],
                 'include_videos' => [

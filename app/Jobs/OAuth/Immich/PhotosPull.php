@@ -41,7 +41,11 @@ class PhotosPull extends BaseFetchJob
         }
 
         // Determine sync mode and date filter
-        $syncMode = $this->integration->configuration['sync_mode'] ?? 'recent';
+        $syncMode = match ($this->integration->configuration['sync_mode'] ?? 'recent') {
+            'recent', 0, '0' => 'recent',
+            'full', 1, '1' => 'full',
+            default => throw new Exception('Invalid Immich sync mode; choose Recent or Full history in integration settings'),
+        };
         $afterDate = null;
 
         if ($syncMode === 'recent') {
