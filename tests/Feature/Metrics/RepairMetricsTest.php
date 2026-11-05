@@ -22,23 +22,6 @@ class RepairMetricsTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    private function statistic(string $service, string $action, array $overrides = []): MetricStatistic
-    {
-        return MetricStatistic::factory()->create($overrides + [
-            'user_id' => $this->user->id,
-            'service' => $service,
-            'action' => $action,
-        ]);
-    }
-
-    private function trend(MetricStatistic $statistic, string $type, array $overrides = []): MetricTrend
-    {
-        return MetricTrend::factory()->create($overrides + [
-            'metric_statistic_id' => $statistic->id,
-            'type' => $type,
-        ]);
-    }
-
     #[Test]
     public function a_dry_run_changes_nothing(): void
     {
@@ -110,5 +93,22 @@ class RepairMetricsTest extends TestCase
     public function an_unknown_user_is_refused(): void
     {
         $this->artisan('metrics:repair', ['--user' => '00000000-0000-0000-0000-000000000000'])->assertFailed();
+    }
+
+    private function statistic(string $service, string $action, array $overrides = []): MetricStatistic
+    {
+        return MetricStatistic::factory()->create($overrides + [
+            'user_id' => $this->user->id,
+            'service' => $service,
+            'action' => $action,
+        ]);
+    }
+
+    private function trend(MetricStatistic $statistic, string $type, array $overrides = []): MetricTrend
+    {
+        return MetricTrend::factory()->create($overrides + [
+            'metric_statistic_id' => $statistic->id,
+            'type' => $type,
+        ]);
     }
 }

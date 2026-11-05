@@ -40,40 +40,6 @@ class InsightEngineTest extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * One event per day for the 90 days up to and including yesterday.
-     *
-     * @param  callable(int, Carbon): float  $value  given days back and the date
-     */
-    private function seed(string $service, string $action, string $unit, callable $value, int $days = 90): MetricStatistic
-    {
-        for ($back = 1; $back <= $days; $back++) {
-            $date = now()->utc()->subDays($back)->startOfDay();
-
-            Event::factory()->create([
-                'integration_id' => $this->integration->id,
-                'service' => $service,
-                'domain' => 'health',
-                'action' => $action,
-                'value' => $value($back, $date),
-                'value_multiplier' => 1,
-                'value_unit' => $unit,
-                'time' => $date,
-                'event_metadata' => [],
-            ]);
-        }
-
-        $statistic = MetricStatistic::firstOrNew([
-            'user_id' => $this->user->id,
-            'service' => $service,
-            'action' => $action,
-            'value_unit' => $unit,
-        ]);
-        app(BaselineService::class)->recompute($statistic);
-
-        return $statistic->fresh();
-    }
-
     #[Test]
     public function a_week_well_above_the_four_week_trend_is_an_insight(): void
     {
@@ -197,5 +163,39 @@ class InsightEngineTest extends TestCase
 
         $this->assertSame(0, MetricTrend::anomalies()->count());
         $this->assertSame(0, MetricTrend::trends()->count());
+    }
+
+    /**
+     * One event per day for the 90 days up to and including yesterday.
+     *
+     * @param  callable(int, Carbon): float  $value  given days back and the date
+     */
+    private function seed(string $service, string $action, string $unit, callable $value, int $days = 90): MetricStatistic
+    {
+        for ($back = 1; $back <= $days; $back++) {
+            $date = now()->utc()->subDays($back)->startOfDay();
+
+            Event::factory()->create([
+                'integration_id' => $this->integration->id,
+                'service' => $service,
+                'domain' => 'health',
+                'action' => $action,
+                'value' => $value($back, $date),
+                'value_multiplier' => 1,
+                'value_unit' => $unit,
+                'time' => $date,
+                'event_metadata' => [],
+            ]);
+        }
+
+        $statistic = MetricStatistic::firstOrNew([
+            'user_id' => $this->user->id,
+            'service' => $service,
+            'action' => $action,
+            'value_unit' => $unit,
+        ]);
+        app(BaselineService::class)->recompute($statistic);
+
+        return $statistic->fresh();
     }
 }

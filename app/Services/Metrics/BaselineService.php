@@ -17,6 +17,11 @@ use Illuminate\Support\Carbon;
  */
 class BaselineService
 {
+    public function __construct(
+        private readonly MetricCatalogue $catalogue,
+        private readonly MetricSeries $series,
+    ) {}
+
     /**
      * Windows kept per metric: the one anomalies are detected on, and the one
      * shown to the person.
@@ -30,11 +35,6 @@ class BaselineService
             (int) config('metrics.display_window_days', 30),
         ]));
     }
-
-    public function __construct(
-        private readonly MetricCatalogue $catalogue,
-        private readonly MetricSeries $series,
-    ) {}
 
     /**
      * Recompute and store the baselines for one metric. Returns false, and
@@ -263,7 +263,7 @@ class BaselineService
 
                 $summary = $this->summarise(array_values($group), $method);
 
-                $rows[$window.'|'.$dayType] = [
+                $rows[$window . '|' . $dayType] = [
                     'window_days' => $window,
                     'day_type' => $dayType,
                     'method' => $method,
@@ -294,7 +294,7 @@ class BaselineService
         MetricBaseline::where('metric_statistic_id', $statistic->id)
             ->whereNull('subject_id')
             ->get()
-            ->reject(fn (MetricBaseline $b) => in_array($b->window_days.'|'.$b->day_type, $keep, true))
+            ->reject(fn (MetricBaseline $b) => in_array($b->window_days . '|' . $b->day_type, $keep, true))
             ->each->delete();
     }
 

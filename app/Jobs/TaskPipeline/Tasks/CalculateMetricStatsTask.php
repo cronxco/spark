@@ -13,6 +13,11 @@ class CalculateMetricStatsTask extends BaseTaskJob
 {
     public const DEBOUNCE_SECONDS = 600;
 
+    public static function debounceKey(MetricStatistic $statistic): string
+    {
+        return "metric-baseline:{$statistic->id}";
+    }
+
     /**
      * Execute the metric statistics calculation task
      *
@@ -68,11 +73,6 @@ class CalculateMetricStatsTask extends BaseTaskJob
                 'spread' => $statistic->stddev_value,
             ]);
         }
-    }
-
-    public static function debounceKey(MetricStatistic $statistic): string
-    {
-        return "metric-baseline:{$statistic->id}";
     }
 
     /**

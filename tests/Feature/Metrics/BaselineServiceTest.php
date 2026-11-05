@@ -38,40 +38,6 @@ class BaselineServiceTest extends TestCase
         parent::tearDown();
     }
 
-    /**
-     * One event per day, ending yesterday.
-     *
-     * @param  callable(int, Carbon): float  $value  given days back and the date
-     */
-    private function days(string $service, string $action, string $unit, int $count, callable $value): void
-    {
-        for ($back = 1; $back <= $count; $back++) {
-            $date = now()->utc()->subDays($back)->startOfDay();
-
-            Event::factory()->create([
-                'integration_id' => $this->integration->id,
-                'service' => $service,
-                'domain' => 'health',
-                'action' => $action,
-                'value' => $value($back, $date),
-                'value_multiplier' => 1,
-                'value_unit' => $unit,
-                'time' => $date,
-                'event_metadata' => [],
-            ]);
-        }
-    }
-
-    private function statistic(string $service, string $action, string $unit): MetricStatistic
-    {
-        return MetricStatistic::firstOrNew([
-            'user_id' => $this->user->id,
-            'service' => $service,
-            'action' => $action,
-            'value_unit' => $unit,
-        ]);
-    }
-
     #[Test]
     public function a_reading_gets_a_mean_and_standard_deviation_baseline(): void
     {
@@ -216,5 +182,39 @@ class BaselineServiceTest extends TestCase
             0.0001,
         );
         $this->assertSame('mean_sd', $described['method']);
+    }
+
+    /**
+     * One event per day, ending yesterday.
+     *
+     * @param  callable(int, Carbon): float  $value  given days back and the date
+     */
+    private function days(string $service, string $action, string $unit, int $count, callable $value): void
+    {
+        for ($back = 1; $back <= $count; $back++) {
+            $date = now()->utc()->subDays($back)->startOfDay();
+
+            Event::factory()->create([
+                'integration_id' => $this->integration->id,
+                'service' => $service,
+                'domain' => 'health',
+                'action' => $action,
+                'value' => $value($back, $date),
+                'value_multiplier' => 1,
+                'value_unit' => $unit,
+                'time' => $date,
+                'event_metadata' => [],
+            ]);
+        }
+    }
+
+    private function statistic(string $service, string $action, string $unit): MetricStatistic
+    {
+        return MetricStatistic::firstOrNew([
+            'user_id' => $this->user->id,
+            'service' => $service,
+            'action' => $action,
+            'value_unit' => $unit,
+        ]);
     }
 }

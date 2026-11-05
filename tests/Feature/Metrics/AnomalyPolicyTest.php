@@ -12,19 +12,6 @@ class AnomalyPolicyTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function statistic(string $service, string $action, array $overrides = []): MetricStatistic
-    {
-        return MetricStatistic::factory()->create($overrides + [
-            'service' => $service,
-            'action' => $action,
-            'mean_value' => 100,
-            'stddev_value' => 10,
-            'normal_lower_bound' => 80,
-            'normal_upper_bound' => 120,
-            'event_count' => 60,
-        ]);
-    }
-
     #[Test]
     public function a_low_value_is_raised_when_higher_is_better(): void
     {
@@ -100,5 +87,18 @@ class AnomalyPolicyTest extends TestCase
         $this->assertFalse($policy->isNoise(3.2, 1));
         $this->assertFalse($policy->isNoise(2.4, 3));
         $this->assertTrue($policy->isNoise(5.0, 7));
+    }
+
+    private function statistic(string $service, string $action, array $overrides = []): MetricStatistic
+    {
+        return MetricStatistic::factory()->create($overrides + [
+            'service' => $service,
+            'action' => $action,
+            'mean_value' => 100,
+            'stddev_value' => 10,
+            'normal_lower_bound' => 80,
+            'normal_upper_bound' => 120,
+            'event_count' => 60,
+        ]);
     }
 }
