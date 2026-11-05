@@ -3,15 +3,19 @@
 namespace Tests\Unit\Jobs;
 
 use App\Jobs\Data\Receipt\ProcessReceiptEmailJob;
+use App\Models\Event;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Services\CurrencyConversionService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionMethod;
 use Tests\TestCase;
+use TypeError;
 
 class ProcessReceiptEmailJobTest extends TestCase
 {
@@ -240,5 +244,68 @@ class ProcessReceiptEmailJobTest extends TestCase
         $result = $parseEmail->invoke($job, $rawEmail);
 
         $this->assertSame('', $result['message_id']);
+    }
+
+    #[Test]
+    public function it_skips_currency_conversion_when_the_total_amount_is_missing()
+    {
+        $this->mock(CurrencyConversionService::class, function (MockInterface $mock) {
+            $mock->shouldNotReceive('convert');
+        });
+
+        $event = $this->invokeCreateReceiptEvent(null, 'USD');
+
+        $this->assertNull($event->value);
+        $this->assertArrayNotHasKey('currency_conversion', $event->fresh()->event_metadata);
+    }
+
+    #[Test]
+    public function it_converts_a_foreign_currency_total_to_the_base_currency()
+    {
+        $this->mock(CurrencyConversionService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('convert')->once()->withArgs(fn ($amount) => $amount === 1250)->andReturn(1000);
+            $mock->shouldReceive('getRate')->once()->andReturn(0.8);
+        });
+
+        $event = $this->invokeCreateReceiptEvent(1250, 'USD');
+
+        $conversion = $event->fresh()->event_metadata['currency_conversion'];
+        $this->assertSame(1250, $conversion['original_amount']);
+        $this->assertSame(1000, $conversion['converted_to_gbp']);
+    }
+
+    #[Test]
+    public function it_does_not_fail_the_receipt_when_conversion_throws_a_type_error()
+    {
+        $this->mock(CurrencyConversionService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('convert')->andThrow(new TypeError('bad amount'));
+        });
+
+        $event = $this->invokeCreateReceiptEvent(1250, 'EUR');
+
+        $this->assertArrayNotHasKey('currency_conversion', $event->fresh()->event_metadata);
+    }
+
+    private function invokeCreateReceiptEvent(mixed $totalAmount, string $currency): Event
+    {
+        $job = new ProcessReceiptEmailJob($this->integration, 'receipts/test-email.eml');
+
+        $receiptData = [
+            'is_valid_receipt' => true,
+            'merchant' => ['name' => 'Shop'],
+            'receipt_metadata' => [],
+            'transaction_metadata' => ['transaction_date' => '2026-10-02T10:00:00+01:00'],
+            'transaction_summary' => ['total_amount' => $totalAmount, 'currency' => $currency],
+            'matching_hints' => [],
+            'line_items' => [],
+        ];
+        $parsedEmail = [
+            'date' => 'Fri, 2 Oct 2026 10:00:00 +0100',
+            'message_id' => 'receipt-' . uniqid() . '@shop.example',
+        ];
+
+        $createReceiptEvent = new ReflectionMethod($job, 'createReceiptEvent');
+
+        return $createReceiptEvent->invoke($job, $receiptData, $parsedEmail, 'receipt_' . uniqid());
     }
 }

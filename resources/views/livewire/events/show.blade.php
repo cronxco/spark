@@ -1,5 +1,6 @@
 <?php
 
+use App\Integrations\Monzo\MonzoPlugin;
 use App\Integrations\PluginRegistry;
 use App\Models\Event;
 use App\Traits\AuthorizesOwnership;
@@ -598,6 +599,19 @@ new class extends Component
     {
         $this->event->delete();
         $this->redirect(route('today.main'), navigate: true);
+    }
+
+    public function rejectSalary(): void
+    {
+        $this->authorizeModelOwner($this->event);
+
+        if ($this->event->service !== 'monzo' || $this->event->action !== 'salary_received_from') {
+            return;
+        }
+
+        MonzoPlugin::rejectSalary($this->event);
+        $this->event->refresh();
+        $this->notifyCopied('Not salary');
     }
 
     public function handleEventUpdated(): void
@@ -1364,6 +1378,16 @@ new class extends Component
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Information</h3>
                         <div class="flex gap-1">
+                            @if ($this->event->service === 'monzo' && $this->event->action === 'salary_received_from')
+                                <button
+                                    wire:click="rejectSalary"
+                                    wire:confirm="Treat as a normal transaction?"
+                                    class="btn btn-ghost btn-xs gap-1"
+                                    title="Not salary">
+                                    <x-icon name="fas.xmark" class="w-3 h-3" />
+                                    <span class="hidden sm:inline">Not salary</span>
+                                </button>
+                            @endif
                             <button
                                 wire:click="copyEventWithoutEmbeddings"
                                 class="btn btn-ghost btn-xs gap-1"

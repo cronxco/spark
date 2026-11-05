@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\Flint\FlintReviewService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
@@ -25,11 +26,11 @@ new class extends Component
             app(FlintReviewService::class)->act(Auth::user(), $kind, $id, $action, [
                 'transaction_id' => $this->chosen[$id] ?? null,
             ]);
-        } catch (\InvalidArgumentException $exception) {
+        } catch (InvalidArgumentException $exception) {
             $this->error($exception->getMessage());
 
             return;
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $exception) {
+        } catch (ModelNotFoundException $exception) {
             unset($this->items);
             $this->error('That item is no longer available. The list has been refreshed.');
 
@@ -48,8 +49,8 @@ new class extends Component
 }; ?>
 
 @php
-    $needsDecision = collect($this->items)->filter(fn ($item) => in_array($item['kind'], ['receipt_suggestion', 'link_suggestion'], true));
-    $automatic = collect($this->items)->reject(fn ($item) => in_array($item['kind'], ['receipt_suggestion', 'link_suggestion'], true));
+    $needsDecision = collect($this->items)->filter(fn ($item) => in_array($item['kind'], ['receipt_suggestion', 'link_suggestion', 'task_proposal'], true));
+    $automatic = collect($this->items)->reject(fn ($item) => in_array($item['kind'], ['receipt_suggestion', 'link_suggestion', 'task_proposal'], true));
 @endphp
 
 <div class="space-y-6">
@@ -71,6 +72,7 @@ new class extends Component
                                     'receipt_suggestion' => 'Receipt suggestion',
                                     'receipt_auto_match' => 'Receipt linked automatically',
                                     'link_suggestion' => 'Link suggestion',
+                                    'task_proposal' => 'Task suggestion',
                                     default => 'Linked automatically',
                                 } }}</span>
                                 @if ($item['confidence'] !== null)

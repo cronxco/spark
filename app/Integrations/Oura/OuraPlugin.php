@@ -83,6 +83,15 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         return true;
     }
 
+    /**
+     * Oura's main overnight period is `long_sleep`; shorter `sleep`, `late_nap` and `rest`
+     * periods are naps, which would otherwise drag down sleep duration baselines.
+     */
+    public static function sleepAction(array $item): string
+    {
+        return in_array($item['type'] ?? null, ['sleep', 'late_nap', 'rest'], true) ? 'napped_for' : 'slept_for';
+    }
+
     public static function getActionTypes(): array
     {
         return [
@@ -90,6 +99,15 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'icon' => 'fas.moon',
                 'display_name' => 'Sleep',
                 'description' => 'Sleep duration and quality data',
+                'display_with_object' => false,
+                'value_unit' => 'seconds',
+                'value_formatter' => '{{ format_duration($value) }}',
+                'hidden' => false,
+            ],
+            'napped_for' => [
+                'icon' => 'fas.moon',
+                'display_name' => 'Nap',
+                'description' => 'A nap or rest period, kept apart from the main sleep',
                 'display_with_object' => false,
                 'value_unit' => 'seconds',
                 'value_formatter' => '{{ format_duration($value) }}',
@@ -103,6 +121,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'value_formatter' => '{{ round($value) }} <span class="text-[0.875em]">bpm</span>',
                 'value_unit' => 'bpm',
                 'hidden' => false,
+                // Written at ~03:00 from overnight readings, then rewritten through the day.
+                'accumulates_through_day' => true,
             ],
             'did_workout' => [
                 'icon' => 'fas.dumbbell',
@@ -719,6 +739,100 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'description' => 'Generic workout activity',
                 'hidden' => false,
             ],
+            'core_exercise' => [
+                'icon' => 'fas.dumbbell',
+                'display_name' => 'Core Exercise',
+                'description' => 'Core Exercise workout activity',
+                'hidden' => false,
+            ],
+            'hiit' => [
+                'icon' => 'fas.bolt',
+                'display_name' => 'HIIT',
+                'description' => 'HIIT workout activity',
+                'hidden' => false,
+            ],
+            'stretching' => [
+                'icon' => 'fas.child-reaching',
+                'display_name' => 'Stretching',
+                'description' => 'Stretching workout activity',
+                'hidden' => false,
+            ],
+            'dance' => [
+                'icon' => 'fas.music',
+                'display_name' => 'Dance',
+                'description' => 'Dance workout activity',
+                'hidden' => false,
+            ],
+            'house_work' => [
+                'icon' => 'fas.broom',
+                'display_name' => 'Housework',
+                'description' => 'Housework workout activity',
+                'hidden' => false,
+            ],
+            'horseback_riding' => [
+                'icon' => 'fas.horse',
+                'display_name' => 'Horseback Riding',
+                'description' => 'Horseback Riding workout activity',
+                'hidden' => false,
+            ],
+
+            // Static per-day metric objects from OuraPlugin::getStaticMetricObject()
+            'daily_activity' => [
+                'icon' => 'fas.person-walking',
+                'display_name' => 'Daily Activity',
+                'description' => 'Daily Activity from Oura Ring',
+                'hidden' => false,
+            ],
+            'daily_sleep_summary' => [
+                'icon' => 'fas.moon',
+                'display_name' => 'Daily Sleep Summary',
+                'description' => 'Daily Sleep Summary from Oura Ring',
+                'hidden' => false,
+            ],
+            'daily_spo2' => [
+                'icon' => 'fas.lungs',
+                'display_name' => 'Daily SpO2',
+                'description' => 'Daily SpO2 from Oura Ring',
+                'hidden' => false,
+            ],
+            'oura_daily_stress' => [
+                'icon' => 'fas.gauge',
+                'display_name' => 'Daily Stress',
+                'description' => 'Daily Stress from Oura Ring',
+                'hidden' => false,
+            ],
+            'oura_daily_resilience' => [
+                'icon' => 'fas.shield-heart',
+                'display_name' => 'Daily Resilience',
+                'description' => 'Daily Resilience from Oura Ring',
+                'hidden' => false,
+            ],
+            'oura_daily_spo2' => [
+                'icon' => 'fas.lungs',
+                'display_name' => 'Daily SpO2',
+                'description' => 'Daily SpO2 record from Oura Ring',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Retired names still present on old rows, recognised by the sense check.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public static function getLegacyTypes(): array
+    {
+        $camelCase = 'Workout type as Oura sent it, before normaliseActivityType() converted it to snake_case';
+
+        return [
+            'object_types' => [
+                'strengthTraining' => $camelCase,
+                'coreExercise' => $camelCase,
+                'HIIT' => $camelCase,
+                'houseWork' => $camelCase,
+                'horsebackRiding' => $camelCase,
+            ],
         ];
     }
 
@@ -868,6 +982,14 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'schema' => self::getConfigurationSchema(),
             ],
         ];
+    }
+
+    /**
+     * Oura sends workout names in camelCase (strengthTraining, HIIT); object types are snake_case.
+     */
+    public static function normaliseActivityType(string $activity): string
+    {
+        return strtolower(preg_replace('/(?<=[a-z])(?=[A-Z])/', '_', $activity));
     }
 
     public function mapValueForStorage(string $mappingKey, mixed $value): ?float
@@ -1347,7 +1469,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true // Use per-instance logging
@@ -1495,7 +1617,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
 
         $actor = $this->ensureUserProfile($integration);
         $workoutId = Arr::get($item, 'id', md5(json_encode($item)));
-        $activityType = Arr::get($item, 'activity', 'workout');
+        $activityType = self::normaliseActivityType((string) Arr::get($item, 'activity', 'workout'));
 
         // Create workout object once per workout instance
         $target = EventObject::firstOrCreate([
@@ -1597,7 +1719,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'metadata' => $objectData['metadata'] ?? [],
                 'url' => $objectData['url'] ?? null,
                 'media_url' => $objectData['image_url'] ?? null,
-                'embeddings' => $objectData['embeddings'] ?? null,
+                ...(isset($objectData['embeddings']) ? ['embeddings' => $objectData['embeddings']] : []),
             ]
         );
     }
@@ -1667,32 +1789,58 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             throw new Exception('Missing access token for authenticated request');
         }
 
-        // Log the API request
-        $this->logApiRequest('GET', $endpoint, [
-            'Authorization' => '[REDACTED]',
-        ], $query, $integration->id);
+        $result = null;
+        $items = [];
+        $seenTokens = [];
 
-        $hub = SentrySdk::getCurrentHub();
-        $parentSpan = $hub->getSpan();
-        $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
-        $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
-        $response = Http::withToken($token)->get($this->baseUrl . $endpoint, $query);
-        $span?->finish();
+        do {
+            $this->logApiRequest('GET', $endpoint, [
+                'Authorization' => '[REDACTED]',
+            ], $query, $integration->id);
 
-        // Log the API response
-        $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
+            $hub = SentrySdk::getCurrentHub();
+            $parentSpan = $hub->getSpan();
+            $desc = 'GET ' . $this->baseUrl . $endpoint . (! empty($query) ? '?' . http_build_query($query) : '');
+            $span = $parentSpan?->startChild((new SpanContext)->setOp('http.client')->setDescription($desc));
+            try {
+                $response = Http::withToken($token)
+                    ->connectTimeout(5)
+                    ->timeout(30)
+                    ->get($this->baseUrl . $endpoint, $query);
+            } finally {
+                $span?->finish();
+            }
 
-        if (! $response->successful()) {
-            Log::warning('Oura API request failed', [
-                'endpoint' => $endpoint,
-                'status' => $response->status(),
-                'response' => $response->body(),
-            ]);
+            $this->logApiResponse('GET', $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
+            $response->throw();
+            $page = $response->json();
+            if (! is_array($page)) {
+                throw new Exception('Oura API returned an invalid JSON response');
+            }
+            if ((array_key_exists('data', $page) && ! is_array($page['data']))
+                || ($result !== null && array_key_exists('data', $result) && ! array_key_exists('data', $page))) {
+                throw new Exception('Oura API returned an invalid collection page');
+            }
+            $result ??= $page;
+            if (isset($page['data']) && is_array($page['data'])) {
+                $items = array_merge($items, $page['data']);
+            }
+            $nextToken = $page['next_token'] ?? null;
+            if ($nextToken !== null && $nextToken !== '') {
+                if (! is_string($nextToken) || isset($seenTokens[$nextToken])) {
+                    throw new Exception('Oura API returned an invalid or repeated pagination token');
+                }
+                $seenTokens[$nextToken] = true;
+                $query['next_token'] = $nextToken;
+            }
+        } while ($nextToken !== null && $nextToken !== '');
 
-            return [];
+        if (array_key_exists('data', $result)) {
+            $result['data'] = $items;
+            $result['next_token'] = null;
         }
 
-        return $response->json();
+        return $result;
     }
 
     /**
@@ -1745,7 +1893,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
     {
         $config = $integration->configuration ?? [];
         $incrementalDays = max(2, (int) ($config['oura_incremental_days'] ?? 3));
-        $startDatetime = now()->subDays($incrementalDays)->toIso8601String();
+        $startDatetime = now()->utc()->subDays($incrementalDays)->startOfDay()->toIso8601String();
         $endDatetime = now()->toIso8601String();
         $lastSweepAt = isset($config['oura_last_sweep_at']) ? Carbon::parse($config['oura_last_sweep_at']) : null;
         $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
@@ -1759,7 +1907,7 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
 
         if ($doSweep) {
             $sweepData = $this->getJson('/usercollection/heartrate', $integration, [
-                'start_datetime' => now()->subDays(7)->toIso8601String(),
+                'start_datetime' => now()->utc()->subDays(7)->startOfDay()->toIso8601String(),
                 'end_datetime' => $endDatetime,
             ]);
             $sweepItems = $sweepData['data'] ?? [];
@@ -2356,12 +2504,13 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'actor_id' => $actor->id,
                 'service' => 'oura',
                 'domain' => self::getDomain(),
-                'action' => 'slept_for',
+                'action' => self::sleepAction($item),
                 'value' => $totalSleepDuration, // Use total_sleep_duration as main event value
                 'value_multiplier' => 1,
                 'value_unit' => 'seconds',
                 'event_metadata' => [
                     'end' => $end,
+                    'type' => Arr::get($item, 'type'),
                     'efficiency' => $efficiency,
                 ],
                 'target_id' => $target->id,
@@ -2591,6 +2740,21 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             $sourceId = "oura_heartrate_{$integration->id}_{$day}";
             $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
             if ($exists) {
+                // The day fills in through the day: keep its average current,
+                // as OuraHeartrateData does, so anomaly detection judges the
+                // whole day rather than the first overnight readings.
+                [$encodedAvg, $avgMultiplier] = $this->encodeNumericValue($avg);
+                $exists->update([
+                    'value' => $encodedAvg,
+                    'value_multiplier' => $avgMultiplier,
+                    'event_metadata' => array_merge($exists->event_metadata ?? [], [
+                        'day' => $day,
+                        'min_bpm' => $min,
+                        'max_bpm' => $max,
+                        'avg_bpm' => $avg,
+                    ]),
+                ]);
+
                 continue;
             }
 
@@ -2825,28 +2989,6 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         }
 
         return $sanitized;
-    }
-
-    /**
-     * Sanitize response body for logging (limit size and remove sensitive data)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        // Limit response body size to prevent huge logs
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
-        }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
     }
 
     protected function fetchCardiovascularAge(Integration $integration, string $startDate, string $endDate): void
@@ -3281,12 +3423,13 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             'actor_id' => $actor->id,
             'service' => 'oura',
             'domain' => self::getDomain(),
-            'action' => 'slept_for',
+            'action' => self::sleepAction($item),
             'value' => $totalSleepDuration,
             'value_multiplier' => 1,
             'value_unit' => 'seconds',
             'event_metadata' => [
                 'end' => $end,
+                'type' => Arr::get($item, 'type'),
                 'efficiency' => $efficiency,
             ],
             'target_id' => $target->id,

@@ -7,6 +7,7 @@ use App\Jobs\Concerns\EnhancedIdempotency;
 use App\Jobs\GoCardless\HandleExpiredEuaJob;
 use App\Models\Integration;
 use App\Notifications\IntegrationFailed;
+use App\Services\GoCardlessAccounts;
 use App\Services\IntegrationRuns\IntegrationRunService;
 use App\Services\IntegrationRuns\RunBatchDispatcher;
 use App\Services\Notifications\NotificationIncidentResolver;
@@ -40,6 +41,8 @@ abstract class BaseFetchJob implements ShouldQueue
 
     protected string $serviceName;
 
+    protected ?array $goCardlessSnapshot = null;
+
     /**
      * Create a new job instance.
      */
@@ -47,6 +50,9 @@ abstract class BaseFetchJob implements ShouldQueue
     {
         $this->integration = $integration;
         $this->serviceName = $this->getServiceName();
+        if ($integration->service === 'gocardless') {
+            $this->goCardlessSnapshot = GoCardlessAccounts::snapshot($integration);
+        }
     }
 
     /**
@@ -62,6 +68,9 @@ abstract class BaseFetchJob implements ShouldQueue
         $hub->setSpan($transaction);
 
         try {
+            if ($this->serviceName === 'gocardless' && ! GoCardlessAccounts::isCurrent($this->integration, $this->goCardlessSnapshot)) {
+                return;
+            }
             // Log start to all levels (instance, group, user)
             log_hierarchical($this->integration, 'info', "Starting {$this->getJobType()} fetch", [
                 'integration_id' => $this->integration->id,
@@ -77,6 +86,12 @@ abstract class BaseFetchJob implements ShouldQueue
             // Fetch the raw data
             $rawData = $this->fetchData();
 
+            if ($this->serviceName === 'gocardless') {
+                if (! GoCardlessAccounts::isCurrent($this->integration, $this->goCardlessSnapshot)) {
+                    return;
+                }
+                $rawData['_gocardless_snapshot'] = $this->goCardlessSnapshot;
+            }
             // Dispatch processing jobs with the fetched data
             $this->dispatchProcessingJobsIntoRun($rawData);
 
@@ -123,6 +138,9 @@ abstract class BaseFetchJob implements ShouldQueue
      */
     public function failed(Throwable $exception): void
     {
+        if ($this->serviceName === 'gocardless' && ! GoCardlessAccounts::isCurrent($this->integration, $this->goCardlessSnapshot)) {
+            return;
+        }
         // Check if this is a GoCardless EUA expiry
         if ($exception instanceof GoCardlessEuaExpiredException) {
             Log::info('BaseFetchJob: Detected GoCardless EUA expiry, dispatching HandleExpiredEuaJob', [
@@ -134,7 +152,8 @@ abstract class BaseFetchJob implements ShouldQueue
             dispatch(new HandleExpiredEuaJob(
                 $exception->getGroupId(),
                 $exception->getEuaId(),
-                $exception->getErrorResponse()
+                $exception->getErrorResponse(),
+                $this->goCardlessSnapshot
             ));
 
             // Don't send the normal failure notification - HandleExpiredEuaJob will handle it

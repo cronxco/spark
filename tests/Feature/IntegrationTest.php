@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Integrations\GitHub\GitHubPlugin;
+use App\Integrations\GoogleCalendar\GoogleCalendarPlugin;
 use App\Integrations\PluginRegistry;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
@@ -49,6 +50,29 @@ class IntegrationTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Available Integrations');
         $response->assertSee('GitHub');
+    }
+
+    #[Test]
+    public function google_calendar_reauthenticate_link_reconnects_the_existing_group()
+    {
+        PluginRegistry::register(GoogleCalendarPlugin::class);
+
+        $user = User::factory()->create();
+        $group = IntegrationGroup::factory()->create([
+            'user_id' => $user->id,
+            'service' => 'google-calendar',
+        ]);
+        Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'google-calendar',
+            'instance_type' => 'events',
+        ]);
+
+        $response = $this->actingAs($user)->get('/settings/integrations');
+
+        $response->assertStatus(200);
+        $response->assertSee(route('integrations.reconnect', ['service' => 'google-calendar', 'group' => $group->id]), false);
     }
 
     #[Test]

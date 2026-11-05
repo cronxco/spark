@@ -18,6 +18,7 @@ allowed_tools:
   - spark__get-event-tool
   - spark__get-block-tool
   - spark__get-flint-notes
+  - spark__acknowledge-flint-notes
   - spark__create-flint-digest
   - spark__manage-flint-topic
   - docs__fetch
@@ -61,6 +62,23 @@ for the evidence-based reasons in Step 9.
 Never supplement from memory — including for background you are confident about.
 If a fact is worth stating, it is worth a source you can name.
 
+## Output contract — read this first
+
+Check each of these before calling `create-flint-digest`:
+
+1. **Interesting beats official.** Each story is one Will would want to know about or
+   pass on: a decision, a conflict, a finding or a consequence. A launch, campaign,
+   consultation or savings package with nothing yet decided ranks below a real story.
+2. **No repeats within two days** unless a new decision or event happened. A new angle,
+   new reactions or a deeper explainer on a story carded yesterday or the day before is
+   not a development.
+3. **No disclaimers.** No "X, not Y" clauses whose only job is to say what something is
+   not ("probing, not confirmed compromises", "estimates, not cash"). State what is
+   known; put a real uncertainty in one `Not yet known:` clause at most.
+4. **Every fact sourced**, cards in the shape Step 10 sets out, Run notes last and under
+   200 words.
+5. **The run token** copied from the payload into `create-flint-digest` exactly.
+
 ---
 
 # RUN
@@ -91,10 +109,14 @@ Load both days to catch yesterday afternoon's arrivals.
 Build candidates from these summaries and the UK sweep (Step 5). Read only
 shortlisted feed originals in Step 7.
 
-Also call `spark__get-flint-notes` for notes updated in the last 30 days. Apply
+Also call `spark__get-flint-notes` for notes updated in the last 30 days, and
+`spark__get-flint-notes(unacknowledged: true)` to include older unread notes.
+Merge the two results by note ID before selecting applicable notes. Apply
 only notes that explicitly bear on news selection, framing, or a linked source
 or Topic. A relevant note is direct user intent and outranks inferred
-preferences. Keep the IDs of notes materially used.
+preferences. Keep the IDs of notes materially used; you acknowledge those after the
+roundup is written (Step 10). Notes about other subjects stay unacknowledged for the
+routine they are for.
 
 ## Step 3: Establish coverage from the data, not from impression
 
@@ -109,6 +131,11 @@ Record item counts and service sync timestamps before judging coverage:
   incomplete coverage; service event counts need not equal unique articles.
 
 Distinguish failure, partial coverage and genuinely empty feeds in Run notes.
+
+A fetched page is only today's news if its content is. A fetch whose title and headline
+items match the one a previous roundup already used (the same "World in Brief" snapshot
+cited three days running, say) is stale: do not cite it as a same-day source, and record
+it in Run notes so the feed can be fixed.
 
 ## Step 4: Check recent coverage and active Topics
 
@@ -126,7 +153,9 @@ record the gap and use the available history.
 A repeated story needs a **material development**: a decision, implemented
 change, consequential new evidence or a substantive change in the stakes.
 Another outlet's explanation, a new quotation or the same figures recast is not
-enough. Record the development against the last published account.
+enough. Nor is a new angle on the same event: on 22 and 23 October the same PHP flaw
+ran on consecutive days as "emergency shutdowns" and then "AI found the flaws". Record
+the development against the last published account.
 
 Use Topics for context and maintenance, not automatic priority. Review the
 three-day mix for repeated subjects and geographic concentration; a continuing
@@ -183,7 +212,9 @@ Rank candidates by:
    not reasons to elevate an otherwise weaker story.
 
 Normally include a consequential, well-sourced UK politics or policy development
-when one is available. This is a strong editorial expectation, not a daily quota:
+when one is available. The UK slot is for decisions, votes, rulings, data and fights,
+not announcements: a campaign launch or a package of estimated savings earns a slot only
+when it changes something for Will or is contested. This is a strong editorial expectation, not a daily quota:
 if stronger stories displace the best UK candidate, name it and explain the
 comparison in the run notes. Do not manufacture a UK card on a genuinely thin day.
 
@@ -337,14 +368,25 @@ spark__create-flint-digest(
 )
 ```
 
+When `create-flint-digest` has succeeded and you used any notes, acknowledge them:
+
+```text
+spark__acknowledge-flint-notes(
+  note_ids: ["<the notes you used>"],
+  run_token: "<run_token from the trigger payload>",
+  routine: "news_roundup"
+)
+```
+
 When supplied, pass `run_token` unchanged. It makes a retry return the original digest instead
 of writing a second one, and it is what attributes the digest to this routine so
 it gets its own place in the app rather than being folded into the morning
 briefing.
 
 **The `summary` is an index, not the stories again.** One line per story, in
-the order of the blocks. The day briefing points at it and notifications quote
-it; the full story lives in the block. Writing the three stories out as prose a
+the order of the blocks. The day briefing links to it in one line, and its own
+reading section covers the newsletters this roundup did not use, so cite every feed
+item a card draws on in `referenced_event_ids`. Notifications quote the summary; the full story lives in the block. Writing the three stories out as prose a
 second time is what made earlier roundups say everything twice.
 
 ### The story blocks — one `flint_news` per story
@@ -383,9 +425,15 @@ out from these blocks, one card per story.
 - **Content:** Give the gist in one or two sentences, at most about 40 words.
 - **Key points:** Give two to four concrete specifics that add to the gist;
   **at most 300 characters each**, including attribution. Attribute researched
-  facts inline. Cut restatements.
+  facts inline. Cut restatements, and cut any clause that only says what the fact is
+  not ("all-age figures, not a count of children", "a proposed role, not a measure in
+  force").
 - **Contested:** Include only a genuine difference between named accounts or
   an account and the record; explain what it turns on. Never invent balance.
+  When a key point you are drafting reports one named party disputing another
+  ("X denies…", "a US official denied that interpretation", "Y says Z controls
+  it", "the disputed issue is…"), that disagreement belongs here, not in key
+  points: move it, and use the freed key point for another specific.
 - **Why it matters:** Connect to Will's work, plans, London or real interests
   only when concrete. Omit generic relevance and Spark/Flint internals.
 - **What to watch:** Name the next event, dated where established. If timing is
@@ -406,7 +454,8 @@ across card fields.
 ### The editorial note
 
 **Always include a `flint_editorial_note` block**, titled `"Run notes"`, and put
-it **last**. Record, in a few lines:
+it **last**. Keep it **under 200 words**: one short line per item below, no prose
+paragraphs. Record:
 
 - the source counts from Step 3 — newsletters, fetches, bookmarks;
 - any coverage gap, and the service it was in;
@@ -453,6 +502,14 @@ spark__manage-flint-topic(
 Rewrite `content` as where the story stands now — not a diary of every update.
 The link history records the days it moved.
 
+**Keep `content` to 150 words or fewer.** When an update would push it past that,
+drop whatever the new development has superseded rather than squeezing it in; the
+`discussed_in` links keep the history. Do not carry caveats into it (“is not
+established”, “does not prove”, “no date is established”): say what is known and what
+the thread is waiting on. One topic is one story — do not fold an unrelated
+development into an existing topic because it shares a broad theme; it either clears
+the bar for its own topic or stays out.
+
 **For a new story** — create a tactical Topic only when it clears the bar:
 
 1. It has run across **at least three separate days** of Will's sources;
@@ -492,5 +549,10 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 - [ ] Every citation grounded; research-only UK cards honestly labelled with empty event-ID arrays.
 - [ ] No unsupported UK angle, default US framing, invented facts or padding.
 - [ ] Structured cards, distinct titles, field limits and final summary order checked.
+- [ ] Every disagreement between named parties sits in `contested`, not in key points.
+- [ ] No story repeats one carded in the last two days without a new decision or event.
+- [ ] No "X, not Y" disclaimer clauses; Run notes under 200 words.
 - [ ] Styleguide fetched; Run notes last with selection, sweep and budget outcomes.
 - [ ] Trigger token preserved when supplied; relevant Topics maintained; no questions.
+- [ ] Topic `content` rewritten to 150 words or fewer, one story per topic, no caveat
+      clauses.

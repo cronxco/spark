@@ -101,13 +101,4 @@ class MetricsOverview extends Component
             'recentTrendsLoaded' => $this->recentTrendsLoaded,
         ]);
     }
-
-    protected function getListeners(): array
-    {
-        return [
-            // Spotlight command events
-            'calculate-statistics' => 'calculateStatistics',
-            'detect-trends' => 'detectTrends',
-        ];
-    }
 }

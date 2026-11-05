@@ -198,7 +198,7 @@ class ManageFlintTopicToolTest extends TestCase
 
         $connection = (new Block)->getConnection();
         $prefix = $connection->getTablePrefix();
-        $tables = ['blocks', 'events', 'integrations'];
+        $tables = ['blocks', 'events', 'integrations', 'relationships', 'users'];
 
         $connection->beginTransaction();
 
