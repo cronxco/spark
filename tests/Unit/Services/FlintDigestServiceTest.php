@@ -379,15 +379,137 @@ class FlintDigestServiceTest extends TestCase
         });
     }
 
-    private function runTokenFor(string $routine, string $period): string
+    #[Test]
+    public function a_second_scheduled_run_for_the_same_slot_returns_the_first_digest(): void
     {
-        return app(FlintRunToken::class)->issue([
+        $payload = fn (string $title) => ['title' => $title, 'period' => 'evening', 'blocks' => $this->digestBlocks(), 'question_omission' => [
+            'reason' => 'Nothing worth asking.',
+            'candidates' => ['One', 'Two', 'Three'],
+        ]];
+
+        $first = $this->service->create($this->user, $payload('Evening A') + [
+            'run_token' => $this->runTokenFor('digest', 'evening', 'scheduled'),
+        ]);
+        $second = $this->service->create($this->user, $payload('Evening B') + [
+            'run_token' => $this->runTokenFor('digest', 'evening', 'scheduled'),
+        ]);
+
+        $this->assertFalse($first['deduplicated']);
+        $this->assertTrue($second['deduplicated']);
+        $this->assertSame($first['event_id'], $second['event_id']);
+        $this->assertSame(1, Event::where('service', 'flint')->where('action', 'had_summary')->count());
+    }
+
+    #[Test]
+    public function a_manual_run_still_writes_its_own_digest_for_a_filled_slot(): void
+    {
+        $payload = fn (string $title) => ['title' => $title, 'period' => 'evening', 'blocks' => $this->digestBlocks(), 'question_omission' => [
+            'reason' => 'Nothing worth asking.',
+            'candidates' => ['One', 'Two', 'Three'],
+        ]];
+
+        $first = $this->service->create($this->user, $payload('Evening A') + [
+            'run_token' => $this->runTokenFor('digest', 'evening', 'scheduled'),
+        ]);
+        $manual = $this->service->create($this->user, $payload('Evening B') + [
+            'run_token' => $this->runTokenFor('digest', 'evening', 'manual'),
+        ]);
+
+        $this->assertFalse($manual['deduplicated']);
+        $this->assertNotSame($first['event_id'], $manual['event_id']);
+    }
+
+    #[Test]
+    public function a_scheduled_news_roundup_returns_a_tokenless_roundup_already_written_for_the_slot(): void
+    {
+        $tokenless = $this->service->create($this->user, [
+            'title' => 'News roundup — today',
+            'period' => 'morning',
+            'blocks' => [
+                ['block_type' => 'flint_news', 'title' => 'A story', 'content' => 'Something happened.'],
+            ],
+        ]);
+
+        $scheduled = $this->service->create($this->user, $this->newsRoundup('News roundup — Friday') + [
+            'run_token' => $this->runTokenFor('news_roundup', 'morning', 'scheduled'),
+        ]);
+
+        $this->assertTrue($scheduled['deduplicated']);
+        $this->assertSame($tokenless['event_id'], $scheduled['event_id']);
+    }
+
+    #[Test]
+    public function a_scheduled_news_roundup_does_not_mistake_the_day_digest_for_a_roundup(): void
+    {
+        $digest = $this->service->create($this->user, [
+            'title' => 'Morning Digest',
+            'period' => 'morning',
+            'blocks' => [],
+        ]);
+
+        $roundup = $this->service->create($this->user, $this->newsRoundup('News roundup — Friday') + [
+            'run_token' => $this->runTokenFor('news_roundup', 'morning', 'scheduled'),
+        ]);
+
+        $this->assertFalse($roundup['deduplicated']);
+        $this->assertNotSame($digest['event_id'], $roundup['event_id']);
+    }
+
+    #[Test]
+    public function a_run_for_one_slot_of_a_multi_slot_schedule_is_not_deduplicated(): void
+    {
+        $roundup = fn (string $occurrence) => $this->service->create($this->user, $this->newsRoundup('News roundup — ' . $occurrence) + [
+            'run_token' => $this->runTokenFor('news_roundup', 'morning', 'scheduled', ['occurrence' => $occurrence]),
+        ]);
+
+        $first = $roundup('0700');
+        $second = $roundup('1300');
+
+        $this->assertFalse($second['deduplicated']);
+        $this->assertNotSame($first['event_id'], $second['event_id']);
+    }
+
+    /** @return array<string, mixed> */
+    private function newsRoundup(string $title): array
+    {
+        return [
+            'title' => $title,
+            'period' => 'morning',
+            'blocks' => [
+                [
+                    'block_type' => 'flint_news',
+                    'title' => 'A story',
+                    'content' => 'TL;DR.',
+                    'news' => [
+                        'key_points' => ['One.', 'Two.'],
+                        'sources' => [['publication' => 'BBC', 'position' => 'Reports it.', 'origin' => 'research', 'url' => 'https://example.com/a']],
+                        'what_to_watch' => 'Next steps.',
+                    ],
+                ],
+                ['block_type' => 'flint_editorial_note', 'title' => 'Run notes', 'content' => 'Notes.'],
+            ],
+        ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function digestBlocks(): array
+    {
+        return [
+            ['block_type' => 'flint_day_context', 'title' => 'Tomorrow at a glance', 'day_context' => ['calendar' => []]],
+            ['block_type' => 'flint_editorial_note', 'title' => 'Editorial note', 'content' => 'Note.'],
+        ];
+    }
+
+    private function runTokenFor(string $routine, string $period, ?string $triggerSource = null, array $claims = []): string
+    {
+        return app(FlintRunToken::class)->issue(array_filter([
             'user_id' => (string) $this->user->id,
             'local_date' => now($this->user->getTimezone())->toDateString(),
             'period' => $period,
             'run_uuid' => (string) Str::uuid(),
             'routine' => $routine,
-        ]);
+            'trigger_source' => $triggerSource,
+        ] + $claims));
     }
 
     private function firstBlock(array $result): Block

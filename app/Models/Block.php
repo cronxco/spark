@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Services\Media\MediaDeduplicationService;
+use App\Traits\PreservesPipelineMetadata;
 use App\Traits\TracksViews;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,7 +22,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Block extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia, LogsActivity, SoftDeletes, TracksViews;
+    use HasFactory, InteractsWithMedia, LogsActivity, PreservesPipelineMetadata, SoftDeletes, TracksViews;
 
     /**
      * Only record update events via LogsActivity trait.
@@ -117,8 +118,9 @@ class Block extends Model implements HasMedia
         $existingBlock = $query->first();
 
         if ($existingBlock) {
-            // Update the existing block
-            $existingBlock->update(array_merge($attributes, $values));
+            // Update the existing block. Mappers pass `embeddings => null` when
+            // they have no vector; that must not wipe a generated embedding.
+            $existingBlock->update(static::withoutNullEmbeddings(array_merge($attributes, $values)));
 
             return $existingBlock;
         }
@@ -134,10 +136,22 @@ class Block extends Model implements HasMedia
                 throw $e;
             }
 
-            $existingBlock->update(array_merge($attributes, $values));
+            $existingBlock->update(static::withoutNullEmbeddings(array_merge($attributes, $values)));
 
             return $existingBlock;
         }
+    }
+
+    /**
+     * Drop a null `embeddings` value so updates keep the existing vector.
+     */
+    public static function withoutNullEmbeddings(array $values): array
+    {
+        if (array_key_exists('embeddings', $values) && $values['embeddings'] === null) {
+            unset($values['embeddings']);
+        }
+
+        return $values;
     }
 
     /**
@@ -171,7 +185,7 @@ class Block extends Model implements HasMedia
 
         static::created(function ($model): void {
             // Dispatch Task Pipeline to run applicable tasks
-            if (config('app.enable_task_pipeline', true)) {
+            if (config('app.enable_task_pipeline', true) && ! $model->event?->isInternal()) {
                 ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
             }
         });

@@ -124,8 +124,7 @@ docs/
 
 | Document                                                   | Description                                   |
 | ---------------------------------------------------------- | --------------------------------------------- |
-| [BLOCK_CARDS.md](UI%20and%20UX/BLOCK_CARDS.md)             | Block card display system with custom layouts |
-| [DESIGN_PATTERNS.md](UI%20and%20UX/DESIGN_PATTERNS.md)     | UI consistency and visual hierarchy           |
+| [DESIGN_LANGUAGE.md](UI%20and%20UX/DESIGN_LANGUAGE.md)     | Shared web and iOS design language: colour, type, cards, block layouts, page patterns |
 | [EVENTS_INTERFACE.md](UI%20and%20UX/EVENTS_INTERFACE.md)   | Event data model and interface                |
 | [UPDATES_INTERFACE.md](UI%20and%20UX/UPDATES_INTERFACE.md) | Integration update system                     |
 
@@ -178,8 +177,7 @@ All documentation in this project follows the [DOCS_STYLE_GUIDE.md](DOCS_STYLE_G
 **For UI/UX Developers:**
 
 - Review [User Interface](#user-interface) documentation
-- Check [BLOCK_CARDS.md](UI%20and%20UX/BLOCK_CARDS.md) for block display patterns
-- Study [DESIGN_PATTERNS.md](UI%20and%20UX/DESIGN_PATTERNS.md) for consistency guidelines
+- Follow [DESIGN_LANGUAGE.md](UI%20and%20UX/DESIGN_LANGUAGE.md) for all UI work, including block card layouts
 
 **For Users:**
 

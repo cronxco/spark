@@ -6,7 +6,10 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Services\LoggingService;
+use App\Support\AdminTenant;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -14,8 +17,10 @@ class LogViewer extends Component
 {
     use WithPagination;
 
+    #[Locked]
     public string $type; // 'user', 'group', or 'integration'
 
+    #[Locked]
     public ?string $entityId = null; // UUID of the user, group, or integration
 
     public string $date;
@@ -41,6 +46,7 @@ class LogViewer extends Component
         $this->type = $type;
         $this->entityId = $entityId;
         $this->date = $date ?? now()->format('Y-m-d');
+        $this->normaliseInputs();
 
         $this->loadAvailableDates();
         $this->loadLogs();
@@ -48,22 +54,33 @@ class LogViewer extends Component
 
     public function updatedDate(): void
     {
+        $this->normaliseInputs();
+        $this->resetPage();
         $this->loadLogs();
     }
 
     public function updatedLevelFilter(): void
     {
+        $this->resetPage();
         $this->loadLogs();
     }
 
     public function updatedSearch(): void
     {
+        $this->resetPage();
         $this->loadLogs();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->normaliseInputs();
+        $this->resetPage();
     }
 
     public function clearFilters(): void
     {
         $this->reset(['search', 'levelFilter']);
+        $this->resetPage();
         $this->loadLogs();
     }
 
@@ -107,6 +124,7 @@ class LogViewer extends Component
 
     public function getPaginatedLogs(): LengthAwarePaginator
     {
+        $this->normaliseInputs();
         $currentPage = $this->getPage();
         $offset = ($currentPage - 1) * $this->perPage;
         $items = array_slice($this->logLines, $offset, $this->perPage);
@@ -134,7 +152,7 @@ class LogViewer extends Component
         // Extract dates from filenames
         $dates = [];
         foreach ($files as $file) {
-            if (preg_match('/_(\d{4}-\d{2}-\d{2})\.log$/', $file, $matches)) {
+            if (preg_match('/[-_](\d{4}-\d{2}-\d{2})\.log$/', $file, $matches)) {
                 $dates[] = $matches[1];
             }
         }
@@ -229,25 +247,43 @@ class LogViewer extends Component
         return array_values($lines);
     }
 
-    protected function getUser(): User
+    /**
+     * Keep URL-bound inputs inside safe bounds: a real calendar date for the
+     * log filename and a capped page size.
+     */
+    protected function normaliseInputs(): void
     {
-        if ($this->entityId) {
-            return User::findOrFail($this->entityId);
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $this->date)) {
+            $this->date = now()->format('Y-m-d');
         }
 
-        /** @var User */
-        $user = auth()->user();
+        $this->perPage = min(max($this->perPage, 10), 250);
+    }
 
-        return $user;
+    /**
+     * Logs are only readable for the tenant the current admin page is scoped
+     * to (the signed-in user, or the viewed user in an operator context).
+     */
+    protected function getUser(): User
+    {
+        $tenantId = AdminTenant::id();
+
+        if ($tenantId === null) {
+            return User::findOrFail($this->entityId ?: Auth::id());
+        }
+
+        abort_unless(! $this->entityId || (string) $this->entityId === (string) $tenantId, 403);
+
+        return User::findOrFail($tenantId);
     }
 
     protected function getGroup(): IntegrationGroup
     {
-        return IntegrationGroup::findOrFail($this->entityId);
+        return AdminTenant::scope(IntegrationGroup::query())->findOrFail($this->entityId);
     }
 
     protected function getIntegration(): Integration
     {
-        return Integration::findOrFail($this->entityId);
+        return AdminTenant::scope(Integration::query())->findOrFail($this->entityId);
     }
 }

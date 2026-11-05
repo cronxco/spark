@@ -92,7 +92,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
         $bookmarkObject = $this->upsertBookmarkObject($bookmark, $tagsMap);
 
         // Create the bookmarked event
-        $createdAt = isset($bookmark['createdAt']) ? Carbon::parse($bookmark['createdAt']) : now();
+        $createdAt = $this->bookmarkTime($bookmark);
         $sourceId = "karakeep_bookmark_{$bookmarkId}";
 
         // Check if event already exists
@@ -235,7 +235,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
         $title = $content['title'] ?? 'Untitled';
         $url = $content['url'] ?? null;
         $previewImage = $content['imageUrl'] ?? null;
-        $createdAt = isset($bookmark['createdAt']) ? Carbon::parse($bookmark['createdAt']) : now();
+        $createdAt = $this->bookmarkTime($bookmark);
 
         // Build content first to ensure it's a string
         $contentText = $this->buildBookmarkContent($bookmark);
@@ -347,7 +347,7 @@ class KarakeepBookmarkData extends BaseProcessingJob
         }
 
         // Use the bookmark's createdAt or current time
-        $createdAt = isset($bookmark['createdAt']) ? Carbon::parse($bookmark['createdAt']) : now();
+        $createdAt = $this->bookmarkTime($bookmark);
 
         Event::create([
             'source_id' => $sourceId,
@@ -463,10 +463,28 @@ class KarakeepBookmarkData extends BaseProcessingJob
         }
     }
 
+    /**
+     * When the bookmark was saved. Imported bookmarks can carry a createdAt a
+     * few seconds after the Unix epoch, so fall back to modifiedAt for those.
+     */
+    protected function bookmarkTime(array $bookmark): Carbon
+    {
+        foreach (['createdAt', 'modifiedAt'] as $field) {
+            if (! empty($bookmark[$field])) {
+                $time = Carbon::parse($bookmark[$field]);
+                if ($time->year >= 2000) {
+                    return $time;
+                }
+            }
+        }
+
+        return now();
+    }
+
     protected function createEventBlocks(Event $event, array $bookmark, array $highlightsMap): void
     {
         $bookmarkId = $bookmark['id'] ?? null;
-        $createdAt = isset($bookmark['createdAt']) ? Carbon::parse($bookmark['createdAt']) : now();
+        $createdAt = $this->bookmarkTime($bookmark);
 
         // Create AI summary block if available
         if (! empty($bookmark['summary'])) {

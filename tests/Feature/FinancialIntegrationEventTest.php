@@ -353,6 +353,7 @@ class FinancialIntegrationEventTest extends TestCase
             'concept' => 'account',
             'type' => 'bank_account',
             'title' => 'GoCardless Account',
+            'metadata' => ['account_id' => 'gocardless-account'],
         ]);
 
         $allAccounts = $plugin->getFinancialAccounts($user);

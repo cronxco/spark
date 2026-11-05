@@ -24,6 +24,11 @@ class NotificationCatalogue
 {
     /** @var array<string, array{label: string, description: string, apns_category: ?string, configurable: bool, stream: string, severity: string, active_hours: ?int, forced_delivery: bool}> */
     private const TYPES = [
+        'task_reminder' => [
+            'label' => 'Task Reminders', 'description' => 'Reminders you set for tasks',
+            'apns_category' => 'SYSTEM', 'configurable' => true, 'stream' => 'attention',
+            'severity' => 'info', 'active_hours' => 24, 'forced_delivery' => false,
+        ],
         'integration_completed' => [
             'label' => 'Integration Completed',
             'description' => 'Notify when an integration finishes syncing successfully',
@@ -57,6 +62,16 @@ class NotificationCatalogue
         'cookie_expiry_warning' => [
             'label' => 'Saved Login Expiring',
             'description' => 'Notify when a saved website login is about to expire and needs refreshing',
+            'apns_category' => 'INTEGRATION_ATTENTION',
+            'configurable' => true,
+            'stream' => 'attention',
+            'severity' => 'warning',
+            'active_hours' => null,
+            'forced_delivery' => false,
+        ],
+        'gocardless_consent_expiring' => [
+            'label' => 'Bank Connection Expiring',
+            'description' => 'Notify when a bank connection needs reconnecting before it stops syncing',
             'apns_category' => 'INTEGRATION_ATTENTION',
             'configurable' => true,
             'stream' => 'attention',

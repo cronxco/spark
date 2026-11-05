@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Flint\Routines;
 
+use App\Ai\Tools\Skills\SkillToolSource;
 use App\Models\User;
 use App\Services\Flint\Routines\OpenAiRoutineDriver;
 use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\Flint\Routines\WebhookRoutineDriver;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Fixtures\FakeOpenAi;
+use Tests\Fixtures\FakeSkillTools;
 use Tests\TestCase;
 
 class RoutineDriverTest extends TestCase
@@ -147,45 +150,37 @@ class RoutineDriverTest extends TestCase
             'services.openai.models.reasoning' => 'test-reasoning-model',
         ]);
 
-        Http::fake(['api.openai.com/v1/responses' => Http::response([
-            'id' => 'resp_test',
-            'status' => 'completed',
-            'error' => null,
-            'incomplete_details' => null,
-            'output' => [
-                ['type' => 'mcp_call', 'name' => 'spark__manage-flint-topic', 'output' => 'ok'],
-                ['type' => 'message', 'content' => [['text' => 'Done.']]],
-            ],
-            'usage' => ['input_tokens' => 120, 'output_tokens' => 30],
-        ])]);
+        $this->app->instance(SkillToolSource::class, $tools = new FakeSkillTools(spark: [
+            'manage-flint-topic' => '{"topics":[]}',
+            'get-events-by-filter-tool' => '{}',
+            'get-latest-flint-digest' => '{}',
+            'complete-flint-run' => '{"ok":true}',
+        ]));
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['spark__manage-flint-topic', ['operation' => 'list']], ['spark__complete-flint-run', []]], ['input_tokens' => 100, 'output_tokens' => 20]),
+            FakeOpenAi::text('Done.', ['input_tokens' => 20, 'output_tokens' => 10]),
+        ]);
 
         $result = app(OpenAiRoutineDriver::class)->run(User::factory()->create(), 'topics', ['routine' => 'topics']);
 
         $this->assertSame('accepted', $result->status);
         $this->assertSame('openai', $result->details['driver']);
-        $this->assertSame(1, $result->details['tool_calls']);
+        $this->assertSame(2, $result->details['tool_calls']);
         $this->assertSame(120, $result->details['input_tokens']);
+        $this->assertStringNotContainsString('secret-token', json_encode($result->details));
 
-        Http::assertSent(function ($request) {
-            $tool = $request['tools'][0];
+        $request = FakeOpenAi::requests()[0];
+        $this->assertSame('test-reasoning-model', $request['model']);
+        $this->assertStringContainsString('Flint Topics', json_encode($request['input']));
 
-            $this->assertSame('mcp', $tool['type']);
-            $this->assertSame('never', $tool['require_approval']);
-            $this->assertSame('https://mcp.example.test/secret-token/sse', $tool['server_url']);
-            $this->assertStringContainsString('Flint Topics', $request['instructions']);
-            $this->assertTrue($request['stream']);
-            $this->assertSame(40, $request['max_tool_calls']);
-            $this->assertArrayNotHasKey('max_tool_calls', $tool);
-
-            // The topics skill must not be handed anything beyond its manifest.
-            $this->assertSame([
-                'spark__get-events-by-filter-tool',
-                'spark__get-latest-flint-digest',
-                'spark__manage-flint-topic',
-                'spark__complete-flint-run',
-            ], $tool['allowed_tools']);
-
-            return true;
-        });
+        // The topics skill must not be handed anything beyond its manifest,
+        // and needs no remote MCP server: its tools all run in-process.
+        $this->assertSame([
+            'spark__get-events-by-filter-tool',
+            'spark__get-latest-flint-digest',
+            'spark__manage-flint-topic',
+            'spark__complete-flint-run',
+        ], collect($request['tools'])->pluck('name')->all());
+        $this->assertSame([], $tools->connections);
     }
 }

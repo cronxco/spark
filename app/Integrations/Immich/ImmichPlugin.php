@@ -80,7 +80,7 @@ class ImmichPlugin extends ManualPlugin
                     'label' => 'Sync Mode',
                     'required' => false,
                     'default' => 'recent',
-                    'options' => ['recent', 'full'],
+                    'options' => ['recent' => 'Recent (last 30 days)', 'full' => 'Full history'],
                     'description' => 'Recent (last 30 days) or Full history',
                 ],
                 'include_videos' => [
@@ -289,39 +289,59 @@ class ImmichPlugin extends ManualPlugin
 
     /**
      * Pull photo data from Immich API
+     *
+     * Uses POST /api/search/metadata (GET /api/assets was removed from Immich).
      */
     public function pullPhotoData(Integration $integration, string $serverUrl, string $apiKey, ?string $afterDate = null): array
     {
         $assets = [];
-        $take = 100;
-        $skip = 0;
+        $page = 1;
+        $cursor = null;
 
         do {
             $params = [
-                'take' => $take,
-                'skip' => $skip,
+                'size' => 250,
+                'page' => $page,
+                'withExif' => true,
+                'withPeople' => true,
             ];
 
+            if ($cursor !== null) {
+                unset($params['page']);
+                $params['cursor'] = $cursor;
+            }
+
             if ($afterDate) {
-                $params['updatedAfter'] = $afterDate;
+                $params['takenAfter'] = $afterDate;
             }
 
             $response = $this->makeRequest(
-                'GET',
-                "{$serverUrl}/api/assets",
+                'POST',
+                rtrim($serverUrl, '/') . '/api/search/metadata',
                 $apiKey,
                 $params,
                 $integration->id
             );
 
-            // API might return array directly or nested in 'assets' key
-            $batch = is_array($response) && isset($response[0]) ? $response : ($response['assets'] ?? []);
+            if (! isset($response['assets']['items']) || ! is_array($response['assets']['items'])) {
+                throw new Exception('Immich returned an invalid asset search response');
+            }
 
-            $assets = array_merge($assets, $batch);
-            $skip += $take;
+            $assets = array_merge($assets, $response['assets']['items']);
+            $nextCursor = $response['assets']['nextCursor'] ?? null;
+            if ($nextCursor !== null && $nextCursor === $cursor) {
+                throw new Exception('Immich returned an invalid next cursor');
+            }
 
-            // Continue if we got a full batch
-        } while (count($batch) === $take);
+            $cursor = $nextCursor;
+            $nextPage = $response['assets']['nextPage'] ?? null;
+
+            if ($nextPage !== null && (int) $nextPage <= $page) {
+                throw new Exception('Immich returned an invalid next page');
+            }
+
+            $page = $nextPage === null ? null : (int) $nextPage;
+        } while ($cursor !== null || $page !== null);
 
         return [
             'assets' => $assets,
@@ -334,16 +354,22 @@ class ImmichPlugin extends ManualPlugin
      */
     public function pullPeopleData(Integration $integration, string $serverUrl, string $apiKey): array
     {
-        $response = $this->makeRequest(
-            'GET',
-            "{$serverUrl}/api/people",
-            $apiKey,
-            ['withHidden' => true],
-            $integration->id
-        );
+        $people = [];
+        $page = 1;
 
-        // API might return array directly or nested in 'people' key
-        $people = is_array($response) && isset($response[0]) ? $response : ($response['people'] ?? []);
+        do {
+            // Immich validates query booleans as the strings "true"/"false"
+            $response = $this->makeRequest(
+                'GET',
+                rtrim($serverUrl, '/') . '/api/people',
+                $apiKey,
+                ['withHidden' => 'true', 'page' => $page, 'size' => 500],
+                $integration->id
+            );
+
+            $people = array_merge($people, $response['people'] ?? []);
+            $page++;
+        } while (($response['hasNextPage'] ?? false) === true);
 
         return [
             'people' => $people,
@@ -377,7 +403,7 @@ class ImmichPlugin extends ManualPlugin
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true
@@ -467,26 +493,5 @@ class ImmichPlugin extends ManualPlugin
         }
 
         return $sanitized;
-    }
-
-    /**
-     * Sanitize response body for logging (limit size)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . ' ... [TRUNCATED]';
-        }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
     }
 }

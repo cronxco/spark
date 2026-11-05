@@ -85,7 +85,7 @@ new class extends Component
 
     public function getSearchLogs()
     {
-        $query = SearchLog::where('user_id', AdminTenant::id());
+        $query = AdminTenant::scope(SearchLog::query());
 
         // Apply search filter
         if ($this->search) {
@@ -103,8 +103,9 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        $sortableColumns = collect($this->headers())->where('sortable', true)->pluck('key')->all();
+        $sortColumn = in_array($this->sortBy['column'] ?? null, $sortableColumns, true) ? $this->sortBy['column'] : 'created_at';
+        $sortDirection = ($this->sortBy['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortColumn, $sortDirection);
 
         return $query->paginate($this->perPage);
@@ -112,9 +113,9 @@ new class extends Component
 
     public function getStatsProperty(): array
     {
-        $totalSearches = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(7))->count();
+        $totalSearches = AdminTenant::scope(SearchLog::query())->where('created_at', '>=', now()->subDays(7))->count();
 
-        $typeBreakdown = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(7))
+        $typeBreakdown = AdminTenant::scope(SearchLog::query())->where('created_at', '>=', now()->subDays(7))
             ->selectRaw('type, COUNT(*) as count')
             ->groupBy('type')
             ->pluck('count', 'type')
@@ -127,7 +128,7 @@ new class extends Component
         $semanticPercent = $totalSearches > 0 ? round(($semanticCount / $totalSearches) * 100) : 0;
         $keywordPercent = $totalSearches > 0 ? round(($keywordCount / $totalSearches) * 100) : 0;
 
-        $avgSimilarity = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(7))
+        $avgSimilarity = AdminTenant::scope(SearchLog::query())->where('created_at', '>=', now()->subDays(7))
             ->whereNotNull('avg_similarity')
             ->avg('avg_similarity');
 
@@ -146,11 +147,10 @@ new class extends Component
 
     public function getEmbeddingCoverageProperty(): array
     {
-        $userId = AdminTenant::id();
-        $ownedBlocks = fn () => Block::whereHas('event.integration', fn ($q) => $q->where('user_id', $userId));
+        $ownedBlocks = fn () => Block::whereHas('event.integration', AdminTenant::scoped());
 
-        $eventsTotal = Event::forUser($userId)->count();
-        $eventsWithEmbeddings = Event::forUser($userId)->whereNotNull('embeddings')->count();
+        $eventsTotal = Event::query()->tap(AdminTenant::scopedForUser())->count();
+        $eventsWithEmbeddings = Event::query()->tap(AdminTenant::scopedForUser())->whereNotNull('embeddings')->count();
         $eventsPercent = $eventsTotal > 0 ? round(($eventsWithEmbeddings / $eventsTotal) * 100) : 0;
 
         $blocksTotal = $ownedBlocks()->count();
@@ -181,7 +181,7 @@ new class extends Component
 
     public function getPerformanceMetricsProperty(): array
     {
-        $last30Days = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(30))->get();
+        $last30Days = AdminTenant::scope(SearchLog::query())->where('created_at', '>=', now()->subDays(30))->get();
 
         $apiCalls = $last30Days->where('type', 'semantic')->count();
         $estimatedCost = ($apiCalls * 20 * 0.02) / 1000000; // Rough estimate: 20 tokens avg, $0.02 per 1M tokens
@@ -202,12 +202,12 @@ new class extends Component
 
     public function getQualityInsightsProperty(): array
     {
-        $lowSimilarity = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(30))
+        $lowSimilarity = AdminTenant::scope(SearchLog::query())->where('created_at', '>=', now()->subDays(30))
             ->whereNotNull('avg_similarity')
             ->where('avg_similarity', '>', 0.4) // Low similarity = high distance
             ->count();
 
-        $noEmbeddings = SearchLog::where('user_id', AdminTenant::id())->where('created_at', '>=', now()->subDays(30))
+        $noEmbeddings = AdminTenant::scope(SearchLog::query())->where('created_at', '>=', now()->subDays(30))
             ->where('results_count', 0)
             ->whereNotNull('threshold')
             ->count();
@@ -272,11 +272,10 @@ new class extends Component
                 '--type' => $type,
                 '--batch' => 50,
                 '--limit' => $limit,
+                '--user' => AdminTenant::id(),
             ]);
 
-            $output = Artisan::output();
-
-            $this->success("Started generating {$type} embeddings. Check queue for progress.");
+            $this->success("Started generating {$type} embeddings.");
         } catch (Exception $e) {
             $this->error('Failed to start embedding generation: ' . $e->getMessage());
         }
@@ -286,7 +285,7 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Search Analytics" subtitle="Monitor semantic search performance and usage" separator>
+    <x-header title="Search Analytics" separator>
         <x-slot:actions>
             <div class="flex items-center gap-2">
                 <div class="dropdown dropdown-end">
@@ -335,7 +334,7 @@ new class extends Component
             <div class="stat bg-base-200 rounded-lg shadow">
                 <div class="stat-title">Avg Match Quality</div>
                 <div class="stat-value text-success">{{ $this->stats['avg_similarity_percent'] }}%</div>
-                <div class="stat-desc">Average similarity score</div>
+
             </div>
             <div class="stat bg-base-200 rounded-lg shadow">
                 <div class="stat-title">Missing Embeddings</div>
@@ -570,7 +569,7 @@ new class extends Component
                     <div class="stat bg-base-200 rounded-lg">
                         <div class="stat-title">Estimated Cost</div>
                         <div class="stat-value text-success text-2xl">${{ $this->performanceMetrics['estimated_cost'] }}</div>
-                        <div class="stat-desc">Based on usage</div>
+
                     </div>
                     <div class="stat bg-base-200 rounded-lg">
                         <div class="stat-title">Avg Response Time</div>

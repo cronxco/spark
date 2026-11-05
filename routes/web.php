@@ -1,11 +1,10 @@
 <?php
 
 use App\Http\Controllers\AasaController;
-use App\Http\Controllers\Admin\BlockViewController;
 use App\Http\Controllers\Admin\GoCardlessAdminController;
-use App\Http\Controllers\Admin\MigrationsController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Auth\OAuthController;
+use App\Http\Controllers\GoCardlessRenewalController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\WebhookController;
 use App\Integrations\GoCardless\GoCardlessBankPlugin;
@@ -15,6 +14,7 @@ use App\Livewire\Day;
 use App\Livewire\FinancialAccounts;
 use App\Livewire\FinancialAccountShow;
 use App\Livewire\IntegrationDetails;
+use App\Livewire\KnowledgeTasks;
 use App\Livewire\Media\Index;
 use App\Livewire\Media\Show;
 use App\Livewire\MetricDetail;
@@ -24,6 +24,7 @@ use App\Livewire\Receipts;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Support\AdminTenant;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -67,6 +68,9 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     // Day-based timeline routes
+    Route::get('knowledge/tasks', KnowledgeTasks::class)->name('knowledge.tasks');
+    Route::get('tasks/{id}', KnowledgeTasks::class)->whereUuid('id')->name('knowledge.task');
+    Route::get('projects/{projectId}', KnowledgeTasks::class)->whereUuid('projectId')->name('knowledge.project');
     Route::get('day/today', Day::class)->name('today.day');
     Route::get('today', Day::class)->name('today.main');
     Route::get('day/tomorrow', Day::class)->name('tomorrow');
@@ -103,6 +107,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
     Route::get('integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
     Route::post('integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
+    Route::get('integrations/gocardless/renewal/{group}', [GoCardlessRenewalController::class, 'show'])
+        ->whereUuid('group')->name('integrations.gocardless.renewal.show');
+    Route::post('integrations/gocardless/renewal/{group}', [GoCardlessRenewalController::class, 'store'])
+        ->whereUuid('group')->name('integrations.gocardless.renewal.store');
+
     Route::get('integrations/{service}/reconnect/{group}', [IntegrationController::class, 'reconnect'])
         ->whereUuid('group')
         ->name('integrations.reconnect');
@@ -315,39 +324,56 @@ Route::get('auth/authelia/callback', function () {
     );
     Auth::login($authUser);
 
+    if (AdminTenant::pullReauthenticationRequest($authUser) && AdminTenant::isGlobalOperator($authUser)) {
+        AdminTenant::start($authUser);
+
+        return redirect()->route('admin.god-mode.index');
+    }
+
     return redirect('/today');
 });
 
 // Admin routes
-Route::middleware(['auth', 'verified', 'admin', 'admin.operator.audit'])->prefix('admin')->name('admin.')->group(function () {
-    Volt::route('operator', 'admin.operator')->middleware('password.confirm:password.confirm,900')->name('operator.index');
-    Route::post('operator/stop', function () {
+Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix('admin')->name('admin.')->group(function () {
+    Volt::route('god-mode', 'admin.god-mode')->name('god-mode.index');
+    Route::post('god-mode/enable', function () {
+        abort_unless(AdminTenant::isGlobalOperator(Auth::user()), 403);
+        AdminTenant::requestReauthentication(Auth::user());
+
+        // prompt=login alone: max_age=0 made Authelia keep asking for re-auth after a good password.
+        return Socialite::driver('authelia')->with(['prompt' => 'login'])->redirect();
+    })->name('god-mode.enable');
+    Route::post('god-mode/disable', function () {
         AdminTenant::end();
 
-        return redirect()->route('admin.operator.index');
-    })->name('operator.stop');
+        return redirect()->route('admin.god-mode.index');
+    })->name('god-mode.disable');
 
-    Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
-    Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
-    Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+    Route::middleware('admin.god-mode.required')->group(function () {
+        Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
+        Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
+        Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+    });
 
-    Route::get('migrations', [MigrationsController::class, 'index'])->name('migrations.index');
-    Route::post('migrations/oura', [MigrationsController::class, 'migrateOuraValues'])->name('migrations.oura');
+    Route::redirect('migrations', '/admin/pulse?section=data_fixes')->name('migrations.index');
 
     Volt::route('daynotes', 'admin.daynotes')->name('daynotes.index');
     Volt::route('events', 'admin.events')->name('events.index');
     Volt::route('objects', 'admin.objects')->name('objects.index');
     Volt::route('blocks', 'admin.blocks')->name('blocks.index');
     Volt::route('relationships', 'admin.relationships')->name('relationships.index');
-    Volt::route('pending-links', 'admin.pending-links')->name('pending-links.index');
+    Route::redirect('pending-links', '/flint')->name('pending-links.index');
     Volt::route('bin', 'admin.bin')->name('bin.index');
-    Volt::route('sense-check', 'admin.sense-check')->name('sense-check.index');
+    Volt::route('pulse', 'admin.sense-check')->name('pulse.index');
+    Route::get('sense-check', fn (Request $request) => redirect()->route('admin.pulse.index', $request->query()))->name('sense-check.index');
     Volt::route('search', 'admin.search')->name('search.index');
     Volt::route('duplicates', 'admin.duplicates.index')->name('duplicates.index');
     Volt::route('logs', 'pages.admin.logs')->name('logs.index');
-    Route::get('block-view', [BlockViewController::class, 'index'])->name('block-view.index');
+    Route::redirect('block-view', '/admin/blocks?view=gallery')->name('block-view.index');
     Route::post('bin/delete', function () {
-        DeleteBinItemsBatch::dispatch(AdminTenant::id());
+        $userId = AdminTenant::id();
+        AdminTenant::recordAction('bin_purge', [], $userId === null);
+        DeleteBinItemsBatch::dispatch($userId === null ? null : (string) $userId);
 
         return response()->json([
             'message' => 'Deletion process started. All items will be permanently deleted.',
@@ -355,5 +381,6 @@ Route::middleware(['auth', 'verified', 'admin', 'admin.operator.audit'])->prefix
     })->name('bin.delete');
     Volt::route('activity', 'admin.activity')->name('activity.index');
     Volt::route('push-notifications', 'admin.push-notifications')->name('push-notifications.index');
-    Volt::route('task-pipeline', 'admin.task-pipeline-overview')->name('task-pipeline.index');
+    Volt::route('pipeline', 'admin.task-pipeline-overview')->name('pipeline.index');
+    Route::redirect('task-pipeline', '/admin/pipeline')->name('task-pipeline.index');
 });

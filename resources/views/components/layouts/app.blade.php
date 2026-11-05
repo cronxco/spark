@@ -172,6 +172,7 @@
                 <x-menu-item title="Yesterday" icon="fas.calendar-minus" link="{{ route('day.yesterday') }}" :active="request()->routeIs('day.*')" data-hotkey="g y" />
                 <x-menu-item title="Tomorrow" icon="fas.calendar-plus" link="{{ route('tomorrow') }}" :active="request()->routeIs('tomorrow')" />
                 <x-menu-item title="Flint" icon="fas.hexagon-nodes" link="{{ route('flint.index') }}" :active="request()->routeIs('flint.index')" />
+                <x-menu-item title="Tasks & Projects" icon="fas.list-check" link="{{ route('knowledge.tasks') }}" :active="request()->routeIs('knowledge.*')" />
                 <x-menu-item title="Map" icon="fas.map-location-dot" link="{{ route('map.index') }}" :active="request()->routeIs('map.*')" data-hotkey="g l" />
                 <x-menu-item title="Notifications" icon="fas.bell" link="{{ route('notifications.index') }}" :active="request()->routeIs('notifications.*')" data-hotkey="g n" />
                 <x-menu-item title="Bookmarks" icon="fas.bookmark" link="{{ route('bookmarks') }}" :active="request()->routeIs('bookmarks.*')" data-hotkey="g b" />
@@ -191,22 +192,9 @@
 
                 @if (auth()->user()?->is_admin)
                 <x-menu-sub title="Admin" icon="fas.shield-halved" :active="request()->routeIs('admin.*')" data-hotkey="g a">
-                    <x-menu-item title="Sense Check" icon="fas.brain" link="{{ route('admin.sense-check.index') }}" :active="request()->routeIs('admin.sense-check.*')" />
-                    <x-menu-item title="Day Notes" icon="fas.calendar-day" link="{{ route('admin.daynotes.index') }}" :active="request()->routeIs('admin.daynotes.*')" />
-                    <x-menu-item title="Search Analytics" icon="fas.magnifying-glass-chart" link="{{ route('admin.search.index') }}" :active="request()->routeIs('admin.search.*')" />
-                    <x-menu-item title="Duplicates" icon="fas.copy" link="{{ route('admin.duplicates.index') }}" :active="request()->routeIs('admin.duplicates.*')" />
-                    <x-menu-item title="Activity" icon="fas.history" link="{{ route('admin.activity.index') }}" :active="request()->routeIs('admin.activity.*')" />
-                    <x-menu-item title="Task Pipeline" icon="fas.diagram-project" link="{{ route('admin.task-pipeline.index') }}" :active="request()->routeIs('admin.task-pipeline.*')" />
-                    <x-menu-item title="Events" icon="fas.list" link="{{ route('admin.events.index') }}" :active="request()->routeIs('admin.events.*')" />
-                    <x-menu-item title="Objects" icon="fas.cube" link="{{ route('admin.objects.index') }}" :active="request()->routeIs('admin.objects.*')" />
-                    <x-menu-item title="Blocks" icon="fas.cubes" link="{{ route('admin.blocks.index') }}" :active="request()->routeIs('admin.blocks.*')" />
-                    <x-menu-item title="Block View" icon="fas.th" link="{{ route('admin.block-view.index') }}" :active="request()->routeIs('admin.block-view.*')" />
-                    <x-menu-item title="Relationships" icon="fas.link" link="{{ route('admin.relationships.index') }}" :active="request()->routeIs('admin.relationships.*')" />
-                    <x-menu-item title="GoCardless" icon="fas.credit-card" link="{{ route('admin.gocardless.index') }}" :active="request()->routeIs('admin.gocardless.*')" />
-                    <x-menu-item title="Migrations" icon="fas.cog" link="{{ route('admin.migrations.index') }}" :active="request()->routeIs('admin.migrations.*')" />
-                    <x-menu-item title="Logs" icon="fas.file-lines" link="{{ route('admin.logs.index') }}" :active="request()->routeIs('admin.logs.*')" />
-                    <x-menu-item title="Bin" icon="fas.trash" link="{{ route('admin.bin.index') }}" :active="request()->routeIs('admin.bin.*')" />
-                    <x-menu-item title="Operator Access" icon="fas.user-shield" link="{{ route('admin.operator.index') }}" :active="request()->routeIs('admin.operator.*')" />
+                    @foreach (\App\Support\AdminPages::visible() as $adminPage)
+                    <x-menu-item :title="$adminPage['title']" :icon="$adminPage['icon']" :link="route($adminPage['route'])" :active="request()->routeIs($adminPage['active'])" />
+                    @endforeach
                 </x-menu-sub>
                 @endif
                 <x-menu-item title="Updates" icon="fas.cloud-arrow-down" link="{{ route('updates.index') }}" :active="request()->routeIs('updates.*')" data-hotkey="g u" />
@@ -215,13 +203,13 @@
 
         {{-- The `$slot` goes here --}}
         <x-slot:content class="bg-base-100">
-            @if (auth()->user()?->is_admin && ($operatorContext = \App\Support\AdminTenant::context()))
+            @if (auth()->user()?->is_admin && \App\Support\AdminTenant::isGodMode())
                 <div class="alert alert-warning mb-4" role="status">
                     <x-icon name="fas.user-shield" class="w-5 h-5" />
-                    <span>Admin pages are showing another user's data. Every page you open is logged.</span>
-                    <form method="POST" action="{{ route('admin.operator.stop') }}">
+                    <span>God Mode is on: admin pages show everything across all users. Every page you open is logged.</span>
+                    <form method="POST" action="{{ route('admin.god-mode.disable') }}">
                         @csrf
-                        <button type="submit" class="btn btn-sm">Back to my data</button>
+                        <button type="submit" class="btn btn-sm">Turn off God Mode</button>
                     </form>
                 </div>
             @endif

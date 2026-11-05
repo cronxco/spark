@@ -16,6 +16,14 @@ class PluginRegistry
     private static ?Collection $cachedSpotlightCommands = null;
 
     /**
+     * Services that write events or integrations without a plugin. They have no
+     * group and declare nothing, so integrity checks leave them out.
+     *
+     * openai: the per-day AI usage ledger written by AiUsageRecorder.
+     */
+    public const INTERNAL_SERVICES = ['openai'];
+
+    /**
      * Get the list of valid domains that plugins can use
      */
     public static function getValidDomains(): array
@@ -41,6 +49,41 @@ class PluginRegistry
     public static function getAllPlugins(): Collection
     {
         return collect(self::$plugins);
+    }
+
+    /**
+     * Retired type names a plugin still has on old rows, from its optional
+     * static getLegacyTypes(). Recognised by integrity checks, never offered
+     * for new writes.
+     *
+     * @param  'action_types'|'block_types'|'object_types'  $kind
+     * @return array<int, string>
+     */
+    public static function getLegacyTypeNames(string $pluginClass, string $kind): array
+    {
+        if (! method_exists($pluginClass, 'getLegacyTypes')) {
+            return [];
+        }
+
+        return array_keys($pluginClass::getLegacyTypes()[$kind] ?? []);
+    }
+
+    /**
+     * Object types are shared across plugins (a day, a user profile), so an
+     * object type counts as known when any plugin declares it.
+     *
+     * @return array<int, string>
+     */
+    public static function getAllObjectTypeNames(): array
+    {
+        return self::getAllPlugins()
+            ->flatMap(fn (string $pluginClass) => array_merge(
+                array_keys($pluginClass::getObjectTypes()),
+                self::getLegacyTypeNames($pluginClass, 'object_types'),
+            ))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

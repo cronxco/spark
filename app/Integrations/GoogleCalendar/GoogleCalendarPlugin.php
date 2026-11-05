@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Notifications\IntegrationAuthenticationFailed;
 use App\Services\GeocodingService;
 use App\Services\PlaceDetectionService;
 use Carbon\Carbon;
@@ -238,6 +239,13 @@ class GoogleCalendarPlugin extends OAuthPlugin
         $sessionKey = 'oauth_csrf_google_calendar_' . $group->id;
         Session::put($sessionKey, $csrfToken);
 
+        // A reconnect started from the iOS app begins in an API request, whose
+        // session the browser that completes consent never sees, so the group
+        // also keeps a hash of the token for the callback to check against
+        $metadata = $group->auth_metadata ?? [];
+        $metadata['oauth_csrf_hash'] = hash('sha256', $csrfToken);
+        $group->update(['auth_metadata' => $metadata]);
+
         $state = encrypt([
             'group_id' => $group->id,
             'user_id' => $group->user_id,
@@ -344,7 +352,6 @@ class GoogleCalendarPlugin extends OAuthPlugin
 
         if (! $response->successful()) {
             Log::error('Google Calendar token exchange failed', [
-                'response' => $response->body(),
                 'status' => $response->status(),
             ]);
             throw new Exception('Failed to exchange code for tokens: ' . $response->body());
@@ -410,7 +417,6 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 Log::warning('Failed to fetch calendar list from Google API', [
                     'group_id' => $group->id,
                     'status' => $response->status(),
-                    'response' => $response->body(),
                 ]);
 
                 return [];
@@ -532,10 +538,9 @@ class GoogleCalendarPlugin extends OAuthPlugin
             Log::warning('Failed to fetch Google Calendar events', [
                 'integration_id' => $integration->id,
                 'status' => $response->status(),
-                'response' => $response->body(),
             ]);
 
-            return [];
+            throw new Exception('Failed to fetch Google Calendar events: ' . $response->status());
         }
 
         $data = $response->json();
@@ -636,7 +641,9 @@ class GoogleCalendarPlugin extends OAuthPlugin
             } else {
                 $startTime = Carbon::parse($start['dateTime']);
                 $endTime = Carbon::parse($end['dateTime']);
-                $durationMinutes = $startTime->diffInMinutes($endTime);
+                // Carbon 3 returns a float, and events.value is a bigint: an event whose
+                // times carry seconds (Google Maps travel entries) failed the whole batch
+                $durationMinutes = (int) round($startTime->diffInMinutes($endTime));
                 $actionType = 'had_event';
             }
 
@@ -669,7 +676,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'time' => $startTime,
                 'actor_id' => $calendarObject->id,
                 'target_id' => $eventObject->id,
-                'service' => 'google_calendar',
+                'service' => self::getIdentifier(),
                 'domain' => self::getDomain(),
                 'action' => $actionType,
                 'value' => $durationMinutes,
@@ -682,6 +689,11 @@ class GoogleCalendarPlugin extends OAuthPlugin
                     'creator' => $event['creator'] ?? null,
                     'organizer' => $event['organizer'] ?? null,
                     'status' => $status,
+                    // focusTime, outOfOffice and workingLocation matter for planning; declined meetings were not attended
+                    'event_type' => $event['eventType'] ?? null,
+                    'response_status' => $this->ownResponseStatus($event),
+                    'transparency' => $event['transparency'] ?? null,
+                    'attendee_count' => isset($event['attendees']) ? count($event['attendees']) : null,
                     'visibility' => $event['visibility'] ?? null,
                     'recurrence' => $event['recurrence'] ?? null,
                     'recurring_event_id' => $event['recurringEventId'] ?? null,
@@ -765,7 +777,6 @@ class GoogleCalendarPlugin extends OAuthPlugin
             Log::warning('Failed to fetch Google Calendar account info', [
                 'group_id' => $group->id,
                 'status' => $response->status(),
-                'response' => $response->body(),
             ]);
         }
     }
@@ -777,7 +788,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 'group_id' => $group->id,
             ]);
 
-            return;
+            throw new Exception('Cannot refresh Google Calendar token: no refresh token available');
         }
 
         Log::info('Refreshing Google Calendar access token', [
@@ -814,7 +825,6 @@ class GoogleCalendarPlugin extends OAuthPlugin
             Log::error('Failed to refresh Google Calendar token', [
                 'group_id' => $group->id,
                 'status' => $response->status(),
-                'response' => $response->body(),
             ]);
 
             // Check if refresh token is invalid
@@ -825,8 +835,25 @@ class GoogleCalendarPlugin extends OAuthPlugin
                 ]);
             }
 
-            // Don't throw exception - let caller handle the failure gracefully
-            return;
+            if (($errorData['error'] ?? '') === 'invalid_grant' || $response->status() === 401) {
+                $integration = $group->integrations()->first();
+                if ($integration) {
+                    try {
+                        $group->user->notify(new IntegrationAuthenticationFailed(
+                            $integration,
+                            'Your connection has expired and needs to be re-authorized.',
+                            ['error_code' => $errorData['error'] ?? '', 'status' => $response->status()]
+                        ));
+                    } catch (Exception $e) {
+                        Log::error('Failed to send Google Calendar authentication notification', [
+                            'group_id' => $group->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
+            throw new Exception('Failed to refresh Google Calendar token');
         }
 
         $tokenData = $response->json();
@@ -860,24 +887,27 @@ class GoogleCalendarPlugin extends OAuthPlugin
         // Get the session key for this group (without session_id to avoid session regeneration issues)
         $sessionKey = 'oauth_csrf_google_calendar_' . $group->id;
 
-        // Retrieve stored token from session
         $storedToken = Session::get($sessionKey);
+        $metadata = $group->auth_metadata ?? [];
+        $storedHash = $metadata['oauth_csrf_hash'] ?? null;
 
-        if (! $storedToken) {
-            Log::warning('Google Calendar CSRF token not found in session', [
+        if (! $storedToken && ! $storedHash) {
+            Log::warning('Google Calendar CSRF token not found in session or group', [
                 'group_id' => $group->id,
                 'session_key' => $sessionKey,
             ]);
 
-            return false; // No stored token found
+            return false;
         }
 
-        // Compare tokens
-        $isValid = hash_equals($storedToken, $token);
+        $isValid = ($storedToken && hash_equals($storedToken, $token))
+            || ($storedHash && hash_equals($storedHash, hash('sha256', $token)));
 
-        // Remove the token from session after validation (one-time use)
+        // One-time use: clear both copies once the callback is accepted
         if ($isValid) {
             Session::forget($sessionKey);
+            unset($metadata['oauth_csrf_hash']);
+            $group->update(['auth_metadata' => $metadata]);
             Log::info('Google Calendar CSRF token validated and removed', [
                 'group_id' => $group->id,
             ]);
@@ -893,6 +923,20 @@ class GoogleCalendarPlugin extends OAuthPlugin
     /**
      * Check if event should be included based on filtering patterns
      */
+    /**
+     * The calendar owner's RSVP: their attendee entry, or accepted when they organised it.
+     */
+    protected function ownResponseStatus(array $event): ?string
+    {
+        foreach ($event['attendees'] ?? [] as $attendee) {
+            if (($attendee['self'] ?? false) === true) {
+                return $attendee['responseStatus'] ?? null;
+            }
+        }
+
+        return ($event['organizer']['self'] ?? false) === true ? 'accepted' : null;
+    }
+
     protected function shouldIncludeEvent(string $title, array $includePatterns, array $excludePatterns): bool
     {
         // Check exclude patterns first (any match = exclude)
@@ -1011,7 +1055,7 @@ class GoogleCalendarPlugin extends OAuthPlugin
      */
     protected function handleEventDeletion(Integration $integration, array $processedEventIds, array $syncWindow): void
     {
-        $timeMin = Carbon::parse($syncWindow['time_min']);
+        $timeMin = Carbon::parse($syncWindow['time_min'])->max(now());
         $timeMax = Carbon::parse($syncWindow['time_max']);
 
         // Get all events in the sync window that weren't in the current sync

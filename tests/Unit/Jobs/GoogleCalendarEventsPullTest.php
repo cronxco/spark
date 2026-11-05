@@ -8,6 +8,7 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -187,7 +188,7 @@ class GoogleCalendarEventsPullTest extends TestCase
     }
 
     #[Test]
-    public function job_handles_api_errors_gracefully(): void
+    public function job_propagates_api_errors(): void
     {
         Http::fake([
             'https://www.googleapis.com/calendar/v3/calendars/primary/events*' => Http::response([
@@ -204,11 +205,10 @@ class GoogleCalendarEventsPullTest extends TestCase
         $reflection = new ReflectionClass($job);
         $method = $reflection->getMethod('fetchData');
 
-        $result = $method->invoke($job);
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to fetch Google Calendar events: 403');
 
-        // Should return empty array on error
-        $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $method->invoke($job);
     }
 
     #[Test]
