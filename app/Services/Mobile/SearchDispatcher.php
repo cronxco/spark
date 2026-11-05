@@ -111,7 +111,7 @@ class SearchDispatcher
         if (! empty($integrationIds)) {
             $events = Event::query()
                 ->whereIn('integration_id', $integrationIds)
-                ->where(fn ($q) => $q->where('action', 'like', $like)->orWhere('service', 'like', $like))
+                ->where(fn ($q) => $q->where('action', 'ILIKE', $like)->orWhere('service', 'ILIKE', $like))
                 ->with(['actor', 'target'])
                 ->limit($limit);
 
@@ -120,7 +120,7 @@ class SearchDispatcher
 
         $objects = EventObject::query()
             ->where('user_id', $user->id)
-            ->where(fn ($q) => $q->where('title', 'like', $like)->orWhere('content', 'like', $like))
+            ->where(fn ($q) => $q->where('title', 'ILIKE', $like)->orWhere('content', 'ILIKE', $like))
             ->when($allFamilies, fn ($q) => $q->where(fn ($q) => $q->whereNull('concept')->orWhere('concept', '!=', 'place')))
             ->limit($limit);
 

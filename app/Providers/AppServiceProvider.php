@@ -16,6 +16,7 @@ use App\Observers\EventObserver;
 use App\Observers\NotificationEntityObserver;
 use App\Services\Actions\ActionCatalogue;
 use App\Services\Actions\ActionRegistry;
+use App\Services\Ai\AiToolTracing;
 use App\Services\EffectiveTimezoneResolver;
 use App\Services\Notifications\NotificationDeliveryRecorder;
 use App\Services\Notifications\NotificationIncidentResolver;
@@ -53,7 +54,7 @@ class AppServiceProvider extends ServiceProvider
         // job. `scoped` (not `singleton`) so long-lived Horizon workers flush the
         // memo between jobs and pick up a freshly acknowledged timezone.
         $this->app->scoped(EffectiveTimezoneResolver::class);
-
+        $this->app->singleton(AiToolTracing::class);
         $this->app->singleton(ActionRegistry::class, fn () => new ActionRegistry(ActionCatalogue::definitions()));
     }
 
@@ -79,6 +80,9 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(function (SocialiteWasCalled $event) {
             $event->extendSocialite('authelia', AutheliaProvider::class);
         });
+
+        // Trace every tool a laravel/ai agent runs
+        Event::subscribe(AiToolTracing::class);
 
         // iOS broadcast on new Event creation. Throttled per-user via Redis to avoid
         // flooding subscribers when bulk ingestion creates many events in quick succession.

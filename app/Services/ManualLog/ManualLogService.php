@@ -61,8 +61,8 @@ class ManualLogService
             ? $this->logTv($integration, $data)
             : $this->logSimple($integration, $data);
 
-        if ($result['status'] === 'logged' && ! empty($data['with'])) {
-            $result['people'] = $this->tagPeople($user, $result['events'], $data['with']);
+        if ($result['status'] === 'logged' && (! empty($data['with']) || ! empty($data['with_ids']))) {
+            $result['people'] = $this->tagPeople($user, $result['events'], $data['with'] ?? [], $data['with_ids'] ?? []);
         }
 
         return $result;
@@ -153,15 +153,22 @@ class ManualLogService
     }
 
     /**
-     * Links each named person to the events with a `with` relationship, creating people not seen before.
+     * Links each person to the events with a `with` relationship. People the app already matched arrive by id and are
+     * never renamed or duplicated; named people are found by exact title, and created when not seen before.
      *
      * @param  array<int, Event>  $events
      * @param  array<int, string>  $names
+     * @param  array<int, string>  $ids  Person ids the app settled on; ids that are not this user's people are ignored
      * @return array<int, array{id: string, name: string, created: bool}>
      */
-    private function tagPeople(User $user, array $events, array $names): array
+    private function tagPeople(User $user, array $events, array $names, array $ids = []): array
     {
         $people = [];
+        $linked = [];
+
+        $matched = $ids === [] ? collect() : Person::query()->where('user_id', $user->id)->whereIn('id', $ids)->get();
+
+        $targets = $matched->map(fn (Person $person) => [$person, false])->all();
 
         foreach (collect($names)->map(fn (string $name) => trim($name))->filter(fn (string $name) => $name !== '' && ! PersonMatcher::isReserved($name))->unique(fn (string $name) => Str::lower($name)) as $name) {
             $person = Person::query()
@@ -177,6 +184,15 @@ class ManualLogService
                 'time' => now(),
                 'metadata' => [],
             ]);
+
+            $targets[] = [$person, $created];
+        }
+
+        foreach ($targets as [$person, $created]) {
+            if (isset($linked[(string) $person->id])) {
+                continue;
+            }
+            $linked[(string) $person->id] = true;
 
             foreach ($events as $event) {
                 Relationship::createRelationship([

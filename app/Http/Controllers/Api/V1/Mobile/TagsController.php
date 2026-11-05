@@ -24,6 +24,9 @@ class TagsController extends Controller
 
     private const MAX_LIMIT = 100;
 
+    /** The `type` a tag without one is listed and filtered under. */
+    private const UNTYPED = 'untyped';
+
     public function __construct(
         protected EventLookup $eventLookup,
         protected ObjectLookup $objectLookup,
@@ -34,25 +37,37 @@ class TagsController extends Controller
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
+            'type' => ['nullable', 'string', 'max:255'],
             'cursor' => ['nullable', 'string'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_LIMIT],
         ]);
 
-        $tags = $this->withTotals(
+        $allTags = $this->withTotals(
             $this->tagQuery($request->user(), $validated['q'] ?? null)->get(),
         )->sortBy([['total_count', 'desc'], ['id', 'asc']])->values();
 
-        [$tags, $nextCursor, $hasMore] = $this->paginate(
+        $type = $validated['type'] ?? null;
+        $tags = $type === null
+            ? $allTags
+            : $allTags->filter(fn (Tag $tag) => ($tag->type ?? self::UNTYPED) === $type)->values();
+
+        [$page, $nextCursor, $hasMore] = $this->paginate(
             $tags,
             $validated['cursor'] ?? null,
             (int) ($validated['limit'] ?? self::DEFAULT_LIMIT),
         );
 
-        return response()->json([
-            'data' => $tags->map(fn (Tag $tag) => $this->tagPayload($tag))->values(),
+        $response = [
+            'data' => $page->map(fn (Tag $tag) => $this->tagPayload($tag))->values(),
             'next_cursor' => $nextCursor,
             'has_more' => $hasMore,
-        ]);
+        ];
+
+        if (($validated['cursor'] ?? null) === null) {
+            $response['types'] = $this->typeTotals($allTags);
+        }
+
+        return response()->json($response);
     }
 
     public function show(Request $request, string $id): JsonResponse
@@ -159,6 +174,25 @@ class TagsController extends Controller
         }
 
         return $this->detach($object, $tagId);
+    }
+
+    /**
+     * One entry per tag type: how many tags it has and how often they are used.
+     *
+     * @return array<int, array{type: string, tags_count: int, total_count: int}>
+     */
+    private function typeTotals(Collection $tags): array
+    {
+        return $tags
+            ->groupBy(fn (Tag $tag) => $tag->type ?? self::UNTYPED)
+            ->map(fn (Collection $group, string $type) => [
+                'type' => $type,
+                'tags_count' => $group->count(),
+                'total_count' => (int) $group->sum('total_count'),
+            ])
+            ->sortBy([['total_count', 'desc'], ['type', 'asc']])
+            ->values()
+            ->all();
     }
 
     private function attach(Request $request, Event|EventObject $entity): JsonResponse

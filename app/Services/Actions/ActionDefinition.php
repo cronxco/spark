@@ -16,9 +16,12 @@ final readonly class ActionDefinition
      * @param  array<string, array{type: string, required?: bool}>  $target  fields the caller supplies; `type` is uuid|string|integer
      * @param  array<string, mixed>  $params  fixed values merged into the target, so one handler serves several actions
      * @param  array<int, string>  $surfaces  web and/or native
-     * @param  array{route: string}|null  $destination  navigation only
+     * @param  array{route?: string, native?: string}|null  $destination  navigation only; `route` is the web route name, `native` the app screen (day, flint, knowledge, explore.health|money|metrics|tags|map)
+     * @param  array<int, string>  $verbs  leading words that pick this action in a typed line such as "sync monzo"
      * @param  class-string<ActionHandler>|null  $handler
      * @param  array<int, string>  $keywords
+     * @param  array<string, array<string, string>>  $contexts  web routes this action is offered on, each mapping a target field to the route parameter that supplies it
+     * @param  string|null  $event  interface only: the browser event the page listens for
      */
     public function __construct(
         public string $id,
@@ -35,15 +38,33 @@ final readonly class ActionDefinition
         public array $surfaces = ['web', 'native'],
         public ?array $destination = null,
         public array $keywords = [],
+        public array $contexts = [],
+        public ?string $event = null,
+        public array $verbs = [],
     ) {
         if ($kind === ActionKind::Navigation && $destination === null) {
             throw new InvalidArgumentException("Action {$id} is navigation but has no destination.");
+        }
+
+        if ($kind === ActionKind::Interface && ($event === null || $surfaces !== ['web'])) {
+            throw new InvalidArgumentException("Action {$id} is an interface action, so it needs an event and runs on web only.");
         }
     }
 
     public function isNavigation(): bool
     {
         return $this->kind === ActionKind::Navigation;
+    }
+
+    public function isInterface(): bool
+    {
+        return $this->kind === ActionKind::Interface;
+    }
+
+    /** Whether this action belongs to a page rather than to every page. */
+    public function isContextual(): bool
+    {
+        return $this->contexts !== [];
     }
 
     public function on(string $surface): bool
@@ -55,6 +76,7 @@ final readonly class ActionDefinition
     public function runsWithoutInput(): bool
     {
         return $this->on('web')
+            && $this->handler !== null
             && $this->confirm !== ConfirmPolicy::Confirm
             && collect($this->target)->doesntContain(fn (array $field): bool => $field['required'] ?? true);
     }
@@ -108,8 +130,9 @@ final readonly class ActionDefinition
             'capability' => $this->capability,
             'target' => (object) $this->target,
             'destination' => $this->destination === null ? null : [
-                'route' => $this->destination['route'],
-                'path' => route($this->destination['route'], absolute: false),
+                'route' => $this->destination['route'] ?? null,
+                'path' => isset($this->destination['route']) ? route($this->destination['route'], absolute: false) : null,
+                'native' => $this->destination['native'] ?? null,
             ],
         ];
     }

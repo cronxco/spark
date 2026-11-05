@@ -1098,6 +1098,33 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
         );
     }
 
+    /**
+     * The track details block's text: a first line a list row can show
+     * ("3:42, Between Worlds"), then the popularity for the block's screen.
+     */
+    protected function trackDetailsContent(array $track, ?int $popularity): string
+    {
+        $durationMs = (int) ($track['duration_ms'] ?? 0);
+        $parts = [];
+
+        if ($durationMs > 0) {
+            $seconds = intdiv($durationMs, 1000);
+            $parts[] = sprintf('%d:%02d', intdiv($seconds, 60), $seconds % 60);
+        }
+
+        if (filled($track['album']['name'] ?? null)) {
+            $parts[] = $track['album']['name'];
+        }
+
+        $content = implode(', ', $parts);
+
+        if ($popularity !== null) {
+            $content .= ($content === '' ? '' : "\n\n") . "Popularity {$popularity} out of 100";
+        }
+
+        return $content;
+    }
+
     protected function createTrackBlocks(Event $event, array $track, Integration $integration): void
     {
         $configuration = $integration->configuration ?? [];
@@ -1115,15 +1142,16 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 ],
                 'url' => $track['external_urls']['spotify'] ?? null,
                 'media_url' => $albumImage['url'],
-                'value' => $albumImage['width'] ?? 300,
-                'value_multiplier' => 1,
-                'value_unit' => 'pixels',
+                // An image has no reading: its width drew a "640 pixels" tile.
+                'value' => null,
+                'value_unit' => null,
             ]);
         }
 
         // Track details block
         $artists = collect($track['artists'])->pluck('name')->implode(', ');
         $duration = gmdate('i:s', ($track['duration_ms'] ?? 0) / 1000);
+        $popularity = isset($track['popularity']) ? (int) $track['popularity'] : null;
 
         $event->createBlock([
             'block_type' => 'track_details',
@@ -1134,13 +1162,15 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 'artists' => $artists,
                 'album' => $track['album']['name'] ?? null,
                 'duration' => $duration,
-                'popularity' => $track['popularity'] ?? null,
+                'popularity' => $popularity,
+                'content' => $this->trackDetailsContent($track, $popularity),
             ],
             'url' => $track['external_urls']['spotify'] ?? null,
             'media_url' => null,
-            'value' => $track['popularity'] ?? 0,
-            'value_multiplier' => 1,
-            'value_unit' => 'popularity',
+            // Popularity is not a reading of this play, so it lives in the
+            // block's text rather than as a "39 popularity" value tile.
+            'value' => null,
+            'value_unit' => null,
         ]);
 
         // Artist information block
@@ -1390,9 +1420,8 @@ class SpotifyPlugin extends OAuthPlugin implements SupportsSpotlightCommands
                 ],
                 'url' => $episode['external_urls']['spotify'] ?? null,
                 'media_url' => $image['url'],
-                'value' => $image['width'] ?? 300,
-                'value_multiplier' => 1,
-                'value_unit' => 'pixels',
+                'value' => null,
+                'value_unit' => null,
             ]);
         }
 

@@ -130,11 +130,12 @@ class PlaywrightFetchClient
     }
 
     /**
-     * Render a URL for an MCP caller without using shared browser contexts.
+     * Render a URL for an MCP caller using the configured browser session.
      *
-     * Saved Fetch cookies are used only when the authenticated caller has a
-     * matching Fetch integration group. Returned cookies are persisted back to
-     * that same group's target-domain cookie store.
+     * Callers with a Fetch integration reuse the default browser when configured,
+     * preserving interactive logins. Otherwise, use an isolated context with
+     * saved Fetch cookies. Returned cookies are persisted only to the caller's
+     * target-domain cookie store.
      *
      * @return array{success: bool, html: string, title: string, url: string, status: ?int, html_bytes: int, returned_html_bytes: int, html_truncated: bool, used_saved_cookies: bool, cookie_store_updated: bool, error: ?string}
      */
@@ -146,7 +147,9 @@ class PlaywrightFetchClient
 
             $domain = FetchHttpClient::getDomainFromUrl($url);
             $domainConfig = $group ? FetchHttpClient::getCookiesForDomain($domain, $group) : [];
-            $cookies = $this->convertCookiesToPlaywrightFormat($domain, $domainConfig['cookies'] ?? []);
+            $useDefaultContext = $group !== null && config('services.playwright.use_default_context', true);
+            // Saved cookies may be older than the interactive browser login.
+            $cookies = $useDefaultContext ? [] : $this->convertCookiesToPlaywrightFormat($domain, $domainConfig['cookies'] ?? []);
 
             $response = Http::timeout(($this->timeout / 1000) + 10)
                 ->post("{$this->workerUrl}/fetch", [
@@ -157,7 +160,7 @@ class PlaywrightFetchClient
                     'screenshot' => false,
                     'userAgent' => $domainConfig['headers']['User-Agent'] ?? null,
                     'usePersistence' => false,
-                    'useDefaultContext' => false,
+                    'useDefaultContext' => $useDefaultContext,
                     'maxHtmlBytes' => (int) config('services.playwright.mcp_max_html_bytes', 1048576),
                 ]);
 

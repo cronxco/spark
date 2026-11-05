@@ -42,15 +42,15 @@ class GlobalActionsQuery
 
     /**
      * What ">" mode offers: web actions that run with no input and no confirm
-     * step. Each non-navigation one is run by the `run-action` listener
-     * mounted in the app layout.
+     * step, except the ones that belong to a page. Each non-navigation one is
+     * run by the `run-action` listener mounted in the app layout.
      *
      * @return Collection<int, ActionDefinition>
      */
     public static function visible(): Collection
     {
         return app(ActionRegistry::class)->forSurface('web')
-            ->filter(fn (ActionDefinition $action): bool => $action->isNavigation() || $action->runsWithoutInput())
+            ->filter(fn (ActionDefinition $action): bool => $action->isNavigation() || ($action->runsWithoutInput() && ! $action->isContextual()))
             ->values();
     }
 }

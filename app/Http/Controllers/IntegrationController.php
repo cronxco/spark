@@ -294,6 +294,12 @@ class IntegrationController extends Controller
             ]);
 
             if ($mobileReauthOrigin) {
+                // A failed attempt must not leave the flag behind, or the next
+                // reconnect from the web would also be sent to the app's scheme
+                if ($failedGroup = $group->fresh()) {
+                    $this->consumeMobileReauthOrigin($failedGroup);
+                }
+
                 return $this->mobileReauthRedirect(false, $mobileAttemptId);
             }
 

@@ -44,6 +44,8 @@ class StoreLogRequest extends FormRequest
             'match_url' => ['nullable', 'url:https', 'max:500', 'prohibited_unless:kind,wine,beer'],
             'with' => ['nullable', 'array', 'max:10'],
             'with.*' => ['string', 'min:1', 'max:100'],
+            'with_ids' => ['nullable', 'array', 'max:10'],
+            'with_ids.*' => ['uuid', 'distinct'],
             'tvdb_id' => ['nullable', 'integer', 'min:1', 'prohibited_unless:kind,tv'],
         ];
     }

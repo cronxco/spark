@@ -92,10 +92,14 @@ class LogIntentsControllerTest extends TestCase
     #[Test]
     public function commit_creates_a_flint_note_idempotently(): void
     {
+        $this->freezeTime();
+
         $first = $this->commit()->assertCreated()
             ->assertJsonPath('status', 'saved')
             ->assertJsonPath('note.body', 'stop asking about sleep');
         $this->commit()->assertOk()->assertJsonPath('note.id', $first->json('note.id'))->assertJsonPath('created', false);
+
+        $this->commit(['text' => '@flint a different reminder'])->assertConflict();
 
         $this->assertSame(1, EventObject::where('type', 'flint_note')->count());
     }

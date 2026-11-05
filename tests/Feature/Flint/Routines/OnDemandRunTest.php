@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Flint\Routines;
 
+use App\Ai\Tools\Skills\SkillToolSource;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Models\Event;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Fixtures\FakeOpenAi;
+use Tests\Fixtures\FakeSkillTools;
 use Tests\TestCase;
 
 class OnDemandRunTest extends TestCase
@@ -126,23 +129,14 @@ class OnDemandRunTest extends TestCase
             'services.openai.models.reasoning' => 'test-reasoning-model',
             'services.flint_routine.cronxtools_url' => 'https://mcp.example.test/token/sse',
         ]);
-        Http::fakeSequence()
-            ->push([
-                'id' => 'resp-paused',
-                'status' => 'completed',
-                'output' => [[
-                    'type' => 'mcp_approval_request',
-                    'id' => 'mcpr-digest',
-                    'server_label' => 'cronxtools',
-                    'name' => 'spark__create-flint-digest',
-                    'arguments' => json_encode(['title' => 'News', 'blocks' => []]),
-                ]],
-            ])
-            ->push([
-                'id' => 'resp-done',
-                'status' => 'completed',
-                'output' => [['type' => 'message', 'content' => [['text' => 'Run notes.']]]],
-            ]);
+        $this->app->instance(SkillToolSource::class, $tools = new FakeSkillTools(
+            spark: ['create-flint-digest' => '{"event_id":"evt-1"}'],
+            remote: ['https://mcp.example.test/token/sse' => ['docs__fetch' => '{}']],
+        ));
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['spark__create-flint-digest', ['title' => 'News', 'blocks' => []]]]),
+            FakeOpenAi::text('Run notes.'),
+        ]);
         $user = User::factory()->create();
 
         $this->artisan('flint:run-skill', [
@@ -162,8 +156,9 @@ class OnDemandRunTest extends TestCase
         $this->assertStringNotContainsString('mcp.example.test', json_encode($record));
         $this->assertSame(0, Event::query()->where('service', 'flint')->count());
         Queue::assertNothingPushed();
-        Http::assertSent(fn ($request) => is_string($request['input'])
-            && json_decode($request['input'], true)['dry_run'] === true);
+        $this->assertSame([], $tools->calledTools());
+        $prompt = collect(FakeOpenAi::requests()[0]['input'])->firstWhere('role', 'user')['content'][0]['text'];
+        $this->assertTrue(json_decode($prompt, true)['dry_run']);
     }
 
     #[Test]

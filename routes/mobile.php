@@ -345,6 +345,9 @@ Route::post('log/intents', [IntentsController::class, 'commit'])
 Route::get('actions', [ActionsController::class, 'index'])
     ->middleware('spark.ability:mobile:session')
     ->name('actions.index');
+Route::get('actions/resolve', [ActionsController::class, 'resolve'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.resolve');
 Route::get('actions/receipts/{id}', [ActionsController::class, 'receipt'])
     ->middleware('spark.ability:mobile:session')
     ->name('actions.receipts.show');

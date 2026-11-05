@@ -167,6 +167,101 @@ class FeedControllerTest extends TestCase
     }
 
     #[Test]
+    public function feed_events_carry_their_integration_and_first_block_refs(): void
+    {
+        $this->integration->update(['name' => 'Current Account']);
+        $this->seedEvents(1);
+        $event = Event::query()->firstOrFail();
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'tax_summary',
+            'title' => 'Tax Summary',
+            'value' => 120,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+        ]);
+        Block::factory()->count(2)->create([
+            'event_id' => $event->id,
+            'block_type' => 'line_item',
+            'value' => null,
+        ]);
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'note',
+            'value' => null,
+        ]);
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'line_item',
+            'value' => null,
+        ])->delete();
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $item = $this->getJson('/api/v1/mobile/feed')
+            ->assertOk()
+            ->json('data.0');
+
+        $this->assertSame('Current Account', $item['integration']['name']);
+        $this->assertSame('monzo', $item['integration']['service']);
+
+        $this->assertCount(3, $item['block_refs']);
+        $this->assertSame(3, $item['block_refs_total']);
+        $this->assertNotContains('note', array_column($item['block_refs'], 'block_type'));
+        $this->assertArrayNotHasKey('blocks', $item);
+
+        $refs = collect($item['block_refs'])->keyBy('block_type');
+        $this->assertSame('Tax Summary', $refs['tax_summary']['title']);
+        $this->assertSame('£1.20', $refs['tax_summary']['display_value']);
+        $this->assertArrayNotHasKey('display_value', $refs['line_item']);
+    }
+
+    #[Test]
+    public function block_refs_stop_at_three_and_report_the_total(): void
+    {
+        $this->seedEvents(1);
+        $event = Event::query()->firstOrFail();
+
+        Block::factory()->count(5)->create([
+            'event_id' => $event->id,
+            'block_type' => 'line_item',
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $item = $this->getJson('/api/v1/mobile/feed')
+            ->assertOk()
+            ->json('data.0');
+
+        $this->assertCount(3, $item['block_refs']);
+        $this->assertSame(5, $item['block_refs_total']);
+    }
+
+    #[Test]
+    public function untitled_block_refs_fall_back_to_the_block_type_name(): void
+    {
+        $this->seedEvents(1);
+        $event = Event::query()->firstOrFail();
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'mystery_widget',
+            'title' => '',
+            'value' => null,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $item = $this->getJson('/api/v1/mobile/feed')
+            ->assertOk()
+            ->json('data.0');
+
+        $this->assertSame('Mystery Widget', $item['block_refs'][0]['title']);
+        $this->assertSame(1, $item['block_refs_total']);
+    }
+
+    #[Test]
     public function feed_events_never_embed_blocks_array_only_count(): void
     {
         $this->seedEvents(1, domain: 'money');

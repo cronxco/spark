@@ -7,9 +7,17 @@ use App\Models\User;
 use App\Services\Actions\ActionFailed;
 use App\Services\Actions\ActionHandler;
 use App\Services\Actions\ActionOutcome;
+use App\Services\Actions\Applicable;
 
-class SyncIntegration implements ActionHandler
+class SyncIntegration implements ActionHandler, Applicable
 {
+    public function applies(User $user, array $target): bool
+    {
+        $integration = $user->integrations()->find($target['integration_id']);
+
+        return $integration !== null && ! $integration->isPaused();
+    }
+
     public function handle(User $user, array $target): ActionOutcome
     {
         $integration = $user->integrations()->find($target['integration_id']) ?? throw ActionFailed::notFound('Integration');

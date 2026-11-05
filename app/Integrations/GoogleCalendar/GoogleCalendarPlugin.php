@@ -239,6 +239,13 @@ class GoogleCalendarPlugin extends OAuthPlugin
         $sessionKey = 'oauth_csrf_google_calendar_' . $group->id;
         Session::put($sessionKey, $csrfToken);
 
+        // A reconnect started from the iOS app begins in an API request, whose
+        // session the browser that completes consent never sees, so the group
+        // also keeps a hash of the token for the callback to check against
+        $metadata = $group->auth_metadata ?? [];
+        $metadata['oauth_csrf_hash'] = hash('sha256', $csrfToken);
+        $group->update(['auth_metadata' => $metadata]);
+
         $state = encrypt([
             'group_id' => $group->id,
             'user_id' => $group->user_id,
@@ -880,24 +887,27 @@ class GoogleCalendarPlugin extends OAuthPlugin
         // Get the session key for this group (without session_id to avoid session regeneration issues)
         $sessionKey = 'oauth_csrf_google_calendar_' . $group->id;
 
-        // Retrieve stored token from session
         $storedToken = Session::get($sessionKey);
+        $metadata = $group->auth_metadata ?? [];
+        $storedHash = $metadata['oauth_csrf_hash'] ?? null;
 
-        if (! $storedToken) {
-            Log::warning('Google Calendar CSRF token not found in session', [
+        if (! $storedToken && ! $storedHash) {
+            Log::warning('Google Calendar CSRF token not found in session or group', [
                 'group_id' => $group->id,
                 'session_key' => $sessionKey,
             ]);
 
-            return false; // No stored token found
+            return false;
         }
 
-        // Compare tokens
-        $isValid = hash_equals($storedToken, $token);
+        $isValid = ($storedToken && hash_equals($storedToken, $token))
+            || ($storedHash && hash_equals($storedHash, hash('sha256', $token)));
 
-        // Remove the token from session after validation (one-time use)
+        // One-time use: clear both copies once the callback is accepted
         if ($isValid) {
             Session::forget($sessionKey);
+            unset($metadata['oauth_csrf_hash']);
+            $group->update(['auth_metadata' => $metadata]);
             Log::info('Google Calendar CSRF token validated and removed', [
                 'group_id' => $group->id,
             ]);

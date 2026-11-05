@@ -8,7 +8,9 @@ use Illuminate\Support\Collection;
 
 /**
  * What is safe to spend until payday: fresh current-account balances, less what the credit cards
- * owe, less the direct debits still due before payday. Amounts are integer pence.
+ * owe, less the direct debits still due before payday. A direct debit that pays a credit card is not
+ * taken off again, since what the card owes already is; it is listed in `card_payments`. Amounts are
+ * integer pence.
  */
 class SafeToSpend
 {
@@ -30,6 +32,7 @@ class SafeToSpend
             'owed_on_cards' => $owedOnCards,
             'upcoming_bills' => $bills['total'],
             'bills' => $bills['bills'],
+            'card_payments' => $bills['card_payments'],
             'payday' => $bills['payday'],
             'payday_known' => $bills['payday_known'],
             'stale_accounts' => $balance['stale'],
