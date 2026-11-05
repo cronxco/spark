@@ -332,6 +332,46 @@ class SkillRunnerTest extends TestCase
     }
 
     #[Test]
+    public function the_runner_supplies_the_run_token_when_the_model_leaves_it_out_of_a_write(): void
+    {
+        $tools = $this->fakeTools(['manage-flint-topic' => '{"topics":[]}']);
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([
+                ['spark__manage-flint-topic', ['operation' => 'list']],
+                ['spark__create-flint-digest', ['title' => 'News']],
+            ]),
+            FakeOpenAi::text('Done.'),
+        ]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup', 'run_token' => 'tok-1']);
+
+        $this->assertSame([
+            ['spark__manage-flint-topic', ['operation' => 'list']],
+            ['spark__create-flint-digest', ['run_token' => 'tok-1', 'title' => 'News']],
+        ], $tools->calls);
+    }
+
+    #[Test]
+    public function a_run_token_the_model_passed_is_left_alone_and_none_is_invented_without_one(): void
+    {
+        $tools = $this->fakeTools();
+        FakeOpenAi::fake([
+            FakeOpenAi::toolCalls([['spark__create-flint-digest', ['title' => 'News', 'run_token' => 'model-tok']]]),
+            FakeOpenAi::toolCalls([['spark__create-flint-digest', ['title' => 'News again']]]),
+            FakeOpenAi::text('Done.'),
+        ]);
+        $skill = app(SkillRegistry::class)->get('flint-news-roundup');
+
+        app(SkillRunner::class)->run(User::factory()->create(), $skill, ['routine' => 'news_roundup']);
+
+        $this->assertSame([
+            ['spark__create-flint-digest', ['title' => 'News', 'run_token' => 'model-tok']],
+            ['spark__create-flint-digest', ['title' => 'News again']],
+        ], $tools->calls);
+    }
+
+    #[Test]
     public function a_normal_run_never_declines_a_write(): void
     {
         $tools = $this->fakeTools();
