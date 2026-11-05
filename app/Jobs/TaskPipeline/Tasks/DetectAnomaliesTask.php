@@ -18,10 +18,18 @@ class DetectAnomaliesTask extends BaseTaskJob
     public const OUTCOME_DAY_IN_PROGRESS = 'day_in_progress';
 
     /**
+     * Recorded on every other run, so a deferral from an earlier run of the
+     * same event doesn't linger in its merged task metadata.
+     */
+    public const OUTCOME_CHECKED = 'checked';
+
+    /**
      * Execute the anomaly detection task
      */
     protected function execute(): void
     {
+        $this->recordOutcome(self::OUTCOME_CHECKED);
+
         // Skip if event has no value
         if ($this->model->value === null || $this->model->value_unit === null) {
             return;

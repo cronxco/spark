@@ -61,6 +61,11 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
                         continue;
                     }
 
+                    // The day before yesterday is only swept for deferred days
+                    if (! $deferred && $event->time->lt(now()->subDay()->startOfDay())) {
+                        continue;
+                    }
+
                     // Dispatch task pipeline with anomaly detection
                     // This will also run stats calculation if needed (due to dependency)
                     ProcessTaskPipelineJob::dispatch(

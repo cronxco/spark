@@ -168,8 +168,11 @@ class DetectAnomaliesTaskTest extends TestCase
 
         (new DispatchRetrospectiveAnomalyTasksJob)->handle();
 
-        Queue::assertPushed(ProcessTaskPipelineJob::class, fn ($job) => $job->model->is($deferred) && $job->force);
-        Queue::assertNotPushed(ProcessTaskPipelineJob::class, fn ($job) => $job->model->is($judged));
+        $swept = Queue::pushed(ProcessTaskPipelineJob::class, fn ($job) => $job->trigger === 'scheduled')
+            ->map(fn ($job) => [$job->model->getKey(), $job->force])
+            ->values()
+            ->all();
+        $this->assertSame([[$deferred->getKey(), true]], $swept);
     }
 
     #[Test]
