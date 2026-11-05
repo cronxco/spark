@@ -6,6 +6,7 @@ use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Services\Metrics\AnomalyPolicy;
+use App\Services\Metrics\BaselineService;
 use App\Services\Metrics\MetricCatalogue;
 use App\Services\Metrics\MetricCompleteness;
 use Illuminate\Support\Facades\Log;
@@ -95,7 +96,14 @@ class DetectAnomaliesTask extends BaseTaskJob
             return;
         }
 
-        $verdict = app(AnomalyPolicy::class)->judge($metricStatistic, (float) $value);
+        // Judge against the history before this day, not one that contains it.
+        $basis = app(BaselineService::class)->excluding(
+            $metricStatistic,
+            $this->model->time,
+            $this->model->integration->user?->getTimezone() ?? 'UTC',
+        );
+
+        $verdict = app(AnomalyPolicy::class)->judge($basis, (float) $value);
 
         if ($verdict === null) {
             // Back within range, or a move in the good direction: an anomaly
@@ -141,15 +149,15 @@ class DetectAnomaliesTask extends BaseTaskJob
             'detected_at' => $this->model->time,
             'start_date' => $this->model->time->toDateString(),
             'end_date' => $this->model->time->toDateString(),
-            'baseline_value' => $metricStatistic->mean_value,
+            'baseline_value' => $basis->mean_value,
             'current_value' => $value,
             'deviation' => $deviation,
             'significance_score' => tanh($deviation / 2),
             'metadata' => [
                 'event_id' => $this->model->id,
-                'normal_lower_bound' => $metricStatistic->normal_lower_bound,
-                'normal_upper_bound' => $metricStatistic->normal_upper_bound,
-                'stddev' => $metricStatistic->stddev_value,
+                'normal_lower_bound' => $basis->normal_lower_bound,
+                'normal_upper_bound' => $basis->normal_upper_bound,
+                'stddev' => $basis->stddev_value,
             ],
         ]);
 
@@ -160,7 +168,7 @@ class DetectAnomaliesTask extends BaseTaskJob
             'value_unit' => $this->model->value_unit,
             'type' => $type,
             'value' => $value,
-            'mean' => $metricStatistic->mean_value,
+            'mean' => $basis->mean_value,
             'deviation' => $deviation,
         ]);
     }

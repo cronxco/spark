@@ -83,6 +83,34 @@ class BaselineService
     }
 
     /**
+     * The statistic as it stands without one day, so a value is judged
+     * against the history before it and does not pull its own baseline
+     * towards itself. Returns the statistic unchanged when too little
+     * history remains. The result is not saved.
+     */
+    public function excluding(MetricStatistic $statistic, CarbonInterface $day, string $timezone): MetricStatistic
+    {
+        $series = $this->series->daily($statistic, $timezone, (int) config('metrics.detection_window_days', 90));
+        unset($series[Carbon::instance($day)->utc()->toDateString()]);
+
+        if (count($series) < 10) {
+            return $statistic;
+        }
+
+        $summary = $this->summarise(array_values($series), $this->catalogue->method($statistic->service, $statistic->action));
+        $basis = $statistic->replicate();
+        $basis->forceFill([
+            'event_count' => count($series),
+            'mean_value' => $summary['centre'],
+            'stddev_value' => $summary['spread'],
+            'normal_lower_bound' => $summary['lower'],
+            'normal_upper_bound' => $summary['upper'],
+        ]);
+
+        return $basis;
+    }
+
+    /**
      * The baselines of one metric as clients read them: the detection
      * baseline, the 30-day display band (one spread either side of the
      * centre) and any day-type baselines that differ for real.
