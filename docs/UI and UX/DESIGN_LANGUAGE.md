@@ -80,7 +80,7 @@ Use semantic tokens, never raw ramp steps or system colours (`Color.red`, `text-
 | Role | Use | Rule |
 |---|---|---|
 | `primary` (spark-5 amber) | The one action on a screen, the active tab, progress, hero values in dark mode | A **fill** in light mode. Never text on a light ground (1.6:1). Text on it is `primary-content` / `sparkOnAccent`. In dark mode it is also the hero value colour (3.6). |
-| `accent` (ocean-5 light, sky-3 dark) | Links, disclosure controls ("See the week", "Editorial note"), quiet emphasis | Reads as text in both themes (8:1+). On iOS, `Color.sparkLink` (Will, 2026-11-05). |
+| `accent` (ocean-5 light, sky-3 dark) | Links outside running prose, disclosure controls ("See the week", "Editorial note"), quiet emphasis | Reads as text in both themes (8:1+). On iOS, `Color.sparkLink` (Will, 2026-11-05). A link inside a sentence takes `highlight` instead (3.3). |
 | `success`, `warning`, `error`, `info` | Status that needs a reaction | Fills in light mode, text only in dark. Pair with a glyph and words. |
 | Domain tints | Which part of life a thing belongs to | One per domain; see 3.2. |
 | `mood-2` … `mood-10` | Check-in scores | Fills only. Position and label carry the value. |
@@ -114,7 +114,7 @@ Contrast figures are against `ash-1` in light and `slate-5` in dark. Online shar
 
 Facts that Flint or a summary picks out inside running text (in Up to Speed, digests and recaps) take one `highlight` token, whatever their domain: ocean-5 `#244f83` in light (8.1:1 on ash-1) and spark-5 `#FFBF00` in dark (11.1:1 on slate-5), at semibold weight. On iOS this is `Color.sparkHighlight`, the default link tint of `SparkRichContentText` and `SparkLongFormContentView`. On the web it is `--color-highlight` in both daisyUI themes. Never use spark-5 as text on a light ground.
 
-**Links inside a sentence (Will, 2026-11-05).** A phrase Flint links inside a sentence, including a question used as a screen's headline ("That £159 Criterion Theatre Trust payment is the one…"), takes the highlight token rather than a reference pill. A tap opens the linked item's peek card (7.5), whose button goes on to its detail page. The markdown is always rendered: a link never shows as source. Where Flint prose appears as a plain label (a list of open questions), the link text stays and the markup is dropped.
+**Links inside a sentence (Will, 2026-11-05).** A phrase Flint links inside a sentence, including a question used as a screen's headline ("That £159 Criterion Theatre Trust payment is the one…"), takes the highlight token (`Color.sparkHighlight`), not `accent` and not a reference pill. `accent` is for links that stand on their own, such as disclosure controls (3.1). A tap opens the linked item's peek card (7.5), whose button goes on to its detail page. The markdown is always rendered: a link never shows as source. Where Flint prose appears as a plain label (a list of open questions), the link text stays and the markup is dropped.
 
 ### 3.4 Change and comparison
 

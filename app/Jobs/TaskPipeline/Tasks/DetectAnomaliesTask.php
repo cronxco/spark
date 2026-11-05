@@ -12,6 +12,12 @@ use Illuminate\Support\Facades\Log;
 class DetectAnomaliesTask extends BaseTaskJob
 {
     /**
+     * Recorded when a daily aggregate was left unjudged because its day had
+     * not ended. The retrospective sweep runs these again once it has.
+     */
+    public const OUTCOME_DAY_IN_PROGRESS = 'day_in_progress';
+
+    /**
      * Execute the anomaly detection task
      */
     protected function execute(): void
@@ -51,6 +57,7 @@ class DetectAnomaliesTask extends BaseTaskJob
         // streak of those stale rows read as "4 days in a row".
         if ($this->isDayStillAccumulating()) {
             $this->clearAnomaliesForEvent($metricStatistic);
+            $this->recordOutcome(self::OUTCOME_DAY_IN_PROGRESS);
 
             return;
         }
@@ -59,6 +66,14 @@ class DetectAnomaliesTask extends BaseTaskJob
         $value = $this->model->getFormattedValueAttribute();
 
         if ($value === null) {
+            return;
+        }
+
+        // Outside money, zero means "no reading" (the baseline leaves zeros
+        // out too), so it can't be judged and an earlier anomaly is cleared.
+        if ($value == 0 && $this->model->domain !== 'money') {
+            $this->clearAnomaliesForEvent($metricStatistic);
+
             return;
         }
 
@@ -151,10 +166,16 @@ class DetectAnomaliesTask extends BaseTaskJob
             return false;
         }
 
+        // Daily aggregates are stamped at 00:00 UTC on the day they cover.
+        // That day is over once it has ended both in UTC (where the source
+        // groups its readings) and in the user's timezone; west of UTC,
+        // converting the stamp would land on the previous local day.
+        $day = Carbon::parse($this->model->time)->utc()->toDateString();
         $timezone = $this->model->integration->user?->getTimezone() ?? 'UTC';
-        $dayEnd = Carbon::parse($this->model->time)->setTimezone($timezone)->endOfDay();
+        $dayEnd = Carbon::parse($day, 'UTC')->endOfDay()
+            ->max(Carbon::parse($day, $timezone)->endOfDay());
 
-        return now($timezone)->lessThanOrEqualTo($dayEnd);
+        return now()->lessThanOrEqualTo($dayEnd);
     }
 
     /**

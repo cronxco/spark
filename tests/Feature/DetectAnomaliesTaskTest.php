@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\TaskPipeline\BaseTaskJob;
+use App\Jobs\TaskPipeline\DispatchRetrospectiveAnomalyTasksJob;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Jobs\TaskPipeline\Tasks\DetectAnomaliesTask;
 use App\Models\Event;
 use App\Models\EventObject;
@@ -10,6 +13,7 @@ use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\TaskPipeline\TaskRegistry;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -129,16 +133,75 @@ class DetectAnomaliesTaskTest extends TestCase
     }
 
     #[Test]
+    public function west_of_utc_the_day_is_still_filling_until_it_ends_locally(): void
+    {
+        $this->user->update(['settings' => ['timezone' => 'America/Los_Angeles']]);
+        Carbon::setTestNow(Carbon::parse('2026-11-05 20:00:00', 'America/Los_Angeles'));
+        $event = $this->heartRateEvent('2026-11-05 00:00:00', 76, 'UTC');
+
+        $this->detect($event->fresh());
+
+        $this->assertSame(0, MetricTrend::where('metric_statistic_id', $this->heartRate->id)->count());
+    }
+
+    #[Test]
+    public function a_day_still_filling_is_recorded_as_deferred(): void
+    {
+        $event = $this->heartRateEvent('2026-11-05 00:00:00', 76);
+
+        $task = $this->detect($event);
+
+        $outcome = \Closure::bind(fn () => $this->outcome, $task, BaseTaskJob::class)();
+        $this->assertSame(DetectAnomaliesTask::OUTCOME_DAY_IN_PROGRESS, $outcome);
+    }
+
+    #[Test]
+    public function the_daily_sweep_runs_a_deferred_day_again_once_it_has_ended(): void
+    {
+        $deferred = $this->heartRateEvent('2026-11-04 00:00:00', 76);
+        $judged = $this->heartRateEvent('2026-11-03 00:00:00', 99);
+        $store = app(TaskExecutionStore::class);
+        $definition = TaskRegistry::getTask('detect_anomalies');
+        $store->recordStatus($deferred, $definition, 'success', ['outcome' => DetectAnomaliesTask::OUTCOME_DAY_IN_PROGRESS]);
+        $store->recordStatus($judged, $definition, 'success');
+
+        (new DispatchRetrospectiveAnomalyTasksJob)->handle();
+
+        Queue::assertPushed(ProcessTaskPipelineJob::class, fn ($job) => $job->model->is($deferred) && $job->force);
+        Queue::assertNotPushed(ProcessTaskPipelineJob::class, fn ($job) => $job->model->is($judged));
+    }
+
+    #[Test]
+    public function a_zero_reading_clears_an_earlier_anomaly(): void
+    {
+        $event = $this->heartRateEvent('2026-11-04 00:00:00', 76);
+        $this->detect($event);
+
+        $event->update(['value' => 0]);
+        $this->detect($event->fresh());
+
+        $this->assertSame(0, MetricTrend::where('metric_statistic_id', $this->heartRate->id)->count());
+    }
+
+    #[Test]
+    public function a_zero_valued_update_still_runs_the_task(): void
+    {
+        $event = $this->heartRateEvent('2026-11-04 00:00:00', 0);
+
+        $this->assertTrue(TaskRegistry::getTask('detect_anomalies')->isApplicableTo($event));
+    }
+
+    #[Test]
     public function the_task_runs_again_when_an_event_is_updated(): void
     {
         $this->assertTrue(TaskRegistry::getTask('detect_anomalies')->runOnUpdate);
     }
 
-    private function heartRateEvent(string $day, float $value): Event
+    private function heartRateEvent(string $day, float $value, string $timezone = 'Europe/London'): Event
     {
         return Event::create([
             'source_id' => 'oura-hr-' . $day,
-            'time' => Carbon::parse($day, 'Europe/London'),
+            'time' => Carbon::parse($day, $timezone),
             'integration_id' => $this->integration->id,
             'actor_id' => EventObject::factory()->create(['user_id' => $this->user->id])->id,
             'target_id' => EventObject::factory()->create(['user_id' => $this->user->id])->id,
@@ -155,10 +218,12 @@ class DetectAnomaliesTaskTest extends TestCase
      * Runs the task body directly: `handle()` also waits on the stats task,
      * which these tests set up by hand.
      */
-    private function detect(Event $event): void
+    private function detect(Event $event): DetectAnomaliesTask
     {
         $task = new DetectAnomaliesTask($event, TaskRegistry::getTask('detect_anomalies'));
 
         (fn () => $this->execute())->call($task);
+
+        return $task;
     }
 }
