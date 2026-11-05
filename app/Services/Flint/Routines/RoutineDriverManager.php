@@ -19,7 +19,7 @@ class RoutineDriverManager
     public const DRIVERS = ['webhook' => WebhookRoutineDriver::class, 'openai' => OpenAiRoutineDriver::class];
 
     /** The routines a driver can be chosen for, keyed as in services.flint_routine.routines. */
-    public const ROUTINES = ['digest', 'topics', 'reading_list', 'news_roundup'];
+    public const ROUTINES = ['digest', 'topics', 'reading_list', 'news_roundup', 'money_weekly', 'money_close'];
 
     public function driverName(string $routine, ?string $override = null, ?User $user = null): string
     {

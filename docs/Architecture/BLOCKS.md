@@ -716,7 +716,7 @@ Blocks appear in:
 - [RELATIONSHIPS.md](RELATIONSHIPS.md) - Relationship model (linking blocks)
 - [MEDIA.md](MEDIA.md) - Media attachment details
 - [SEMANTIC_SEARCH.md](SEMANTIC_SEARCH.md) - Vector search implementation
-- [../UI and UX/BLOCK_CARDS.md](../UI%20and%20UX/BLOCK_CARDS.md) - Block card display system
+- [../UI and UX/DESIGN_LANGUAGE.md](../UI%20and%20UX/DESIGN_LANGUAGE.md) - Block card display system (§7) and visual patterns (§8)
 - [INTEGRATION_PLUGINS.md](INTEGRATION_PLUGINS.md) - How integrations create blocks
 - [JOBS.md](JOBS.md) - Job architecture for data processing
 - [../CLAUDE.md](../CLAUDE.md) - Development guide

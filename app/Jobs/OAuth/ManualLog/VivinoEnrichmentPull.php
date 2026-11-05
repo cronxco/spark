@@ -2,13 +2,10 @@
 
 namespace App\Jobs\OAuth\ManualLog;
 
-use App\Integrations\Fetch\PlaywrightFetchClient;
-use App\Integrations\ManualLog\VivinoSearchParser;
 use App\Jobs\Base\BaseFetchJob;
 use App\Jobs\Data\ManualLog\VivinoEnrichmentData;
 use App\Models\Integration;
-use Illuminate\Support\Facades\Log;
-use Throwable;
+use App\Services\ManualLog\ManualLogLookup;
 
 /**
  * Looks up richer detail (winery, vintage, region, label image, Vivino's
@@ -23,8 +20,9 @@ use Throwable;
  * PlaywrightFetchClient's per-domain cookie-replay signature, not because
  * any Vivino auth is actually needed.
  *
- * CAVEAT: VivinoSearchParser's selectors are a best-effort scaffold, not
- * verified against Vivino's real markup - see its class docblock.
+ * Only a card whose name covers the logged name is used: Vivino's search is
+ * fuzzy and its first card is often an unrelated wine. A card the user picked
+ * in the preview is used as chosen.
  */
 class VivinoEnrichmentPull extends BaseFetchJob
 {
@@ -32,6 +30,7 @@ class VivinoEnrichmentPull extends BaseFetchJob
         Integration $integration,
         public string $eventId,
         public string $wineName,
+        public ?string $matchUrl = null,
     ) {
         parent::__construct($integration);
     }
@@ -54,26 +53,10 @@ class VivinoEnrichmentPull extends BaseFetchJob
             return ['event_id' => $this->eventId, 'wine' => null];
         }
 
-        $searchUrl = config('services.vivino.search_url') . '?' . http_build_query(['q' => $this->wineName]);
+        $lookup = app(ManualLogLookup::class);
+        $cards = $lookup->results('wine', $this->wineName, $group);
 
-        try {
-            $result = app(PlaywrightFetchClient::class)->fetch($searchUrl, $group);
-        } catch (Throwable $e) {
-            Log::warning('Wine enrichment: Vivino search failed', [
-                'event_id' => $this->eventId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return ['event_id' => $this->eventId, 'wine' => null];
-        }
-
-        if (! ($result['success'] ?? false) || empty($result['html'])) {
-            return ['event_id' => $this->eventId, 'wine' => null];
-        }
-
-        $wine = app(VivinoSearchParser::class)->parseFirstResult($result['html']);
-
-        return ['event_id' => $this->eventId, 'wine' => $wine];
+        return ['event_id' => $this->eventId, 'wine' => $cards === null ? null : $lookup->pick($cards, $this->wineName, $this->matchUrl)];
     }
 
     protected function dispatchProcessingJobs(array $rawData): void

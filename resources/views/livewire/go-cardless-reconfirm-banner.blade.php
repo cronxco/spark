@@ -40,13 +40,7 @@
                         </span>
                     </button>
 
-                    <button
-                        wire:click="createNewEua"
-                        wire:loading.attr="disabled"
-                        class="btn btn-ghost"
-                    >
-                        Connect Different Account
-                    </button>
+
                 </div>
             </div>
         </div>

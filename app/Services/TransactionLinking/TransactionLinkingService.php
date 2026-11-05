@@ -4,6 +4,7 @@ namespace App\Services\TransactionLinking;
 
 use App\Models\Event;
 use App\Models\Relationship;
+use App\Services\Money\BufferDepositLinker;
 use App\Services\TransactionLinking\Contracts\LinkingStrategy;
 use App\Services\TransactionLinking\Strategies\BacsRecordStrategy;
 use App\Services\TransactionLinking\Strategies\CrossProviderStrategy;
@@ -71,6 +72,10 @@ class TransactionLinkingService
 
         $userId = $event->integration->user_id;
 
+        if ($event->action === 'pot_transfer_to') {
+            $stats['created'] += app(BufferDepositLinker::class)->link($event);
+        }
+
         foreach ($this->strategies as $strategy) {
             if (! $strategy->canProcess($event)) {
                 continue;
@@ -133,9 +138,10 @@ class TransactionLinkingService
     /**
      * Get statistics about pending links for a user.
      */
-    public function getPendingStats(string $userId): array
+    public function getPendingStats(?string $userId): array
     {
-        $baseQuery = Relationship::where('user_id', $userId)
+        $baseQuery = Relationship::query()
+            ->when($userId !== null, fn ($query) => $query->where('user_id', $userId))
             ->where('from_type', Event::class)
             ->where('to_type', Event::class)
             ->pending();

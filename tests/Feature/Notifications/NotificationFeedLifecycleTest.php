@@ -7,6 +7,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\User;
 use App\Notifications\DailyDigestReady;
+use App\Notifications\IntegrationAuthenticationFailed;
 use App\Notifications\IntegrationFailed;
 use App\Services\Notifications\NotificationFeedService;
 use App\Services\Notifications\NotificationIncidentResolver;
@@ -220,6 +221,20 @@ class NotificationFeedLifecycleTest extends TestCase
 
         $this->artisan('notifications:maintain-history', ['--stale-hours' => 2])->assertSuccessful();
         $this->assertTrue($progress->fresh()->isFailed());
+    }
+
+    #[Test]
+    public function reauth_notifications_expose_a_web_url_and_reconnect_action(): void
+    {
+        $user = User::factory()->create();
+        $integration = Integration::factory()->create(['user_id' => $user->id]);
+        $user->notifyNow(new IntegrationAuthenticationFailed($integration, 'expired'));
+
+        $item = app(NotificationFeedService::class)->feed($user)['data'][0];
+
+        $this->assertSame('integration-reauth:' . $integration->id, $item['destination']);
+        $this->assertStringStartsWith('http', $item['web_url']);
+        $this->assertSame(['id' => 'reconnect', 'label' => 'Reconnect'], $item['primary_action']);
     }
 
     /** @param array<string, mixed> $data */

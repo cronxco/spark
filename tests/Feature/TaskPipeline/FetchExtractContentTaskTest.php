@@ -13,10 +13,8 @@ use App\Services\TaskPipeline\TaskDefinition;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-use OpenAI\Laravel\Facades\OpenAI;
-use OpenAI\Resources\Chat;
-use OpenAI\Responses\Chat\CreateResponse;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Fixtures\FakeOpenAi;
 use Tests\TestCase;
 
 class FetchExtractContentTaskTest extends TestCase
@@ -27,7 +25,7 @@ class FetchExtractContentTaskTest extends TestCase
     public function it_extracts_fetch_content_and_marks_success(): void
     {
         Queue::fake([ProcessTaskPipelineJob::class]);
-        $fake = OpenAI::fake([$this->openAiResponse('# Clean Article')]);
+        FakeOpenAi::fake([$this->openAiResponse('# Clean Article')]);
 
         [$event, $webpage] = $this->fetchEvent(webpageContent: null, blockText: 'Raw article text');
 
@@ -37,7 +35,7 @@ class FetchExtractContentTaskTest extends TestCase
         $this->assertSame('# Clean Article', $event->blocks()->where('block_type', 'fetch_content')->first()->metadata['article_text']);
         $this->assertSame('success', $event->refresh()->event_metadata['task_executions']['fetch_extract_content']['last_attempt']['status']);
         Queue::assertPushed(ProcessTaskPipelineJob::class);
-        $fake->assertSent(Chat::class, 1);
+        $this->assertCount(1, FakeOpenAi::requests());
     }
 
     #[Test]
@@ -98,7 +96,7 @@ class FetchExtractContentTaskTest extends TestCase
     #[Test]
     public function a_stale_extraction_enriches_its_revision_without_overwriting_the_latest_object(): void
     {
-        OpenAI::fake([$this->openAiResponse('# Older clean article')]);
+        FakeOpenAi::fake([$this->openAiResponse('# Older clean article')]);
         [$event, $webpage] = $this->fetchEvent(webpageContent: 'Latest article', blockText: 'Older raw article');
         $newerEvent = Event::factory()->create([
             'integration_id' => $event->integration_id,
@@ -167,17 +165,9 @@ class FetchExtractContentTaskTest extends TestCase
         );
     }
 
-    private function openAiResponse(string $content): CreateResponse
+    /** @return array<string, mixed> */
+    private function openAiResponse(string $content): array
     {
-        return CreateResponse::fake([
-            'choices' => [
-                [
-                    'message' => [
-                        'role' => 'assistant',
-                        'content' => $content,
-                    ],
-                ],
-            ],
-        ]);
+        return FakeOpenAi::text($content);
     }
 }

@@ -72,6 +72,41 @@ class DayTimezoneTest extends TestCase
         );
     }
 
+    #[Test]
+    public function internal_flint_task_events_are_hidden_from_the_day_feed(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00', 'UTC'));
+
+        $user = User::factory()->create(['settings' => ['timezone' => 'UTC']]);
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'flint']);
+
+        $visible = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'flint',
+            'action' => 'created_digest',
+            'time' => Carbon::parse('2026-06-15 09:00', 'UTC'),
+        ]);
+
+        $hidden = collect(['created_task', 'task_created', 'task_incident_reported', 'task_incident_resolved'])
+            ->map(fn (string $action) => Event::factory()->create([
+                'integration_id' => $integration->id,
+                'service' => 'flint',
+                'action' => $action,
+                'time' => Carbon::parse('2026-06-15 09:00', 'UTC'),
+                'event_metadata' => ['internal' => true],
+            ]));
+
+        $loaded = Livewire::actingAs($user, 'web')
+            ->test(Day::class)
+            ->set('coreEventsLoaded', false)
+            ->set('date', '2026-06-15')
+            ->call('loadCoreEvents')
+            ->get('filteredEvents');
+
+        $this->assertTrue($loaded->contains(fn ($e) => $e->id === $visible->id));
+        $hidden->each(fn (Event $event) => $this->assertFalse($loaded->contains(fn ($e) => $e->id === $event->id), $event->action));
+    }
+
     private function makeTimezoneEvent(Integration $integration, string $timezone, string $acknowledgedAt): Event
     {
         return Event::factory()->create([

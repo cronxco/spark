@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Tags\Tag;
@@ -63,6 +64,45 @@ class TagsControllerTest extends TestCase
             ->assertJsonPath('data.0.events_count', 1)
             ->assertJsonPath('data.0.total_count', 1)
             ->assertJsonMissing(['name' => 'private-other-user-tag']);
+    }
+
+    #[Test]
+    public function browse_filters_by_type_and_totals_each_type_on_the_first_page(): void
+    {
+        $artist = Tag::findOrCreate('RAYE', 'music_artist');
+        $otherArtist = Tag::findOrCreate('Judah Earl', 'music_artist');
+        $category = Tag::findOrCreate('bills', 'transaction_category');
+        $untyped = Tag::findOrCreate('loose', null);
+
+        $this->createEvent('Play one')->attachTags([$artist, $category]);
+        $this->createEvent('Play two')->attachTags([$artist, $otherArtist]);
+        $this->createEvent('Untyped')->attachTag($untyped);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/tags?type=music_artist')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', (string) $artist->id)
+            ->assertJsonPath('data.1.id', (string) $otherArtist->id)
+            ->assertJsonPath('types.0', ['type' => 'music_artist', 'tags_count' => 2, 'total_count' => 3])
+            ->assertJsonCount(3, 'types');
+
+        $this->getJson('/api/v1/mobile/tags?type=untyped')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', (string) $untyped->id);
+
+        $this->getJson('/api/v1/mobile/tags?type=music_artist&limit=1')
+            ->assertOk()
+            ->assertJsonPath('has_more', true);
+
+        $cursor = $this->getJson('/api/v1/mobile/tags?type=music_artist&limit=1')->json('next_cursor');
+
+        $this->getJson('/api/v1/mobile/tags?type=music_artist&limit=1&cursor=' . urlencode($cursor))
+            ->assertOk()
+            ->assertJsonPath('data.0.id', (string) $otherArtist->id)
+            ->assertJsonMissingPath('types');
     }
 
     #[Test]
@@ -174,6 +214,32 @@ class TagsControllerTest extends TestCase
         $this->getJson("/api/v1/mobile/objects/{$object->id}")
             ->assertOk()
             ->assertJsonPath('tags.0.id', (string) $tag->id);
+    }
+
+    #[Test]
+    public function retrying_a_tag_attach_with_its_idempotency_key_replays_despite_the_stale_if_match(): void
+    {
+        $object = EventObject::factory()->create(['user_id' => $this->user->id]);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $headers = $this->ifMatchObject($object) + ['Idempotency-Key' => (string) Str::uuid()];
+
+        // Move the clock on so the first attach's touch() always moves the
+        // object's version on, leaving the retry's If-Match stale.
+        $this->travel(1)->minute();
+
+        $first = $this->postJson("/api/v1/mobile/objects/{$object->id}/tags", ['name' => 'Errand'], $headers)
+            ->assertCreated();
+        $this->assertNotSame($headers['If-Match'], $first->headers->get('ETag'));
+
+        $this->postJson("/api/v1/mobile/objects/{$object->id}/tags", ['name' => 'Errand'], $headers)
+            ->assertCreated()
+            ->assertExactJson($first->json())
+            ->assertHeader('ETag', $first->headers->get('ETag'));
+
+        // Without the key, the stale If-Match is still refused.
+        $this->postJson("/api/v1/mobile/objects/{$object->id}/tags", ['name' => 'Errand'], ['If-Match' => $headers['If-Match']])
+            ->assertStatus(412);
     }
 
     #[Test]

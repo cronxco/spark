@@ -544,6 +544,26 @@
         </div>
     </div>
 </x-tab>
+<x-tab name="now" label="Now" icon="fas.compass">
+    <div class="flex flex-col gap-6">
+        <livewire:money.now />
+    </div>
+</x-tab>
+<x-tab name="spending" label="Spending" icon="fas.receipt">
+    <livewire:money.spending />
+</x-tab>
+<x-tab name="budgets" label="Budgets" icon="fas.chart-pie">
+    <livewire:money.budgets />
+</x-tab>
+<x-tab name="pots" label="Pots" icon="fas.piggy-bank">
+    <div class="flex flex-col gap-6">
+        <livewire:money.plan-overview />
+        <livewire:money.buffer-pot />
+    </div>
+</x-tab>
+<x-tab name="worth" label="Worth" icon="fas.scale-balanced">
+    <livewire:money.worth />
+</x-tab>
 </x-tabs>
 
 <!-- Add Balance Update Modal -->

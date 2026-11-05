@@ -88,7 +88,7 @@ class GoogleCalendarLocationTest extends TestCase
 
         $this->plugin->processEventData($this->integration, $rawData);
 
-        $events = Event::where('service', 'google_calendar')->get();
+        $events = Event::where('service', 'google-calendar')->get();
 
         $this->assertCount(1, $events);
 
@@ -125,7 +125,7 @@ class GoogleCalendarLocationTest extends TestCase
 
         $this->plugin->processEventData($this->integration, $rawData);
 
-        $event = Event::where('service', 'google_calendar')->first();
+        $event = Event::where('service', 'google-calendar')->first();
 
         $this->assertNotNull($event);
         $this->assertNull($event->location);
@@ -157,7 +157,7 @@ class GoogleCalendarLocationTest extends TestCase
 
         $this->plugin->processEventData($this->integration, $rawData);
 
-        $event = Event::where('service', 'google_calendar')->first();
+        $event = Event::where('service', 'google-calendar')->first();
 
         $this->assertNotNull($event);
         $this->assertNull($event->location);
@@ -187,7 +187,7 @@ class GoogleCalendarLocationTest extends TestCase
 
         $this->plugin->processEventData($this->integration, $rawData);
 
-        $event = Event::where('service', 'google_calendar')->first();
+        $event = Event::where('service', 'google-calendar')->first();
 
         $this->assertNotNull($event);
         $this->assertNull($event->location);

@@ -30,6 +30,61 @@ class FlintRunDispatcher
         mixed $driverOverride = null,
         mixed $driver = null,
     ): FlintDispatchResult {
+        $run = $this->resolve($user, $skill, $routine, $date, $period, $driverOverride, $driver);
+        $canonical = $run->skill;
+        $resolvedRoutine = $run->routine;
+        $selectedDriver = $run->driver;
+        $driverOverride = $run->driverOverride;
+        $timezone = $run->timezone;
+        $localDate = $run->localDate;
+
+        $runUuid = (string) Str::uuid();
+        $progress = ActionProgress::createProgress(
+            userId: $user->id,
+            actionType: 'flint_skill',
+            actionId: $runUuid,
+            step: 'queued',
+            message: 'Flint skill queued',
+            details: [
+                'run_uuid' => $runUuid,
+                'skill' => $canonical,
+                'routine' => $resolvedRoutine,
+                'driver' => $selectedDriver,
+                'local_date' => $localDate,
+                'period' => $period,
+            ],
+        );
+
+        $job = $resolvedRoutine === 'digest'
+            ? new TriggerFlintDigestRoutineJob($user, $period, $localDate, $timezone, 'manual', null, true, $runUuid, $progress->id, $driverOverride)
+            : new TriggerFlintRoutineJob($user, $resolvedRoutine, $localDate, $timezone, true, $runUuid, $progress->id, $period, $driverOverride);
+
+        $sync ? dispatch_sync($job) : dispatch($job)->onQueue('flint');
+
+        return new FlintDispatchResult(
+            $runUuid,
+            $progress,
+            $canonical,
+            $resolvedRoutine,
+            $selectedDriver,
+            $localDate,
+            $period,
+        );
+    }
+
+    /**
+     * Validates a run request and settles its skill, routine, driver and local
+     * date, without starting anything.
+     */
+    public function resolve(
+        User $user,
+        mixed $skill = null,
+        mixed $routine = null,
+        mixed $date = null,
+        mixed $period = 'morning',
+        mixed $driverOverride = null,
+        mixed $driver = null,
+    ): FlintRunRequest {
         if (($skill !== null && ! is_string($skill)) || ($routine !== null && ! is_string($routine))) {
             throw new InvalidArgumentException('Skill and routine must be strings.');
         }
@@ -74,37 +129,6 @@ class FlintRunDispatcher
             throw new InvalidArgumentException('Date must use YYYY-MM-DD format.');
         }
 
-        $runUuid = (string) Str::uuid();
-        $progress = ActionProgress::createProgress(
-            userId: $user->id,
-            actionType: 'flint_skill',
-            actionId: $runUuid,
-            step: 'queued',
-            message: 'Flint skill queued',
-            details: [
-                'run_uuid' => $runUuid,
-                'skill' => $canonical,
-                'routine' => $resolvedRoutine,
-                'driver' => $selectedDriver,
-                'local_date' => $localDate,
-                'period' => $period,
-            ],
-        );
-
-        $job = $resolvedRoutine === 'digest'
-            ? new TriggerFlintDigestRoutineJob($user, $period, $localDate, $timezone, 'manual', null, true, $runUuid, $progress->id, $driverOverride)
-            : new TriggerFlintRoutineJob($user, $resolvedRoutine, $localDate, $timezone, true, $runUuid, $progress->id, $period, $driverOverride);
-
-        $sync ? dispatch_sync($job) : dispatch($job)->onQueue('flint');
-
-        return new FlintDispatchResult(
-            $runUuid,
-            $progress,
-            $canonical,
-            $resolvedRoutine,
-            $selectedDriver,
-            $localDate,
-            $period,
-        );
+        return new FlintRunRequest($canonical, $resolvedRoutine, $selectedDriver, $driverOverride, $timezone, $localDate, $period);
     }
 }

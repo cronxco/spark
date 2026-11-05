@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Services\GeocodingService;
+use App\Services\GoCardlessAccounts;
 use App\Services\Media\MediaDownloadHelper;
 use App\Services\PlaceDetectionService;
 use Exception;
@@ -44,6 +45,8 @@ abstract class BaseProcessingJob implements ShouldQueue
 
     protected string $serviceName;
 
+    protected ?array $goCardlessSnapshot = null;
+
     /**
      * Create a new job instance.
      */
@@ -52,6 +55,10 @@ abstract class BaseProcessingJob implements ShouldQueue
         $this->integration = $integration;
         $this->rawData = $rawData;
         $this->serviceName = $this->getServiceName();
+        if ($integration->service === 'gocardless') {
+            $this->goCardlessSnapshot = $rawData['_gocardless_snapshot'] ?? GoCardlessAccounts::snapshot($integration);
+            unset($this->rawData['_gocardless_snapshot']);
+        }
     }
 
     /**
@@ -82,7 +89,16 @@ abstract class BaseProcessingJob implements ShouldQueue
             Log::info("Starting {$this->getJobType()} processing for integration {$this->integration->id} ({$this->serviceName})");
 
             $span = $transaction->startChild((new SpanContext)->setOp('integration.process')->setDescription($this->serviceName));
-            $this->process();
+            if ($this->serviceName === 'gocardless') {
+                app(GoCardlessAccounts::class)->locked($this->integration->user_id, function () {
+                    if (GoCardlessAccounts::isCurrent($this->integration, $this->goCardlessSnapshot)) {
+                        $this->integration->refresh();
+                        $this->process();
+                    }
+                });
+            } else {
+                $this->process();
+            }
             $span->finish();
 
             // Mark as successfully processed
@@ -292,20 +308,29 @@ abstract class BaseProcessingJob implements ShouldQueue
      */
     protected function createOrUpdateObject(array $objectData): EventObject
     {
+        $attributes = [
+            'user_id' => $this->integration->user_id,
+            'concept' => $objectData['concept'],
+            'type' => $objectData['type'],
+            'title' => $objectData['title'],
+        ];
+
+        // Shared objects (e.g. "Sleep Record") omit `time`. Stamping them with
+        // now() on every upsert rewrites the row and re-triggers the task
+        // pipeline, so only default the time when the object is first created.
+        if (! array_key_exists('time', $objectData) && ($existing = EventObject::where($attributes)->first())) {
+            $objectData['time'] = $existing->time;
+        }
+
         return EventObject::updateOrCreate(
-            [
-                'user_id' => $this->integration->user_id,
-                'concept' => $objectData['concept'],
-                'type' => $objectData['type'],
-                'title' => $objectData['title'],
-            ],
+            $attributes,
             [
                 'time' => $objectData['time'] ?? now(),
                 'content' => $objectData['content'] ?? null,
                 'metadata' => $objectData['metadata'] ?? [],
                 'url' => $objectData['url'] ?? null,
                 'media_url' => $objectData['image_url'] ?? null,
-                'embeddings' => $objectData['embeddings'] ?? null,
+                ...(isset($objectData['embeddings']) ? ['embeddings' => $objectData['embeddings']] : []),
             ]
         );
     }
