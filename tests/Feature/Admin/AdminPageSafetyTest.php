@@ -19,7 +19,6 @@ use App\Notifications\AdminPushNotification;
 use App\Services\DuplicateDetectionService;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
@@ -68,8 +67,8 @@ class AdminPageSafetyTest extends TestCase
 
         $this->actingAs($this->admin);
 
-        $this->expectException(ModelNotFoundException::class);
-        Livewire::test(LogViewer::class, ['type' => 'group', 'entityId' => $foreignGroup->id]);
+        Livewire::test(LogViewer::class, ['type' => 'group', 'entityId' => $foreignGroup->id])
+            ->assertNotFound();
     }
 
     #[Test]
@@ -79,8 +78,8 @@ class AdminPageSafetyTest extends TestCase
 
         $this->actingAs($this->admin);
 
-        $this->expectException(ModelNotFoundException::class);
-        Livewire::test(LogViewer::class, ['type' => 'integration', 'entityId' => $foreignIntegration->id]);
+        Livewire::test(LogViewer::class, ['type' => 'integration', 'entityId' => $foreignIntegration->id])
+            ->assertNotFound();
     }
 
     #[Test]

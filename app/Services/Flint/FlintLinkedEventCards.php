@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Services\MetricPresentation;
 use App\Support\EventCardKind;
+use App\Support\FlintQuestion;
 use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 
@@ -24,6 +25,13 @@ use Spatie\Activitylog\Models\Activity;
  * digest saw as `at_digest`, recovered from the event's changelog, so the
  * client can say "updated from 66" rather than silently contradicting the
  * sentence above it.
+ *
+ * Each card names its `layout` (see FlintEventCardDetails): daily metrics keep
+ * the compact metric card and its comparison with the reader's baseline;
+ * flights, calendar entries, payments and articles get a card that says what
+ * they are, with no baseline line, since a one-off event has no usual. When
+ * the reader has answered a question in the same digest that links the event,
+ * the card carries that `answer`.
  */
 class FlintLinkedEventCards
 {
@@ -33,7 +41,10 @@ class FlintLinkedEventCards
      */
     private const LINK_PATTERN = '~/events?/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?![0-9a-z-])~i';
 
-    public function __construct(private MetricPresentation $presentation) {}
+    public function __construct(
+        private MetricPresentation $presentation,
+        private FlintEventCardDetails $details,
+    ) {}
 
     /**
      * Linked event ids in the order the prose first mentions them.
@@ -58,8 +69,10 @@ class FlintLinkedEventCards
     /**
      * Cards for each digest's linked events, keyed by digest id.
      *
-     * Only events with a value get a card: an article or a calendar entry is
-     * already a link in the prose, and a card would only repeat its title.
+     * Events with a value get a card, and so do articles, whose card shows
+     * the source's own headline and takeaways rather than repeating the
+     * linked phrase. Anything else without a value is already said by the
+     * prose and gets none.
      *
      * @param  Collection<int, Event>  $digests
      * @param  array<int, string>|Collection<int, string>  $integrationIds  the reader's integrations; a link to
@@ -81,24 +94,29 @@ class FlintLinkedEventCards
         $events = Event::query()
             ->whereIn('id', $allIds)
             ->whereIn('integration_id', $integrationIds)
-            ->whereNotNull('value')
-            ->with(['integration', 'actor', 'target'])
+            ->with(['integration', 'actor', 'target', 'blocks'])
             ->get()
+            ->filter(fn (Event $event): bool => $event->value !== null || $this->details->isReading($event))
             ->keyBy(fn (Event $event): string => strtolower($event->id));
 
         $statistics = $this->statisticsFor($events, $userId);
         $changes = $this->valueChanges($events, $digests);
 
-        return $linkedIdsByDigest->map(function (array $ids, string $digestId) use ($events, $statistics, $changes, $digests): array {
+        $details = $events->map(fn (Event $event): array => $this->details->for($event, $userId));
+
+        return $linkedIdsByDigest->map(function (array $ids, string $digestId) use ($events, $statistics, $changes, $digests, $details): array {
             $digest = $digests->firstWhere('id', $digestId);
+            $answers = $this->answers($digest);
 
             return collect($ids)
                 ->map(fn (string $id): ?Event => $events->get($id))
                 ->filter()
                 ->map(fn (Event $event): array => $this->card(
                     $event,
+                    $details->get(strtolower($event->id)),
                     $statistics->get($this->metricKey($event)),
                     $this->valueAtDigest($event, $digest, $changes->get($event->id, collect())),
+                    $answers[strtolower($event->id)] ?? null,
                 ))
                 ->values()
                 ->all();
@@ -106,20 +124,57 @@ class FlintLinkedEventCards
     }
 
     /**
+     * @param  array{layout: string, details: array<string, mixed>|null}  $layout
      * @param  array{value: float|int|string, display_value: string}|null  $atDigest
+     * @param  array{answer: string, note: string|null}|null  $answer
      * @return array<string, mixed>
      */
-    private function card(Event $event, ?MetricStatistic $statistic, ?array $atDigest): array
+    private function card(Event $event, array $layout, ?MetricStatistic $statistic, ?array $atDigest, ?array $answer): array
     {
         $kind = "{$event->service}.{$event->action}";
         $pattern = EventCardKind::for($kind, null, null)['pattern'];
+        $isMetric = $layout['layout'] === 'metric';
 
         return [
             'kind' => $kind,
+            'layout' => $layout['layout'],
             'event' => CompactEventResource::make($event)->resolve(request()),
-            'context' => $statistic ? $this->context($statistic, (float) $event->formatted_value, $pattern) : null,
+            'context' => $isMetric && $statistic ? $this->context($statistic, (float) $event->formatted_value, $pattern) : null,
             'at_digest' => $atDigest,
+            'details' => $layout['details'],
+            'answer' => $answer,
         ];
+    }
+
+    /**
+     * The reader's answers to this digest's questions, keyed by the event
+     * each question links to. A question links the fact it asks about ("That
+     * [£159 Criterion Theatre Trust payment](…/events/{id}) …"), so the card
+     * for that event can close the loop.
+     *
+     * @return array<string, array{answer: string, note: string|null}>
+     */
+    private function answers(?Event $digest): array
+    {
+        if ($digest === null) {
+            return [];
+        }
+
+        $answers = [];
+
+        foreach ($digest->blocks->filter(fn ($block): bool => FlintQuestion::isQuestion($block) && FlintQuestion::isAnswered($block)) as $block) {
+            $metadata = $block->metadata ?? [];
+            $answer = [
+                'answer' => (string) $metadata['answer'],
+                'note' => filled($metadata['answer_note'] ?? null) ? (string) $metadata['answer_note'] : null,
+            ];
+
+            foreach (self::linkedIds($metadata['question'] ?? null) as $id) {
+                $answers[$id] ??= $answer;
+            }
+        }
+
+        return $answers;
     }
 
     /**

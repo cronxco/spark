@@ -14,6 +14,7 @@ use App\Services\MetricPresentation;
 use App\Support\FlintDigestDay;
 use App\Support\FlintDigestKind;
 use App\Support\FlintQuestion;
+use App\Support\KeyTakeaways;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -291,6 +292,8 @@ class UpToSpeedController extends Controller
                         'baseline_display' => $presentation->formatValue($stat, $baselineValue),
                         'deviation' => round($trend->deviation, 2),
                         'streak_days' => $streakCount,
+                        // The window the baseline is drawn from, for "21bpm below 90d trend".
+                        'baseline_window_days' => $stat->baseline_window_days ?? MetricStatistic::DEFAULT_WINDOW_DAYS,
                         'detected_at' => $trend->detected_at->toIso8601String(),
                         'acknowledged_at' => $trend->acknowledged_at?->toIso8601String(),
                     ],
@@ -413,7 +416,7 @@ class UpToSpeedController extends Controller
                 } elseif (str_contains($blockType, 'summary')) {
                     $payload['summary'] = $block->getContent();
                 } elseif (str_contains($blockType, 'key_takeaways')) {
-                    $payload['key_takeaways'] = $this->normaliseKeyTakeaways($block->getContent());
+                    $payload['key_takeaways'] = KeyTakeaways::normalise($block->getContent());
                 }
             }
 
@@ -488,44 +491,6 @@ class UpToSpeedController extends Controller
     private function digestKind(Event $event, array $meta): string
     {
         return FlintDigestKind::for($event, $meta);
-    }
-
-    /**
-     * Normalise a key-takeaways block into a clean list of strings.
-     *
-     * The block stores a JSON-encoded array whose entries sometimes carry a
-     * literal markdown bullet and sometimes do not, depending on which
-     * summariser wrote them. Clients were each re-deriving the same repair.
-     *
-     * @return array<int, string>|null
-     */
-    private function normaliseKeyTakeaways(mixed $content): ?array
-    {
-        if ($content === null) {
-            return null;
-        }
-
-        $items = is_array($content) ? $content : json_decode((string) $content, true);
-
-        if (! is_array($items)) {
-            // Not a JSON array — treat it as bullet-per-line prose.
-            $items = preg_split('/\R+/', (string) $content) ?: [];
-        }
-
-        $clean = [];
-        foreach ($items as $item) {
-            if (! is_scalar($item)) {
-                continue;
-            }
-
-            $text = trim(preg_replace('/^\s*[-*\x{2022}]\s+/u', '', (string) $item) ?? '');
-
-            if ($text !== '') {
-                $clean[] = $text;
-            }
-        }
-
-        return $clean === [] ? null : $clean;
     }
 
     /**

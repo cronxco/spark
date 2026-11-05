@@ -267,6 +267,20 @@ if (! function_exists('format_duration')) {
     }
 }
 
+if (! function_exists('format_money')) {
+    /**
+     * An amount in its own currency: `£24.80`, `$3.00`, `CHF 12.50`. Block
+     * layouts used to hard-code the pound sign whatever the currency was.
+     */
+    function format_money(float|int $amount, ?string $currency = null, int $decimals = 2): string
+    {
+        $currency = strtoupper($currency ?: 'GBP');
+        $symbol = ['GBP' => '£', 'USD' => '$', 'EUR' => '€', 'JPY' => '¥'][$currency] ?? $currency . ' ';
+
+        return $symbol . number_format($amount, $decimals);
+    }
+}
+
 if (! function_exists('format_block_value_display')) {
     /**
      * Format a block's value for display with improved unit formatting.
@@ -1594,6 +1608,25 @@ if (! function_exists('render_markdown')) {
         }
 
         return Str::markdown($markdown, [
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
+        ]);
+    }
+}
+
+if (! function_exists('render_inline_markdown')) {
+    /**
+     * Render one line of untrusted markdown to inline HTML, with the same
+     * policy as render_markdown(): raw HTML is stripped and unsafe links
+     * (javascript:, vbscript:, file:, most data:) are dropped.
+     */
+    function render_inline_markdown(?string $markdown): string
+    {
+        if ($markdown === null || trim($markdown) === '') {
+            return '';
+        }
+
+        return Str::inlineMarkdown($markdown, [
             'html_input' => 'strip',
             'allow_unsafe_links' => false,
         ]);

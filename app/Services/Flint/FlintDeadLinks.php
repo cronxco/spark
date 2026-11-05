@@ -18,7 +18,7 @@ use App\Models\User;
 class FlintDeadLinks
 {
     /** A markdown link to a Spark event, capturing the words and whatever follows `/events/`. */
-    private const LINK_PATTERN = '~\[([^\]]+)\]\((?:https?://[^/\s)]+)?/events/([^)\s?#]+)[^)\s]*\)~';
+    private const LINK_PATTERN = '~\[([^\]]+)\]\(((?:https?://[^/\s)]+)?)/events/([^)\s?#]+)[^)\s]*\)~';
 
     private const UUID_PATTERN = '~^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$~i';
 
@@ -39,20 +39,37 @@ class FlintDeadLinks
             return ['text' => $markdown, 'removed' => []];
         }
 
-        preg_match_all(self::LINK_PATTERN, $markdown, $matches);
-        $this->resolve($matches[2]);
+        preg_match_all(self::LINK_PATTERN, $markdown, $matches, PREG_SET_ORDER);
+        $targets = array_map(
+            fn (array $match): string => $match[3],
+            array_filter($matches, fn (array $match): bool => $this->isSparkOrigin($match[2])),
+        );
+        $this->resolve($targets);
 
         $removed = [];
         $text = preg_replace_callback(self::LINK_PATTERN, function (array $match) use (&$removed): string {
-            if ($this->resolved[strtolower($match[2])] ?? false) {
+            if (! $this->isSparkOrigin($match[2]) || ($this->resolved[strtolower($match[3])] ?? false)) {
                 return $match[0];
             }
-            $removed[] = $match[2];
+            $removed[] = $match[3];
 
             return $match[1];
         }, $markdown);
 
         return ['text' => $text, 'removed' => array_values(array_unique($removed))];
+    }
+
+    /** Relative links and the configured/canonical Spark hosts belong to this application. */
+    private function isSparkOrigin(string $origin): bool
+    {
+        if ($origin === '') {
+            return true;
+        }
+
+        $host = strtolower((string) parse_url($origin, PHP_URL_HOST));
+        $configuredHost = strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST));
+
+        return in_array($host, ['spark.cronx.co', $configuredHost], true);
     }
 
     /** @param array<int, string> $targets */
