@@ -118,8 +118,8 @@ final class ActionCatalogue
             ),
             new ActionDefinition(
                 id: 'metrics.detect_trends',
-                title: 'Detect trends',
-                subtitle: 'Check every metric',
+                title: 'Refresh insights',
+                subtitle: 'Compare every metric',
                 icon: 'chart-bar',
                 domain: 'insights',
                 kind: ActionKind::Safe,
