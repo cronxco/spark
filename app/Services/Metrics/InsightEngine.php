@@ -222,7 +222,7 @@ class InsightEngine
             [
                 'day_type' => $baseline->day_type,
                 'day_label' => match (true) {
-                    str_starts_with($baseline->day_type, 'dow_') => 'a '.$date->format('l'),
+                    str_starts_with($baseline->day_type, 'dow_') => 'a ' . $date->format('l'),
                     $baseline->day_type === MetricBaseline::DAY_TYPE_WEEKDAY => 'a weekday',
                     $baseline->day_type === MetricBaseline::DAY_TYPE_WEEKEND => 'a weekend day',
                     default => null,
@@ -309,7 +309,7 @@ class InsightEngine
     {
         /** @var MetricStatistic $statistic */
         $statistic = $candidate['statistic'];
-        $opposite = $candidate['kind'].'_'.($candidate['direction'] === 'up' ? 'down' : 'up');
+        $opposite = $candidate['kind'] . '_' . ($candidate['direction'] === 'up' ? 'down' : 'up');
 
         // The same comparison flipping side replaces the earlier one.
         MetricTrend::where('metric_statistic_id', $statistic->id)

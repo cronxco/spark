@@ -43,57 +43,6 @@ class DetectAnomaliesPolicyTest extends TestCase
         parent::tearDown();
     }
 
-    private function integration(string $service, ?string $instanceType = null): Integration
-    {
-        return Integration::factory()->create(array_filter([
-            'user_id' => $this->user->id,
-            'service' => $service,
-            'instance_type' => $instanceType,
-        ]));
-    }
-
-    private function statistic(string $service, string $action, array $overrides = []): MetricStatistic
-    {
-        return MetricStatistic::factory()->create($overrides + [
-            'user_id' => $this->user->id,
-            'service' => $service,
-            'action' => $action,
-            'value_unit' => 'percent',
-            'mean_value' => 80,
-            'stddev_value' => 5,
-            'normal_lower_bound' => 70,
-            'normal_upper_bound' => 90,
-            'event_count' => 60,
-        ]);
-    }
-
-    private function event(Integration $integration, string $service, string $action, float $value): Event
-    {
-        $event = Event::factory()->create([
-            'integration_id' => $integration->id,
-            'service' => $service,
-            'domain' => 'health',
-            'action' => $action,
-            'value' => $value,
-            'value_multiplier' => 1,
-            'value_unit' => 'percent',
-            'time' => Carbon::parse('2026-11-04 00:00:00', 'UTC'),
-            'event_metadata' => [],
-        ]);
-
-        // Settled: written two days ago.
-        Event::whereKey($event->id)->update(['updated_at' => now()->subDays(2)]);
-
-        return $event->fresh();
-    }
-
-    private function detect(Event $event): void
-    {
-        $task = new DetectAnomaliesTask($event, TaskRegistry::getTask('detect_anomalies'));
-
-        (fn () => $this->execute())->call($task);
-    }
-
     #[Test]
     public function a_low_readiness_is_raised(): void
     {
@@ -174,5 +123,56 @@ class DetectAnomaliesPolicyTest extends TestCase
         $retrospective = $this->event($this->integration('apple_health', 'metrics'), 'apple_health', 'had_respiratory_rate', 80);
 
         $this->assertTrue($definition->isApplicableTo($retrospective));
+    }
+
+    private function integration(string $service, ?string $instanceType = null): Integration
+    {
+        return Integration::factory()->create(array_filter([
+            'user_id' => $this->user->id,
+            'service' => $service,
+            'instance_type' => $instanceType,
+        ]));
+    }
+
+    private function statistic(string $service, string $action, array $overrides = []): MetricStatistic
+    {
+        return MetricStatistic::factory()->create($overrides + [
+            'user_id' => $this->user->id,
+            'service' => $service,
+            'action' => $action,
+            'value_unit' => 'percent',
+            'mean_value' => 80,
+            'stddev_value' => 5,
+            'normal_lower_bound' => 70,
+            'normal_upper_bound' => 90,
+            'event_count' => 60,
+        ]);
+    }
+
+    private function event(Integration $integration, string $service, string $action, float $value): Event
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => $service,
+            'domain' => 'health',
+            'action' => $action,
+            'value' => $value,
+            'value_multiplier' => 1,
+            'value_unit' => 'percent',
+            'time' => Carbon::parse('2026-11-04 00:00:00', 'UTC'),
+            'event_metadata' => [],
+        ]);
+
+        // Settled: written two days ago.
+        Event::whereKey($event->id)->update(['updated_at' => now()->subDays(2)]);
+
+        return $event->fresh();
+    }
+
+    private function detect(Event $event): void
+    {
+        $task = new DetectAnomaliesTask($event, TaskRegistry::getTask('detect_anomalies'));
+
+        (fn () => $this->execute())->call($task);
     }
 }

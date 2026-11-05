@@ -40,7 +40,7 @@
                 <div>
                     <h3 class="font-bold">{{ $recentTrends->count() }} New {{ Str::plural('insight', $recentTrends->count()) }}</h3>
                     <div class="text-sm">
-                        
+
                     </div>
                 </div>
             </div>

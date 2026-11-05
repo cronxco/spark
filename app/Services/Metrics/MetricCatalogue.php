@@ -38,7 +38,7 @@ class MetricCatalogue
     {
         $metrics = config('metrics.metrics', []);
 
-        return $metrics[$this->canonicalService($service).".{$action}"]
+        return $metrics[$this->canonicalService($service) . ".{$action}"]
             ?? $metrics["{$service}.{$action}"]
             ?? null;
     }

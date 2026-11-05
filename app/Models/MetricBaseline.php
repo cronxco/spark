@@ -56,6 +56,11 @@ class MetricBaseline extends Model
         'computed_at' => 'datetime',
     ];
 
+    public static function dayTypeForIsoWeekday(int $isoWeekday): string
+    {
+        return $isoWeekday >= 6 ? self::DAY_TYPE_WEEKEND : self::DAY_TYPE_WEEKDAY;
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $model) {
@@ -68,10 +73,5 @@ class MetricBaseline extends Model
     public function metricStatistic(): BelongsTo
     {
         return $this->belongsTo(MetricStatistic::class);
-    }
-
-    public static function dayTypeForIsoWeekday(int $isoWeekday): string
-    {
-        return $isoWeekday >= 6 ? self::DAY_TYPE_WEEKEND : self::DAY_TYPE_WEEKDAY;
     }
 }

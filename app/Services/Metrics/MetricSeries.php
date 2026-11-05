@@ -75,6 +75,15 @@ class MetricSeries
     }
 
     /**
+     * Zero is a real value for money and no reading elsewhere.
+     */
+    public function keepsZeros(MetricStatistic $statistic): bool
+    {
+        return SpendSeries::isSpend($statistic)
+            || in_array($statistic->service, config('metrics.spend.services', []), true);
+    }
+
+    /**
      * @param  array<string, float>  $byDay
      * @return array<string, float>
      */
@@ -91,14 +100,5 @@ class MetricSeries
             $timezone,
             $now,
         ), ARRAY_FILTER_USE_BOTH);
-    }
-
-    /**
-     * Zero is a real value for money and no reading elsewhere.
-     */
-    public function keepsZeros(MetricStatistic $statistic): bool
-    {
-        return SpendSeries::isSpend($statistic)
-            || in_array($statistic->service, config('metrics.spend.services', []), true);
     }
 }
