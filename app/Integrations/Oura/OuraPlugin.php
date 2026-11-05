@@ -121,6 +121,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'value_formatter' => '{{ round($value) }} <span class="text-[0.875em]">bpm</span>',
                 'value_unit' => 'bpm',
                 'hidden' => false,
+                // Written at ~03:00 from overnight readings, then rewritten through the day.
+                'accumulates_through_day' => true,
             ],
             'did_workout' => [
                 'icon' => 'fas.dumbbell',
@@ -2738,6 +2740,21 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             $sourceId = "oura_heartrate_{$integration->id}_{$day}";
             $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
             if ($exists) {
+                // The day fills in through the day: keep its average current,
+                // as OuraHeartrateData does, so anomaly detection judges the
+                // whole day rather than the first overnight readings.
+                [$encodedAvg, $avgMultiplier] = $this->encodeNumericValue($avg);
+                $exists->update([
+                    'value' => $encodedAvg,
+                    'value_multiplier' => $avgMultiplier,
+                    'event_metadata' => array_merge($exists->event_metadata ?? [], [
+                        'day' => $day,
+                        'min_bpm' => $min,
+                        'max_bpm' => $max,
+                        'avg_bpm' => $avg,
+                    ]),
+                ]);
+
                 continue;
             }
 
