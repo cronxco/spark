@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\TaskPipeline\TaskExecutionStore;
 use App\Services\TaskPipeline\TaskRegistry;
 use Carbon\Carbon;
+use Closure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
@@ -151,7 +152,7 @@ class DetectAnomaliesTaskTest extends TestCase
 
         $task = $this->detect($event);
 
-        $outcome = \Closure::bind(fn () => $this->outcome, $task, BaseTaskJob::class)();
+        $outcome = Closure::bind(fn () => $this->outcome, $task, BaseTaskJob::class)();
         $this->assertSame(DetectAnomaliesTask::OUTCOME_DAY_IN_PROGRESS, $outcome);
     }
 
