@@ -20,17 +20,17 @@
         "chart.js": "^4.5.1",
         "concurrently": "^9.0.1",
         "gitmoji-cli": "^9.0.0",
-        "laravel-vite-plugin": "^2.0",
-        "vite": "^7.0.4"
+        "laravel-vite-plugin": "^3.1",
+        "vite": "^8.0.16"
     },
     "optionalDependencies": {
-        "@rollup/rollup-linux-x64-gnu": "4.57.1",
+        "@rollup/rollup-linux-x64-gnu": "4.67.5",
         "@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
         "lightningcss-linux-x64-gnu": "^1.29.1"
     },
     "devDependencies": {
         "@semantic-release/exec": "7.1.0",
-        "@sentry/browser": "10.63.0",
+        "@sentry/browser": "10.72.0",
         "@sentry/vite-plugin": "4.9.1",
         "@tailwindcss/vite": "4.3.3",
         "chokidar": "5.0.0",
@@ -38,7 +38,7 @@
         "husky": "9.1.7",
         "lint-staged": "16.4.0",
         "prettier": "3.9.6",
-        "semantic-release": "24.2.9",
+        "semantic-release": "25.0.9",
         "semantic-release-gitmoji": "1.6.9",
         "tailwindcss": "4.3.3"
     },

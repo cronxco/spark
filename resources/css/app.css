@@ -40,7 +40,8 @@
     --color-error-content: #120404;
     /* Highlighted facts in Flint and summary prose (design language §3.3) */
     --highlight: #244f83;
-    /* Domain tints (design language §3.2): fill for glyphs and rings, ink for tinted text */
+    /* Domain tints (docs/UI and UX/DESIGN_LANGUAGE.md §3.2): fill for chips,
+       rings and tinted grounds; ink for tinted text. */
     --domain-health: #7abaa1;
     --domain-health-ink: oklch(26% 0.051 172.552);
     --domain-activity: #f79129;
@@ -51,8 +52,16 @@
     --domain-media-ink: #b02411;
     --domain-knowledge: #3f88c5;
     --domain-knowledge-ink: #316ea1;
-    --domain-online: color-mix(in oklab, #011627 60%, transparent);
-    --domain-online-ink: #011627;
+    --domain-online: #244f83;
+    --domain-online-ink: #244f83;
+    --domain-anomaly: #b16c89;
+    --domain-anomaly-ink: #011627;
+    /* Generated surface (DESIGN_LANGUAGE.md §3.5): the Flint avatar's
+       spark-to-ember pairing. */
+    --color-spark: #ffbf00;
+    --color-ember: #f79129;
+    --generated-spark: 6%;
+    --generated-ember: 16%;
     --radius-selector: 0.25rem;
     --radius-field: 0.25rem;
     --radius-box: 0.5rem;
@@ -99,8 +108,16 @@
     --domain-media-ink: #ee6352;
     --domain-knowledge: #3f88c5;
     --domain-knowledge-ink: #8db9dd;
-    --domain-online: color-mix(in oklab, #fcfcfc 60%, transparent);
-    --domain-online-ink: #fcfcfc;
+    --domain-online: #8db9dd;
+    --domain-online-ink: #8db9dd;
+    --domain-anomaly: #b16c89;
+    --domain-anomaly-ink: #d2abbb;
+    --color-spark: #ffbf00;
+    --color-ember: #f79129;
+    --generated-spark: 10%;
+    --generated-ember: 22%;
+    /* Hero values are amber in dark mode, whatever the domain (§3.6). */
+    --color-hero: var(--color-primary);
     --radius-selector: 0.25rem;
     --radius-field: 0.25rem;
     --radius-box: 0.5rem;
@@ -131,7 +148,8 @@
     --font-mono: "PT Mono", monospace;
 }
 
-/* Highlight and domain tint utilities (text-highlight, text-domain-health, …), resolved per daisyUI theme */
+/* Domain tint utilities (`text-domain-money`, `bg-domain-media/10`, …).
+   The values come from the daisyUI themes above, so they follow the theme. */
 @theme inline {
     --color-highlight: var(--highlight);
     --color-domain-health: var(--domain-health);
@@ -146,10 +164,56 @@
     --color-domain-knowledge-ink: var(--domain-knowledge-ink);
     --color-domain-online: var(--domain-online);
     --color-domain-online-ink: var(--domain-online-ink);
+    --color-domain-anomaly: var(--domain-anomaly);
+    --color-domain-anomaly-ink: var(--domain-anomaly-ink);
+}
+
+/* Anything a model wrote sits on the generated surface (DESIGN_LANGUAGE.md
+   §3.5): a diagonal spark-to-ember wash over the card ground with an ember
+   hairline. Text on it stays base-content. One per card; rows inside stay
+   plain. */
+.surface-generated {
+    background-color: var(--color-base-200);
+    background-image: linear-gradient(
+        to bottom right,
+        color-mix(
+            in oklab,
+            var(--color-spark) var(--generated-spark),
+            transparent
+        ),
+        color-mix(
+            in oklab,
+            var(--color-ember) var(--generated-ember),
+            transparent
+        )
+    );
+    border: 1px solid color-mix(in oklab, var(--color-ember) 30%, transparent);
+}
+
+@media (prefers-contrast: more) {
+    .surface-generated {
+        border-color: var(--color-ember);
+    }
+}
+
+/* The hero value colour (DESIGN_LANGUAGE.md §3.6): the card's domain ink
+   (`--hero-ink`, set by the card shell) in light mode, falling back to
+   base-content; the dark theme sets `--color-hero` to amber. */
+@utility text-hero {
+    color: var(--color-hero, var(--hero-ink, var(--color-base-content)));
 }
 
 [x-cloak] {
     display: none;
+}
+
+/*
+ * Linked event cards in Flint briefings (design language §7.3): the card's
+ * domain tint at 9% mixed into base-100, so the fill stays opaque content,
+ * not glass. The card sets --card-tint to its domain's fill token.
+ */
+.surface-domain-tint {
+    background: color-mix(in oklab, var(--card-tint, transparent) 9%, var(--color-base-100));
 }
 
 pretty-json {

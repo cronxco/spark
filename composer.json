@@ -27,7 +27,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.30",
-        "livewire/livewire": "^3.6",
+        "livewire/livewire": "^4.0",
         "livewire/volt": "^1.7",
         "owenvoke/blade-fontawesome": "^3.3",
         "pgvector/pgvector": "^0.2.2",
@@ -42,7 +42,7 @@
         "spatie/laravel-activitylog": "^4",
         "spatie/laravel-medialibrary": "^11.17",
         "spatie/laravel-tags": "^4.10",
-        "symfony/emoji": "^7.3",
+        "symfony/emoji": "^8.0",
         "willscottuk/monzo-php": "dev-master",
         "wire-elements/pro": "^4.0",
         "zbateson/mail-mime-parser": "^3.0"

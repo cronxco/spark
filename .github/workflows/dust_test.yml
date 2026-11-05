@@ -24,7 +24,7 @@ jobs:
     steps:
       - name: Add reaction to comment
         if: github.event_name == 'issue_comment'
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
         with:
           comment-id: ${{ github.event.comment.id }}
           reactions: eyes
@@ -44,7 +44,7 @@ jobs:
         with:
           args: fix
 
-      - uses: stefanzweifel/git-auto-commit-action@778341af668090896ca464160c2def5d1d1a3eb0 # v6
+      - uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7
         id: auto_commit_action
         with:
           commit_message: 🚨 Fix code style
@@ -125,7 +125,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "npm"
 
       - name: Install Node Dependencies
@@ -164,7 +164,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: test-reports-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/
@@ -172,7 +172,7 @@ jobs:
 
       - name: Comment success
         if: success() && github.event_name == 'issue_comment'
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
@@ -189,7 +189,7 @@ jobs:
 
       - name: Comment failure
         if: failure() && github.event_name == 'issue_comment'
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |

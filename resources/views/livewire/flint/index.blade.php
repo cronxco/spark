@@ -528,7 +528,7 @@ new class extends Component
                                                 {!! render_markdown($paragraph['markdown']) !!}
                                             </div>
                                             @if ($paragraph['cards'])
-                                                {{-- Up to three across, as the prose orders them; the rest behind "+N more" (design language §7.3) --}}
+                                                {{-- Metric cards go up to three across, as the prose orders them, the rest behind "+N more"; wide cards take a row each (design language §7.3) --}}
                                                 @php
                                                     $cards = $paragraph['cards'];
                                                     $overflow = count($cards) > 3 ? array_slice($cards, 2) : [];
@@ -536,7 +536,8 @@ new class extends Component
                                                 @endphp
                                                 <div x-data="{ expanded: false }" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                     @foreach ($shown as $card)
-                                                        <x-event-card :card="$card" wire:key="linked-{{ $loop->parent->index }}-{{ $card['event']['id'] }}" />
+                                                        {{-- A lone card spans the row; flights, payments, calendar entries and articles always do (§7.3) --}}
+                                                        <x-event-card :card="$card" :wide="count($cards) === 1" wire:key="linked-{{ $loop->parent->index }}-{{ $card['event']['id'] }}" />
                                                     @endforeach
                                                     @if ($overflow)
                                                         <button type="button" x-show="! expanded" x-on:click="expanded = true"
