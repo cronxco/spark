@@ -2740,6 +2740,21 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             $sourceId = "oura_heartrate_{$integration->id}_{$day}";
             $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
             if ($exists) {
+                // The day fills in through the day: keep its average current,
+                // as OuraHeartrateData does, so anomaly detection judges the
+                // whole day rather than the first overnight readings.
+                [$encodedAvg, $avgMultiplier] = $this->encodeNumericValue($avg);
+                $exists->update([
+                    'value' => $encodedAvg,
+                    'value_multiplier' => $avgMultiplier,
+                    'event_metadata' => array_merge($exists->event_metadata ?? [], [
+                        'day' => $day,
+                        'min_bpm' => $min,
+                        'max_bpm' => $max,
+                        'avg_bpm' => $avg,
+                    ]),
+                ]);
+
                 continue;
             }
 
