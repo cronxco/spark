@@ -3,6 +3,10 @@
 namespace App\Services\Jev;
 
 use InvalidArgumentException;
+use Laravel\Ai\Classification\Boolean;
+use Laravel\Ai\Classification\Choice;
+use Laravel\Ai\Classification\Score;
+use Laravel\Ai\Contracts\Question;
 
 /**
  * One typed question for Jev: a Choice over declared options, a Noul (yes/no
@@ -69,16 +73,14 @@ final readonly class JevQuestion
     }
 
     /**
-     * @return array{type: string, instructions: string, criteria?: array<mixed>}
+     * The question as laravel/ai asks it.
      */
-    public function toPayload(): array
+    public function toQuestion(): Question
     {
-        $payload = ['type' => $this->type, 'instructions' => $this->instructions];
-
-        if ($this->criteria !== null) {
-            $payload['criteria'] = $this->criteria;
-        }
-
-        return $payload;
+        return match ($this->type) {
+            self::CHOICE => new Choice($this->instructions, $this->criteria ?? []),
+            self::NOUL => new Boolean($this->instructions, $this->criteria),
+            self::SCORE => new Score($this->instructions, $this->criteria ?? []),
+        };
     }
 }

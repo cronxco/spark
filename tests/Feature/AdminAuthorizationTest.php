@@ -44,8 +44,6 @@ class AdminAuthorizationTest extends TestCase
         $admin->is_admin = true;
         $admin->save();
 
-        // GoCardless admin index swallows API errors and always renders, so it
-        // is a stable check that the admin middleware lets admins through.
-        $this->actingAs($admin)->get(route('admin.gocardless.index'))->assertOk();
+        $this->actingAs($admin)->get(route('admin.pulse.index'))->assertOk();
     }
 }

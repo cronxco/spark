@@ -2,6 +2,9 @@
 
 namespace App\Spotlight\Queries\Actions;
 
+use App\Services\Actions\ActionDefinition;
+use App\Services\Actions\ActionRegistry;
+use Illuminate\Support\Collection;
 use WireElements\Pro\Components\Spotlight\SpotlightQuery;
 use WireElements\Pro\Components\Spotlight\SpotlightResult;
 
@@ -9,97 +12,45 @@ class GlobalActionsQuery
 {
     /**
      * Create Spotlight query for global actions (triggered by ">" mode).
+     * Renders from the ActionRegistry; nothing is declared here.
      */
     public static function make(): SpotlightQuery
     {
         return SpotlightQuery::forMode('actions', function (string $query) {
-            $actions = self::actions();
-
-            $results = collect();
-
-            foreach ($actions as $actionConfig) {
-                if (blank($query) || str_contains(strtolower($actionConfig['title']), strtolower($query))) {
+            return self::visible()
+                ->filter(fn (ActionDefinition $action): bool => $action->matches($query))
+                ->map(function (ActionDefinition $action): SpotlightResult {
                     $result = SpotlightResult::make()
-                        ->setTitle($actionConfig['title'])
-                        ->setSubtitle($actionConfig['subtitle'])
-                        ->setTypeahead('Action: ' . $actionConfig['title'])
-                        ->setIcon($actionConfig['icon'])
+                        ->setTitle($action->title)
+                        ->setSubtitle($action->subtitle)
+                        ->setTypeahead('Action: ' . $action->title)
+                        ->setIcon($action->icon)
                         ->setGroup('commands')
                         ->setPriority(1);
 
-                    if (isset($actionConfig['event'])) {
-                        $result->setAction('dispatch_event', [
-                            'name' => $actionConfig['event'],
-                            'data' => $actionConfig['data'] ?? [],
+                    return $action->isNavigation()
+                        ? $result->setAction('jump_to', ['path' => route($action->destination['route'])])
+                        : $result->setAction('dispatch_event', [
+                            'name' => 'run-action',
+                            'data' => ['action' => $action->id],
                             'close' => true,
                         ]);
-                    } elseif (isset($actionConfig['route'])) {
-                        $result->setAction('jump_to', ['path' => route($actionConfig['route'])]);
-                    }
-
-                    $results->push($result);
-                }
-            }
-
-            return $results;
+                })
+                ->values();
         });
     }
 
     /**
-     * The commands ">" mode offers. Each `event` must have a listener that
-     * is mounted on every page, or the command does nothing.
+     * What ">" mode offers: web actions that run with no input and no confirm
+     * step, except the ones that belong to a page. Each non-navigation one is
+     * run by the `run-action` listener mounted in the app layout.
      *
-     * @return array<int, array{title: string, subtitle: string, icon: string, event?: string, data?: array<string, mixed>, route?: string}>
+     * @return Collection<int, ActionDefinition>
      */
-    public static function actions(): array
+    public static function visible(): Collection
     {
-        return [
-            [
-                'title' => 'Trigger All Integration Updates',
-                'subtitle' => 'Fetch latest data from all integrations',
-                'icon' => 'arrow-path',
-                'event' => 'trigger-all-integrations',
-            ],
-            [
-                'title' => 'Run Flint Digest',
-                'subtitle' => 'Generate today\'s Flint digest now',
-                'icon' => 'newspaper',
-                'event' => 'run-flint-routine',
-                'data' => ['skill' => 'spark-day-briefing-async'],
-            ],
-            [
-                'title' => 'Run Flint Topics',
-                'subtitle' => 'Review and update Flint Topics now',
-                'icon' => 'map',
-                'event' => 'run-flint-routine',
-                'data' => ['skill' => 'flint-topics'],
-            ],
-            [
-                'title' => 'Run Flint Reading List',
-                'subtitle' => 'Pick out what is worth reading now',
-                'icon' => 'book-open',
-                'event' => 'run-flint-routine',
-                'data' => ['skill' => 'flint-reading-list'],
-            ],
-            [
-                'title' => 'Run Flint News Roundup',
-                'subtitle' => 'Synthesise overnight newsletters now',
-                'icon' => 'rss',
-                'event' => 'run-flint-routine',
-                'data' => ['skill' => 'flint-news-roundup'],
-            ],
-            [
-                'title' => 'Create New Tag',
-                'subtitle' => 'Open Tags to add a new tag',
-                'icon' => 'tag',
-                'route' => 'tags.index',
-            ],
-            [
-                'title' => 'View Recent Activity',
-                'subtitle' => 'See recent system activity and changes',
-                'icon' => 'clock',
-                'route' => 'admin.activity.index',
-            ],
-        ];
+        return app(ActionRegistry::class)->forSurface('web')
+            ->filter(fn (ActionDefinition $action): bool => $action->isNavigation() || ($action->runsWithoutInput() && ! $action->isContextual()))
+            ->values();
     }
 }

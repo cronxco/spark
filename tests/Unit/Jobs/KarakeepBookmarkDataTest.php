@@ -94,6 +94,31 @@ class KarakeepBookmarkDataTest extends TestCase
     }
 
     #[Test]
+    public function epoch_created_at_falls_back_to_modified_at(): void
+    {
+        $bookmark = [
+            'id' => 'imported1',
+            'createdAt' => '1970-01-01T00:33:42.000Z',
+            'modifiedAt' => '2025-06-21T18:24:02.000Z',
+            'summary' => 'Imported',
+            'content' => [
+                'type' => 'link',
+                'url' => 'https://example.com/imported',
+                'title' => 'Imported Article',
+            ],
+            'tags' => [],
+            'lists' => [],
+        ];
+
+        (new KarakeepBookmarkData($this->integration, $bookmark, $this->contextData))->handle();
+
+        $event = Event::where('action', 'bookmarked')->first();
+        $this->assertSame('2025-06-21 18:24:02', $event->time->utc()->format('Y-m-d H:i:s'));
+        $this->assertSame('2025-06-21 18:24:02', $event->target->time->utc()->format('Y-m-d H:i:s'));
+        $this->assertTrue($event->blocks->every(fn ($block) => $block->time->year === 2025));
+    }
+
+    #[Test]
     public function processes_bookmark_with_tags(): void
     {
         $bookmark = [

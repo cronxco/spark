@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Services\Media\MediaDeduplicationService;
+use App\Traits\PreservesPipelineMetadata;
 use App\Traits\TracksViews;
 use ArrayAccess;
 use Clickbar\Magellan\Data\Geometries\Point;
@@ -23,7 +24,7 @@ use Spatie\Tags\Tag;
 
 class EventObject extends Model implements HasMedia
 {
-    use HasFactory, HasTags, InteractsWithMedia, LogsActivity, SoftDeletes, TracksViews;
+    use HasFactory, HasTags, InteractsWithMedia, LogsActivity, PreservesPipelineMetadata, SoftDeletes, TracksViews;
 
     /**
      * Only record update events via LogsActivity trait.
@@ -91,7 +92,7 @@ class EventObject extends Model implements HasMedia
 
         static::created(function ($model): void {
             // Dispatch Task Pipeline to run applicable tasks
-            if (config('app.enable_task_pipeline', true)) {
+            if (! data_get($model->metadata, 'internal', false) && config('app.enable_task_pipeline', true)) {
                 ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
             }
         });
@@ -205,6 +206,27 @@ class EventObject extends Model implements HasMedia
             ->width(800)
             ->format('webp')
             ->performOnCollections('screenshots', 'error_screenshots', 'downloaded_images', 'article_images');
+    }
+
+    /**
+     * Objects nothing points at. An object is in use when it is an event's
+     * actor or target (soft-deleted events included), or when a live
+     * relationship row names it on either side — places, linked URLs, Flint
+     * notes and merged places hang off relationships alone. Relationship
+     * endpoints match on id because the stored type is sometimes EventObject
+     * and sometimes a subclass such as Place.
+     */
+    public function scopeUnreferenced(Builder $query): Builder
+    {
+        return $query
+            ->whereDoesntHave('actorEvents')
+            ->whereDoesntHave('targetEvents')
+            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+                ->from('relationships')
+                ->whereNull('relationships.deleted_at')
+                ->where(fn ($r) => $r
+                    ->whereColumn('relationships.from_id', 'objects.id')
+                    ->orWhereColumn('relationships.to_id', 'objects.id')));
     }
 
     public function user()

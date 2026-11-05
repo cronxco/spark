@@ -24,10 +24,10 @@ class TaskPipelineAdminTest extends TestCase
     public function admin_task_pipeline_page_loads_for_admin_user(): void
     {
         $response = $this->actingAs($this->admin())
-            ->get(route('admin.task-pipeline.index'));
+            ->get(route('admin.pipeline.index'));
 
         $response->assertSuccessful();
-        $response->assertSee('Task Pipeline');
+        $response->assertSee('Pipeline');
         $response->assertSee('Generate Embedding');
     }
 
@@ -37,14 +37,14 @@ class TaskPipelineAdminTest extends TestCase
         $user = User::factory()->create();
 
         $this->actingAs($user)
-            ->get(route('admin.task-pipeline.index'))
+            ->get(route('admin.pipeline.index'))
             ->assertForbidden();
     }
 
     #[Test]
     public function admin_task_pipeline_page_requires_authentication(): void
     {
-        $response = $this->get(route('admin.task-pipeline.index'));
+        $response = $this->get(route('admin.pipeline.index'));
 
         $response->assertRedirect(route('login'));
     }
@@ -194,6 +194,34 @@ class TaskPipelineAdminTest extends TestCase
             ->call('retryFailure', $execution->id);
 
         Queue::assertNotPushed(ProcessTaskPipelineJob::class);
+    }
+
+    #[Test]
+    public function integration_executions_render_a_ref_card_instead_of_gone(): void
+    {
+        $user = $this->admin();
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'name' => 'Ref Card Integration']);
+        $execution = TaskExecution::factory()->create([
+            'user_id' => $user->id,
+            'entity_type' => 'integration',
+            'entity_id' => $integration->id,
+            'task_key' => 'run_integration_update',
+            'status' => 'success',
+        ]);
+        $missing = TaskExecution::factory()->create([
+            'user_id' => $user->id,
+            'entity_type' => 'integration',
+            'entity_id' => (string) Str::uuid(),
+            'task_key' => 'run_integration_update',
+            'status' => 'success',
+        ]);
+
+        $this->actingAs($user);
+
+        $component = Volt::test('admin.task-pipeline-overview');
+        $component->assertSee('Ref Card Integration')->assertSee('(gone)');
+        $this->assertInstanceOf(Integration::class, $component->instance()->entityFor($execution));
+        $this->assertNull($component->instance()->entityFor($missing));
     }
 
     #[Test]

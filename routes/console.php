@@ -5,6 +5,8 @@ use App\Jobs\Fetch\CheckCookieExpiryJob;
 use App\Jobs\Fetch\RefreshExpiringCookies;
 use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\Flint\TriggerFlintRoutineJob;
+use App\Jobs\GoCardless\CheckGoCardlessConsentExpiry;
+use App\Jobs\Knowledge\MaintainTasks;
 use App\Jobs\TaskPipeline\DispatchRetrospectiveAnomalyTasksJob;
 use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
 use App\Models\Event;
@@ -24,6 +26,9 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+Schedule::job((new MaintainTasks)->onQueue('pull'))
+    ->everyMinute()->withoutOverlapping()->onOneServer();
+
 // Schedule integration update check job every minute
 Schedule::job(new CheckIntegrationUpdates)
     ->everyMinute()
@@ -41,6 +46,14 @@ Schedule::job(new DispatchTrendDetectionTasksJob)
 // Detect retrospective metric anomalies daily via task pipeline
 Schedule::job(new DispatchRetrospectiveAnomalyTasksJob)
     ->daily()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->sentryMonitor();
+
+// Sweep a small recent receipt batch for review-only proposals. This never
+// creates automatic historical links and leaves explicit user dismissals alone.
+Schedule::command('receipt-matching:backfill --dispatch --limit=25 --recent-days=60 --retry-after-days=7')
+    ->dailyAt('04:20')
     ->withoutOverlapping()
     ->onOneServer()
     ->sentryMonitor();
@@ -74,9 +87,23 @@ Schedule::command('notifications:send-digests')
     ->withoutOverlapping()
     ->sentryMonitor();
 
+// Monzo pays pot interest just after midnight on the 1st; infer it from the new snapshots on the 2nd.
+Schedule::command('monzo:infer-interest --apply --since="-45 days"')
+    ->monthlyOn(2, '06:00')
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->sentryMonitor();
+
 // Check cookie expiry daily at 6am
 Schedule::job(new CheckCookieExpiryJob)
     ->dailyAt('06:00')
+    ->onOneServer()
+    ->withoutOverlapping()
+    ->sentryMonitor();
+
+// Warn before GoCardless bank agreements expire
+Schedule::job(new CheckGoCardlessConsentExpiry)
+    ->dailyAt('07:00')
     ->onOneServer()
     ->withoutOverlapping()
     ->sentryMonitor();
@@ -126,6 +153,7 @@ Schedule::call(function () {
         // Evening digest: pure time gate at the configured evening slot.
         $eveningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'evening');
         if (FlintScheduleSettings::enabled($settings, 'evening_digest_enabled')
+            && $flintSchedule->occursOn($user, 'evening_digest', $now)
             && $now->gte(Carbon::parse($eveningTime, $tz)) && ! Cache::has($eveningMarker)) {
             dispatch(new TriggerFlintDigestRoutineJob($user, 'evening', $today, $tz, 'scheduled'))
                 ->onQueue('flint');
@@ -137,6 +165,7 @@ Schedule::call(function () {
         // DispatchMorningDigestOnSleepScoreTask; this is the backstop.)
         $morningMarker = TriggerFlintDigestRoutineJob::markerKey($user->id, $today, 'morning');
         if (FlintScheduleSettings::enabled($settings, 'morning_digest_enabled')
+            && $flintSchedule->occursOn($user, 'morning_digest', $now)
             && $now->gte(Carbon::parse($morningTime, $tz)) && ! Cache::has($morningMarker)) {
             $sleepEventId = $sleepScoreEventIdFor($user, $today);
 
@@ -176,15 +205,18 @@ Schedule::call(function () {
         $now = $resolver->now($user);
         $today = $resolver->today($user)->toDateString();
 
-        foreach (['topics', 'reading_list', 'news_roundup'] as $routine) {
+        foreach (['topics', 'reading_list', 'news_roundup', 'money_weekly', 'money_close'] as $routine) {
             if (! FlintScheduleSettings::enabled($settings, "{$routine}_enabled")) {
                 continue;
             }
-            $slot = $flintSchedule->slot($user, $routine, $now);
-            $marker = TriggerFlintRoutineJob::markerKey($user->id, $today, $routine);
+            $due = $flintSchedule->dueOccurrence($user, $routine, $now);
+            if ($due === null) {
+                continue;
+            }
+            $marker = TriggerFlintRoutineJob::markerKey($user->id, $today, $routine, $due['key']);
 
-            if ($now->gte(Carbon::parse($slot, $tz)) && ! Cache::has($marker)) {
-                dispatch(new TriggerFlintRoutineJob($user, $routine, $today, $tz))->onQueue('flint');
+            if (! Cache::has($marker) && ! $flintSchedule->isRunning($user, $routine)) {
+                dispatch(new TriggerFlintRoutineJob($user, $routine, $today, $tz, occurrence: $due['key']))->onQueue('flint');
             }
         }
     }

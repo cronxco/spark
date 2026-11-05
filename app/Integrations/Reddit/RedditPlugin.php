@@ -279,18 +279,13 @@ class RedditPlugin extends OAuthPlugin
     {
         $username = $integration->group?->account_id ?? $integration->account_id;
 
-        $after = $integration->configuration['reddit']['after'] ?? null;
         $limit = 100;
 
         $endpoint = "/user/{$username}/saved?limit={$limit}&raw_json=1";
-        if (! empty($after)) {
-            $endpoint .= "&after={$after}";
-        }
 
         Log::info('Reddit: fetching saved items', [
             'integration_id' => $integration->id,
             'username' => $username,
-            'after' => $after,
         ]);
 
         $saved = $this->makeAuthenticatedApiRequest($endpoint, $integration);

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
+use App\Traits\PreservesPipelineMetadata;
 use App\Traits\TracksViews;
 use ArrayAccess;
 use Clickbar\Magellan\Data\Geometries\Point;
@@ -20,7 +21,7 @@ use Spatie\Tags\Tag;
 
 class Event extends Model
 {
-    use HasFactory, HasTags, LogsActivity, SoftDeletes, TracksViews;
+    use HasFactory, HasTags, LogsActivity, PreservesPipelineMetadata, SoftDeletes, TracksViews;
 
     /**
      * Only record update events via LogsActivity trait

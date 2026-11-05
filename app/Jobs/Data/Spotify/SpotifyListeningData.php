@@ -22,6 +22,8 @@ class SpotifyListeningData extends BaseProcessingJob
         $listeningData = $this->rawData;
         $plugin = new SpotifyPlugin;
 
-        $plugin->processListeningData($this->integration, $listeningData);
+        // Retry transient failures, but on the last attempt skip tracks that keep
+        // failing so the listening cursor can still advance.
+        $plugin->processListeningData($this->integration, $listeningData, $this->attempts() >= $this->tries);
     }
 }
