@@ -3,6 +3,6 @@
 
 @if (filled($text))
     <div {{ $attributes->class('prose prose-sm max-w-none text-base-content/80 line-clamp-5') }}>
-        {!! str($text)->markdown() !!}
+        {!! render_markdown($text) !!}
     </div>
 @endif

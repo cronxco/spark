@@ -17,7 +17,7 @@ $checked = (bool) ($block->metadata['checked'] ?? false);
         </span>
         <span class="sr-only">{{ $checked ? 'Done:' : 'To do:' }}</span>
         <div @class(['text-base [&_p]:inline', 'line-through text-base-content/50' => $checked])>
-            {!! Str::of($block->title)->inlineMarkdown()->trim() !!}
+            {!! trim(render_inline_markdown($block->title)) !!}
         </div>
     </div>
 </x-block-card.shell>

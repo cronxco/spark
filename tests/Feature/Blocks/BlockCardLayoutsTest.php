@@ -30,6 +30,20 @@ class BlockCardLayoutsTest extends TestCase
             ->all();
     }
 
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function sourceDerivedTextLayouts(): array
+    {
+        return [
+            'bookmark summary' => ['bookmark_summary'],
+            'fetch tl;dr' => ['fetch_tldr'],
+            'newsletter summary' => ['newsletter_summary_paragraph'],
+            'fetch takeaways' => ['fetch_key_takeaways'],
+            'newsletter takeaways' => ['newsletter_key_takeaways'],
+        ];
+    }
+
     #[Test]
     #[DataProvider('layouts')]
     public function the_layout_renders_inside_the_shared_shell(string $blockType): void
@@ -125,6 +139,36 @@ class BlockCardLayoutsTest extends TestCase
     }
 
     #[Test]
+    #[DataProvider('sourceDerivedTextLayouts')]
+    public function source_derived_text_cannot_inject_markup_or_unsafe_links(string $blockType): void
+    {
+        $hostile = "- Read <img src=x onerror=\"alert('xss')\"> this\n"
+            . "- [Click](javascript:alert('xss')) here\n"
+            . "- <script>alert('xss')</script>Plain point\n"
+            . '- [Safe link](https://example.com/ok)';
+
+        $html = Blade::render('<x-block-card :block="$block" />', ['block' => $this->makeBlock($blockType, ['content' => $hostile])]);
+
+        $this->assertDoesNotMatchRegularExpression('/<img[^>]*onerror/i', $html);
+        $this->assertDoesNotMatchRegularExpression('/<script/i', $html);
+        $this->assertDoesNotMatchRegularExpression('/href="\s*javascript:/i', $html);
+        $this->assertStringContainsString('href="https://example.com/ok"', $html);
+    }
+
+    #[Test]
+    public function task_titles_cannot_inject_markup_or_unsafe_links(): void
+    {
+        foreach (['day_task', 'doc_task'] as $blockType) {
+            $block = $this->makeBlock($blockType, [], 'Call <img src=x onerror=alert(1)> [them](javascript:alert(1)) **today**');
+            $html = Blade::render('<x-block-card :block="$block" />', ['block' => $block]);
+
+            $this->assertDoesNotMatchRegularExpression('/<img[^>]*onerror/i', $html, $blockType);
+            $this->assertDoesNotMatchRegularExpression('/href="\s*javascript:/i', $html, $blockType);
+            $this->assertStringContainsString('<strong>today</strong>', $html, $blockType);
+        }
+    }
+
+    #[Test]
     public function the_generic_value_card_no_longer_lists_raw_metadata(): void
     {
         $html = Blade::render('<x-block-card :block="$block" />', ['block' => $this->makeBlock('some_unlisted_type')]);
@@ -133,7 +177,10 @@ class BlockCardLayoutsTest extends TestCase
         $this->assertStringNotContainsString('Internal key', $html);
     }
 
-    private function makeBlock(string $blockType): Block
+    /**
+     * @param  array<string, mixed>  $metadata  Overrides for the default metadata.
+     */
+    private function makeBlock(string $blockType, array $metadata = [], ?string $title = null): Block
     {
         $user = User::factory()->create();
         $this->actingAs($user);
@@ -146,7 +193,7 @@ class BlockCardLayoutsTest extends TestCase
 
         return $event->createBlock([
             'block_type' => $blockType,
-            'title' => 'A block title',
+            'title' => $title ?? 'A block title',
             'time' => now()->subHour(),
             'url' => 'https://example.com/article',
             'value' => 1250,
@@ -184,6 +231,7 @@ class BlockCardLayoutsTest extends TestCase
                 'news' => ['summary' => 'A story', 'key_points' => ['One']],
                 'day_context' => ['calendar' => [['title' => 'Stand-up', 'start' => '2026-10-28T09:00:00Z']]],
                 'question' => 'Why were you up so late?',
+                ...$metadata,
             ],
         ])->load('event');
     }

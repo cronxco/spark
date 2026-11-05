@@ -1613,3 +1613,22 @@ if (! function_exists('render_markdown')) {
         ]);
     }
 }
+
+if (! function_exists('render_inline_markdown')) {
+    /**
+     * Render one line of untrusted markdown to inline HTML, with the same
+     * policy as render_markdown(): raw HTML is stripped and unsafe links
+     * (javascript:, vbscript:, file:, most data:) are dropped.
+     */
+    function render_inline_markdown(?string $markdown): string
+    {
+        if ($markdown === null || trim($markdown) === '') {
+            return '';
+        }
+
+        return Str::inlineMarkdown($markdown, [
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
+        ]);
+    }
+}

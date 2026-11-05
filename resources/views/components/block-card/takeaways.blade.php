@@ -14,7 +14,7 @@ $items = collect(is_string($items) ? preg_split('/[\n\r]+/', $items) : (array) $
         @foreach ($items->take($limit) as $item)
             <li class="flex gap-2 items-start">
                 <x-icon name="fas.check" class="w-3 h-3 mt-1 shrink-0 text-base-content/70" />
-                <span class="[&_p]:inline">{!! str($item)->inlineMarkdown() !!}</span>
+                <span class="[&_p]:inline">{!! render_inline_markdown($item) !!}</span>
             </li>
         @endforeach
     </ul>
