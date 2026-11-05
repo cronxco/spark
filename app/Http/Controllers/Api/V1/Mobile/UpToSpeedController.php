@@ -1,0 +1,531 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Mobile;
+
+use App\Http\Controllers\Controller;
+use App\Integrations\DailyCheckin\DailyCheckinPlugin;
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\MetricStatistic;
+use App\Models\MetricTrend;
+use App\Models\User;
+use App\Services\Flint\FlintLinkedEventCards;
+use App\Services\MetricPresentation;
+use App\Support\FlintDigestDay;
+use App\Support\FlintDigestKind;
+use App\Support\FlintQuestion;
+use App\Support\KeyTakeaways;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Spatie\Activitylog\Models\Activity;
+
+class UpToSpeedController extends Controller
+{
+    /**
+     * Consecutive days of the same anomaly after which the baseline — not the
+     * reading — is what has moved, and the metric should stop being raised.
+     */
+    private const REBASELINE_STREAK_DAYS = 7;
+
+    /**
+     * Standard deviations a first-day anomaly must clear to be worth raising.
+     * Below this a single day's movement is noise.
+     */
+    private const SINGLE_DAY_DEVIATION_THRESHOLD = 3.0;
+
+    /**
+     * Hours of reading material to offer. A rolling window, so unaffected by
+     * the reader's timezone.
+     */
+    private const NEWS_WINDOW_HOURS = 48;
+
+    /**
+     * Most news items to return. A heavy newsletter day previously returned
+     * every one of them in a single unbounded response, which is neither a
+     * sensible payload nor a readable queue.
+     */
+    private const DEFAULT_NEWS_LIMIT = 20;
+
+    private const MAX_NEWS_LIMIT = 100;
+
+    /**
+     * Fetch actions for a page the user monitors rather than bookmarks.
+     *
+     * Only "bookmarked" used to qualify, which quietly excluded every monitored
+     * page: The Economist's World in Brief is re-fetched through the day and so
+     * arrives as "fetched"/"updated". It had therefore never once appeared in
+     * Up to Speed, despite carrying a full set of summary blocks. A page the
+     * user asked Spark to watch is at least as much catch-up reading as one
+     * they bookmarked.
+     *
+     * Kept separate from "bookmarked", which stays service-agnostic: Karakeep
+     * bookmarks are knowledge-domain "bookmarked" events too, and scoping the
+     * whole clause to `service = fetch` would have dropped them.
+     */
+    private const FETCH_MONITORED_ACTIONS = ['fetched', 'updated'];
+
+    /**
+     * How many candidate rows to retrieve at a time while collapsing re-fetches.
+     * A monitored page can produce a handful of events inside the window — four
+     * for World in Brief on a normal day — so loading in batches avoids pulling
+     * every candidate when the requested number of distinct articles is small.
+     */
+    private const NEWS_DEDUPE_FACTOR = 5;
+
+    /**
+     * GET /api/v1/mobile/up-to-speed
+     *
+     * Returns an ordered, typed queue of catch-up items for the mobile
+     * "Up to Speed" Stories flow.
+     *
+     * Ordering: flint_digest → check_in → anomaly → news_summary
+     * All items are included; caught_up_at is populated for items that have
+     * been marked via POST /up-to-speed/read (or via completion for check-ins).
+     * Read state is exposed, never enforced — the client decides what to show,
+     * which is what lets it offer a recap of everything already seen.
+     *
+     * Query: include_acknowledged (bool) — also return anomalies the user has
+     * acknowledged or suppressed. Off by default, since those are dismissed;
+     * the client asks for them when building the recap so a mis-tapped
+     * dismissal can be undone.
+     */
+    public function __invoke(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'include_acknowledged' => ['sometimes', 'boolean'],
+            'news_limit' => ['sometimes', 'integer', 'min:1', 'max:' . self::MAX_NEWS_LIMIT],
+        ]);
+
+        $user = $request->user();
+        $timezone = $user->timezone ?? 'UTC';
+        $today = Carbon::today($timezone);
+        $integrationIds = $user->integrations()->pluck('id');
+        $includeAcknowledged = (bool) ($validated['include_acknowledged'] ?? false);
+        $newsLimit = (int) ($validated['news_limit'] ?? self::DEFAULT_NEWS_LIMIT);
+
+        $digestItems = $this->buildDigestItems($user, $today, $integrationIds, $timezone);
+        $checkInItems = $this->buildCheckInItems($user, $today);
+        $anomalyItems = $this->buildAnomalyItems($user, $today, $timezone, $includeAcknowledged);
+        $newsItems = $this->buildNewsItems($user, $integrationIds, $newsLimit);
+
+        // Batch-fetch caught_up activities for all activity-log-tracked items
+        $subjectIds = collect($digestItems)
+            ->concat($anomalyItems)
+            ->concat($newsItems)
+            ->pluck('_subject_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $caughtUpMap = Activity::query()
+            ->where('causer_type', User::class)
+            ->where('causer_id', $user->id)
+            ->where('event', 'caught_up')
+            ->whereIn('subject_type', [Event::class, MetricTrend::class])
+            ->whereIn('subject_id', $subjectIds)
+            ->get()
+            ->keyBy(fn (Activity $activity): string => "{$activity->subject_type}:{$activity->subject_id}");
+
+        $enrich = function (array $item) use ($caughtUpMap): array {
+            $subjectKey = $item['_subject_key'] ?? null;
+            $activity = $subjectKey ? $caughtUpMap->get($subjectKey) : null;
+            $item['caught_up_at'] = $activity?->created_at?->toIso8601String();
+            unset($item['_subject_id'], $item['_subject_key']);
+
+            return $item;
+        };
+
+        $items = collect($digestItems)->map($enrich)
+            ->concat(collect($checkInItems))
+            ->concat(collect($anomalyItems)->map($enrich))
+            ->concat(collect($newsItems)->map($enrich))
+            ->values();
+
+        return response()->json(['items' => $items]);
+    }
+
+    /**
+     * @param  Collection<int, mixed>  $integrationIds
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildDigestItems(User $user, Carbon $today, mixed $integrationIds, string $timezone): array
+    {
+        $events = Event::whereIn('integration_id', $integrationIds)
+            ->where('service', 'flint')
+            ->where('action', 'had_summary')
+            ->tap(fn ($query) => FlintDigestDay::on($query, $today->copy()->timezone($timezone)->toDateString()))
+            ->with('blocks')
+            // All of a day's digests share the same `time` (the local day),
+            // so the run order comes from `created_at`.
+            ->orderBy('time', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $linkedEvents = app(FlintLinkedEventCards::class)->forDigests($events, $integrationIds, $user->id);
+
+        return $events->map(function (Event $event) use ($linkedEvents): array {
+            $meta = $event->event_metadata ?? [];
+
+            return [
+                'id' => $event->id,
+                'type' => 'flint_digest',
+                'caught_up_at' => null,
+                '_subject_id' => $event->id,
+                '_subject_key' => Event::class . ':' . $event->id,
+                'payload' => [
+                    'date' => $meta['local_date'] ?? $event->time->toDateString(),
+                    'period' => $meta['period'] ?? null,
+                    'title' => $meta['title'] ?? null,
+                    'kind' => $this->digestKind($event, $meta),
+                    'summary' => $meta['summary'] ?? null,
+                    'block_count' => $event->blocks->count(),
+                    'unanswered_question_count' => $event->blocks->filter(
+                        fn (Block $b) => FlintQuestion::isOpen($b)
+                    )->count(),
+                    // Cards for the metric events the summary links to, in
+                    // the order it mentions them. See FlintLinkedEventCards.
+                    'linked_events' => $linkedEvents[$event->id] ?? [],
+                ],
+            ];
+        })->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildCheckInItems(User $user, Carbon $today): array
+    {
+        $dateString = $today->toDateString();
+        $checkins = (new DailyCheckinPlugin)->getCheckinsForDate($user->id, $dateString);
+        $items = [];
+
+        foreach (['morning', 'afternoon'] as $period) {
+            /** @var Event|null $event */
+            $event = $checkins[$period];
+            $items[] = [
+                'id' => "{$period}:{$dateString}",
+                'type' => 'check_in',
+                'caught_up_at' => $event !== null ? $event->time->toIso8601String() : null,
+                'payload' => [
+                    'period' => $period,
+                    'date' => $dateString,
+                    'completed' => $event !== null,
+                    'event_id' => $event?->id,
+                ],
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildAnomalyItems(
+        User $user,
+        Carbon $today,
+        string $timezone,
+        bool $includeAcknowledged = false
+    ): array {
+        $trends = MetricTrend::query()
+            ->whereHas('metricStatistic', fn ($q) => $q->where('user_id', $user->id))
+            ->anomalies()
+            ->when(! $includeAcknowledged, fn ($q) => $q->unacknowledged())
+            ->whereBetween('detected_at', $this->localDayRange($today, $timezone))
+            ->with('metricStatistic')
+            ->get()
+            ->filter(function (MetricTrend $trend) use ($includeAcknowledged): bool {
+                if ($includeAcknowledged) {
+                    return true;
+                }
+
+                $suppressUntil = $trend->metadata['suppress_until'] ?? null;
+
+                return ! ($suppressUntil && Carbon::parse($suppressUntil)->isFuture());
+            });
+
+        $presentation = app(MetricPresentation::class);
+
+        $trends = $trends->reject(
+            fn (MetricTrend $trend): bool => ! ($includeAcknowledged && $trend->acknowledged_at !== null)
+                && $this->isNoise($trend, $presentation)
+        );
+
+        $events = Event::query()
+            ->with('actor')
+            ->whereKey($trends->pluck('metadata.event_id')->filter()->unique())
+            ->get()
+            ->keyBy('id');
+
+        return $trends
+            ->map(function (MetricTrend $trend) use ($events, $presentation): array {
+                $stat = $trend->metricStatistic;
+                $direction = $trend->getDirection();
+                $streakCount = $this->calculateStreakDays($trend, $stat);
+                $currentValue = round($trend->current_value, 2);
+                $baselineValue = round($trend->baseline_value, 2);
+                $account = $events->get($trend->metadata['event_id'] ?? null)?->actor;
+
+                return [
+                    'id' => $trend->id,
+                    'type' => 'anomaly',
+                    'caught_up_at' => null,
+                    '_subject_id' => $trend->id,
+                    '_subject_key' => MetricTrend::class . ':' . $trend->id,
+                    'payload' => [
+                        'metric' => $stat->getIdentifier(),
+                        'display_name' => $presentation->displayName($stat),
+                        'domain' => $presentation->domain($stat),
+                        'service' => $stat->service,
+                        'unit' => $stat->value_unit,
+                        'type' => $trend->type,
+                        'direction' => $direction,
+                        'valence' => $presentation->valence($stat, $direction, $account),
+                        'is_ordinal' => $presentation->isOrdinal($stat),
+                        'current_value' => $currentValue,
+                        'baseline_value' => $baselineValue,
+                        'current_display' => $presentation->formatValue($stat, $currentValue),
+                        'baseline_display' => $presentation->formatValue($stat, $baselineValue),
+                        'deviation' => round($trend->deviation, 2),
+                        'streak_days' => $streakCount,
+                        // The window the baseline is drawn from, for "21bpm below 90d trend".
+                        'baseline_window_days' => $stat->baseline_window_days ?? MetricStatistic::DEFAULT_WINDOW_DAYS,
+                        'detected_at' => $trend->detected_at->toIso8601String(),
+                        'acknowledged_at' => $trend->acknowledged_at?->toIso8601String(),
+                    ],
+                ];
+            })->values()->all();
+    }
+
+    /**
+     * Whether an anomaly is not worth raising.
+     *
+     * The briefing styleguide is explicit that a single-day movement is noise
+     * unless the deviation is genuinely large, and that a topic should not keep
+     * resurfacing merely because it has appeared for several days running. Both
+     * were being ignored: a cardiovascular age that moved five years overnight
+     * was shown on day one, and a balance sitting above its baseline for a
+     * fortnight was still being announced as a surprise.
+     *
+     * A long streak means the baseline is stale, not that today is unusual —
+     * that is surfaced as `baseline_stale` rather than as a fresh anomaly.
+     */
+    private function isNoise(MetricTrend $trend, MetricPresentation $presentation): bool
+    {
+        $stat = $trend->metricStatistic;
+
+        if ($stat === null) {
+            return true;
+        }
+
+        // The plugin has asked for this metric to stay out of Flint.
+        if ($presentation->isExcludedFromFlint($stat)) {
+            return true;
+        }
+
+        $streak = $this->calculateStreakDays($trend, $stat);
+        $deviation = abs((float) $trend->deviation);
+
+        // Seen every day for long enough that the baseline, not the reading, is
+        // what has drifted.
+        if ($streak >= self::REBASELINE_STREAK_DAYS) {
+            return true;
+        }
+
+        // A one-off move has to be large to be worth interrupting for.
+        if ($streak <= 1 && $deviation < self::SINGLE_DAY_DEVIATION_THRESHOLD) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Reading material from the last 48 hours: bookmarks, monitored pages and
+     * newsletters, one card per article.
+     *
+     * Deduplicated by target, keeping the newest. A monitored page is re-fetched
+     * on a schedule and each fetch is its own event with its own summary, so
+     * without this The Economist's World in Brief alone would contribute four
+     * near-identical cards — and the freshest fetch is the one worth reading.
+     *
+     * @param  Collection<int, mixed>  $integrationIds
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildNewsItems(User $user, mixed $integrationIds, int $limit): array
+    {
+        $summaryBlockTypes = [
+            'fetch_tldr',
+            'fetch_summary_paragraph',
+            'fetch_key_takeaways',
+            'newsletter_tldr',
+            'newsletter_summary_paragraph',
+            'newsletter_key_takeaways',
+        ];
+
+        $events = Event::whereIn('integration_id', $integrationIds)
+            ->where('domain', 'knowledge')
+            ->where(function ($q): void {
+                $q->where('action', 'bookmarked')
+                    ->orWhere(function ($q): void {
+                        $q->where('service', 'fetch')
+                            ->whereIn('action', self::FETCH_MONITORED_ACTIONS);
+                    })
+                    ->orWhere(function ($q): void {
+                        $q->where('service', 'newsletter')
+                            ->where('action', 'received_post');
+                    });
+            })
+            ->where('time', '>=', now()->subHours(self::NEWS_WINDOW_HOURS))
+            ->whereHas('blocks', fn ($q) => $q->whereIn('block_type', $summaryBlockTypes))
+            ->with(['blocks', 'target', 'actor'])
+            ->orderBy('time', 'desc')
+            // Collapse re-fetches before trimming. `lazy()` continues into the
+            // next batch when one page fills the current batch, until enough
+            // distinct articles have been found.
+            ->lazy($limit * self::NEWS_DEDUPE_FACTOR)
+            ->unique(fn (Event $event): string => $event->target_id ?? $event->id)
+            ->take($limit)
+            ->values();
+
+        return $events->map(function (Event $event) use ($summaryBlockTypes): array {
+            $blocks = $event->blocks->keyBy('block_type');
+            $payload = [
+                'title' => $this->newsTitle($event),
+                'publication' => $this->newsPublication($event),
+                'source' => $event->service,
+                'url' => $event->displayTargetUrl(),
+                'time' => $event->time->toIso8601String(),
+                'tldr' => null,
+                'summary' => null,
+                'key_takeaways' => null,
+            ];
+
+            foreach ($summaryBlockTypes as $blockType) {
+                $block = $blocks->get($blockType);
+                if ($block === null) {
+                    continue;
+                }
+
+                if (str_contains($blockType, 'tldr')) {
+                    $payload['tldr'] = $block->getContent();
+                } elseif (str_contains($blockType, 'summary')) {
+                    $payload['summary'] = $block->getContent();
+                } elseif (str_contains($blockType, 'key_takeaways')) {
+                    $payload['key_takeaways'] = KeyTakeaways::normalise($block->getContent());
+                }
+            }
+
+            return [
+                'id' => $event->id,
+                'type' => 'news_summary',
+                'caught_up_at' => null,
+                '_subject_id' => $event->id,
+                '_subject_key' => Event::class . ':' . $event->id,
+                'payload' => $payload,
+            ];
+        })->all();
+    }
+
+    /**
+     * A newsletter event targets its publication, so the target title is the
+     * masthead ("POLITICO London Playbook") rather than the issue itself. The
+     * email subject is what distinguishes one issue from the next.
+     */
+    private function newsTitle(Event $event): string
+    {
+        if ($event->service === 'newsletter') {
+            $subject = trim((string) data_get($event->event_metadata, 'email_subject', ''));
+            if ($subject !== '') {
+                return $subject;
+            }
+        }
+
+        return $event->displayTargetTitle() ?? $event->actor?->title ?? 'Untitled';
+    }
+
+    /**
+     * The outlet an article came from, where Spark knows it. Only newsletters
+     * carry a stable publication object; fetched pages and bookmarks return
+     * null and the client falls back to the URL host.
+     */
+    private function newsPublication(Event $event): ?string
+    {
+        if ($event->service !== 'newsletter') {
+            return null;
+        }
+
+        $publication = $event->target?->title ?? data_get($event->event_metadata, 'email_from_name');
+
+        return filled($publication) ? (string) $publication : null;
+    }
+
+    /**
+     * The UTC instants bounding a local calendar day.
+     *
+     * `whereDate()` compares against the stored UTC date, so pairing it with a
+     * timezone-aware Carbon::today() silently mixed two different notions of
+     * "today" — an evening digest could land on the wrong side of midnight for
+     * anyone east or west of UTC.
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function localDayRange(Carbon $localDay, string $timezone): array
+    {
+        $start = $localDay->copy()->startOfDay()->setTimezone('UTC');
+        $end = $localDay->copy()->endOfDay()->setTimezone('UTC');
+
+        return [$start, $end];
+    }
+
+    /**
+     * What sort of digest this is. Resolution lives in FlintDigestKind so the
+     * feed, the digest endpoints and the web all agree.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private function digestKind(Event $event, array $meta): string
+    {
+        return FlintDigestKind::for($event, $meta);
+    }
+
+    /**
+     * How many consecutive days, ending on this anomaly's own day, this
+     * statistic has produced an anomaly.
+     *
+     * Counted in distinct days, not rows: a metric can detect more than one
+     * anomaly in a day, and counting rows would let a single day report a
+     * streak of two — long enough to clear the `streak <= 1` noise gate that
+     * keeps marginal one-off moves out of the feed.
+     */
+    private function calculateStreakDays(MetricTrend $trend, MetricStatistic $stat): int
+    {
+        $days = MetricTrend::where('metric_statistic_id', $stat->id)
+            ->anomalies()
+            ->where('detected_at', '<=', $trend->detected_at)
+            ->where('detected_at', '>=', $trend->detected_at->copy()->subDays(30))
+            ->orderByDesc('detected_at')
+            ->get()
+            ->map(fn (MetricTrend $t): Carbon => $t->detected_at->copy()->startOfDay())
+            ->unique(fn (Carbon $day): string => $day->toDateString())
+            ->values();
+
+        $streakCount = 0;
+        $lastDate = $trend->detected_at->copy()->startOfDay();
+
+        foreach ($days as $day) {
+            if (abs($day->diffInDays($lastDate)) > 1) {
+                break;
+            }
+
+            $streakCount++;
+            $lastDate = $day;
+        }
+
+        return $streakCount;
+    }
+}

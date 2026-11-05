@@ -18,11 +18,17 @@ public_html/hot
 storage/*.key
 storage/logs/fetch_playwright_last.json
 storage/logs/fetch_extraction_last.json
+storage/logs/fetch/
 .env
 Homestead.yaml
 Homestead.json
 /.vagrant
 .phpunit.result.cache
+
+# Deploy-time artifacts written by deploy.php (version:set) / read by config/sentry.php;
+# also created transiently by SentryReleaseConfigTest. Must not be committed.
+/VERSION
+/VERSION.txt
 
 /public/build
 /storage/pail
@@ -36,7 +42,10 @@ auth.json
 
 # Claude Code
 .agents/
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/hooks/**
 skills-lock.json
 **/caddy
 frankenphp
@@ -44,4 +53,3 @@ frankenphp-worker.php
 docker/compose.yml
 docker/nginx-jupiter.conf
 docker/Dockerfile
-.DS_Store

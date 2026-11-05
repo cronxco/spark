@@ -3,9 +3,9 @@
 namespace Database\Factories;
 
 use App\Models\EventObject;
-use App\Models\Integration;
+use App\Models\User;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 class EventObjectFactory extends Factory
 {
@@ -16,7 +16,7 @@ class EventObjectFactory extends Factory
         return [
             'id' => $this->faker->uuid(),
             'time' => $this->faker->dateTime(),
-            'integration_id' => Integration::factory(),
+            'user_id' => User::factory(),
             'concept' => $this->faker->word(),
             'type' => $this->faker->word(),
             'title' => $this->faker->sentence(),
@@ -24,9 +24,35 @@ class EventObjectFactory extends Factory
             'metadata' => [],
             'url' => $this->faker->url(),
             'media_url' => $this->faker->imageUrl(),
-            'embeddings' => array_map(fn() => $this->faker->randomFloat(4, -1, 1), range(1, 3)),
+            'embeddings' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ];
     }
-} 
+
+    /**
+     * Indicate that the object should have valid embeddings (1536 dimensions)
+     */
+    public function withEmbeddings(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'embeddings' => array_map(fn () => $this->faker->randomFloat(4, -1, 1), range(1, 1536)),
+        ]);
+    }
+
+    /**
+     * Indicate that the object should have a location
+     */
+    public function withLocation(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'location' => Point::makeGeodetic(
+                $this->faker->latitude(49, 61),
+                $this->faker->longitude(-8, 2)
+            ),
+            'location_address' => $this->faker->address(),
+            'location_geocoded_at' => now(),
+            'location_source' => 'test',
+        ]);
+    }
+}

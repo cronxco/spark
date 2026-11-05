@@ -1,0 +1,318 @@
+<?php
+
+use App\Models\Block;
+use App\Models\Event;
+use App\Support\AdminTenant;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use App\Livewire\Concerns\HasAdminListControls;
+use Livewire\Volt\Component;
+use Livewire\WithPagination;
+use Mary\Traits\Toast;
+
+use function Livewire\Volt\layout;
+
+layout('components.layouts.app');
+
+new class extends Component
+{
+    use HasAdminListControls, Toast, WithPagination;
+
+    public string $search = '';
+    public string $serviceFilter = '';
+    public string $domainFilter = '';
+    public string $actionFilter = '';
+    public array $selectedEvents = [];
+    public int $perPage = 25;
+    public array $sortBy = ['column' => 'time', 'direction' => 'desc'];
+
+    protected $queryString = [
+        'search' => ['except' => ''],
+        'serviceFilter' => ['except' => '', 'as' => 'service'],
+        'domainFilter' => ['except' => '', 'as' => 'domain'],
+        'actionFilter' => ['except' => '', 'as' => 'action'],
+        'sortBy' => ['except' => ['column' => 'time', 'direction' => 'desc']],
+        'perPage' => ['except' => 25],
+        'page' => ['except' => 1],
+    ];
+
+    public function mount(): void
+    {
+        // Initialize any required data
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedServiceFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedDomainFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedActionFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearFilters(): void
+    {
+        $this->reset(['search', 'serviceFilter', 'domainFilter', 'actionFilter']);
+        $this->resetPage();
+    }
+
+    public function headers(): array
+    {
+        return [
+            ['key' => 'id', 'label' => 'ID', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'service', 'label' => 'Service', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'domain', 'label' => 'Domain', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'action', 'label' => 'Action', 'sortable' => true],
+            ['key' => 'target', 'label' => 'Target', 'sortable' => false],
+            ['key' => 'value', 'label' => 'Value', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'blocks', 'label' => 'Blocks', 'sortable' => false, 'class' => 'hidden sm:table-cell'],
+            ['key' => 'time', 'label' => 'Time', 'sortable' => true, 'class' => 'hidden sm:table-cell'],
+        ];
+    }
+
+    public function bulkDelete(): void
+    {
+        if (empty($this->selectedEvents)) {
+            $this->error('No events selected for deletion.');
+
+            return;
+        }
+
+        try {
+            $count = DB::transaction(function () {
+                // Re-resolve the client-supplied selection through the same
+                // ownership predicate the listing uses. $selectedEvents is a
+                // public Livewire property and cannot be trusted as an authority.
+                $ownedIds = AdminTenant::scopeForUser(Event::query())
+                    ->whereIn('id', $this->selectedEvents)
+                    ->pluck('id');
+
+                AdminTenant::recordAction('events_bulk_delete', ['ids' => $ownedIds->all()]);
+
+                // Delete blocks first (cascade)
+                Block::whereIn('event_id', $ownedIds)->delete();
+
+                // Delete events
+                return Event::whereIn('id', $ownedIds)->delete();
+            });
+
+            $this->success("Successfully deleted {$count} event(s) and their associated blocks.");
+
+            $this->selectedEvents = [];
+            $this->resetPage();
+        } catch (Exception $e) {
+            $this->error('Failed to delete events: ' . $e->getMessage());
+        }
+    }
+
+    public function getEvents()
+    {
+        $query = Event::with(['actor', 'target', 'integration', 'blocks'])
+            ->whereHas('integration', function ($q) {
+                AdminTenant::scope($q);
+            });
+
+        // Apply search filter
+        if ($this->search) {
+            $query->where(function ($q) {
+                $q->where('service', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('domain', 'ilike', '%' . $this->search . '%')
+                    ->orWhere('action', 'ilike', '%' . $this->search . '%')
+                    ->orWhereHas('actor', function ($actorQuery) {
+                        $actorQuery->where('title', 'ilike', '%' . $this->search . '%');
+                    })
+                    ->orWhereHas('target', function ($targetQuery) {
+                        $targetQuery->where('title', 'ilike', '%' . $this->search . '%');
+                    });
+            });
+        }
+
+        // Apply service filter
+        if ($this->serviceFilter) {
+            $query->where('service', $this->serviceFilter);
+        }
+
+        // Apply domain filter
+        if ($this->domainFilter) {
+            $query->where('domain', $this->domainFilter);
+        }
+
+        // Apply action filter
+        if ($this->actionFilter) {
+            $query->where('action', $this->actionFilter);
+        }
+
+        // Apply sorting
+        [$sortColumn, $sortDirection] = $this->resolvedSort('time');
+        $query->orderBy($sortColumn, $sortDirection);
+
+        return $query->paginate($this->resolvedPerPage());
+    }
+
+    public function getUniqueServices()
+    {
+        return Event::whereHas('integration', function ($q) {
+            AdminTenant::scope($q);
+        })->distinct()->pluck('service')->filter()->sort()->values();
+    }
+
+    public function getUniqueDomains()
+    {
+        return Event::whereHas('integration', function ($q) {
+            AdminTenant::scope($q);
+        })->distinct()->pluck('domain')->filter()->sort()->values();
+    }
+
+    public function getUniqueActions()
+    {
+        return Event::whereHas('integration', function ($q) {
+            AdminTenant::scope($q);
+        })->distinct()->pluck('action')->filter()->sort()->values();
+    }
+
+    public function truncateId(string $id): string
+    {
+        return Str::limit($id, 8, '');
+    }
+
+    public function formatValue(?int $value, ?int $multiplier, ?string $unit): string
+    {
+        if ($value === null) {
+            return '-';
+        }
+
+        $formattedValue = $value;
+        if ($multiplier && $multiplier !== 1 && $multiplier !== 0) {
+            $formattedValue = $value / $multiplier;
+        }
+
+        $result = number_format($formattedValue, 2);
+        if ($unit) {
+            $result .= ' ' . $unit;
+        }
+
+        return $result;
+    }
+
+    public function prettifyAction(string $action): string
+    {
+        return Str::title(str_replace('_', ' ', $action));
+    }
+};
+
+?>
+
+<div>
+    <x-header title="Data" separator>
+        <x-slot:actions>
+            <div class="flex items-center gap-2">
+                @if (count($selectedEvents) > 0)
+                <button class="btn btn-error btn-sm" wire:click="bulkDelete"
+                    wire:confirm="Are you sure you want to delete {{ count($selectedEvents) }} event(s) and their associated blocks? This action cannot be undone.">
+                    <x-icon name="fas.trash" class="w-4 h-4 mr-1" />
+                    Delete Selected ({{ count($selectedEvents) }})
+                </button>
+                @endif
+            </div>
+        </x-slot:actions>
+    </x-header>
+
+    <x-admin.data-tabs active="events" />
+
+    <div class="space-y-4 lg:space-y-6">
+        <x-admin.filter-bar
+            search-placeholder="Search events..."
+            :active="$search || $serviceFilter || $domainFilter || $actionFilter"
+            :filters="[
+                ['model' => 'serviceFilter', 'label' => 'Service', 'placeholder' => 'All services', 'options' => $this->getUniqueServices()->mapWithKeys(fn ($v) => [$v => $v])],
+                ['model' => 'domainFilter', 'label' => 'Domain', 'placeholder' => 'All domains', 'options' => $this->getUniqueDomains()->mapWithKeys(fn ($v) => [$v => $v])],
+                ['model' => 'actionFilter', 'label' => 'Action', 'placeholder' => 'All actions', 'options' => $this->getUniqueActions()->mapWithKeys(fn ($v) => [$v => $this->prettifyAction($v)])],
+            ]" />
+
+        <!-- Events Table -->
+        <div class="card bg-base-200 shadow card-xs sm:card-md">
+            <div class="card-body">
+                <x-table
+                    :headers="$this->headers()"
+                    :rows="$this->getEvents()"
+                    :sort-by="$sortBy"
+                    with-pagination
+                    per-page="perPage"
+                    :per-page-values="[10, 25, 50, 100]"
+                    selectable
+                    selectable-key="id"
+                    wire:model.live="selectedEvents"
+                    striped
+                    class="[&_table]:!static [&_td]:!static">
+                    <x-slot:empty>
+                        <div class="text-center py-12">
+                            <x-icon name="fas.calendar" class="w-16 h-16 mx-auto mb-4 text-base-content/70" />
+                            <h3 class="text-lg font-medium text-base-content mb-2">No events found</h3>
+                            <p class="text-base-content/70">
+                                @if ($search || $serviceFilter || $domainFilter || $actionFilter)
+                                Try adjusting your filters or search terms
+                                @else
+                                No events have been recorded yet
+                                @endif
+                            </p>
+                        </div>
+                    </x-slot:empty>
+
+                    @scope('cell_id', $event)
+                    <x-event-ref :event="$event" :showService="false" :text="'<span class=\'font-mono text-xs\'>' . $this->truncateId($event->id) . '</span>'" />
+                    @endscope
+
+                    @scope('cell_service', $event)
+                    <span class="text-sm">{{ $event->service }}</span>
+                    @endscope
+
+                    @scope('cell_domain', $event)
+                    <span class="text-sm">{{ $event->domain }}</span>
+                    @endscope
+
+                    @scope('cell_action', $event)
+                    <div class="flex flex-col gap-1">
+                        <span class="sm:hidden text-xs">{{ $event->service }}</span>
+                        <x-action-ref :action="$event->action" :service="$event->service" :href="route('events.show', $event)" />
+                        @if (!empty($event->value))
+                        <span class="sm:hidden text-sm">{{ $this->formatValue($event->value, $event->value_multiplier, $event->value_unit) }}</span>
+                        @endif
+                    </div>
+                    @endscope
+
+                    @scope('cell_target', $event)
+                    <x-uk-date :date="$event->time" class="sm:hidden" />
+                    @if ($event->target)
+                    <x-object-ref :object="$event->target" />
+                    @elseif ($event->actor)
+                    <x-object-ref :object="$event->actor" />
+                    @endif
+                    @endscope
+
+                    @scope('cell_value', $event)
+                    <span class="text-sm">{{ $this->formatValue($event->value, $event->value_multiplier, $event->value_unit) }}</span>
+                    @endscope
+
+                    @scope('cell_blocks', $event)
+                    <span class="text-sm text-base-content/70">{{ $event->blocks_count ?? $event->blocks->count() }}</span>
+                    @endscope
+
+                    @scope('cell_time', $event)
+                    <x-uk-date :date="$event->time" />
+                    @endscope
+                </x-table>
+            </div>
+        </div>
+    </div>
+</div>

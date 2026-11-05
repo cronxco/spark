@@ -1,0 +1,1207 @@
+<?php
+
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Services\AgentWorkingMemoryService;
+use App\Services\Ai\AiUsageSummary;
+use App\Services\Flint\FlintLinkedEventCards;
+use App\Services\Flint\FlintScheduleSettings;
+use App\Services\Flint\Routines\RoutineDriverManager;
+use App\Services\FlintTopicService;
+use App\Services\FlintTopicTaskService;
+use App\Support\FlintDigestKind;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
+use Livewire\Volt\Component;
+use Mary\Traits\Toast;
+
+new class extends Component
+{
+    use Toast;
+
+    public string $activeTab = 'today';
+
+    // --- Settings (mirrors the keys the flint-digest-dispatcher actually reads) ---
+    public bool $morningDigestEnabled = true;
+    public bool $eveningDigestEnabled = true;
+    public bool $topicsEnabled = true;
+    public bool $readingListEnabled = true;
+    public bool $newsRoundupEnabled = true;
+    public bool $moneyWeeklyEnabled = false;
+    public bool $moneyCloseEnabled = false;
+    public string $morningTimeWeekday = '07:30';
+    public string $morningTimeWeekend = '09:30';
+    public string $morningFallback = '11:00';
+    public string $eveningTime = '19:30';
+    public string $topicsTime = '21:00';
+    public string $readingListTime = '20:00';
+    public string $newsRoundupTime = '07:00';
+    // An empty string means "not chosen here": the default falls back to the
+    // server's env value, and a routine falls back to the default.
+    public string $driver = '';
+    public array $drivers = ['digest' => '', 'topics' => '', 'reading_list' => '', 'news_roundup' => '', 'money_weekly' => '', 'money_close' => ''];
+    public int $usageDays = 7;
+    public string $usageScope = 'all';
+
+    // --- Today ---
+    public ?string $selectedDigestId = null;
+
+    // --- Topics ---
+    public string $topicKindFilter = '';
+    public string $topicStatusFilter = 'active';
+    public ?string $expandedTopicId = null;
+    public ?string $editingTopicId = null;
+    public string $editTitle = '';
+    public string $editContent = '';
+    public string $editKind = 'thematic';
+    public string $editStatus = 'active';
+    public ?string $editNextReviewAt = null;
+
+    public array $timeOptions = [];
+
+    public array $topicKinds = [
+        'strategic' => 'Strategic — a long horizon outcome',
+        'thematic' => 'Thematic — an ongoing thread with no end date',
+        'tactical' => 'Tactical — time-bound, expires when it resolves',
+    ];
+
+    public array $topicStatuses = ['active', 'dormant', 'resolved', 'expired'];
+
+    public function mount(): void
+    {
+        $settings = Auth::user()->settings['flint'] ?? [];
+
+        $this->morningDigestEnabled = FlintScheduleSettings::enabled($settings, 'morning_digest_enabled');
+        $this->eveningDigestEnabled = FlintScheduleSettings::enabled($settings, 'evening_digest_enabled');
+        $this->topicsEnabled = FlintScheduleSettings::enabled($settings, 'topics_enabled');
+        $this->readingListEnabled = FlintScheduleSettings::enabled($settings, 'reading_list_enabled');
+        $this->newsRoundupEnabled = FlintScheduleSettings::enabled($settings, 'news_roundup_enabled');
+        $this->moneyWeeklyEnabled = FlintScheduleSettings::enabled($settings, 'money_weekly_enabled');
+        $this->moneyCloseEnabled = FlintScheduleSettings::enabled($settings, 'money_close_enabled');
+        $this->morningTimeWeekday = $settings['morning_time_weekday'] ?? config('services.flint_routine.morning_time_weekday');
+        $this->morningTimeWeekend = $settings['morning_time_weekend'] ?? config('services.flint_routine.morning_time_weekend');
+        $this->morningFallback = $settings['morning_fallback'] ?? config('services.flint_routine.morning_fallback');
+        $this->eveningTime = $settings['evening_time'] ?? config('services.flint_routine.evening_time');
+        $this->topicsTime = $settings['topics_time'] ?? config('services.flint_routine.topics_time');
+        $this->readingListTime = $settings['reading_list_time'] ?? config('services.flint_routine.reading_list_time');
+        $this->newsRoundupTime = $settings['news_roundup_time'] ?? config('services.flint_routine.news_roundup_time');
+        $this->driver = (string) ($settings['driver'] ?? '');
+        foreach (RoutineDriverManager::ROUTINES as $routine) {
+            $this->drivers[$routine] = (string) ($settings['drivers'][$routine] ?? '');
+        }
+
+        // Every quarter hour — the dispatcher only wakes up on that cadence, so
+        // finer-grained times would be misleading.
+        $this->timeOptions = collect(range(0, 23))
+            ->flatMap(fn ($hour) => collect([0, 15, 30, 45])->mapWithKeys(function ($minute) use ($hour) {
+                $time = sprintf('%02d:%02d', $hour, $minute);
+
+                return [$time => $time];
+            }))
+            ->toArray();
+    }
+
+    // ------------------------------------------------------------------
+    // Today
+    // ------------------------------------------------------------------
+
+    /**
+     * Digest events, newest first. These are written by the Flint routine via
+     * the create-flint-digest MCP tool — the same rows the mobile app reads.
+     *
+     * Computed, so one render queries this once however many times it is read.
+     */
+    #[Computed]
+    public function digests()
+    {
+        return Event::query()
+            ->whereIn('integration_id', Auth::user()->integrations()->pluck('id'))
+            ->where('service', 'flint')
+            ->where('action', 'had_summary')
+            ->orderByDesc('time')
+            ->orderByDesc('created_at')
+            ->limit(30)
+            ->get();
+    }
+
+    /** The digest currently on screen: the one picked from the list, else the newest. */
+    public function currentDigest(): ?Event
+    {
+        $digests = $this->digests;
+
+        $digest = $this->selectedDigestId
+            ? $digests->firstWhere('id', $this->selectedDigestId)
+            : $digests->first();
+
+        // block-card and the question view both reach through to the block's event
+        // for its plugin styling, so pull that in rather than paying it per block.
+        return $digest?->loadMissing(['blocks.event.integration']);
+    }
+
+    public function selectDigest(string $eventId): void
+    {
+        $this->selectedDigestId = $eventId;
+    }
+
+    /**
+     * The digest's blocks, split so the view can lead with anything awaiting an
+     * answer rather than burying it under commentary.
+     *
+     * Editorial notes are separated from the rest. They are Flint's own run
+     * diagnostics — several hundred words of selection reasoning per digest,
+     * four times a day — and showing them expanded alongside the content made
+     * the debugging artefact the loudest thing on the page.
+     *
+     * @return array{questions: Collection, notes: Collection, editorial: Collection}
+     */
+    public function digestBlocks(?Event $digest): array
+    {
+        $blocks = $digest?->blocks ?? collect();
+
+        return [
+            'questions' => $blocks->where('block_type', 'flint_user_question')
+                ->sortBy(fn ($block) => is_null($block->metadata['answer'] ?? null) ? 0 : 1)
+                ->values(),
+            'notes' => $blocks->whereNotIn('block_type', ['flint_user_question', 'flint_editorial_note'])
+                ->sortBy('time')
+                ->values(),
+            'editorial' => $blocks->where('block_type', 'flint_editorial_note')
+                ->sortBy('time')
+                ->values(),
+        ];
+    }
+
+    /**
+     * The digest summary split into paragraphs, each with cards for the metric
+     * events it links to — the same cards Up to Speed shows on iOS.
+     *
+     * @return array<int, array{markdown: string, cards: array<int, array<string, mixed>>}>
+     */
+    public function summaryParagraphs(Event $digest): array
+    {
+        $summary = $digest->event_metadata['summary'] ?? null;
+
+        if (! is_string($summary) || trim($summary) === '') {
+            return [];
+        }
+
+        $cards = collect(app(FlintLinkedEventCards::class)->forDigests(
+            collect([$digest]),
+            Auth::user()->integrations()->pluck('id'),
+            Auth::id(),
+        )[$digest->id] ?? [])->keyBy(fn (array $card): string => strtolower($card['event']['id']));
+
+        return collect(preg_split('/\n\s*\n/', trim($summary)))
+            ->map(fn (string $paragraph): array => [
+                'markdown' => $paragraph,
+                'cards' => collect(FlintLinkedEventCards::linkedIds($paragraph))
+                    ->map(fn (string $id): ?array => $cards->get($id))
+                    ->filter()
+                    ->values()
+                    ->all(),
+            ])
+            ->all();
+    }
+
+    /**
+     * How this digest should be laid out — the briefing, a news roundup, or a
+     * reading list. Resolved server-side from the routine that wrote it.
+     */
+    public function digestKind(Event $digest): string
+    {
+        return FlintDigestKind::for($digest);
+    }
+
+    /** Topics this digest touched, via the `discussed_in` relationship. */
+    public function topicsTouchedBy(?Event $digest)
+    {
+        if (! $digest) {
+            return collect();
+        }
+
+        return $digest->relatedObjects('discussed_in')
+            ->where('concept', 'flint')
+            ->where('type', 'topic')
+            ->get();
+    }
+
+    // ------------------------------------------------------------------
+    // Topics
+    // ------------------------------------------------------------------
+
+    public function topics()
+    {
+        return app(FlintTopicService::class)
+            ->query(Auth::user(), $this->topicStatusFilter ?: null, $this->topicKindFilter ?: null)
+            ->orderByDesc('updated_at')
+            ->get();
+    }
+
+    public function topicStatusCounts(): array
+    {
+        return app(FlintTopicService::class)->statusCounts(Auth::user());
+    }
+
+    public function topicMentions(EventObject $topic)
+    {
+        return app(FlintTopicService::class)->mentions($topic);
+    }
+
+    public string $newTaskTopicId = '';
+    public string $newTaskTitle = '';
+    public string $newTaskContent = '';
+    public ?string $newTaskDueOn = null;
+    public ?string $newTaskReviewOn = null;
+
+    public function topicTasks(EventObject $topic): array
+    {
+        return app(FlintTopicTaskService::class)->list(Auth::user(), (string) $topic->id);
+    }
+
+    public function addTopicTask(string $topicId): void
+    {
+        try {
+            $data = $this->validate([
+                'newTaskTitle' => ['required', 'string', 'max:255'],
+                'newTaskContent' => ['nullable', 'string', 'max:20000'],
+                'newTaskDueOn' => ['nullable', 'date_format:Y-m-d'],
+                'newTaskReviewOn' => ['nullable', 'date_format:Y-m-d'],
+            ]);
+            $task = app(FlintTopicTaskService::class)->create(Auth::user(), $topicId, [
+                'title' => $data['newTaskTitle'],
+                'client_mutation_id' => (string) Str::uuid(),
+                'content' => $data['newTaskContent'],
+                'due_on' => $data['newTaskDueOn'],
+                'review_on' => $data['newTaskReviewOn'],
+            ]);
+            if (! $task) {
+                $this->error('Topic not found.');
+                return;
+            }
+            $this->reset(['newTaskTopicId', 'newTaskTitle', 'newTaskContent', 'newTaskDueOn', 'newTaskReviewOn']);
+            $this->success('Task added.');
+        } catch (ValidationException $exception) {
+            $this->error($exception->validator->errors()->first());
+        }
+    }
+
+    public function toggleTopicTask(string $topicId, string $taskId, bool $completed): void
+    {
+        $service = app(FlintTopicTaskService::class);
+        $current = collect($service->list(Auth::user(), $topicId))->firstWhere('id', $taskId);
+
+        if (! $current) {
+            $this->error('Task not found.');
+
+            return;
+        }
+
+        $task = $service->update(Auth::user(), $topicId, $taskId, [
+            'completed' => $completed,
+        ], $current['version']);
+        $task ? $this->success($completed ? 'Task completed.' : 'Task reopened.') : $this->error('Task not found.');
+    }
+
+    public function expandTopic(string $topicId): void
+    {
+        $this->expandedTopicId = $this->expandedTopicId === $topicId ? null : $topicId;
+    }
+
+    public function editTopic(string $topicId): void
+    {
+        $topic = app(FlintTopicService::class)->query(Auth::user())->find($topicId);
+
+        if (! $topic) {
+            $this->error('Topic not found.');
+
+            return;
+        }
+
+        $this->editingTopicId = $topic->id;
+        $this->editTitle = $topic->title ?? '';
+        $this->editContent = $topic->content ?? '';
+        $this->editKind = $topic->metadata['kind'] ?? 'thematic';
+        $this->editStatus = $topic->metadata['status'] ?? 'active';
+        $this->editNextReviewAt = $topic->metadata['next_review_at'] ?? null;
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->reset(['editingTopicId', 'editTitle', 'editContent', 'editKind', 'editStatus', 'editNextReviewAt']);
+    }
+
+    public function saveTopic(): void
+    {
+        if (! $this->editingTopicId) {
+            return;
+        }
+
+        try {
+            $updated = app(FlintTopicService::class)->update(Auth::user(), $this->editingTopicId, [
+                'title' => $this->editTitle,
+                'content' => $this->editContent,
+                'kind' => $this->editKind,
+                'status' => $this->editStatus,
+                'next_review_at' => $this->editNextReviewAt ?: null,
+            ]);
+        } catch (ValidationException $exception) {
+            $this->error($exception->validator->errors()->first());
+
+            return;
+        }
+
+        if (! $updated) {
+            $this->error('Topic not found.');
+
+            return;
+        }
+
+        $this->cancelEdit();
+        $this->success('Topic updated.');
+    }
+
+    /** Quick status change from the card, without opening the editor. */
+    public function setTopicStatus(string $topicId, string $status): void
+    {
+        try {
+            $updated = app(FlintTopicService::class)->update(Auth::user(), $topicId, ['status' => $status]);
+        } catch (ValidationException $exception) {
+            $this->error($exception->validator->errors()->first());
+
+            return;
+        }
+
+        $updated
+            ? $this->success("Topic marked {$status}.")
+            : $this->error('Topic not found.');
+    }
+
+    public function deleteTopic(string $topicId): void
+    {
+        if (! app(FlintTopicService::class)->delete(Auth::user(), $topicId)) {
+            $this->error('Topic not found.');
+
+            return;
+        }
+
+        if ($this->expandedTopicId === $topicId) {
+            $this->expandedTopicId = null;
+        }
+
+        $this->cancelEdit();
+        $this->success('Topic deleted.');
+    }
+
+    // ------------------------------------------------------------------
+    // Settings
+    // ------------------------------------------------------------------
+
+    public function feedbackStats(): array
+    {
+        return app(AgentWorkingMemoryService::class)->getFeedbackStatistics(Auth::id());
+    }
+
+    #[Computed]
+    public function usage(): array
+    {
+        return app(AiUsageSummary::class)->for(
+            Auth::user(),
+            in_array($this->usageDays, [1, 7, 30], true) ? $this->usageDays : 7,
+            $this->usageScope === 'flint',
+        );
+    }
+
+    /** @return array<string, string> */
+    public function driverLabels(): array
+    {
+        return [
+            'webhook' => __('Claude Code routine (webhook)'),
+            'openai' => __('OpenAI (runs in Spark)'),
+        ];
+    }
+
+    public function save(): void
+    {
+        $this->validate([
+            'morningTimeWeekday' => ['required', 'date_format:H:i'],
+            'morningTimeWeekend' => ['required', 'date_format:H:i'],
+            'morningFallback' => ['required', 'date_format:H:i'],
+            'eveningTime' => ['required', 'date_format:H:i'],
+            'topicsTime' => ['required', 'date_format:H:i'],
+            'readingListTime' => ['required', 'date_format:H:i'],
+            'newsRoundupTime' => ['required', 'date_format:H:i'],
+            'driver' => ['nullable', 'in:' . implode(',', array_keys(RoutineDriverManager::DRIVERS))],
+            'drivers.*' => ['nullable', 'in:' . implode(',', array_keys(RoutineDriverManager::DRIVERS))],
+        ]);
+
+        $user = Auth::user();
+        $settings = $user->settings;
+
+        // Merge rather than replace: the scheduler and the routine both read out
+        // of this bag, and a blind overwrite would drop keys set elsewhere.
+        // The legacy all-routines switch is dropped on save (decision D-F1).
+        $settings['flint'] = array_merge(Arr::except($settings['flint'] ?? [], 'digests_enabled'), [
+            'morning_digest_enabled' => $this->morningDigestEnabled,
+            'evening_digest_enabled' => $this->eveningDigestEnabled,
+            'topics_enabled' => $this->topicsEnabled,
+            'reading_list_enabled' => $this->readingListEnabled,
+            'news_roundup_enabled' => $this->newsRoundupEnabled,
+            'money_weekly_enabled' => $this->moneyWeeklyEnabled,
+            'money_close_enabled' => $this->moneyCloseEnabled,
+            'morning_time_weekday' => $this->morningTimeWeekday,
+            'morning_time_weekend' => $this->morningTimeWeekend,
+            'morning_fallback' => $this->morningFallback,
+            'evening_time' => $this->eveningTime,
+            'topics_time' => $this->topicsTime,
+            'reading_list_time' => $this->readingListTime,
+            'news_roundup_time' => $this->newsRoundupTime,
+            'driver' => $this->driver ?: null,
+            'drivers' => collect(RoutineDriverManager::ROUTINES)
+                ->mapWithKeys(fn (string $routine) => [$routine => ($this->drivers[$routine] ?? '') ?: null])
+                ->all(),
+        ]);
+
+        $user->settings = $settings;
+        $user->save();
+
+        $this->dispatch('save-flint-schedules');
+
+        $this->success('Flint settings saved.');
+    }
+}; ?>
+
+<div>
+    <x-header title="{{ __('Flint') }}" subtitle="{{ __('Your personal AI assistant') }}" separator />
+
+    <x-tabs wire:model="activeTab">
+        {{-- ============================== Today ============================== --}}
+        <x-tab name="today" label="Today" icon="fas.newspaper">
+            @php
+                $digests = $this->digests;
+                $digest = $this->currentDigest();
+                $grouped = $this->digestBlocks($digest);
+                $touchedTopics = $this->topicsTouchedBy($digest);
+            @endphp
+
+            @if (! $digest)
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body text-center py-12">
+                        <x-icon name="fas.newspaper" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                        <h3 class="text-lg font-semibold mb-2">{{ __('No digests yet') }}</h3>
+                        <p class="text-sm text-base-content/60">
+                            {{ __('Flint writes a digest at each scheduled slot. The next one will appear here.') }}
+                        </p>
+                    </div>
+                </div>
+            @else
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 space-y-6">
+                        {{-- The digest itself: prose first, because that is the digest --}}
+                        <div class="card bg-base-200 shadow">
+                            <div class="card-body p-5 lg:p-6 gap-4">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="badge badge-primary badge-sm">
+                                        {{ ucfirst($digest->event_metadata['period'] ?? 'digest') }}
+                                    </span>
+                                    <span class="text-xs text-base-content/60">
+                                        <x-user-time :time="$digest->time" format="l j F Y" />
+                                    </span>
+                                    @if ($grouped['questions']->whereNull('metadata.answer')->isNotEmpty())
+                                        <span class="badge badge-warning badge-sm">
+                                            {{ $grouped['questions']->whereNull('metadata.answer')->count() }} {{ __('awaiting you') }}
+                                        </span>
+                                    @endif
+                                </div>
+
+                                <h2 class="text-2xl font-serif font-bold leading-tight">
+                                    {{ $digest->event_metadata['title'] ?? __('Daily digest') }}
+                                </h2>
+
+                                @if ($paragraphs = $this->summaryParagraphs($digest))
+                                    <div class="space-y-4">
+                                        @foreach ($paragraphs as $paragraph)
+                                            <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90 prose-a:text-highlight prose-a:font-semibold prose-a:no-underline hover:prose-a:underline">
+                                                {!! render_markdown($paragraph['markdown']) !!}
+                                            </div>
+                                            @if ($paragraph['cards'])
+                                                {{-- Metric cards go up to three across, as the prose orders them, the rest behind "+N more"; wide cards take a row each (design language §7.3) --}}
+                                                @php
+                                                    $cards = $paragraph['cards'];
+                                                    $overflow = count($cards) > 3 ? array_slice($cards, 2) : [];
+                                                    $shown = $overflow ? array_slice($cards, 0, 2) : $cards;
+                                                @endphp
+                                                <div x-data="{ expanded: false }" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                                    @foreach ($shown as $card)
+                                                        {{-- A lone card spans the row; flights, payments, calendar entries and articles always do (§7.3) --}}
+                                                        <x-event-card :card="$card" :wide="count($cards) === 1" wire:key="linked-{{ $loop->parent->index }}-{{ $card['event']['id'] }}" />
+                                                    @endforeach
+                                                    @if ($overflow)
+                                                        <button type="button" x-show="! expanded" x-on:click="expanded = true"
+                                                            class="flex min-h-28 items-center justify-center rounded-box bg-base-100 p-4 text-sm font-semibold text-base-content/70 transition-colors hover:bg-base-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+                                                            {{ __('+:count more', ['count' => count($overflow)]) }}
+                                                        </button>
+                                                        @foreach ($overflow as $card)
+                                                            <x-event-card :card="$card" x-show="expanded" x-cloak wire:key="linked-more-{{ $loop->parent->index }}-{{ $card['event']['id'] }}" />
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                <div class="pt-2 border-t border-base-300">
+                                    <a href="{{ route('events.show', $digest->id) }}" class="btn btn-ghost btn-xs">
+                                        <x-icon name="fas.arrow-up-right-from-square" class="w-3 h-3" />
+                                        {{ __('Open full event') }}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Questions Flint asked, unanswered first --}}
+                        @if ($grouped['questions']->isNotEmpty())
+                            <div class="space-y-3">
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/60">
+                                    {{ __('Flint asked') }}
+                                </h3>
+                                @foreach ($grouped['questions'] as $block)
+                                    <div wire:key="question-{{ $block->id }}">
+                                        <x-block-card :block="$block" />
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        {{-- Content blocks, headed and laid out by digest kind --}}
+                        @if ($grouped['notes']->isNotEmpty())
+                            @php
+                                $kind = $this->digestKind($digest);
+                                $heading = match ($kind) {
+                                    FlintDigestKind::NEWS_ROUNDUP => __('The stories'),
+                                    FlintDigestKind::READING_LIST => __('Worth reading'),
+                                    default => __('In this digest'),
+                                };
+                                // A news story is a read, not a tile: one column keeps the
+                                // prose at a sane measure. Briefing blocks are short and
+                                // pair well two-up.
+                                $gridClass = $kind === FlintDigestKind::BRIEFING
+                                    ? 'grid grid-cols-1 xl:grid-cols-2 gap-3'
+                                    : 'flex flex-col gap-3';
+                            @endphp
+                            <div class="space-y-3">
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/60">
+                                    {{ $heading }}
+                                </h3>
+                                <div class="{{ $gridClass }}">
+                                    @foreach ($grouped['notes'] as $block)
+                                        <div wire:key="block-{{ $block->id }}">
+                                            <x-block-card :block="$block" />
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Flint's own run diagnostics, collapsed --}}
+                        @if ($grouped['editorial']->isNotEmpty())
+                            <details class="group">
+                                <summary class="cursor-pointer text-sm font-semibold uppercase tracking-wider text-base-content/50 hover:text-base-content/80 flex items-center gap-2">
+                                    <x-icon name="fas.pen-nib" class="w-3 h-3" />
+                                    {{ __('Run notes') }}
+                                    <span class="text-xs font-normal normal-case tracking-normal text-base-content/40">
+                                        {{ __('how Flint put this together') }}
+                                    </span>
+                                </summary>
+                                <div class="flex flex-col gap-3 pt-3">
+                                    @foreach ($grouped['editorial'] as $block)
+                                        <div wire:key="editorial-{{ $block->id }}">
+                                            <x-block-card :block="$block" />
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </details>
+                        @endif
+                    </div>
+
+                    {{-- Sidebar --}}
+                    <div class="space-y-6">
+                        {{-- Topics this digest touched --}}
+                        <div class="card bg-base-200 shadow">
+                            <div class="card-body p-4 gap-3">
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="fas.compass" class="w-4 h-4 text-primary" />
+                                    <span class="text-xs font-semibold uppercase tracking-wider">{{ __('Topics touched') }}</span>
+                                </div>
+
+                                @forelse ($touchedTopics as $topic)
+                                    <a
+                                        href="{{ route('objects.show', $topic->id) }}"
+                                        class="block p-2 rounded-lg bg-base-100 hover:bg-base-300 transition-colors"
+                                        wire:key="touched-{{ $topic->id }}"
+                                    >
+                                        <div class="text-sm font-medium">{{ $topic->title }}</div>
+                                        <div class="text-xs text-base-content/60">
+                                            {{ ucfirst($topic->metadata['kind'] ?? 'thematic') }}
+                                            &middot; {{ ucfirst($topic->metadata['status'] ?? 'active') }}
+                                        </div>
+                                    </a>
+                                @empty
+                                    <p class="text-xs text-base-content/60">
+                                        {{ __('This digest is not linked to any topic yet.') }}
+                                    </p>
+                                @endforelse
+
+                                <button wire:click="$set('activeTab', 'topics')" class="btn btn-ghost btn-xs justify-start">
+                                    {{ __('Browse all topics') }}
+                                    <x-icon name="fas.arrow-right" class="w-3 h-3" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Recent digests --}}
+                        <div class="card bg-base-200 shadow">
+                            <div class="card-body p-4 gap-2">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <x-icon name="fas.clock-rotate-left" class="w-4 h-4 text-base-content/60" />
+                                    <span class="text-xs font-semibold uppercase tracking-wider">{{ __('Recent digests') }}</span>
+                                </div>
+
+                                @foreach ($digests as $item)
+                                    <button
+                                        wire:click="selectDigest('{{ $item->id }}')"
+                                        wire:key="digest-{{ $item->id }}"
+                                        class="text-left p-2 rounded-lg transition-colors {{ $item->id === $digest->id ? 'bg-primary/10 ring-1 ring-primary/30' : 'bg-base-100 hover:bg-base-300' }}"
+                                    >
+                                        <div class="text-sm font-medium line-clamp-1">
+                                            {{ $item->event_metadata['title'] ?? __('Daily digest') }}
+                                        </div>
+                                        <div class="text-xs text-base-content/60">
+                                            <x-user-time :time="$item->time" format="j M" />
+                                            &middot; {{ ucfirst($item->event_metadata['period'] ?? '') }}
+                                        </div>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </x-tab>
+
+        {{-- ============================== Topics ============================== --}}
+        <x-tab name="topics" label="Topics" icon="fas.compass">
+            @php
+                $topics = $this->topics();
+                $statusCounts = $this->topicStatusCounts();
+            @endphp
+
+            <div class="space-y-4 lg:space-y-6">
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body gap-4">
+                        <div>
+                            <h3 class="text-lg font-semibold">{{ __('Topics') }}</h3>
+                            <p class="text-sm text-base-content/70">
+                                {{ __('The long-lived threads Flint tracks across digests and coaching sessions. Flint proposes and updates these; you have the final say on all of them.') }}
+                            </p>
+                        </div>
+
+                        <div class="flex flex-wrap gap-3">
+                            <select wire:model.live="topicStatusFilter" class="select select-bordered select-sm">
+                                <option value="">{{ __('All statuses') }} ({{ array_sum($statusCounts) }})</option>
+                                @foreach ($topicStatuses as $status)
+                                    <option value="{{ $status }}">
+                                        {{ ucfirst($status) }} ({{ $statusCounts[$status] ?? 0 }})
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            <select wire:model.live="topicKindFilter" class="select select-bordered select-sm">
+                                <option value="">{{ __('All kinds') }}</option>
+                                @foreach ($topicKinds as $kind => $description)
+                                    <option value="{{ $kind }}">{{ ucfirst($kind) }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                @forelse ($topics as $topic)
+                    @php
+                        $kind = $topic->metadata['kind'] ?? 'thematic';
+                        $status = $topic->metadata['status'] ?? 'active';
+                        $statusBadge = match ($status) {
+                            'active' => 'badge-success',
+                            'dormant' => 'badge-ghost',
+                            'resolved' => 'badge-info',
+                            default => 'badge-neutral',
+                        };
+                    @endphp
+
+                    <div class="card bg-base-200 shadow" wire:key="topic-{{ $topic->id }}">
+                        <div class="card-body p-4 gap-3">
+                            @if ($editingTopicId === $topic->id)
+                                {{-- Inline editor --}}
+                                <div class="space-y-3">
+                                    <x-input label="{{ __('Title') }}" wire:model="editTitle" />
+                                    <x-textarea label="{{ __('Summary') }}" wire:model="editContent" rows="6"
+                                        hint="{{ __('Markdown. This is the current understanding, not a log.') }}" />
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div class="form-control">
+                                            <label class="label"><span class="label-text">{{ __('Kind') }}</span></label>
+                                            <select wire:model="editKind" class="select select-bordered">
+                                                @foreach ($topicKinds as $value => $description)
+                                                    <option value="{{ $value }}">{{ ucfirst($value) }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="form-control">
+                                            <label class="label"><span class="label-text">{{ __('Status') }}</span></label>
+                                            <select wire:model="editStatus" class="select select-bordered">
+                                                @foreach ($topicStatuses as $value)
+                                                    <option value="{{ $value }}">{{ ucfirst($value) }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <x-input type="date" label="{{ __('Review on') }}" wire:model="editNextReviewAt" />
+                                    </div>
+
+                                    <div class="flex justify-end gap-2">
+                                        <x-button label="{{ __('Cancel') }}" wire:click="cancelEdit" class="btn-ghost btn-sm" />
+                                        <x-button label="{{ __('Save') }}" wire:click="saveTopic" class="btn-primary btn-sm" spinner="saveTopic" />
+                                    </div>
+                                </div>
+                            @else
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <a href="{{ route('objects.show', $topic->id) }}" class="font-semibold hover:text-primary">
+                                            {{ $topic->title }}
+                                        </a>
+                                        <div class="flex flex-wrap items-center gap-2 mt-1">
+                                            <span class="badge badge-outline badge-sm">{{ ucfirst($kind) }}</span>
+                                            <span class="badge {{ $statusBadge }} badge-sm">{{ ucfirst($status) }}</span>
+                                            @if ($touched = $topic->metadata['last_touched_at'] ?? null)
+                                                <span class="text-xs text-base-content/60">
+                                                    {{ __('Touched') }} {{ \Carbon\Carbon::parse($touched)->diffForHumans() }}
+                                                </span>
+                                            @endif
+                                            @if ($review = $topic->metadata['next_review_at'] ?? null)
+                                                <span class="text-xs text-base-content/60">
+                                                    &middot; {{ __('Review') }} {{ \Carbon\Carbon::parse($review)->format('j M Y') }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-1 flex-shrink-0">
+                                        <button wire:click="editTopic('{{ $topic->id }}')" class="btn btn-ghost btn-xs" title="{{ __('Edit') }}">
+                                            <x-icon name="fas.pen" class="w-3 h-3" />
+                                        </button>
+                                        @if ($status !== 'dormant')
+                                            <button wire:click="setTopicStatus('{{ $topic->id }}', 'dormant')" class="btn btn-ghost btn-xs" title="{{ __('Mark dormant') }}">
+                                                <x-icon name="fas.moon" class="w-3 h-3" />
+                                            </button>
+                                        @endif
+                                        @if ($status !== 'resolved')
+                                            <button wire:click="setTopicStatus('{{ $topic->id }}', 'resolved')" class="btn btn-ghost btn-xs" title="{{ __('Mark resolved') }}">
+                                                <x-icon name="fas.check" class="w-3 h-3" />
+                                            </button>
+                                        @endif
+                                        <button
+                                            wire:click="deleteTopic('{{ $topic->id }}')"
+                                            wire:confirm="{{ __('Delete this topic? Its mention history goes with it.') }}"
+                                            class="btn btn-ghost btn-xs hover:text-error"
+                                            title="{{ __('Delete') }}"
+                                        >
+                                            <x-icon name="fas.trash" class="w-3 h-3" />
+                                        </button>
+                                        <button wire:click="expandTopic('{{ $topic->id }}')" class="btn btn-ghost btn-xs">
+                                            <x-icon name="fas.chevron-{{ $expandedTopicId === $topic->id ? 'up' : 'down' }}" class="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                @if ($topic->content)
+                                    <div class="prose prose-sm max-w-none text-base-content/80 {{ $expandedTopicId === $topic->id ? '' : 'line-clamp-3' }}">
+                                        {!! render_markdown($topic->content) !!}
+                                    </div>
+                                @endif
+
+                                @if ($expandedTopicId === $topic->id)
+                                    <div class="pt-3 border-t border-base-300 space-y-2">
+                                        <div class="text-xs font-semibold uppercase tracking-wider text-base-content/60">
+                                            {{ __('Tasks') }}
+                                        </div>
+                                        @foreach ($this->topicTasks($topic) as $task)
+                                            <div class="flex items-start gap-2 text-sm" wire:key="topic-task-{{ $task['id'] }}">
+                                                <button type="button"
+                                                    wire:click="toggleTopicTask('{{ $topic->id }}', '{{ $task['id'] }}', {{ $task['completed_at'] ? 'false' : 'true' }})"
+                                                    aria-label="{{ $task['completed_at'] ? __('Reopen task') : __('Complete task') }}"
+                                                    class="btn btn-ghost btn-xs">{{ $task['completed_at'] ? '☑' : '□' }}</button>
+                                                <div>
+                                                    <div class="{{ $task['completed_at'] ? 'line-through opacity-60' : '' }}">{{ $task['title'] }}</div>
+                                                    @if ($task['content']) <p class="text-base-content/70">{{ $task['content'] }}</p> @endif
+                                                    <div class="text-xs text-base-content/60">
+                                                        @if ($task['due_on']) {{ __('Due') }} {{ $task['due_on'] }} @endif
+                                                        @if ($task['review_on']) {{ __('Review') }} {{ $task['review_on'] }} @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                        @if ($newTaskTopicId === $topic->id)
+                                            <x-input label="{{ __('Task') }}" wire:model="newTaskTitle" />
+                                            <x-textarea label="{{ __('Details') }}" wire:model="newTaskContent" rows="2" />
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <x-input type="date" label="{{ __('Due on') }}" wire:model="newTaskDueOn" />
+                                                <x-input type="date" label="{{ __('Review on') }}" wire:model="newTaskReviewOn" />
+                                            </div>
+                                            <x-button label="{{ __('Add task') }}" wire:click="addTopicTask('{{ $topic->id }}')" class="btn-primary btn-sm" />
+                                        @else
+                                            <x-button label="{{ __('Add task') }}" wire:click="$set('newTaskTopicId', '{{ $topic->id }}')" class="btn-ghost btn-sm" />
+                                        @endif
+                                    </div>
+                                    @php $mentions = $this->topicMentions($topic); @endphp
+                                    <div class="pt-3 border-t border-base-300">
+                                        <div class="text-xs font-semibold uppercase tracking-wider text-base-content/60 mb-2">
+                                            {{ __('Mentioned in') }}
+                                        </div>
+                                        @forelse ($mentions as $mention)
+                                            <a
+                                                href="{{ $mention['kind'] === 'event' ? route('events.show', $mention['id']) : route('blocks.show', $mention['id']) }}"
+                                                class="flex items-center justify-between gap-3 py-1.5 text-sm hover:text-primary"
+                                                wire:key="mention-{{ $mention['id'] }}"
+                                            >
+                                                <span class="line-clamp-1">{{ $mention['title'] }}</span>
+                                                <span class="text-xs text-base-content/50 flex-shrink-0">
+                                                    <x-user-time :time="$mention['time']" format="j M" />
+                                                </span>
+                                            </a>
+                                        @empty
+                                            <p class="text-xs text-base-content/60">
+                                                {{ __('Nothing has linked to this topic yet.') }}
+                                            </p>
+                                        @endforelse
+                                    </div>
+                                @endif
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <div class="card bg-base-200 shadow">
+                        <div class="card-body text-center py-12">
+                            <x-icon name="fas.compass" class="w-16 h-16 mx-auto text-base-content/30 mb-4" />
+                            <h3 class="text-lg font-semibold mb-2">{{ __('No topics here') }}</h3>
+                            <p class="text-sm text-base-content/60">
+                                {{ $topicStatusFilter || $topicKindFilter
+                                    ? __('No topics match these filters.')
+                                    : __('Flint proposes topics as recurring threads show up in your digests and coaching sessions.') }}
+                            </p>
+                        </div>
+                    </div>
+                @endforelse
+            </div>
+        </x-tab>
+
+        {{-- ============================== Fitness Coach ============================== --}}
+        <x-tab name="coach" label="Fitness Coach" icon="fas.dumbbell">
+            <div class="space-y-4 lg:space-y-6">
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">{{ __('Hevy Fitness Coach') }}</h3>
+                        <p class="text-sm text-base-content/70 mb-4">
+                            {{ __('Automatically analyzes your workouts and updates your Hevy routine with progressive overload recommendations.') }}
+                        </p>
+
+                        @php
+                        $hevyIntegration = \App\Models\Integration::where('user_id', Auth::id())
+                            ->where('service', 'hevy')
+                            ->where('instance_type', 'workouts')
+                            ->first();
+
+                        $coachEnabled = $hevyIntegration && ($hevyIntegration->configuration['coach_enabled'] ?? false);
+
+                        $lastAnalysis = null;
+                        $recommendationCount = 0;
+
+                        if ($hevyIntegration) {
+                            $lastAnalysis = \App\Models\Event::where('integration_id', $hevyIntegration->id)
+                                ->where('action', 'had_coach_recommendation')
+                                ->latest('time')
+                                ->first();
+
+                            if ($lastAnalysis) {
+                                $recommendationCount = \App\Models\Block::whereHas('event', function($q) use ($hevyIntegration) {
+                                    $q->where('integration_id', $hevyIntegration->id)
+                                      ->where('action', 'had_coach_recommendation');
+                                })
+                                ->where('block_type', 'coach_recommendation')
+                                ->where('created_at', '>=', now()->subDays(7))
+                                ->count();
+                            }
+                        }
+                        @endphp
+
+                        @if (!$hevyIntegration)
+                        <div class="alert alert-info">
+                            <x-icon name="o-information-circle" class="w-5 h-5" />
+                            <div>
+                                <div class="font-medium">{{ __('No Hevy Integration Found') }}</div>
+                                <div class="text-sm">{{ __('Connect your Hevy account to use the fitness coach.') }}</div>
+                            </div>
+                        </div>
+                        @else
+                        {{-- Stats --}}
+                        <div class="stats stats-vertical lg:stats-horizontal shadow mt-4 mb-4">
+                            <div class="stat bg-base-100">
+                                <div class="stat-title">{{ __('Last Analysis') }}</div>
+                                <div class="stat-value text-sm">
+                                    {{ $lastAnalysis ? $lastAnalysis->time->diffForHumans() : __('Never') }}
+                                </div>
+                            </div>
+
+                            <div class="stat bg-base-100">
+                                <div class="stat-title">{{ __('Recommendations') }}</div>
+                                <div class="stat-value text-sm">
+                                    {{ $recommendationCount }}
+                                </div>
+                                <div class="stat-desc">{{ __('Last 7 days') }}</div>
+                            </div>
+
+                            <div class="stat bg-base-100">
+                                <div class="stat-title">{{ __('Coach Status') }}</div>
+                                <div class="stat-value text-sm">
+                                    @if ($coachEnabled)
+                                        <span class="text-success">{{ __('Enabled') }}</span>
+                                    @else
+                                        <span class="text-base-content/50">{{ __('Disabled') }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Quick Actions --}}
+                        <div class="card-actions justify-end">
+                            <a href="{{ route('integrations.details', $hevyIntegration) }}" class="btn btn-outline btn-sm">
+                                <x-icon name="o-cog-6-tooth" class="w-4 h-4" />
+                                {{ __('Configure') }}
+                            </a>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Recent Recommendations --}}
+                @if ($hevyIntegration && $recommendationCount > 0)
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="text-lg font-semibold mb-4">{{ __('Recent Recommendations') }}</h3>
+                        <p class="text-sm text-base-content/70 mb-4">
+                            {{ __('Latest progression recommendations from your fitness coach') }}
+                        </p>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            @php
+                            $recentBlocks = \App\Models\Block::whereHas('event', function($q) use ($hevyIntegration) {
+                                $q->where('integration_id', $hevyIntegration->id)
+                                  ->where('action', 'had_coach_recommendation');
+                            })
+                            ->where('block_type', 'coach_recommendation')
+                            ->where('created_at', '>=', now()->subDays(7))
+                            ->latest()
+                            ->limit(6)
+                            ->get();
+                            @endphp
+
+                            @foreach ($recentBlocks as $block)
+                                <x-block-card :block="$block" />
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+                @endif
+            </div>
+        </x-tab>
+
+        {{-- ============================== Review ============================== --}}
+        <x-tab name="review" label="Review" icon="o-clipboard-document-check">
+            <livewire:flint.review />
+        </x-tab>
+
+        {{-- ============================== Settings ============================== --}}
+        <x-tab name="settings" label="Settings" icon="o-cog-6-tooth">
+            @php $feedback = $this->feedbackStats(); @endphp
+
+            <div class="space-y-4 lg:space-y-6">
+                @php
+                    $driverLabels = $this->driverLabels();
+                    $serverDefault = app(RoutineDriverManager::class)->configuredDriver();
+                    $routineCards = [
+                        ['toggle' => 'morningDigestEnabled', 'label' => __('Morning briefing'), 'driver' => 'digest', 'run' => "skill: 'spark-day-briefing-async', period: 'morning'", 'digest' => 'morning'],
+                        ['toggle' => 'eveningDigestEnabled', 'label' => __('Evening briefing'), 'driver' => 'digest', 'run' => "skill: 'spark-day-briefing-async', period: 'evening'", 'digest' => 'evening'],
+                        ['toggle' => 'topicsEnabled', 'label' => __('Topic review'), 'driver' => 'topics', 'run' => "skill: 'flint-topics', period: 'evening'", 'schedule' => 'topics'],
+                        ['toggle' => 'readingListEnabled', 'label' => __('Reading list'), 'driver' => 'reading_list', 'run' => "skill: 'flint-reading-list', period: 'evening'", 'schedule' => 'reading_list'],
+                        ['toggle' => 'newsRoundupEnabled', 'label' => __('News roundup'), 'driver' => 'news_roundup', 'run' => "skill: 'flint-news-roundup', period: 'morning'", 'schedule' => 'news_roundup'],
+                        ['toggle' => 'moneyWeeklyEnabled', 'label' => __('Money weekly check'), 'driver' => 'money_weekly', 'run' => "routine: 'money_weekly', period: 'morning'", 'schedule' => 'money_weekly'],
+                        ['toggle' => 'moneyCloseEnabled', 'label' => __('Money monthly close'), 'driver' => 'money_close', 'run' => "routine: 'money_close', period: 'morning'", 'schedule' => 'money_close'],
+                    ];
+                @endphp
+
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <div class="form-control max-w-md">
+                            <label class="label"><span class="label-text">{{ __('Default runner') }}</span></label>
+                            <select wire:model="driver" class="select select-bordered">
+                                <option value="">{{ __('Server default (:driver)', ['driver' => $driverLabels[$serverDefault] ?? $serverDefault]) }}</option>
+                                @foreach ($driverLabels as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                @foreach ($routineCards as $card)
+                    <div class="card bg-base-200 shadow" wire:key="routine-{{ $card['toggle'] }}">
+                        <div class="card-body gap-4">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <label class="flex items-center gap-3 font-semibold text-lg">
+                                    <input type="checkbox" class="toggle toggle-primary" wire:model.live="{{ $card['toggle'] }}" aria-label="{{ $card['label'] }} on or off" />
+                                    {{ $card['label'] }}
+                                </label>
+                                <div class="join">
+                                    <x-button wire:click="$dispatch('run-flint-routine', { {{ $card['run'] }} })" class="btn-outline btn-sm join-item" icon="fas.play" label="{{ __('Run now') }}" />
+                                    <div class="dropdown dropdown-end join-item">
+                                        <button type="button" tabindex="0" class="btn btn-outline btn-sm join-item" aria-label="{{ __('Run with a specific runner') }}">
+                                            <x-icon name="o-chevron-down" class="w-4 h-4" />
+                                        </button>
+                                        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow">
+                                            <li><button type="button" wire:click="$dispatch('run-flint-routine', { {{ $card['run'] }}, driverOverride: 'webhook' })">{{ __('Run with Webhook') }}</button></li>
+                                            <li><button type="button" wire:click="$dispatch('run-flint-routine', { {{ $card['run'] }}, driverOverride: 'openai' })">{{ __('Run with OpenAI') }}</button></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <fieldset @disabled(! $this->{$card['toggle']}) @class(['flex flex-col gap-4', 'opacity-50' => ! $this->{$card['toggle']}])>
+                                @if (($card['digest'] ?? null) === 'morning')
+                                    <p class="text-sm text-base-content/70">{{ __('Waits for your Oura sleep score: runs at the later of the morning time and the score arriving, or at the fallback time if none lands.') }}</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        @foreach (['morningTimeWeekday' => __('Mon–Fri'), 'morningTimeWeekend' => __('Sat–Sun'), 'morningFallback' => __('Fallback')] as $property => $timeLabel)
+                                            <div class="form-control">
+                                                <label class="label"><span class="label-text">{{ $timeLabel }}</span></label>
+                                                <select wire:model="{{ $property }}" class="select select-bordered select-sm">
+                                                    @foreach ($timeOptions as $value => $option)
+                                                        <option value="{{ $value }}">{{ $option }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @elseif (($card['digest'] ?? null) === 'evening')
+                                    <div class="form-control max-w-xs">
+                                        <label class="label"><span class="label-text">{{ __('Time') }}</span></label>
+                                        <select wire:model="eveningTime" class="select select-bordered select-sm">
+                                            @foreach ($timeOptions as $value => $option)
+                                                <option value="{{ $value }}">{{ $option }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                @else
+                                    <livewire:flint.schedule-editor :routine="$card['schedule']" :key="'schedule-'.$card['schedule']" />
+                                @endif
+
+                                <div class="form-control max-w-xs">
+                                    <label class="label"><span class="label-text">{{ __('Runs in') }}</span></label>
+                                    <select wire:model="drivers.{{ $card['driver'] }}" class="select select-bordered select-sm">
+                                        <option value="">{{ __('Default runner') }}</option>
+                                        @foreach ($driverLabels as $value => $driverLabel)
+                                            <option value="{{ $value }}">{{ $driverLabel }}</option>
+                                        @endforeach
+                                    </select>
+                                    @if ($card['driver'] === 'digest')
+                                        <label class="label"><span class="label-text-alt">{{ __('Shared by both briefings') }}</span></label>
+                                    @endif
+                                </div>
+                            </fieldset>
+                        </div>
+                    </div>
+                @endforeach
+
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold">{{ __('OpenAI usage') }}</h3>
+                                <p class="text-sm text-base-content/70">{{ __('Token usage recorded for your account, grouped by model.') }}</p>
+                            </div>
+                            <div class="join">
+                                @foreach ([1 => __('Today'), 7 => __('7 days'), 30 => __('30 days')] as $days => $label)
+                                    <button type="button" wire:click="$set('usageDays', {{ $days }})" @class(['btn btn-sm join-item', 'btn-active' => $usageDays === $days])>{{ $label }}</button>
+                                @endforeach
+                            </div>
+                            <div class="join">
+                                <button type="button" wire:click="$set('usageScope', 'all')" @class(['btn btn-sm join-item', 'btn-active' => $usageScope === 'all'])>{{ __('All OpenAI') }}</button>
+                                <button type="button" wire:click="$set('usageScope', 'flint')" @class(['btn btn-sm join-item', 'btn-active' => $usageScope === 'flint'])>{{ __('Flint only') }}</button>
+                            </div>
+                        </div>
+
+                        @if (empty($this->usage))
+                            <div class="rounded-lg bg-base-100 p-6 text-center text-sm text-base-content/60">
+                                {{ __('No OpenAI usage was recorded for this period and scope.') }}
+                            </div>
+                        @else
+                            <div class="overflow-x-auto">
+                                <table class="table table-sm">
+                                    <thead><tr><th>{{ __('Model') }}</th><th>{{ __('Requests') }}</th><th>{{ __('Input') }}</th><th>{{ __('Output') }}</th><th>{{ __('Total') }}</th><th>{{ __('Cached') }}</th><th>{{ __('Reasoning') }}</th><th>{{ __('Failures') }}</th></tr></thead>
+                                    <tbody>
+                                        @foreach ($this->usage as $row)
+                                            <tr wire:key="usage-{{ $row['model'] }}">
+                                                <td class="font-medium">{{ $row['model'] }}</td>
+                                                @foreach (['request_count', 'input_tokens', 'output_tokens', 'total_tokens', 'cached_tokens', 'reasoning_tokens', 'failure_count'] as $field)
+                                                    <td class="tabular-nums">{{ number_format($row[$field]) }}</td>
+                                                @endforeach
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                @if (($feedback['total_feedback_count'] ?? 0) > 0)
+                    <div class="card bg-base-200 shadow">
+                        <div class="card-body">
+                            <h3 class="text-lg font-semibold mb-4">{{ __('Your feedback') }}</h3>
+                            <div class="stats stats-vertical sm:stats-horizontal shadow">
+                                <div class="stat bg-base-100">
+                                    <div class="stat-title">{{ __('Rated or dismissed') }}</div>
+                                    <div class="stat-value text-lg">{{ $feedback['total_feedback_count'] }}</div>
+                                </div>
+                                @if (($feedback['rating_average'] ?? 0) > 0)
+                                    <div class="stat bg-base-100">
+                                        <div class="stat-title">{{ __('Average rating') }}</div>
+                                        <div class="stat-value text-lg">{{ number_format($feedback['rating_average'], 1) }}/5</div>
+                                    </div>
+                                @endif
+                                <div class="stat bg-base-100">
+                                    <div class="stat-title">{{ __('Acted on') }}</div>
+                                    <div class="stat-value text-lg">{{ $feedback['acted_count'] ?? 0 }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                <div class="flex justify-end">
+                    <x-button label="{{ __('Save Settings') }}" wire:click="save" class="btn-primary" spinner="save" />
+                </div>
+            </div>
+        </x-tab>
+    </x-tabs>
+</div>

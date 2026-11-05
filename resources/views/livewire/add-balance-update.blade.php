@@ -1,0 +1,167 @@
+<div>
+    <form wire:submit.prevent="saveAndClose">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Account Selection -->
+                        <div class="form-control md:col-span-2">
+                            <label class="label">
+                                <span class="label-text">Account *</span>
+                            </label>
+                            @if ($isAccountPreselected)
+                                @php
+                                    $selectedAccount = $accounts->firstWhere('id', $accountId);
+                                    $metadata = $selectedAccount ? $selectedAccount->metadata : [];
+
+                                    // Handle different account types
+                                    $name = $metadata['name'] ?? $selectedAccount->title ?? 'Unnamed Account';
+                                    $provider = $metadata['provider'] ?? '';
+                                    $currency = $metadata['currency'] ?? 'GBP';
+
+                                    // For Monzo accounts, get provider from metadata
+                                    if ($selectedAccount && $selectedAccount->type === 'monzo_account') {
+                                        $provider = 'Monzo';
+                                    } elseif ($selectedAccount && $selectedAccount->type === 'monzo_pot') {
+                                        $provider = 'Monzo Pot';
+                                    } elseif ($selectedAccount && $selectedAccount->type === 'bank_account') {
+                                        $provider = $metadata['details'] ?? 'Bank Account';
+                                    }
+
+                                    // Get currency symbol
+                                    $currencySymbols = [
+                                        'GBP' => '£',
+                                        'USD' => '$',
+                                        'EUR' => '€',
+                                    ];
+                                    $currencySymbol = $currencySymbols[$currency] ?? $currency;
+
+                                    // Get current balance from latest event
+                                    $plugin = new \App\Integrations\Financial\FinancialPlugin();
+                                    $latestBalance = $selectedAccount ? $plugin->getLatestBalance($selectedAccount) : null;
+                                    $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? 0 : 0;
+                                @endphp
+                                <div class="flex gap-2">
+                                    <div class="input input-bordered w-full bg-base-200 flex-1">
+                                        {{ $name }} - {{ $provider }} ({{ $currencySymbol }}{{ number_format($currentBalance, 2) }})
+                                    </div>
+                                    <button type="button" wire:click="$set('isAccountPreselected', false)" class="btn btn-outline btn-sm">
+                                        Change
+                                    </button>
+                                </div>
+                                <input type="hidden" wire:model="accountId" value="{{ $accountId }}" />
+                            @else
+                                <select wire:model="accountId" class="select select-bordered w-full @error('accountId') select-error @enderror">
+                                    <option value="">Select an account</option>
+                                    @foreach ($accounts as $account)
+                                        @php
+                                            $metadata = $account->metadata;
+
+                                            // Handle different account types
+                                            $name = $metadata['name'] ?? $account->title ?? 'Unnamed Account';
+                                            $provider = $metadata['provider'] ?? '';
+                                            $currency = $metadata['currency'] ?? 'GBP';
+
+                                            // For Monzo accounts, get provider from metadata
+                                            if ($account->type === 'monzo_account') {
+                                                $provider = 'Monzo';
+                                            } elseif ($account->type === 'monzo_pot') {
+                                                $provider = 'Monzo Pot';
+                                            } elseif ($account->type === 'bank_account') {
+                                                $provider = $metadata['details'] ?? 'Bank Account';
+                                            }
+
+                                            // Get currency symbol
+                                            $currencySymbols = [
+                                                'GBP' => '£',
+                                                'USD' => '$',
+                                                'EUR' => '€',
+                                            ];
+                                            $currencySymbol = $currencySymbols[$currency] ?? $currency;
+
+                                            // Get current balance from latest event
+                                            $plugin = new \App\Integrations\Financial\FinancialPlugin();
+                                            $latestBalance = $plugin->getLatestBalance($account);
+                                            $currentBalance = $latestBalance ? $latestBalance->event_metadata['balance'] ?? 0 : 0;
+                                        @endphp
+                                        <option value="{{ $account->id }}">
+                                            {{ $name }} - {{ $provider }} ({{ $currencySymbol }}{{ number_format($currentBalance, 2) }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @endif
+                            @error('accountId')
+                                <label class="label">
+                                    <span class="label-text-alt text-error">{{ $message }}</span>
+                                </label>
+                            @enderror
+                        </div>
+
+                        <!-- Balance -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Balance *</span>
+                            </label>
+                            <input
+                                type="number"
+                                wire:model="balance"
+                                placeholder="0.00"
+                                step="0.01"
+                                class="input input-bordered w-full @error('balance') input-error @enderror"
+                            />
+                            @error('balance')
+                                <label class="label">
+                                    <span class="label-text-alt text-error">{{ $message }}</span>
+                                </label>
+                            @enderror
+                        </div>
+
+                        <!-- Date -->
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Date *</span>
+                            </label>
+                            <input
+                                type="date"
+                                wire:model="date"
+                                class="input input-bordered w-full @error('date') input-error @enderror"
+                            />
+                            @error('date')
+                                <label class="label">
+                                    <span class="label-text-alt text-error">{{ $message }}</span>
+                                </label>
+                            @enderror
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="form-control md:col-span-2">
+                            <label class="label">
+                                <span class="label-text">Notes</span>
+                            </label>
+                            <textarea
+                                wire:model="notes"
+                                placeholder="Optional notes about this balance update..."
+                                rows="3"
+                                class="textarea textarea-bordered w-full @error('notes') textarea-error @enderror"
+                            ></textarea>
+                            @error('notes')
+                                <label class="label">
+                                    <span class="label-text-alt text-error">{{ $message }}</span>
+                                </label>
+                            @enderror
+                        </div>
+                    </div>
+
+        <!-- Form Actions -->
+        <div class="flex gap-3 mt-8">
+            <button type="button" wire:click="saveAndContinue" class="btn btn-primary">
+                <x-icon name="fas.plus" class="w-4 h-4" />
+                Save & Continue
+            </button>
+            <button type="submit" class="btn btn-outline">
+                <x-icon name="fas.check" class="w-4 h-4" />
+                Save & Close
+            </button>
+            <button type="button" wire:click="$dispatch('close-add-balance-modal')" class="btn btn-ghost">
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>

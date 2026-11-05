@@ -1,0 +1,686 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Models\Relationship;
+use App\Models\User;
+use App\Services\TransactionLinking\Strategies\BacsRecordStrategy;
+use App\Services\TransactionLinking\Strategies\CrossProviderStrategy;
+use App\Services\TransactionLinking\Strategies\ExplicitReferenceStrategy;
+use App\Services\TransactionLinking\TransactionLinkingService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
+use ReflectionClass;
+use Tests\TestCase;
+
+class TransactionLinkingTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $user;
+
+    private Integration $integration;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->user = User::factory()->create();
+        $this->integration = Integration::factory()->create(['user_id' => $this->user->id]);
+    }
+
+    // ==========================================
+    // ExplicitReferenceStrategy Tests
+    // ==========================================
+
+    #[Test]
+    public function explicit_strategy_finds_transaction_id_reference(): void
+    {
+        $strategy = new ExplicitReferenceStrategy;
+
+        // Create the target event
+        $targetEvent = $this->createMonzoEvent([
+            'source_id' => 'tx_00001234',
+            'action' => 'card_payment_to',
+            'value' => -1000,
+        ]);
+
+        // Create the referencing event (e.g., cashback)
+        $sourceEvent = $this->createMonzoEvent([
+            'action' => 'cashback_reward_from',
+            'value' => 100,
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'transaction_id' => 'tx_00001234',
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($strategy->canProcess($sourceEvent));
+
+        $links = $strategy->findLinks($sourceEvent);
+
+        $this->assertCount(1, $links);
+        $this->assertEquals($targetEvent->id, $links->first()['target_event']->id);
+        $this->assertEquals('triggered_by', $links->first()['relationship_type']);
+        $this->assertEquals(100.0, $links->first()['confidence']);
+    }
+
+    #[Test]
+    public function explicit_strategy_ignores_coin_jar_transaction_to_prevent_wrong_direction(): void
+    {
+        $strategy = new ExplicitReferenceStrategy;
+
+        // Create the original card payment with coin_jar_transaction reference
+        // This should NOT create a link because coin_jar_transaction points TO the
+        // triggered transaction, which would create a relationship in the wrong direction.
+        // Instead, the triggered transaction has triggered_by pointing back, which
+        // gives the correct direction.
+        $cardPayment = $this->createMonzoEvent([
+            'source_id' => 'tx_original_payment',
+            'action' => 'card_payment_to',
+            'value' => -1299,
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'coin_jar_transaction' => 'tx_coin_jar_deposit',
+                    ],
+                ],
+            ],
+        ]);
+
+        // Create the coin jar transaction (the one referenced)
+        $coinJar = $this->createMonzoEvent([
+            'source_id' => 'tx_coin_jar_deposit',
+            'action' => 'pot_deposit_from',
+            'value' => -1,
+        ]);
+
+        // The card payment should NOT find links via coin_jar_transaction
+        $links = $strategy->findLinks($cardPayment);
+
+        $this->assertCount(0, $links, 'coin_jar_transaction should not create links (wrong direction)');
+    }
+
+    #[Test]
+    public function explicit_strategy_finds_triggered_by_reference(): void
+    {
+        $strategy = new ExplicitReferenceStrategy;
+
+        // Create the triggering transaction
+        $trigger = $this->createMonzoEvent([
+            'source_id' => 'tx_trigger_event',
+            'action' => 'card_payment_to',
+            'value' => -500,
+        ]);
+
+        // Create the triggered transaction
+        $triggered = $this->createMonzoEvent([
+            'action' => 'reward_from',
+            'value' => 50,
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'triggered_by' => 'tx_trigger_event',
+                    ],
+                ],
+            ],
+        ]);
+
+        $links = $strategy->findLinks($triggered);
+
+        $this->assertCount(1, $links);
+        $this->assertEquals($trigger->id, $links->first()['target_event']->id);
+    }
+
+    #[Test]
+    public function explicit_strategy_ignores_non_tx_references(): void
+    {
+        $strategy = new ExplicitReferenceStrategy;
+
+        // Create event with non-tx reference (should be ignored)
+        $event = $this->createMonzoEvent([
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'triggered_by' => 'direct-debit', // Not a tx_ ID
+                    ],
+                ],
+            ],
+        ]);
+
+        $links = $strategy->findLinks($event);
+
+        $this->assertCount(0, $links);
+    }
+
+    #[Test]
+    public function explicit_strategy_only_processes_monzo_events_with_metadata(): void
+    {
+        $strategy = new ExplicitReferenceStrategy;
+
+        $monzoEventWithMetadata = $this->createMonzoEvent([
+            'event_metadata' => ['raw' => ['some' => 'data']],
+        ]);
+        $monzoEventWithoutMetadata = $this->createMonzoEvent([
+            'event_metadata' => [],
+        ]);
+        $otherEvent = $this->createEvent([
+            'service' => 'other_service',
+            'event_metadata' => ['raw' => ['some' => 'data']],
+        ]);
+
+        $this->assertTrue($strategy->canProcess($monzoEventWithMetadata));
+        $this->assertFalse($strategy->canProcess($monzoEventWithoutMetadata));
+        $this->assertFalse($strategy->canProcess($otherEvent));
+    }
+
+    // ==========================================
+    // BacsRecordStrategy Tests
+    // ==========================================
+
+    #[Test]
+    public function bacs_strategy_finds_pot_withdrawal_for_direct_debit(): void
+    {
+        $strategy = new BacsRecordStrategy;
+
+        // Create direct debit with bacs_record_id
+        $directDebit = $this->createMonzoEvent([
+            'action' => 'direct_debit_to',
+            'value' => -5000,
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'bacs_record_id' => 'bacsrcd_ABC123',
+                    ],
+                ],
+            ],
+        ]);
+
+        // Create pot withdrawal referencing the BACS record
+        $potWithdrawal = $this->createMonzoEvent([
+            'action' => 'pot_withdrawal_to',
+            'value' => 5000,
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'external_id' => 'dd-withdrawal:bacsrcd_ABC123#pot_XYZ#bacspaymentevent_123',
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($strategy->canProcess($directDebit));
+
+        $links = $strategy->findLinks($directDebit);
+
+        $this->assertCount(1, $links);
+        $this->assertEquals($potWithdrawal->id, $links->first()['target_event']->id);
+        $this->assertEquals('funded_by', $links->first()['relationship_type']);
+        $this->assertEquals(100.0, $links->first()['confidence']);
+    }
+
+    #[Test]
+    public function bacs_strategy_finds_direct_debit_from_pot_withdrawal(): void
+    {
+        $strategy = new BacsRecordStrategy;
+
+        // Create direct debit with bacs_record_id
+        $directDebit = $this->createMonzoEvent([
+            'action' => 'direct_debit_to',
+            'value' => -5000,
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'bacs_record_id' => 'bacsrcd_DEF456',
+                    ],
+                ],
+            ],
+        ]);
+
+        // Create pot withdrawal referencing the BACS record
+        $potWithdrawal = $this->createMonzoEvent([
+            'action' => 'pot_withdrawal_to',
+            'value' => 5000,
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'external_id' => 'dd-withdrawal:bacsrcd_DEF456#pot_XYZ',
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($strategy->canProcess($potWithdrawal));
+
+        $links = $strategy->findLinks($potWithdrawal);
+
+        $this->assertCount(1, $links);
+        $this->assertEquals($directDebit->id, $links->first()['target_event']->id);
+    }
+
+    #[Test]
+    public function bacs_strategy_only_processes_monzo_with_bacs_metadata(): void
+    {
+        $strategy = new BacsRecordStrategy;
+
+        $eventWithBacs = $this->createMonzoEvent([
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'bacs_record_id' => 'bacsrcd_TEST',
+                    ],
+                ],
+            ],
+        ]);
+
+        $eventWithExternalId = $this->createMonzoEvent([
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'external_id' => 'dd-withdrawal:bacsrcd_TEST',
+                    ],
+                ],
+            ],
+        ]);
+
+        $eventWithoutBacs = $this->createMonzoEvent([
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [],
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($strategy->canProcess($eventWithBacs));
+        $this->assertTrue($strategy->canProcess($eventWithExternalId));
+        $this->assertFalse($strategy->canProcess($eventWithoutBacs));
+    }
+
+    // ==========================================
+    // CrossProviderStrategy Tests
+    // ==========================================
+
+    #[Test]
+    public function cross_provider_strategy_identifies_credit_card_payment(): void
+    {
+        $strategy = new CrossProviderStrategy;
+
+        $amexPayment = $this->createEvent([
+            'action' => 'direct_debit_to',
+            'event_metadata' => [
+                'raw' => [
+                    'description' => 'AMERICAN EXPRESS ************4006',
+                ],
+            ],
+        ]);
+
+        $this->assertTrue($strategy->canProcess($amexPayment));
+    }
+
+    #[Test]
+    public function cross_provider_strategy_rejects_non_credit_card_payments(): void
+    {
+        $strategy = new CrossProviderStrategy;
+
+        $normalPayment = $this->createEvent([
+            'action' => 'card_payment_to',
+            'event_metadata' => [
+                'raw' => [
+                    'description' => 'Tesco Stores',
+                ],
+            ],
+        ]);
+
+        $this->assertFalse($strategy->canProcess($normalPayment));
+    }
+
+    #[Test]
+    public function cross_provider_strategy_extracts_card_identification(): void
+    {
+        $strategy = new CrossProviderStrategy;
+
+        $event = $this->createEvent([
+            'action' => 'direct_debit_to',
+            'event_metadata' => [
+                'raw' => [
+                    'description' => 'AMERICAN EXPRESS ************4006',
+                ],
+            ],
+        ]);
+
+        // Use reflection to test private method
+        $reflection = new ReflectionClass($strategy);
+        $method = $reflection->getMethod('extractCardIdentification');
+        $method->setAccessible(true);
+
+        $cardId = $method->invoke($strategy, $event);
+
+        $this->assertEquals('4006', $cardId);
+    }
+
+    // ==========================================
+    // TransactionLinkingService Tests
+    // ==========================================
+
+    #[Test]
+    public function service_auto_approves_high_confidence_links(): void
+    {
+        $service = app(TransactionLinkingService::class);
+
+        // Create events with explicit reference (100% confidence -> auto-approved)
+        $targetEvent = $this->createMonzoEvent([
+            'source_id' => 'tx_service_test',
+            'action' => 'card_payment_to',
+        ]);
+
+        $sourceEvent = $this->createMonzoEvent([
+            'action' => 'reward_from',
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'transaction_id' => 'tx_service_test',
+                    ],
+                ],
+            ],
+        ]);
+
+        $result = $service->processEvent($sourceEvent);
+
+        // High confidence matches should be auto-approved (created)
+        $this->assertEquals(1, $result['created']);
+        $this->assertEquals(0, $result['pending']);
+
+        // Check relationship was created and is NOT pending
+        $relationship = Relationship::where('user_id', $this->user->id)
+            ->where('from_type', Event::class)
+            ->where('from_id', $sourceEvent->id)
+            ->where('to_type', Event::class)
+            ->where('to_id', $targetEvent->id)
+            ->where('type', 'triggered_by')
+            ->first();
+
+        $this->assertNotNull($relationship);
+        $this->assertFalse($relationship->isPending());
+    }
+
+    #[Test]
+    public function service_skips_when_reverse_relationship_exists(): void
+    {
+        $service = app(TransactionLinkingService::class);
+
+        $eventA = $this->createMonzoEvent([
+            'source_id' => 'tx_event_a',
+            'action' => 'card_payment_to',
+        ]);
+
+        $eventB = $this->createMonzoEvent([
+            'source_id' => 'tx_event_b',
+            'action' => 'reward_from',
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'transaction_id' => 'tx_event_a',
+                    ],
+                ],
+            ],
+        ]);
+
+        // Create relationship in reverse direction (A -> B)
+        Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $eventA->id,
+            'to_type' => Event::class,
+            'to_id' => $eventB->id,
+            'type' => 'triggered_by',
+        ]);
+
+        // Try to process eventB which would create B -> A link
+        $result = $service->processEvent($eventB);
+
+        // Should be skipped because reverse relationship exists
+        $this->assertEquals(0, $result['created']);
+        $this->assertEquals(1, $result['skipped']);
+    }
+
+    #[Test]
+    public function service_skips_when_reverse_pending_link_exists(): void
+    {
+        $service = app(TransactionLinkingService::class);
+
+        $eventA = $this->createMonzoEvent([
+            'source_id' => 'tx_pending_a',
+            'action' => 'card_payment_to',
+        ]);
+
+        $eventB = $this->createMonzoEvent([
+            'source_id' => 'tx_pending_b',
+            'action' => 'reward_from',
+            'event_metadata' => [
+                'raw' => [
+                    'metadata' => [
+                        'transaction_id' => 'tx_pending_a',
+                    ],
+                ],
+            ],
+        ]);
+
+        // Create pending relationship in reverse direction (A -> B)
+        Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $eventA->id,
+            'to_type' => Event::class,
+            'to_id' => $eventB->id,
+            'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 75,
+                'detection_strategy' => 'test',
+            ],
+        ]);
+
+        // Try to process eventB which would create B -> A link
+        $result = $service->processEvent($eventB);
+
+        // Should be skipped because reverse pending link exists
+        $this->assertEquals(0, $result['created']);
+        $this->assertEquals(1, $result['skipped']);
+    }
+
+    #[Test]
+    public function service_returns_stats(): void
+    {
+        $service = app(TransactionLinkingService::class);
+
+        // Create some pending relationships
+        Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $this->createMonzoEvent()->id,
+            'to_type' => Event::class,
+            'to_id' => $this->createMonzoEvent()->id,
+            'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 90,
+                'detection_strategy' => 'test',
+            ],
+        ]);
+
+        Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $this->createMonzoEvent()->id,
+            'to_type' => Event::class,
+            'to_id' => $this->createMonzoEvent()->id,
+            'type' => 'funded_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 60,
+                'detection_strategy' => 'test',
+            ],
+        ]);
+
+        Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $this->createMonzoEvent()->id,
+            'to_type' => Event::class,
+            'to_id' => $this->createMonzoEvent()->id,
+            'type' => 'payment_for',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 40,
+                'detection_strategy' => 'test',
+            ],
+        ]);
+
+        $stats = $service->getPendingStats($this->user->id);
+
+        $this->assertEquals(3, $stats['total']);
+        $this->assertEquals(1, $stats['by_confidence']['high']);
+        $this->assertEquals(1, $stats['by_confidence']['medium']);
+        $this->assertEquals(1, $stats['by_confidence']['low']);
+    }
+
+    // ==========================================
+    // Pending Relationship Tests
+    // ==========================================
+
+    #[Test]
+    public function pending_relationship_can_be_approved(): void
+    {
+        $sourceEvent = $this->createMonzoEvent();
+        $targetEvent = $this->createMonzoEvent();
+
+        $relationship = Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $sourceEvent->id,
+            'to_type' => Event::class,
+            'to_id' => $targetEvent->id,
+            'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 75,
+                'detection_strategy' => 'test',
+            ],
+        ]);
+
+        $this->assertTrue($relationship->isPending());
+
+        $relationship->approve();
+
+        $this->assertFalse($relationship->fresh()->isPending());
+        $this->assertNotNull($relationship->fresh()->metadata['approved_at']);
+    }
+
+    #[Test]
+    public function pending_relationship_can_be_rejected(): void
+    {
+        $sourceEvent = $this->createMonzoEvent();
+        $targetEvent = $this->createMonzoEvent();
+
+        $relationship = Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $sourceEvent->id,
+            'to_type' => Event::class,
+            'to_id' => $targetEvent->id,
+            'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 75,
+                'detection_strategy' => 'test',
+            ],
+        ]);
+
+        $relationship->reject();
+
+        // Should be soft deleted
+        $this->assertSoftDeleted('relationships', ['id' => $relationship->id]);
+
+        // Metadata should have rejected_at
+        $deletedRelationship = Relationship::withTrashed()->find($relationship->id);
+        $this->assertNotNull($deletedRelationship->metadata['rejected_at']);
+    }
+
+    #[Test]
+    public function pending_relationship_scopes_work_correctly(): void
+    {
+        $sourceEvent = $this->createMonzoEvent();
+        $targetEvent = $this->createMonzoEvent();
+
+        // Create a pending relationship
+        Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $sourceEvent->id,
+            'to_type' => Event::class,
+            'to_id' => $targetEvent->id,
+            'type' => 'triggered_by',
+            'metadata' => [
+                'pending' => true,
+                'confidence' => 90,
+                'detection_strategy' => 'explicit_reference',
+            ],
+        ]);
+
+        // Create a confirmed relationship
+        Relationship::createRelationship([
+            'user_id' => $this->user->id,
+            'from_type' => Event::class,
+            'from_id' => $this->createMonzoEvent()->id,
+            'to_type' => Event::class,
+            'to_id' => $this->createMonzoEvent()->id,
+            'type' => 'funded_by',
+            'metadata' => [
+                'confidence' => 50,
+                'detection_strategy' => 'bacs_record',
+            ],
+        ]);
+
+        $this->assertEquals(1, Relationship::pending()->count());
+        $this->assertEquals(1, Relationship::confirmed()->count());
+        $this->assertEquals(1, Relationship::aboveConfidence(80)->count());
+        $this->assertEquals(1, Relationship::forStrategy('explicit_reference')->count());
+    }
+
+    // ==========================================
+    // Helper Methods
+    // ==========================================
+
+    private function createMonzoEvent(array $attributes = []): Event
+    {
+        return $this->createEvent(array_merge(['service' => 'monzo'], $attributes));
+    }
+
+    private function createEvent(array $attributes = []): Event
+    {
+        $actor = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $target = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        return Event::create(array_merge([
+            'id' => fake()->uuid(),
+            'source_id' => fake()->uuid(),
+            'time' => now(),
+            'integration_id' => $this->integration->id,
+            'actor_id' => $actor->id,
+            'target_id' => $target->id,
+            'service' => 'test',
+            'domain' => 'money',
+            'action' => 'test_action',
+            'value' => 0,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'event_metadata' => [],
+        ], $attributes));
+    }
+}

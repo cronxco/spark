@@ -2,17 +2,40 @@
 
 namespace App\Models;
 
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
+use App\Traits\PreservesPipelineMetadata;
+use App\Traits\TracksViews;
+use ArrayAccess;
+use Clickbar\Magellan\Data\Geometries\Point;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Tags\HasTags;
+use Spatie\Tags\Tag;
 
 class Event extends Model
 {
-    use HasFactory;
+    use HasFactory, HasTags, LogsActivity, PreservesPipelineMetadata, SoftDeletes, TracksViews;
+
+    /**
+     * Only record update events via LogsActivity trait
+     * to avoid duplicating data on create/delete.
+     *
+     * @var array<int, string>
+     */
+    protected static $recordEvents = ['updated'];
+
+    public $incrementing = false;
 
     protected $table = 'events';
+
     protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $fillable = [
         'source_id',
@@ -30,6 +53,17 @@ class Event extends Model
         'target_id',
         'target_metadata',
         'embeddings',
+        'location_address',
+        'location_geocoded_at',
+        'location_source',
+    ];
+
+    /**
+     * A 1536-dim pgvector column; keep it out of JSON/array serialisation
+     * so it can't be accidentally shipped over API or Livewire payloads.
+     */
+    protected $hidden = [
+        'embeddings',
     ];
 
     protected $casts = [
@@ -39,6 +73,9 @@ class Event extends Model
         'target_metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+        'location_geocoded_at' => 'datetime',
+        'location' => Point::class,
     ];
 
     protected static function booted()
@@ -48,25 +85,758 @@ class Event extends Model
                 $model->id = Str::uuid();
             }
         });
+
+        static::created(function ($model): void {
+            if ($model->isInternal()) {
+                return;
+            }
+
+            // Dispatch Task Pipeline to run applicable tasks
+            // This includes: embedding generation, anomaly detection, receipt matching, etc.
+            if (config('app.enable_task_pipeline', true)) {
+                ProcessTaskPipelineJob::dispatch($model, 'created')->onQueue('tasks');
+            }
+        });
+
+        static::deleted(function ($model): void {
+            activity('changelog')
+                ->performedOn($model)
+                ->event('deleted')
+                ->log('deleted');
+        });
+
+        static::restored(function ($model): void {
+            activity('changelog')
+                ->performedOn($model)
+                ->event('restored')
+                ->log('restored');
+        });
+    }
+
+    public function isInternal(): bool
+    {
+        return data_get($this->event_metadata, 'internal') === true;
+    }
+
+    public function hasFetchTargetSnapshot(): bool
+    {
+        return $this->service === 'fetch' && ! empty($this->target_metadata);
+    }
+
+    public function displayTargetTitle(): ?string
+    {
+        return $this->hasFetchTargetSnapshot()
+            ? ($this->target_metadata['title'] ?? $this->target?->title)
+            : $this->target?->title;
+    }
+
+    public function displayTargetUrl(): ?string
+    {
+        return $this->hasFetchTargetSnapshot()
+            ? ($this->target_metadata['url'] ?? $this->event_metadata['url'] ?? $this->target?->url)
+            : ($this->url ?? $this->target?->url);
+    }
+
+    public function displayTargetMediaUrl(): ?string
+    {
+        return $this->hasFetchTargetSnapshot()
+            ? ($this->target_metadata['media_url'] ?? $this->target?->media_url)
+            : $this->target?->media_url;
+    }
+
+    public function displayTargetContent(): ?string
+    {
+        if (! $this->hasFetchTargetSnapshot()) {
+            return $this->issueContent() ?? $this->target?->content;
+        }
+
+        $this->loadMissing('blocks');
+        $rawBlock = $this->blocks->firstWhere('block_type', 'fetch_content');
+
+        return $rawBlock?->metadata['article_text']
+            ?? $rawBlock?->metadata['text']
+            ?? $this->target_metadata['excerpt']
+            ?? $this->target?->content;
+    }
+
+    /**
+     * The text of this newsletter issue. A publication object is shared by
+     * every issue, so its own `content` only ever holds the latest one.
+     */
+    public function issueContent(): ?string
+    {
+        if ($this->service !== 'newsletter') {
+            return null;
+        }
+
+        $block = $this->relationLoaded('blocks')
+            ? $this->blocks->first(fn (Block $block) => $block->block_type === 'newsletter_content' && $block->deleted_at === null)
+            : $this->blocks()->where('block_type', 'newsletter_content')->whereNull('deleted_at')->first();
+        $content = $block?->metadata['content'] ?? null;
+
+        return is_string($content) && trim($content) !== '' ? $content : null;
+    }
+
+    public function scopeWithoutInternal(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereNull('event_metadata->internal')
+                ->orWhere('event_metadata->internal', false);
+        });
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('changelog')
+            ->logFillable()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->dontLogIfAttributesChangedOnly(['updated_at']);
     }
 
     public function integration()
     {
-        return $this->belongsTo(Integration::class);
+        return $this->belongsTo(Integration::class)->withTrashed();
+    }
+
+    public function source()
+    {
+        return $this->belongsTo(EventObject::class, 'source_id')->withTrashed();
     }
 
     public function actor()
     {
-        return $this->belongsTo(EventObject::class, 'actor_id');
+        return $this->belongsTo(EventObject::class, 'actor_id')->withTrashed();
     }
 
     public function target()
     {
-        return $this->belongsTo(EventObject::class, 'target_id');
+        return $this->belongsTo(EventObject::class, 'target_id')->withTrashed();
     }
 
     public function blocks()
     {
-        return $this->hasMany(Block::class);
+        return $this->hasMany(Block::class)->withTrashed();
     }
-} 
+
+    /**
+     * Create or update a block for this event, ensuring no duplicates
+     * based on title and block_type combination.
+     *
+     * ✅ PREFERRED METHOD: This method prevents duplicate blocks and updates existing ones.
+     * ❌ DO NOT USE: $event->blocks()->create() - This creates duplicates!
+     *
+     * @param  array  $blockData  Block data including:
+     *                            - string $title (required) - Block title, used for uniqueness
+     *                            - string $block_type (optional) - Block category, used for uniqueness
+     *                            - mixed $value (optional) - Numeric value
+     *                            - int $value_multiplier (optional) - Value multiplier, defaults to 1
+     *                            - string $value_unit (optional) - Value unit (e.g., 'bpm', 'kcal')
+     *                            - array $metadata (optional) - Additional metadata
+     *                            - string $url (optional) - Related URL
+     *                            - string $media_url (optional) - Media/image URL
+     *                            - mixed $embeddings (optional) - Vector embeddings
+     *                            - string $time (optional) - Block timestamp, defaults to event time
+     * @return Block The created or updated block
+     *
+     * @example
+     * // Create a heart rate block
+     * $event->createBlock([
+     *     'title' => 'Average Heart Rate',
+     *     'block_type' => 'heart_rate',
+     *     'value' => 75,
+     *     'value_unit' => 'bpm',
+     *     'metadata' => ['type' => 'average'],
+     * ]);
+     */
+    public function createBlock(array $blockData): Block
+    {
+        return Block::updateOrCreateForEvent($this->id, $blockData);
+    }
+
+    /**
+     * Get the formatted value considering the multiplier
+     */
+    public function getFormattedValueAttribute()
+    {
+        if ($this->value === null || $this->value_multiplier === null) {
+            return $this->value;
+        }
+
+        if ($this->value_multiplier === 1 || $this->value_multiplier === 0) {
+            return $this->value;
+        }
+
+        return $this->value / $this->value_multiplier;
+    }
+
+    /**
+     * Get related objects through direct relationships (actor/target)
+     * This maintains compatibility with the original simple design
+     */
+    public function objects()
+    {
+        return new class($this)
+        {
+            private $event;
+
+            public function __construct($event)
+            {
+                $this->event = $event;
+            }
+
+            public function syncWithoutDetaching($relationships)
+            {
+                // For backward compatibility, just return true
+                // The original design didn't need complex object relationships
+                return true;
+            }
+
+            public function get()
+            {
+                $objects = collect();
+
+                // Return actor and target objects
+                if ($this->event->actor) {
+                    $this->event->actor->pivot = (object) ['role' => 'actor'];
+                    $objects->push($this->event->actor);
+                }
+
+                if ($this->event->target) {
+                    $this->event->target->pivot = (object) ['role' => 'target'];
+                    $objects->push($this->event->target);
+                }
+
+                return $objects;
+            }
+        };
+    }
+
+    /**
+     * Polymorphic relationships where this event is the "from" entity.
+     */
+    public function relationshipsFrom()
+    {
+        return $this->morphMany(Relationship::class, 'from')->withTrashed();
+    }
+
+    /**
+     * Polymorphic relationships where this event is the "to" entity.
+     */
+    public function relationshipsTo()
+    {
+        return $this->morphMany(Relationship::class, 'to')->withTrashed();
+    }
+
+    /**
+     * Get all relationships for this event (both from and to).
+     */
+    public function allRelationships()
+    {
+        return Relationship::where(function ($query) {
+            $query->where('from_type', self::class)
+                ->where('from_id', $this->id);
+        })->orWhere(function ($query) {
+            $query->where('to_type', self::class)
+                ->where('to_id', $this->id);
+        })->withTrashed();
+    }
+
+    /**
+     * Get all related EventObjects through relationships.
+     *
+     * @param  string|null  $type  Optional relationship type filter
+     */
+    public function relatedObjects(?string $type = null)
+    {
+        $query = EventObject::whereIn('id', function ($subQuery) use ($type) {
+            $subQuery->select('from_id')
+                ->from('relationships')
+                ->where('from_type', EventObject::class)
+                ->where('to_type', self::class)
+                ->where('to_id', $this->id)
+                ->when($type, fn ($q) => $q->where('type', $type))
+                ->union(
+                    DB::table('relationships')
+                        ->select('to_id')
+                        ->where('to_type', EventObject::class)
+                        ->where('from_type', self::class)
+                        ->where('from_id', $this->id)
+                        ->when($type, fn ($q) => $q->where('type', $type))
+                );
+        });
+
+        return $query;
+    }
+
+    /**
+     * Get all related Events through relationships.
+     *
+     * @param  string|null  $type  Optional relationship type filter
+     */
+    public function relatedEvents(?string $type = null)
+    {
+        $query = self::whereIn('id', function ($subQuery) use ($type) {
+            $subQuery->select('from_id')
+                ->from('relationships')
+                ->where('from_type', self::class)
+                ->where('to_type', self::class)
+                ->where('to_id', $this->id)
+                ->when($type, fn ($q) => $q->where('type', $type))
+                ->union(
+                    DB::table('relationships')
+                        ->select('to_id')
+                        ->where('to_type', self::class)
+                        ->where('from_type', self::class)
+                        ->where('from_id', $this->id)
+                        ->when($type, fn ($q) => $q->where('type', $type))
+                );
+        });
+
+        return $query;
+    }
+
+    /**
+     * Get all related Blocks through relationships.
+     *
+     * @param  string|null  $type  Optional relationship type filter
+     */
+    public function relatedBlocks(?string $type = null)
+    {
+        $query = Block::whereIn('id', function ($subQuery) use ($type) {
+            $subQuery->select('from_id')
+                ->from('relationships')
+                ->where('from_type', Block::class)
+                ->where('to_type', self::class)
+                ->where('to_id', $this->id)
+                ->when($type, fn ($q) => $q->where('type', $type))
+                ->union(
+                    DB::table('relationships')
+                        ->select('to_id')
+                        ->where('to_type', Block::class)
+                        ->where('from_type', self::class)
+                        ->where('from_id', $this->id)
+                        ->when($type, fn ($q) => $q->where('type', $type))
+                );
+        });
+
+        return $query;
+    }
+
+    /**
+     * Override attachTags to log activity
+     */
+    public function attachTags(array|ArrayAccess|Tag $tags, ?string $type = null): static
+    {
+        $className = static::getTagClassName();
+
+        $tagObjects = collect($className::findOrCreate($tags, $type));
+
+        // Get currently attached tag IDs before syncing
+        $existingTagIds = $this->tags()->pluck('id')->toArray();
+
+        $this->tags()->syncWithoutDetaching($tagObjects->pluck('id')->toArray());
+
+        // Log only newly attached tags
+        foreach ($tagObjects as $tag) {
+            if (! in_array($tag->id, $existingTagIds)) {
+                $this->logTagActivity($tag, null, 'added');
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Override detachTags to log activity
+     */
+    public function detachTags(array|ArrayAccess $tags, ?string $type = null): static
+    {
+        $tags = static::convertToTags($tags, $type);
+
+        collect($tags)
+            ->filter()
+            ->each(function (Tag $tag) {
+                $this->tags()->detach($tag);
+                // Log the tag removal
+                $this->logTagActivity($tag, null, 'removed');
+            });
+
+        return $this;
+    }
+
+    /**
+     * Get the searchable text for this event (used for embedding generation)
+     *
+     * Format: [Actor Title] [Action (Sentence Case)] [Target Title] [Value/Units OR Summary] — [Domain] [Service]
+     * Example: "John Smith Made Transaction Coffee Shop 50.00 GBP — Money Monzo"
+     * Or with summary: "John Smith Listened To Bohemian Rhapsody A 6-minute epic rock opera — Media Spotify"
+     */
+    public function getSearchableText(): string
+    {
+        // Load relationships if not already loaded
+        $this->loadMissing(['actor', 'target', 'blocks']);
+
+        $parts = [];
+
+        // Actor title
+        if ($this->actor && $this->actor->title) {
+            $parts[] = $this->actor->title;
+        }
+
+        // Action in sentence case
+        if ($this->action) {
+            $parts[] = Str::headline($this->action);
+        }
+
+        // Target title
+        if ($targetTitle = $this->displayTargetTitle()) {
+            $parts[] = $targetTitle;
+        }
+
+        // Value/units OR summary block (prefer summary if it exists)
+        // Prioritize specific block types with content
+        $priorityOrder = [
+            'fetch_summary_paragraph',
+            'fetch_summary_short',
+            'bookmark_summary',
+            'track_details',
+            'event_details',
+        ];
+
+        // Filter blocks to only those with "summary" or "details" in block_type
+        $candidateBlocks = $this->blocks->filter(function ($block) {
+            if (empty($block->block_type)) {
+                return false;
+            }
+
+            $content = $block->getContent();
+            if (empty($content) || strlen($content) <= 20) {
+                return false;
+            }
+
+            $blockType = strtolower($block->block_type);
+
+            return str_contains($blockType, 'summary') || str_contains($blockType, 'details');
+        });
+
+        // Sort by priority order
+        $summaryBlock = $candidateBlocks->sortBy(function ($block) use ($priorityOrder) {
+            $index = array_search($block->block_type, $priorityOrder);
+
+            return $index !== false ? $index : 999; // Priority blocks first, others last
+        })->first();
+
+        if ($summaryBlock) {
+            // Use the block's content as context
+            $parts[] = $summaryBlock->getContent();
+        } elseif ($this->formatted_value !== null && $this->value_unit) {
+            // Use formatted value (value / value_multiplier)
+            $parts[] = $this->formatted_value . ' ' . $this->value_unit;
+        }
+
+        // Add domain and service at the end with separator
+        $suffix = array_filter([$this->domain, $this->service]);
+        if (! empty($suffix)) {
+            $parts[] = '—';
+            $parts = array_merge($parts, $suffix);
+        }
+
+        return implode(' ', array_filter($parts));
+    }
+
+    /**
+     * Scope for semantic search using vector similarity with temporal weighting
+     *
+     * @param  Builder  $query
+     * @param  array  $embedding  The query embedding vector (1536 dimensions)
+     * @param  float  $threshold  Maximum cosine distance (0-2, lower is more similar)
+     * @param  int  $limit  Maximum number of results
+     * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day, higher = stronger recency bias)
+     * @return Builder
+     */
+    public function scopeSemanticSearch($query, array $embedding, float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
+    {
+        $query->withoutInternal();
+        $embeddingString = '[' . implode(',', $embedding) . ']';
+
+        if ($temporalWeight > 0) {
+            // Apply temporal weighting: recent events get a small boost
+            // Formula: similarity * (1 + (days_ago * temporal_weight))
+            // Example: 7 days ago with 0.01 weight = similarity * 1.07 (7% penalty)
+            return $query->selectRaw('
+                *,
+                (embeddings <=> ?) as similarity,
+                EXTRACT(EPOCH FROM (NOW() - time)) / 86400 as days_ago,
+                ((embeddings <=> ?) * (1 + (EXTRACT(EPOCH FROM (NOW() - time)) / 86400) * ?)) as weighted_similarity
+            ', [$embeddingString, $embeddingString, $temporalWeight])
+                ->whereNotNull('embeddings')
+                ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold])
+                ->orderBy('weighted_similarity', 'asc')
+                ->limit($limit);
+        }
+
+        // No temporal weighting - use raw similarity
+        return $query->selectRaw('*, (embeddings <=> ?) as similarity', [$embeddingString])
+            ->whereNotNull('embeddings')
+            ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold])
+            ->orderBy('similarity', 'asc')
+            ->limit($limit);
+    }
+
+    /**
+     * Scope for hybrid search (semantic + metadata filters) with temporal weighting
+     *
+     * @param  Builder  $query
+     * @param  array  $embedding  The query embedding vector
+     * @param  array  $filters  Additional metadata filters (service, domain, action, integration_id, etc.)
+     * @param  float  $threshold  Maximum cosine distance
+     * @param  int  $limit  Maximum number of results
+     * @param  float  $temporalWeight  Temporal decay factor (0 = no boost, 0.01 = 1% per day)
+     * @return Builder
+     */
+    public function scopeHybridSearch($query, array $embedding, array $filters = [], float $threshold = 1.0, int $limit = 20, float $temporalWeight = 0.01)
+    {
+        $query->withoutInternal();
+        $embeddingString = '[' . implode(',', $embedding) . ']';
+
+        if ($temporalWeight > 0) {
+            $query->selectRaw('
+                *,
+                (embeddings <=> ?) as similarity,
+                EXTRACT(EPOCH FROM (NOW() - time)) / 86400 as days_ago,
+                ((embeddings <=> ?) * (1 + (EXTRACT(EPOCH FROM (NOW() - time)) / 86400) * ?)) as weighted_similarity
+            ', [$embeddingString, $embeddingString, $temporalWeight])
+                ->whereNotNull('embeddings')
+                ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold]);
+        } else {
+            $query->selectRaw('*, (embeddings <=> ?) as similarity', [$embeddingString])
+                ->whereNotNull('embeddings')
+                ->whereRaw('(embeddings <=> ?) < ?', [$embeddingString, $threshold]);
+        }
+
+        // Apply metadata filters
+        if (isset($filters['integration_id'])) {
+            $query->where('integration_id', $filters['integration_id']);
+        }
+
+        if (isset($filters['service'])) {
+            $query->where('service', $filters['service']);
+        }
+
+        if (isset($filters['domain'])) {
+            $query->where('domain', $filters['domain']);
+        }
+
+        if (isset($filters['action'])) {
+            $query->where('action', $filters['action']);
+        }
+
+        if (isset($filters['from_date'])) {
+            $query->where('time', '>=', $filters['from_date']);
+        }
+
+        if (isset($filters['to_date'])) {
+            $query->where('time', '<=', $filters['to_date']);
+        }
+
+        $orderColumn = $temporalWeight > 0 ? 'weighted_similarity' : 'similarity';
+
+        return $query->orderBy($orderColumn, 'asc')->limit($limit);
+    }
+
+    /**
+     * Scope for loading standard relations (for list views)
+     */
+    public function scopeWithStandardRelations($query)
+    {
+        return $query->with(['source', 'actor', 'target', 'integration', 'tags']);
+    }
+
+    /**
+     * Scope for listing events with count instead of full blocks
+     */
+    public function scopeForListing($query)
+    {
+        return $query->withStandardRelations()->withCount('blocks');
+    }
+
+    /**
+     * Scope for detailed event view (includes full blocks)
+     */
+    public function scopeForDetail($query)
+    {
+        return $query->with(['source', 'actor', 'target', 'blocks', 'integration', 'tags']);
+    }
+
+    /**
+     * Scope for filtering events by user through integration
+     */
+    public function scopeForUser($query, $userId)
+    {
+        return $query->whereHas('integration', function ($q) use ($userId) {
+            $q->where('user_id', $userId);
+        });
+    }
+
+    /**
+     * Set location from coordinates
+     */
+    public function setLocation(float $latitude, float $longitude, ?string $address = null, string $source = 'manual'): void
+    {
+        $this->location = Point::makeGeodetic($latitude, $longitude);
+        $this->location_address = $address;
+        $this->location_geocoded_at = now();
+        $this->location_source = $source;
+        $this->save();
+    }
+
+    /**
+     * Inherit location from target EventObject if available
+     */
+    public function inheritLocationFromTarget(): bool
+    {
+        if (! $this->target_id || ! $this->target) {
+            return false;
+        }
+
+        if (! $this->target->location) {
+            return false;
+        }
+
+        $this->location = $this->target->location;
+        $this->location_address = $this->target->location_address;
+        $this->location_geocoded_at = now();
+        $this->location_source = 'inherited';
+        $this->save();
+
+        return true;
+    }
+
+    /**
+     * Get latitude (convenience method)
+     */
+    public function getLatitudeAttribute(): ?float
+    {
+        return $this->location?->getLatitude();
+    }
+
+    /**
+     * Get longitude (convenience method)
+     */
+    public function getLongitudeAttribute(): ?float
+    {
+        return $this->location?->getLongitude();
+    }
+
+    /**
+     * Scope: events with location
+     */
+    public function scopeHasLocation($query)
+    {
+        return $query->whereNotNull('location');
+    }
+
+    /**
+     * Scope: events within radius (meters)
+     */
+    public function scopeWithinRadius($query, float $latitude, float $longitude, int $radiusMeters)
+    {
+        $point = Point::makeGeodetic($latitude, $longitude);
+
+        return $query->whereRaw(
+            'ST_DWithin(location, ST_GeogFromText(?), ?)',
+            [(string) $point, $radiusMeters]
+        );
+    }
+
+    /**
+     * Scope: events within bounding box
+     */
+    public function scopeWithinBounds($query, float $north, float $south, float $east, float $west)
+    {
+        return $query->whereRaw(
+            'location && ST_MakeEnvelope(?, ?, ?, ?, 4326)',
+            [$west, $south, $east, $north]
+        );
+    }
+
+    /**
+     * Create or update multiple blocks efficiently using batch operations.
+     * Prevents N+1 queries by pre-loading existing blocks.
+     */
+    public function createBlocksInBatch(array $blocksData): Collection
+    {
+        if (empty($blocksData)) {
+            return collect();
+        }
+
+        // Step 1: Pre-load ALL existing blocks for this event (1 query)
+        $existingBlocks = $this->blocks()
+            ->whereNull('deleted_at')
+            ->get()
+            ->keyBy(fn ($block) => $block->title . '::' . ($block->block_type ?? 'null'));
+
+        $blocksToUpdate = [];
+        $blocksToCreate = [];
+        $resultBlocks = collect();
+
+        foreach ($blocksData as $blockData) {
+            $key = $blockData['title'] . '::' . ($blockData['block_type'] ?? 'null');
+
+            if ($existingBlocks->has($key)) {
+                // Update existing block
+                $existingBlock = $existingBlocks->get($key);
+                $existingBlock->fill($blockData);
+                $blocksToUpdate[] = $existingBlock;
+                $resultBlocks->push($existingBlock);
+            } else {
+                // Prepare for creation
+                $blockData['event_id'] = $this->id;
+                $blockData['time'] = $blockData['time'] ?? $this->time;
+                $blocksToCreate[] = $blockData;
+            }
+        }
+
+        // Batch update
+        foreach ($blocksToUpdate as $block) {
+            $block->save();
+        }
+
+        // Batch create
+        foreach ($blocksToCreate as $blockData) {
+            $block = Block::create($blockData);
+            $resultBlocks->push($block);
+        }
+
+        return $resultBlocks;
+    }
+
+    /**
+     * Log tag activity to the activity log
+     */
+    private function logTagActivity(string|Tag $tag, ?string $type, string $action): void
+    {
+        // Determine tag name and type
+        if ($tag instanceof Tag) {
+            $tagName = $tag->name;
+            $tagType = $tag->type;
+        } else {
+            $tagName = $tag;
+            $tagType = $type;
+        }
+
+        // Format tag label
+        $tagLabel = $tagType && $tagType !== 'spark' && $tagType !== 'emoji'
+            ? "{$tagType}:{$tagName}"
+            : $tagName;
+
+        // Log to activity log
+        activity('changelog')
+            ->performedOn($this)
+            ->event("tag_{$action}")
+            ->withProperties(['tag' => $tagLabel, 'tag_name' => $tagName, 'tag_type' => $tagType])
+            ->log("{$action} tag \"{$tagLabel}\"");
+    }
+}

@@ -1,0 +1,47 @@
+name: Automatic Rebase
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  rebase:
+    name: Rebase
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.issue.pull_request != '' && 
+      (
+        contains(github.event.comment.body, '/rebase') || 
+        contains(github.event.comment.body, '/autosquash')
+      )
+    steps:
+      - name: App Token
+        id: app_token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+      - name: Checkout the latest code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          token: ${{ steps.app_token.outputs.token }}
+          fetch-depth: 0 # otherwise, you will fail to push refs to dest repo
+      - name: Resolve requested pull request
+        id: requested-pr
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          PR_HEAD=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.label')
+          test -n "$PR_HEAD"
+          echo "head=$PR_HEAD" >> "$GITHUB_OUTPUT"
+      - uses: peter-evans/rebase@e4945786f7ca41fe6e101cead4395f5489593943 # v4
+        id: rebase
+        with:
+          head: ${{ steps.requested-pr.outputs.head }}
+      - name: Add reaction
+        if: steps.rebase.outputs.rebased-count == 1
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
+        with:
+          token: ${{ steps.app_token.outputs.token }}
+          repository: ${{ github.event.repository.full_name }}
+          comment-id: ${{ github.event.comment.id }}
+          reactions: hooray

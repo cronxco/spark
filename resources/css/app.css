@@ -1,66 +1,735 @@
-@import 'tailwindcss';
-@import '../../vendor/livewire/flux/dist/flux.css';
+/* Wire Elements Pro Spotlight CSS is replaced by custom Spark theming below */
+/* @import "../../vendor/wire-elements/pro/resources/css/tailwind/spotlight-component.css"; */
 
-@source '../views';
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../vendor/livewire/flux-pro/stubs/**/*.blade.php';
-@source '../../vendor/livewire/flux/stubs/**/*.blade.php';
+/* Tailwind */
+@import "tailwindcss";
+/* @plugin 'tailwindcss-animate'; */
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
 
+/* daisyUI */
+@plugin "daisyui" {
+    themes:
+        spark --default,
+        spark-dark --prefersdark;
+}
+@plugin "daisyui/theme" {
+    name: "spark";
+    default: true;
+    prefersdark: false;
+    color-scheme: "light";
+    --color-base-100: #fcfcfc;
+    --color-base-200: #f5f5f5;
+    --color-base-300: #ebebeb;
+    --color-base-content: #011627;
+    --color-primary: #ffbf00;
+    --color-primary-content: #011627;
+    --color-secondary: #f79129;
+    --color-secondary-content: #150701;
+    --color-accent: #244f83;
+    --color-accent-content: #d1dae6;
+    --color-neutral: oklch(27% 0.041 260.031);
+    --color-neutral-content: oklch(98% 0.003 247.858);
+    --color-info: #649ec0;
+    --color-info-content: #03090e;
+    --color-success: #7abaa1;
+    --color-success-content: oklch(26% 0.051 172.552);
+    --color-warning: #b16c89;
+    --color-warning-content: #0c0407;
+    --color-error: #e26969;
+    --color-error-content: #120404;
+    /* Highlighted facts in Flint and summary prose (design language §3.3) */
+    --highlight: #244f83;
+    /* Domain tints (docs/UI and UX/DESIGN_LANGUAGE.md §3.2): fill for chips,
+       rings and tinted grounds; ink for tinted text. */
+    --domain-health: #7abaa1;
+    --domain-health-ink: oklch(26% 0.051 172.552);
+    --domain-activity: #f79129;
+    --domain-activity-ink: #a75706;
+    --domain-money: #ffbf00;
+    --domain-money-ink: #664d00;
+    --domain-media: #ee6352;
+    --domain-media-ink: #b02411;
+    --domain-knowledge: #3f88c5;
+    --domain-knowledge-ink: #316ea1;
+    --domain-online: #244f83;
+    --domain-online-ink: #244f83;
+    --domain-anomaly: #b16c89;
+    --domain-anomaly-ink: #011627;
+    /* Generated surface (DESIGN_LANGUAGE.md §3.5): the Flint avatar's
+       spark-to-ember pairing. */
+    --color-spark: #ffbf00;
+    --color-ember: #f79129;
+    --generated-spark: 6%;
+    --generated-ember: 16%;
+    --radius-selector: 0.25rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 1;
+}
+
+@plugin "daisyui/theme" {
+    name: "spark-dark";
+    default: false;
+    prefersdark: true;
+    color-scheme: "dark";
+    --color-base-100: #011627;
+    --color-base-200: #01111e;
+    --color-base-300: #010e19;
+    --color-base-content: #fcfcfc;
+    --color-primary: #ffd966;
+    --color-primary-content: #011627;
+    --color-secondary: #f5a499;
+    --color-secondary-content: #011627;
+    --color-accent: #8db9dd;
+    --color-accent-content: #011627;
+    --color-neutral: #01111e;
+    --color-neutral-content: #ebebeb;
+    --color-info: #a7c7db;
+    --color-info-content: #01111e;
+    --color-success: #b3d8c9;
+    --color-success-content: #01111e;
+    --color-warning: #d2abbb;
+    --color-warning-content: #01111e;
+    --color-error: #e26969;
+    --color-error-content: #01111e;
+    --highlight: #ffbf00;
+    --domain-health: #7abaa1;
+    --domain-health-ink: #b3d8c9;
+    --domain-activity: #f79129;
+    --domain-activity-ink: #f79129;
+    --domain-money: #ffbf00;
+    --domain-money-ink: #ffbf00;
+    --domain-media: #ee6352;
+    --domain-media-ink: #ee6352;
+    --domain-knowledge: #3f88c5;
+    --domain-knowledge-ink: #8db9dd;
+    --domain-online: #8db9dd;
+    --domain-online-ink: #8db9dd;
+    --domain-anomaly: #b16c89;
+    --domain-anomaly-ink: #d2abbb;
+    --color-spark: #ffbf00;
+    --color-ember: #f79129;
+    --generated-spark: 10%;
+    --generated-ember: 22%;
+    /* Hero values are amber in dark mode, whatever the domain (§3.6). */
+    --color-hero: var(--color-primary);
+    --radius-selector: 0.25rem;
+    --radius-field: 0.25rem;
+    --radius-box: 0.5rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 1;
+}
+
+/* maryUI */
+@source "../../vendor/robsontenorio/mary/src/View/Components/**/*.php";
+
+/* Dark theme variant support */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Laravel 12 defaults */
+@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
+@source "../../storage/framework/views/*.php";
+@source "../**/*.blade.php";
+@source "../**/*.js";
+@source "../**/*.vue";
+
+/* Theme */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-
-    --color-zinc-50: #fafafa;
-    --color-zinc-100: #f5f5f5;
-    --color-zinc-200: #e5e5e5;
-    --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
-
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
+    --font-display: "Comfortaa", "Nunito", sans-serif;
+    --font-sans: "Nunito", sans-serif;
+    --font-mono: "PT Mono", monospace;
 }
 
-@layer theme {
-    .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+/* Domain tint utilities (`text-domain-money`, `bg-domain-media/10`, …).
+   The values come from the daisyUI themes above, so they follow the theme. */
+@theme inline {
+    --color-highlight: var(--highlight);
+    --color-domain-health: var(--domain-health);
+    --color-domain-health-ink: var(--domain-health-ink);
+    --color-domain-activity: var(--domain-activity);
+    --color-domain-activity-ink: var(--domain-activity-ink);
+    --color-domain-money: var(--domain-money);
+    --color-domain-money-ink: var(--domain-money-ink);
+    --color-domain-media: var(--domain-media);
+    --color-domain-media-ink: var(--domain-media-ink);
+    --color-domain-knowledge: var(--domain-knowledge);
+    --color-domain-knowledge-ink: var(--domain-knowledge-ink);
+    --color-domain-online: var(--domain-online);
+    --color-domain-online-ink: var(--domain-online-ink);
+    --color-domain-anomaly: var(--domain-anomaly);
+    --color-domain-anomaly-ink: var(--domain-anomaly-ink);
+}
+
+/* Anything a model wrote sits on the generated surface (DESIGN_LANGUAGE.md
+   §3.5): a diagonal spark-to-ember wash over the card ground with an ember
+   hairline. Text on it stays base-content. One per card; rows inside stay
+   plain. */
+.surface-generated {
+    background-color: var(--color-base-200);
+    background-image: linear-gradient(
+        to bottom right,
+        color-mix(
+            in oklab,
+            var(--color-spark) var(--generated-spark),
+            transparent
+        ),
+        color-mix(
+            in oklab,
+            var(--color-ember) var(--generated-ember),
+            transparent
+        )
+    );
+    border: 1px solid color-mix(in oklab, var(--color-ember) 30%, transparent);
+}
+
+@media (prefers-contrast: more) {
+    .surface-generated {
+        border-color: var(--color-ember);
     }
 }
 
-@layer base {
+/* The hero value colour (DESIGN_LANGUAGE.md §3.6): the card's domain ink
+   (`--hero-ink`, set by the card shell) in light mode, falling back to
+   base-content; the dark theme sets `--color-hero` to amber. */
+@utility text-hero {
+    color: var(--color-hero, var(--hero-ink, var(--color-base-content)));
+}
 
-    *,
-    ::after,
-    ::before,
-    ::backdrop,
-    ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
+[x-cloak] {
+    display: none;
+}
+
+/*
+ * Linked event cards in Flint briefings (design language §7.3): the card's
+ * domain tint at 9% mixed into base-100, so the fill stays opaque content,
+ * not glass. The card sets --card-tint to its domain's fill token.
+ */
+.surface-domain-tint {
+    background: color-mix(in oklab, var(--card-tint, transparent) 9%, var(--color-base-100));
+}
+
+pretty-json {
+    --key-color: #b02411;
+    --arrow-color: #011627;
+    --brace-color: #244f83;
+    --bracket-color: #244f83;
+    --string-color: #f79129;
+    --number-color: #ffbf00;
+    --null-color: #8f2d56;
+    --boolean-color: #419d78;
+    --comma-color: #011627;
+    --ellipsis-color: #011627;
+
+    --indent: 2rem;
+}
+
+/* Also handle the dark mode */
+@media (prefers-color-scheme: dark) {
+    pretty-json {
+        --key-color: #f5a499;
+        --arrow-color: #ebebeb;
+        --brace-color: #8db9dd;
+        --bracket-color: #8db9dd;
+        --string-color: #fabd7f;
+        --number-color: #ffd966;
+        --null-color: #d2abbb;
+        --boolean-color: #b3d8c9;
+        --comma-color: #ebebeb;
+        --ellipsis-color: #ebebeb;
     }
 }
 
-[data-flux-field]:not(ui-radio, ui-checkbox) {
-    @apply grid gap-2;
+.wep-spotlight-inner-container {
+    @apply mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-4xl bg-base-100 rounded-sm shadow-sm overflow-hidden divide-y antialiased;
+    z-index: 999;
 }
 
-[data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+.wep-spotlight-input-search-icon {
+    @apply text-base-content pointer-events-none h-5 w-5;
 }
 
-input:focus[data-flux-control],
-textarea:focus[data-flux-control],
-select:focus[data-flux-control] {
-    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+.wep-spotlight-token-container {
+    @apply flex space-x-1 text-sm;
 }
 
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
+.wep-spotlight-input {
+    @apply text-base-content rounded-sm pl-1 py-3 bg-base-100 text-sm border-0 block w-full focus:outline-hidden focus:ring-0;
+}
+
+.wep-spotlight-input-escape-icon {
+    @apply w-5 h-5;
+}
+
+/* .wep-spotlight-token-divider {
+    @apply;
 } */
+
+.wep-spotlight-backdrop {
+    @apply fixed inset-0 bg-black/25 transition-opacity backdrop-blur-sm;
+    z-index: 888;
+}
+
+.wep-spotlight-footer {
+    @apply flex flex-wrap items-center justify-between py-2.5 px-4 text-xs bg-base-300 text-base-content;
+}
+
+.wep-spotlight-footer-tip kbd {
+    @apply mx-1 flex h-5 w-5 items-center justify-center rounded-sm border bg-base-100 text-base-content sm:mx-2;
+}
+
+.wep-spotlight-footer-helper-key {
+    @apply mx-1 flex h-5 w-5 items-center justify-center rounded-sm border bg-base-100 sm:mx-2;
+}
+
+.wep-spotlight-group {
+    @apply border-b border-base-300 px-2.5 pb-2 mb-4;
+}
+
+.wep-spotlight-group-title {
+    @apply font-display text-base-content text-xs font-semibold px-2 pb-2;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active {
+    @apply bg-primary/80 dark:bg-primary text-primary-content;
+}
+
+.wep-spotlight-item-icon {
+    @apply h-5 w-5 mr-2 flex-none shrink-0 text-base-content;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-icon {
+    @apply text-primary-content;
+}
+
+.wep-spotlight-item-content {
+    @apply flex-1 min-w-0;
+}
+
+.wep-spotlight-item-title {
+    @apply truncate whitespace-nowrap text-base-content;
+}
+
+.wep-spotlight-item-subtitle {
+    @apply text-xs truncate whitespace-nowrap font-mono text-base-content/70 mt-0.5;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-title {
+    @apply font-semibold text-primary-content;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-subtitle {
+    @apply text-xs truncate whitespace-nowrap font-mono text-primary-content/80;
+}
+
+.wep-spotlight-item.wep-spotlight-item-active .wep-spotlight-item-instructions {
+    @apply flex text-primary-content;
+}
+
+.wep-spotlight-item-action-key,
+.wep-spotlight-item-token-key {
+    @apply border rounded-xs text-xs border-secondary font-mono text-primary-content;
+}
+
+.wep-spotlight-no-results-icon {
+    @apply mx-auto h-6 w-6;
+}
+.wep-spotlight-no-results-heading {
+    @apply mt-4 font-semibold;
+}
+.wep-spotlight-no-results-message {
+    @apply mt-2;
+}
+
+.wep-spotlight {
+    @apply relative;
+}
+
+.wep-spotlight-outer-container {
+    @apply fixed inset-0 overflow-y-auto p-4 sm:p-6 md:p-20;
+    z-index: 900;
+}
+
+.wep-spotlight-inner-container.enter {
+    @apply ease-out duration-300;
+}
+
+.wep-spotlight-inner-container.enter.start,
+.wep-spotlight-inner-container.leave.end {
+    @apply opacity-0 scale-95;
+}
+
+.wep-spotlight-inner-container.enter.end,
+.wep-spotlight-inner-container.leave.start {
+    @apply opacity-100 scale-100;
+}
+
+.wep-spotlight-inner-container.leave {
+    @apply ease-in duration-200;
+}
+
+.wep-spotlight-input-container {
+    @apply relative flex items-center space-x-0.5;
+}
+
+.wep-spotlight-input-icon {
+    @apply ml-4 flex items-center w-6;
+}
+
+.wep-spotlight-input-loading-icon {
+    @apply animate-spin h-4 w-4;
+}
+
+.wep-spotlight-input-inner-container {
+    @apply w-full relative;
+}
+
+.wep-spotlight-input-escape {
+    @apply absolute top-0 right-3 h-full flex items-center;
+}
+
+.wep-spotlight-token {
+    @apply text-base-content font-medium whitespace-nowrap;
+}
+
+.wep-spotlight-backdrop.enter {
+    @apply ease-out duration-300;
+}
+
+.wep-spotlight-backdrop.enter.start,
+.wep-spotlight-backdrop.leave.end {
+    @apply opacity-0;
+}
+
+.wep-spotlight-backdrop.enter.end,
+.wep-spotlight-backdrop.leave.start {
+    @apply opacity-100;
+}
+
+.wep-spotlight-backdrop.leave {
+    @apply ease-in duration-200;
+}
+
+.wep-spotlight-footer-tip {
+    @apply flex items-center;
+}
+
+.wep-spotlight-footer-tip-label {
+    @apply font-semibold mr-1;
+}
+
+.wep-spotlight-footer-helper {
+    @apply flex items-center;
+}
+
+.wep-spotlight-footer-helper {
+    @apply flex items-center;
+}
+
+.wep-spotlight-groups {
+    @apply pt-4 pb-2 space-y-2 max-h-96 overflow-y-auto;
+}
+
+.wep-spotlight-groups .wep-spotlight-group:last-child {
+    @apply pb-0 mb-0 border-0;
+}
+
+.wep-spotlight-item {
+    @apply flex px-3 py-2 items-center text-sm rounded-sm relative cursor-pointer;
+}
+
+.wep-spotlight-item-icon img {
+    @apply rounded-full;
+}
+
+.wep-spotlight-item-instructions {
+    @apply hidden ml-auto text-xs space-x-2 shrink-0;
+}
+
+.wep-spotlight-item-action,
+.wep-spotlight-item-token {
+    @apply flex space-x-2;
+}
+
+.wep-spotlight-item-action-description {
+    @apply lowercase;
+}
+
+.wep-spotlight-no-results {
+    @apply py-10 px-6 text-center text-sm sm:px-10;
+}
+
+/* Tagify theme integration (DaisyUI/MaryUI aligned) */
+:root {
+    /* Container (borders/background) */
+    --tags-border-color: var(--color-base-300);
+    --tags-hover-border-color: var(--color-base-300);
+    --tags-focus-border-color: var(--color-primary);
+    --tags-disabled-bg: var(--color-base-200);
+
+    /* Tag chips */
+    --tag-border-radius: var(--radius-field);
+    --tag-bg: var(--color-base-200);
+    --tag-hover: var(--color-base-300);
+    --tag-text-color: var(--color-base-content);
+    --tag-text-color--edit: var(--color-base-content);
+    --tag-pad: 0.15rem 0.4rem;
+    --tag--min-width: 0ch;
+    --tag--max-width: 32ch;
+    --tag-inset-shadow-size: 0px; /* keep flat like DaisyUI inputs */
+    --tag-invalid-color: var(--color-error);
+    --tag-invalid-bg: color-mix(
+        in oklab,
+        var(--color-error) 10%,
+        var(--color-base-100)
+    );
+
+    /* Remove (×) button */
+    --tag-remove-btn-color: var(--color-base-content);
+    --tag-remove-btn-bg: transparent;
+    --tag-remove-btn-bg--hover: color-mix(
+        in oklab,
+        var(--color-error) 16%,
+        transparent
+    );
+    --tag-remove-bg: color-mix(in oklab, var(--color-error) 8%, transparent);
+
+    /* Input/placeholder */
+    --placeholder-color: color-mix(
+        in oklab,
+        var(--color-base-content) 45%,
+        transparent
+    );
+    --placeholder-color-focus: color-mix(
+        in oklab,
+        var(--color-base-content) 55%,
+        transparent
+    );
+    --loader-size: 0.9em;
+    --readonly-striped: 0;
+
+    /* Suggestions dropdown */
+    --tagify-dd-color-primary: var(--color-primary);
+    --tagify-dd-text-color: var(--color-base-content);
+    --tagify-dd-bg-color: var(--color-base-100);
+    --tagify-dd-item--hidden-duration: 0.15s;
+    --tagify-dd-item-pad: 0.4rem 0.5rem;
+    --tagify-dd-max-height: 18rem;
+}
+
+/* Make Tagify fill available width and wrap/grow with content */
+.tagify {
+    width: 100%;
+    /* Re-assert variables on the component to win over Tagify's :root defaults */
+    --tags-border-color: var(--color-base-300);
+    --tags-hover-border-color: var(--color-base-300);
+    --tags-focus-border-color: var(--color-primary);
+    --tags-disabled-bg: var(--color-base-200);
+    --tag-border-radius: var(--radius-field);
+    --tag-bg: var(--color-base-200);
+    --tag-hover: var(--color-base-300);
+    --tag-text-color: var(--color-base-content);
+    --tag-text-color--edit: var(--color-base-content);
+    --tag-pad: 0.15rem 0.4rem;
+    --tag--min-width: 0ch;
+    --tag--max-width: 32ch;
+    --tag-inset-shadow-size: 0px;
+    --tag-invalid-color: var(--color-error);
+    --tag-invalid-bg: color-mix(
+        in oklab,
+        var(--color-error) 10%,
+        var(--color-base-100)
+    );
+    --tag-remove-btn-color: var(--color-base-content);
+    --tag-remove-btn-bg: transparent;
+    --tag-remove-btn-bg--hover: color-mix(
+        in oklab,
+        var(--color-error) 16%,
+        transparent
+    );
+    --tag-remove-bg: color-mix(in oklab, var(--color-error) 8%, transparent);
+    --input-color: var(--color-base-content);
+    --placeholder-color: color-mix(
+        in oklab,
+        var(--color-base-content) 45%,
+        transparent
+    );
+    --placeholder-color-focus: color-mix(
+        in oklab,
+        var(--color-base-content) 55%,
+        transparent
+    );
+    --loader-size: 0.9em;
+    --readonly-striped: 0;
+    --tagify-dd-color-primary: var(--color-primary);
+    --tagify-dd-text-color: var(--color-base-content);
+    --tagify-dd-bg-color: var(--color-base-100);
+    --tagify-dd-item--hidden-duration: 0.15s;
+    --tagify-dd-item-pad: 0.4rem 0.5rem;
+    --tagify-dd-max-height: 18rem;
+}
+.tagify {
+    /* Visually match DaisyUI input without fixing height */
+    border: var(--border) solid var(--color-base-300);
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+    border-radius: var(--radius-field);
+    display: block; /* let Tagify manage internal flex */
+    width: 100%;
+    padding: 0.375rem 0.5rem; /* compact input spacing */
+    min-height: 2.25rem; /* input-sm baseline, still grows */
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+    overflow: visible;
+    height: auto !important; /* force growth if Tagify sets a fixed height */
+}
+.tagify:focus-within {
+    outline: 2px solid
+        color-mix(in oklab, var(--color-primary) 40%, transparent);
+    outline-offset: 0;
+    border-color: var(--color-primary);
+}
+.tagify--focus {
+    box-shadow: 0 0 0 2px
+        color-mix(in oklab, var(--color-primary) 15%, transparent);
+}
+.tagify__tag {
+    /* Subtle chip look by default */
+    background-color: var(--tag-bg);
+    color: var(--tag-text-color);
+    border-radius: var(--tag-border-radius);
+    border: 1px solid var(--color-base-300);
+    margin: 0.125rem;
+}
+.tagify__tag:hover {
+    background-color: var(--tag-hover);
+}
+.tagify__tag .tagify__tag-text {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+.tagify__tag__removeBtn {
+    color: var(--tag-remove-btn-color);
+    background: var(--tag-remove-btn-bg);
+}
+.tagify__tag__removeBtn:hover {
+    background: var(--tag-remove-btn-bg--hover);
+}
+.tagify__input {
+    /* Make the editable input take remaining space and wrap */
+    flex: 1 1 12ch !important;
+    min-width: 12ch !important;
+    width: auto !important;
+}
+
+/* Ensure tags flow nicely if Tagify exposes a tags wrapper */
+.tagify__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: flex-start;
+    position: static !important; /* ensure wrapper height includes tags */
+    width: 100%;
+}
+
+/* Suggestions dropdown styled like DaisyUI menu */
+.tagify__dropdown {
+    background-color: var(--tagify-dd-bg-color);
+    color: var(--tagify-dd-text-color);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+.tagify__dropdown__item {
+    padding: var(--tagify-dd-item-pad);
+}
+.tagify__dropdown__item--active {
+    background-color: var(--tagify-dd-color-primary);
+    color: var(--color-primary-content);
+}
+
+.EasyMDEContainer .CodeMirror {
+    @apply bg-base-100 text-base-content;
+}
+
+.EasyMDEContainer .CodeMirror {
+    @apply bg-base-100 text-base-content;
+}
+
+.EasyMDEContainer .CodeMirror-cursor {
+    @apply border border-b-base-100;
+}
+
+.EasyMDEContainer .editor-toolbar > button:hover,
+.EasyMDEContainer .editor-toolbar > .active {
+    @apply bg-base-100 text-base-content;
+}
+
+.EasyMDEContainer .editor-statusbar {
+    @apply hidden;
+}
+
+/* Leaflet Map Popup Styling */
+.spark-map-popup .leaflet-popup-content-wrapper {
+    @apply p-0 bg-transparent shadow-none;
+    border-radius: 0.5rem;
+}
+
+.spark-map-popup .leaflet-popup-content {
+    @apply m-0 w-auto;
+}
+
+.spark-map-popup .leaflet-popup-tip {
+    background: #fcfcfc !important;
+}
+
+/* Force light mode in map popups */
+.spark-map-popup .card {
+    background: #fcfcfc !important;
+    color: #011627 !important;
+}
+
+.spark-map-popup .bg-base-100 {
+    background: #fcfcfc !important;
+}
+
+.spark-map-popup .bg-base-200 {
+    background: #f5f5f5 !important;
+}
+
+.spark-map-popup .bg-base-300 {
+    background: #ebebeb !important;
+}
+
+.spark-map-popup .text-base-content {
+    color: #011627 !important;
+}
+
+.spark-map-popup .text-base-content\/60 {
+    color: rgba(1, 22, 39, 0.6) !important;
+}
+
+.spark-map-popup .text-base-content\/70 {
+    color: rgba(1, 22, 39, 0.7) !important;
+}
+
+.spark-map-popup .text-base-content\/80 {
+    color: rgba(1, 22, 39, 0.8) !important;
+}
+
+.spark-map-popup .text-base-content\/50 {
+    color: rgba(1, 22, 39, 0.5) !important;
+}
+
+.spark-map-popup .border-base-300 {
+    border-color: #ebebeb !important;
+}

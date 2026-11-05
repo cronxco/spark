@@ -1,0 +1,7 @@
+---
+description: Use Laravel Sail and Core Laravel Principles
+globs:
+alwaysApply: true
+---
+Remember that this project uses Laravel Sail, so you should use the `sail` prefix in terminal commands where appropriate.
+**Follow Laravel conventions first.** If Laravel has a documented way to do something, use it. Only deviate when you have a clear justification.

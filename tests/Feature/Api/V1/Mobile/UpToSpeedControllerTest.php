@@ -1,0 +1,1598 @@
+<?php
+
+namespace Tests\Feature\Api\V1\Mobile;
+
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Models\IntegrationGroup;
+use App\Models\MetricStatistic;
+use App\Models\MetricTrend;
+use App\Models\User;
+use App\Support\SparkAbility;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
+use Spatie\Activitylog\Models\Activity;
+use Tests\TestCase;
+
+class UpToSpeedControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected User $user;
+
+    protected Integration $flintIntegration;
+
+    protected Integration $knowledgeIntegration;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['ios.mobile_api_enabled' => true]);
+
+        $this->user = User::factory()->create();
+
+        $flintGroup = IntegrationGroup::factory()->create(['user_id' => $this->user->id]);
+        $this->flintIntegration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $flintGroup->id,
+            'service' => 'flint',
+        ]);
+
+        $knowledgeGroup = IntegrationGroup::factory()->create(['user_id' => $this->user->id]);
+        $this->knowledgeIntegration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $knowledgeGroup->id,
+            'service' => 'fetch',
+        ]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Auth
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function requires_authentication(): void
+    {
+        $this->getJson('/api/v1/mobile/up-to-speed')
+            ->assertStatus(401);
+    }
+
+    #[Test]
+    public function requires_ios_read_ability(): void
+    {
+        Sanctum::actingAs($this->user, []);
+
+        $this->getJson('/api/v1/mobile/up-to-speed')
+            ->assertStatus(403);
+    }
+
+    // -------------------------------------------------------------------------
+    // Basic response structure
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function returns_empty_items_when_nothing_exists(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $response = $this->getJson('/api/v1/mobile/up-to-speed')
+            ->assertOk()
+            ->assertJsonStructure(['items']);
+
+        // Check-ins are always included (both morning and afternoon)
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        $this->assertEquals('check_in', $items[0]['type']);
+        $this->assertEquals('check_in', $items[1]['type']);
+    }
+
+    // -------------------------------------------------------------------------
+    // flint_digest items
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function includes_todays_flint_digests(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+            'event_metadata' => ['period' => 'morning', 'title' => 'Morning Digest', 'summary' => 'Summary text'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $response = $this->getJson('/api/v1/mobile/up-to-speed')->assertOk();
+        $items = collect($response->json('items'));
+
+        $digest = $items->firstWhere('type', 'flint_digest');
+        $this->assertNotNull($digest);
+        $this->assertEquals($event->id, $digest['id']);
+        $this->assertNull($digest['caught_up_at']);
+        $this->assertEquals('morning', $digest['payload']['period']);
+        $this->assertEquals('Morning Digest', $digest['payload']['title']);
+    }
+
+    #[Test]
+    public function excludes_flint_digests_from_other_days(): void
+    {
+        Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now()->subDays(2),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'flint_digest'));
+    }
+
+    #[Test]
+    public function flint_digest_caught_up_at_is_set_when_marked(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+        ]);
+
+        Activity::create([
+            'log_name' => 'changelog',
+            'description' => 'caught_up',
+            'subject_type' => Event::class,
+            'subject_id' => $event->id,
+            'causer_type' => User::class,
+            'causer_id' => $this->user->id,
+            'event' => 'caught_up',
+            'properties' => [],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $digest = $items->firstWhere('type', 'flint_digest');
+        $this->assertNotNull($digest['caught_up_at']);
+    }
+
+    // -------------------------------------------------------------------------
+    // check_in items
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function includes_both_check_in_periods(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $checkIns = $items->where('type', 'check_in')->values();
+
+        $this->assertCount(2, $checkIns);
+        $this->assertEquals('morning', $checkIns[0]['payload']['period']);
+        $this->assertEquals('afternoon', $checkIns[1]['payload']['period']);
+    }
+
+    #[Test]
+    public function check_in_uses_synthetic_id_format(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $today = Carbon::today('UTC')->toDateString();
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $checkIns = $items->where('type', 'check_in')->values();
+
+        $this->assertEquals("morning:{$today}", $checkIns[0]['id']);
+        $this->assertEquals("afternoon:{$today}", $checkIns[1]['id']);
+    }
+
+    #[Test]
+    public function check_in_caught_up_at_is_set_when_completed(): void
+    {
+        $group = IntegrationGroup::factory()->create(['user_id' => $this->user->id]);
+        $integration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'daily_checkin',
+        ]);
+
+        $today = Carbon::today('UTC')->toDateString();
+        $checkinTime = now()->setTimeFromTimeString('08:00:00');
+
+        Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'daily_checkin',
+            'action' => 'had_morning_checkin',
+            'source_id' => 'daily_checkin_morning_' . $today,
+            'time' => $checkinTime,
+            'event_metadata' => ['date' => $today],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $morning = $items->first(fn ($i) => $i['type'] === 'check_in' && $i['payload']['period'] === 'morning');
+
+        $this->assertNotNull($morning);
+        $this->assertTrue($morning['payload']['completed']);
+        $this->assertNotNull($morning['caught_up_at']);
+    }
+
+    #[Test]
+    public function incomplete_check_in_has_null_caught_up_at(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $morning = $items->first(fn ($i) => $i['type'] === 'check_in' && $i['payload']['period'] === 'morning');
+
+        $this->assertNotNull($morning);
+        $this->assertFalse($morning['payload']['completed']);
+        $this->assertNull($morning['caught_up_at']);
+    }
+
+    // -------------------------------------------------------------------------
+    // anomaly items
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function includes_todays_unacknowledged_anomalies(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $anomaly = MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $anomalyItem = $items->firstWhere('type', 'anomaly');
+
+        $this->assertNotNull($anomalyItem);
+        $this->assertEquals($anomaly->id, $anomalyItem['id']);
+        $this->assertNull($anomalyItem['caught_up_at']);
+        $this->assertArrayHasKey('metric', $anomalyItem['payload']);
+        $this->assertArrayHasKey('direction', $anomalyItem['payload']);
+    }
+
+    #[Test]
+    public function excludes_acknowledged_anomalies(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'anomaly'));
+    }
+
+    #[Test]
+    public function excludes_suppressed_anomalies(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+            'metadata' => ['suppress_until' => now()->addDay()->toDateString()],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'anomaly'));
+    }
+
+    #[Test]
+    public function anomaly_caught_up_at_is_set_when_marked(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $anomaly = MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+        ]);
+
+        Activity::create([
+            'log_name' => 'changelog',
+            'description' => 'caught_up',
+            'subject_type' => MetricTrend::class,
+            'subject_id' => $anomaly->id,
+            'causer_type' => User::class,
+            'causer_id' => $this->user->id,
+            'event' => 'caught_up',
+            'properties' => [],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $anomalyItem = $items->firstWhere('type', 'anomaly');
+        $this->assertNotNull($anomalyItem['caught_up_at']);
+    }
+
+    // -------------------------------------------------------------------------
+    // news_summary items
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function includes_bookmarks_with_summary_blocks_in_48h_window(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'fetch',
+            'action' => 'bookmarked',
+            'time' => now()->subHours(12),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_tldr',
+            'metadata' => ['text' => 'Short summary'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $newsItem = $items->firstWhere('type', 'news_summary');
+
+        $this->assertNotNull($newsItem);
+        $this->assertEquals($event->id, $newsItem['id']);
+        $this->assertEquals('fetch', $newsItem['payload']['source']);
+    }
+
+    /**
+     * The Economist's World in Brief is a monitored page, not a bookmark, so it
+     * arrives as "fetched". Only "bookmarked" used to qualify, and it had
+     * therefore never once reached Up to Speed.
+     */
+    #[Test]
+    public function includes_monitored_fetch_pages(): void
+    {
+        $target = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'World in Brief',
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'fetch',
+            'action' => 'fetched',
+            'target_id' => $target->id,
+            'target_metadata' => [
+                'title' => 'World in Brief: snapshot',
+                'url' => 'https://example.test/world-in-brief-snapshot',
+            ],
+            'time' => now()->subHours(2),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_tldr',
+            'metadata' => ['content' => 'Oil disruption dominates the headlines.'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $newsItem = $items->firstWhere('type', 'news_summary');
+
+        $this->assertNotNull($newsItem);
+        $this->assertEquals($event->id, $newsItem['id']);
+        $this->assertEquals('World in Brief: snapshot', $newsItem['payload']['title']);
+        $this->assertEquals('https://example.test/world-in-brief-snapshot', $newsItem['payload']['url']);
+        $this->assertEquals('Oil disruption dominates the headlines.', $newsItem['payload']['tldr']);
+    }
+
+    /**
+     * A newsletter event targets its publication, so without the subject every
+     * issue of the same newsletter would be titled with the masthead.
+     */
+    #[Test]
+    public function newsletter_items_carry_the_publication_and_issue_subject(): void
+    {
+        $publication = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'POLITICO London Playbook',
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'newsletter',
+            'action' => 'received_post',
+            'target_id' => $publication->id,
+            'event_metadata' => ['email_subject' => 'City verdict lands'],
+            'time' => now()->subHours(3),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'newsletter_tldr',
+            'metadata' => ['content' => 'The commission found against City.'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $newsItem = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
+            ->firstWhere('type', 'news_summary');
+
+        $this->assertNotNull($newsItem);
+        $this->assertEquals('City verdict lands', $newsItem['payload']['title']);
+        $this->assertEquals('POLITICO London Playbook', $newsItem['payload']['publication']);
+    }
+
+    #[Test]
+    public function newsletter_without_a_subject_falls_back_to_the_publication_title(): void
+    {
+        $publication = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'The Economist Espresso',
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'newsletter',
+            'action' => 'received_post',
+            'target_id' => $publication->id,
+            'event_metadata' => ['email_subject' => '   '],
+            'time' => now()->subHours(3),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'newsletter_tldr',
+            'metadata' => ['content' => 'Short summary'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $newsItem = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
+            ->firstWhere('type', 'news_summary');
+
+        $this->assertEquals('The Economist Espresso', $newsItem['payload']['title']);
+        $this->assertEquals('The Economist Espresso', $newsItem['payload']['publication']);
+    }
+
+    #[Test]
+    public function fetched_items_leave_publication_null_for_the_client_to_derive(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'fetch',
+            'action' => 'bookmarked',
+            'time' => now()->subHours(2),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_tldr',
+            'metadata' => ['content' => 'Short summary'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $newsItem = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
+            ->firstWhere('type', 'news_summary');
+
+        $this->assertNotNull($newsItem);
+        $this->assertArrayHasKey('publication', $newsItem['payload']);
+        $this->assertNull($newsItem['payload']['publication']);
+    }
+
+    /**
+     * A busy monitored page must not prevent older, distinct reading from
+     * filling the requested queue just because its repeated events span more
+     * than one candidate batch.
+     */
+    #[Test]
+    public function fills_the_news_limit_after_duplicate_fetches_exceed_a_candidate_batch(): void
+    {
+        $repeatedTarget = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $otherTarget = EventObject::factory()->create(['user_id' => $this->user->id]);
+
+        foreach (range(1, 11) as $minutesAgo) {
+            $event = Event::factory()->create([
+                'integration_id' => $this->knowledgeIntegration->id,
+                'domain' => 'knowledge',
+                'service' => 'fetch',
+                'action' => 'fetched',
+                'target_id' => $repeatedTarget->id,
+                'time' => now()->subMinutes($minutesAgo),
+            ]);
+
+            Block::factory()->create(['event_id' => $event->id, 'block_type' => 'fetch_tldr']);
+        }
+
+        $otherEvent = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'fetch',
+            'action' => 'fetched',
+            'target_id' => $otherTarget->id,
+            'time' => now()->subHours(1),
+        ]);
+        Block::factory()->create(['event_id' => $otherEvent->id, 'block_type' => 'fetch_tldr']);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $newsItems = collect($this->getJson('/api/v1/mobile/up-to-speed?news_limit=2')
+            ->assertOk()
+            ->json('items'))
+            ->where('type', 'news_summary')
+            ->values();
+
+        $this->assertCount(2, $newsItems);
+        $this->assertEquals($otherEvent->id, $newsItems[1]['id']);
+    }
+
+    /**
+     * A monitored page is re-fetched through the day, each fetch its own event
+     * with its own summary. Without collapsing them the 48h window puts four
+     * near-identical World in Brief cards in the queue.
+     */
+    #[Test]
+    public function collapses_repeated_fetches_of_the_same_page_keeping_the_newest(): void
+    {
+        $target = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'World in Brief',
+        ]);
+
+        $newest = null;
+        foreach ([26, 14, 6, 1] as $index => $hoursAgo) {
+            $event = Event::factory()->create([
+                'integration_id' => $this->knowledgeIntegration->id,
+                'domain' => 'knowledge',
+                'service' => 'fetch',
+                'action' => $index === 1 ? 'updated' : 'fetched',
+                'target_id' => $target->id,
+                'time' => now()->subHours($hoursAgo),
+            ]);
+
+            Block::factory()->create([
+                'event_id' => $event->id,
+                'block_type' => 'fetch_tldr',
+                'metadata' => ['content' => "Summary from {$hoursAgo}h ago."],
+            ]);
+
+            $newest = $event;
+        }
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $newsItems = $items->where('type', 'news_summary')->values();
+
+        $this->assertCount(1, $newsItems);
+        $this->assertEquals($newest->id, $newsItems[0]['id']);
+        $this->assertEquals('Summary from 1h ago.', $newsItems[0]['payload']['tldr']);
+    }
+
+    /**
+     * Karakeep bookmarks are knowledge-domain "bookmarked" events on a different
+     * service, so the monitored-page clause must not be scoped in a way that
+     * drops them.
+     */
+    #[Test]
+    public function still_includes_bookmarks_from_other_services(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'karakeep',
+            'action' => 'bookmarked',
+            'time' => now()->subHours(3),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_tldr',
+            'metadata' => ['content' => 'A saved article.'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+
+        $this->assertNotNull($items->firstWhere('id', $event->id));
+    }
+
+    #[Test]
+    public function excludes_bookmarks_without_summary_blocks(): void
+    {
+        Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'action' => 'bookmarked',
+            'time' => now()->subHours(12),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'news_summary'));
+    }
+
+    #[Test]
+    public function excludes_news_older_than_48_hours(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'action' => 'bookmarked',
+            'time' => now()->subHours(49),
+        ]);
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_tldr',
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'news_summary'));
+    }
+
+    #[Test]
+    public function news_caught_up_at_is_set_when_marked(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'action' => 'bookmarked',
+            'time' => now()->subHours(12),
+        ]);
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'fetch_summary_paragraph',
+        ]);
+
+        Activity::create([
+            'log_name' => 'changelog',
+            'description' => 'caught_up',
+            'subject_type' => Event::class,
+            'subject_id' => $event->id,
+            'causer_type' => User::class,
+            'causer_id' => $this->user->id,
+            'event' => 'caught_up',
+            'properties' => [],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $newsItem = $items->firstWhere('type', 'news_summary');
+        $this->assertNotNull($newsItem['caught_up_at']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Ordering
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function items_are_ordered_correctly(): void
+    {
+        // Create one of each type
+        Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+        ]);
+
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+        ]);
+
+        $newsEvent = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'action' => 'bookmarked',
+            'time' => now()->subHours(1),
+        ]);
+        Block::factory()->create(['event_id' => $newsEvent->id, 'block_type' => 'fetch_tldr']);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $types = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
+            ->pluck('type')
+            ->all();
+
+        $this->assertEquals(['flint_digest', 'check_in', 'check_in', 'anomaly', 'news_summary'], $types);
+    }
+
+    // -------------------------------------------------------------------------
+    // Anomaly presentation
+    // -------------------------------------------------------------------------
+
+    /**
+     * The payload carried only a metric identifier string, so the client had no
+     * way to tell a bank balance from a sleep score — which is why every
+     * anomaly, money included, was filed under "Your body".
+     */
+    #[Test]
+    public function anomaly_payload_carries_its_domain_and_unit(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_cardiovascular_age',
+            'value_unit' => 'years',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'current_value' => 44,
+            'baseline_value' => 38.87,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $payload = $this->firstAnomalyPayload();
+
+        $this->assertSame('health', $payload['domain']);
+        $this->assertSame('oura', $payload['service']);
+        $this->assertSame('years', $payload['unit']);
+        $this->assertSame('Cardiovascular Age', $payload['display_name']);
+    }
+
+    #[Test]
+    public function anomaly_payload_carries_preformatted_values(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+            'value_unit' => 'percent',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'current_value' => 78,
+            'baseline_value' => 85,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $payload = $this->firstAnomalyPayload();
+
+        $this->assertSame('78%', $payload['current_display']);
+        $this->assertSame('85%', $payload['baseline_display']);
+        $this->assertStringNotContainsString('<', $payload['current_display']);
+    }
+
+    /**
+     * Direction is not valence, and the shipped UI had only direction — so it
+     * tinted a rising number as a warning whatever the number meant.
+     */
+    #[Test]
+    public function anomaly_payload_distinguishes_valence_from_direction(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_cardiovascular_age',
+            'value_unit' => 'years',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'current_value' => 44,
+            'baseline_value' => 38.87,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $payload = $this->firstAnomalyPayload();
+
+        $this->assertSame('up', $payload['direction']);
+        $this->assertSame('bad', $payload['valence']);
+    }
+
+    #[Test]
+    public function anomaly_payload_flags_ordinal_metrics(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_resilience_score',
+            'value_unit' => 'resilience_level',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'type' => 'anomaly_low',
+            'detected_at' => now(),
+            'current_value' => 2,
+            'baseline_value' => 3.2,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $payload = $this->firstAnomalyPayload();
+
+        $this->assertTrue($payload['is_ordinal']);
+        $this->assertSame('Adequate', $payload['current_display']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Noise gating — the briefing styleguide, applied
+    // -------------------------------------------------------------------------
+
+    /**
+     * "A single-day movement should usually be treated as noise unless the
+     * deviation is genuinely large."
+     */
+    #[Test]
+    public function excludes_a_marginal_single_day_anomaly(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+        ]);
+        MetricTrend::factory()->marginal()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'anomaly'));
+    }
+
+    #[Test]
+    public function includes_a_large_single_day_anomaly(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertCount(1, $items->where('type', 'anomaly'));
+    }
+
+    /**
+     * A metric anomalous every day for a fortnight is not surprising — its
+     * baseline has drifted. The card was announcing "I've seen this 14 days
+     * running, so I'm raising it", which is backwards.
+     */
+    #[Test]
+    public function excludes_an_anomaly_that_has_run_for_a_week(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_readiness_score',
+        ]);
+
+        foreach (range(0, 8) as $daysAgo) {
+            MetricTrend::factory()->significant()->create([
+                'metric_statistic_id' => $stat->id,
+                'detected_at' => now()->subDays($daysAgo),
+            ]);
+        }
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'anomaly'));
+    }
+
+    /**
+     * The plugin marks account balances as exclude_from_flint, and Flint was
+     * leading the anomaly chapter with one anyway.
+     */
+    #[Test]
+    public function excludes_metrics_the_plugin_keeps_out_of_flint(): void
+    {
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'gocardless',
+            'action' => 'had_balance',
+            'value_unit' => 'GBP',
+        ]);
+        MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'current_value' => 2082.23,
+            'baseline_value' => 241.68,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'anomaly'));
+    }
+
+    // -------------------------------------------------------------------------
+    // Read state is exposed, never enforced
+    // -------------------------------------------------------------------------
+
+    /**
+     * The client builds its "already seen today" recap out of the caught-up
+     * items in this response, so they must keep being returned after they are
+     * marked. Filtering them here would make an accidental dismissal
+     * unrecoverable.
+     */
+    #[Test]
+    public function caught_up_items_are_still_returned(): void
+    {
+        $event = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/up-to-speed/read', [
+            'items' => [['type' => 'flint_digest', 'id' => $event->id]],
+        ])->assertOk();
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $digest = $items->firstWhere('id', $event->id);
+
+        $this->assertNotNull($digest, 'a caught-up digest must still appear in the feed');
+        $this->assertNotNull($digest['caught_up_at']);
+    }
+
+    // -------------------------------------------------------------------------
+    // include_acknowledged
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function acknowledged_anomalies_are_excluded_by_default(): void
+    {
+        $anomaly = $this->acknowledgedAnomaly();
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertNull($items->firstWhere('id', $anomaly->id));
+    }
+
+    #[Test]
+    public function include_acknowledged_returns_dismissed_anomalies(): void
+    {
+        $anomaly = $this->acknowledgedAnomaly();
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+
+        $found = $items->firstWhere('id', $anomaly->id);
+        $this->assertNotNull($found, 'a dismissed anomaly must be recoverable');
+        $this->assertNotNull($found['payload']['acknowledged_at']);
+    }
+
+    #[Test]
+    public function include_acknowledged_bypasses_noise_only_for_acknowledged_anomalies(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $acknowledged = MetricTrend::factory()->marginal()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+        ]);
+        $unacknowledged = MetricTrend::factory()->marginal()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+
+        $this->assertNotNull($items->firstWhere('id', $acknowledged->id));
+        $this->assertNull($items->firstWhere('id', $unacknowledged->id));
+    }
+
+    #[Test]
+    public function acknowledged_balance_anomaly_uses_its_account_direction(): void
+    {
+        $account = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'metadata' => ['account_type' => 'credit_card'],
+        ]);
+        $event = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'actor_id' => $account->id,
+            'service' => 'gocardless',
+            'domain' => 'money',
+            'action' => 'had_balance',
+            'value_unit' => 'GBP',
+        ]);
+        $stat = MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'gocardless',
+            'action' => 'had_balance',
+            'value_unit' => 'GBP',
+        ]);
+        $anomaly = MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+            'metadata' => ['event_id' => $event->id],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+
+        $this->assertSame('bad', $items->firstWhere('id', $anomaly->id)['payload']['valence']);
+    }
+
+    #[Test]
+    public function include_acknowledged_returns_suppressed_anomalies(): void
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $anomaly = MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => null,
+            'metadata' => ['suppress_until' => now()->addDays(7)->toDateString()],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $default = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertNull($default->firstWhere('id', $anomaly->id));
+
+        $included = collect(
+            $this->getJson('/api/v1/mobile/up-to-speed?include_acknowledged=1')->assertOk()->json('items')
+        );
+        $this->assertNotNull($included->firstWhere('id', $anomaly->id));
+    }
+
+    #[Test]
+    public function internal_subject_keys_are_not_exposed(): void
+    {
+        Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = $this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items');
+
+        foreach ($items as $item) {
+            $this->assertArrayNotHasKey('_subject_id', $item);
+            $this->assertArrayNotHasKey('_subject_key', $item);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Data isolation
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function does_not_include_other_users_items(): void
+    {
+        $other = User::factory()->create();
+        $otherGroup = IntegrationGroup::factory()->create(['user_id' => $other->id]);
+        $otherIntegration = Integration::factory()->create([
+            'user_id' => $other->id,
+            'integration_group_id' => $otherGroup->id,
+            'service' => 'flint',
+        ]);
+
+        Event::factory()->create([
+            'integration_id' => $otherIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $this->assertEmpty($items->where('type', 'flint_digest'));
+    }
+
+    #[Test]
+    public function flint_digest_carries_cards_for_linked_metric_events_in_mention_order(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 66, 'percent');
+        $sleep = $this->ouraEvent($oura, 'slept_for', 28500, 'seconds');
+        $article = $this->ouraEvent($oura, 'had_note', null, null);
+
+        $otherUser = User::factory()->create();
+        $otherIntegration = Integration::factory()->create(['user_id' => $otherUser->id, 'service' => 'oura']);
+        $foreign = $this->ouraEvent($otherIntegration, 'had_readiness_score', 88, 'percent');
+
+        $this->digestLinking(
+            "[7h55 of sleep](https://spark.cronx.co/events/{$sleep->id}), a [sleep score of 66](https://spark.cronx.co/events/{$score->id}), "
+            . "[a note](https://spark.cronx.co/events/{$article->id}), [readiness at 88](https://spark.cronx.co/events/{$foreign->id}) "
+            . "and [the score again](https://spark.cronx.co/event/{$score->id})."
+        );
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $linked = $this->digestPayload()['linked_events'];
+
+        $this->assertSame([$sleep->id, $score->id], array_column(array_column($linked, 'event'), 'id'));
+        $this->assertSame('oura.slept_for', $linked[0]['kind']);
+        $this->assertSame('oura.had_sleep_score', $linked[1]['kind']);
+        $this->assertNull($linked[1]['at_digest']);
+    }
+
+    #[Test]
+    public function linked_event_card_reports_the_value_the_digest_saw_when_it_has_since_changed(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 66, 'percent');
+
+        Carbon::setTestNow(now()->subMinutes(5));
+        $this->digestLinking("a [sleep score of 66](https://spark.cronx.co/events/{$score->id})");
+        Carbon::setTestNow();
+
+        $score->update(['value' => 80]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertEquals(80, $card['event']['value']);
+        $this->assertEquals(66, $card['at_digest']['value']);
+        $this->assertNotEmpty($card['at_digest']['display_value']);
+    }
+
+    #[Test]
+    public function linked_event_card_ignores_changes_made_before_the_digest_was_written(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 60, 'percent');
+
+        Carbon::setTestNow(now()->subMinutes(10));
+        $score->update(['value' => 66]);
+        Carbon::setTestNow(now()->addMinutes(5));
+        $this->digestLinking("a [sleep score of 66](https://spark.cronx.co/events/{$score->id})");
+        Carbon::setTestNow();
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->assertNull($this->digestPayload()['linked_events'][0]['at_digest']);
+    }
+
+    #[Test]
+    public function linked_event_card_compares_with_the_usual(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 66, 'percent');
+
+        MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'had_sleep_score',
+            'value_unit' => 'percent',
+            'event_count' => 30,
+            'mean_value' => 78,
+            'stddev_value' => 4,
+            'normal_lower_bound' => 70,
+            'normal_upper_bound' => 86,
+            'baseline_window_days' => 30,
+        ]);
+
+        $this->digestLinking("a [sleep score of 66](https://spark.cronx.co/events/{$score->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $context = $this->digestPayload()['linked_events'][0]['context'];
+
+        $this->assertSame('down', $context['direction']);
+        $this->assertFalse($context['within_usual_range']);
+        $this->assertStringEndsWith('below 30d trend', $context['text']);
+        $this->assertEquals(78, $context['mean']);
+    }
+
+    #[Test]
+    public function linked_duration_card_compares_with_the_average_its_bar_marks(): void
+    {
+        $oura = $this->ouraIntegration();
+        $sleep = $this->ouraEvent($oura, 'slept_for', 28500, 'seconds');
+
+        MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'oura',
+            'action' => 'slept_for',
+            'value_unit' => 'seconds',
+            'event_count' => 30,
+            'mean_value' => 26400,
+            'stddev_value' => 1800,
+            'normal_lower_bound' => 22800,
+            'normal_upper_bound' => 30000,
+            'baseline_window_days' => 30,
+        ]);
+
+        $this->digestLinking("[7h55 of sleep](https://spark.cronx.co/events/{$sleep->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $context = $this->digestPayload()['linked_events'][0]['context'];
+
+        $this->assertSame('up', $context['direction']);
+        $this->assertTrue($context['within_usual_range']);
+        $this->assertSame('neutral', $context['valence']);
+        $this->assertStringEndsWith('above 30d avg', $context['text']);
+        $this->assertEquals(26400, $context['mean']);
+    }
+
+    #[Test]
+    public function flint_digest_without_links_has_no_linked_events(): void
+    {
+        $this->digestLinking('Nothing linked today.');
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->assertSame([], $this->digestPayload()['linked_events']);
+    }
+
+    #[Test]
+    public function linked_metric_cards_use_the_metric_layout(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 81, 'percent');
+
+        $this->digestLinking("a [sleep score of 81](https://spark.cronx.co/events/{$score->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('metric', $card['layout']);
+        $this->assertNull($card['details']);
+        $this->assertNull($card['answer']);
+    }
+
+    #[Test]
+    public function linked_flight_gets_a_journey_card_without_a_baseline(): void
+    {
+        $calendar = $this->calendarIntegration();
+        $flight = $this->calendarEvent(
+            $calendar,
+            "\u{2708} LGW\u{200B}\u{2192}\u{200B}ACE \u{2022} BA\u{00A0}2704",
+            "British Airways\u{00A0}2704\nLondon to Lanzarote\n\u{2197} 8:10 GMT\n\u{2198} 12:25 WET\nFlight time 4 hrs, 15 min",
+            255,
+        );
+        MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'google-calendar',
+            'action' => 'had_event',
+            'value_unit' => 'minutes',
+            'event_count' => 90,
+            'mean_value' => 60,
+            'stddev_value' => 20,
+            'normal_lower_bound' => 30,
+            'normal_upper_bound' => 90,
+            'baseline_window_days' => 90,
+        ]);
+
+        $this->digestLinking("The [flight is due into Arrecife at 12:25](https://spark.cronx.co/events/{$flight->id}).");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('journey', $card['layout']);
+        $this->assertNull($card['context']);
+        $this->assertSame('BA2704', $card['details']['flight']);
+        $this->assertSame('LGW', $card['details']['from']);
+        $this->assertSame('ACE', $card['details']['to']);
+        $this->assertSame('London to Lanzarote', $card['details']['route']);
+        $this->assertSame('08:10', $card['details']['departs_local']);
+        $this->assertSame('GMT', $card['details']['departs_zone']);
+        $this->assertSame('12:25', $card['details']['arrives_local']);
+        $this->assertSame('WET', $card['details']['arrives_zone']);
+        $this->assertSame(255, $card['details']['duration_minutes']);
+    }
+
+    #[Test]
+    public function linked_calendar_entry_that_is_not_a_flight_gets_a_calendar_card(): void
+    {
+        $calendar = $this->calendarIntegration();
+        $meeting = $this->calendarEvent($calendar, 'Design review', null, 45);
+
+        $this->digestLinking("[Design review](https://spark.cronx.co/events/{$meeting->id}) at ten.");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('calendar', $card['layout']);
+        $this->assertSame('Design review', $card['details']['title']);
+        $this->assertSame(45, $card['details']['duration_minutes']);
+        $this->assertNotNull($card['details']['ends_at']);
+    }
+
+    #[Test]
+    public function linked_payment_gets_a_merchant_card_with_its_place_in_the_week_and_the_readers_answer(): void
+    {
+        $monzo = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'monzo',
+        ]);
+        $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account', 'type' => 'monzo_account', 'title' => 'Monzo Current']);
+        $theatre = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'monzo_counterparty', 'title' => 'CRITERION THEATRE TRUST - BOX OFFICE']);
+        $coffee = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'monzo_counterparty', 'title' => 'Coffee']);
+
+        $payment = $this->monzoPayment($monzo, $account, $theatre, 15900, now()->subHours(2));
+        $this->monzoPayment($monzo, $account, $coffee, 350, now()->subDays(2));
+        $this->monzoPayment($monzo, $account, $coffee, 420, now()->subDays(3));
+
+        $digest = $this->digestLinking("a [£159 Criterion Theatre Trust payment](https://spark.cronx.co/events/{$payment->id})");
+        Block::factory()->create([
+            'event_id' => $digest->id,
+            'block_type' => 'flint_user_question',
+            'metadata' => [
+                'question' => "That [£159 payment](https://spark.cronx.co/events/{$payment->id}) — what was it for?",
+                'answer' => 'Theatre tickets or booking',
+                'answer_note' => 'Redcliffe, Sat 30 January with Dan',
+            ],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('payment', $card['layout']);
+        $this->assertNull($card['context']);
+        $this->assertSame('Criterion Theatre Trust - Box Office', $card['details']['merchant']);
+        $this->assertSame('Monzo Current', $card['details']['account']);
+        $this->assertFalse($card['details']['pending']);
+        $this->assertSame([420, 350, 15900], $card['details']['week']['amounts']);
+        $this->assertSame(2, $card['details']['week']['index']);
+        $this->assertSame('Largest this week', $card['details']['week']['caption']);
+        $this->assertSame('Theatre tickets or booking', $card['answer']['answer']);
+        $this->assertSame('Redcliffe, Sat 30 January with Dan', $card['answer']['note']);
+    }
+
+    #[Test]
+    public function linked_payment_outside_the_weeks_ten_largest_is_still_the_highlighted_bar(): void
+    {
+        $monzo = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'monzo',
+        ]);
+        $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account', 'type' => 'monzo_account', 'title' => 'Monzo Current']);
+        $shop = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'monzo_counterparty', 'title' => 'Shop']);
+
+        foreach (range(1, 11) as $hour) {
+            $this->monzoPayment($monzo, $account, $shop, 1000 + $hour * 100, now()->subHours($hour + 2));
+        }
+        $coffee = $this->monzoPayment($monzo, $account, $shop, 250, now()->subHour());
+
+        $this->digestLinking("a [£2.50 coffee](https://spark.cronx.co/events/{$coffee->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $week = $this->digestPayload()['linked_events'][0]['details']['week'];
+
+        $this->assertCount(10, $week['amounts']);
+        $this->assertSame(9, $week['index']);
+        $this->assertSame(250, $week['amounts'][$week['index']]);
+        $this->assertNull($week['caption']);
+    }
+
+    #[Test]
+    public function linked_article_gets_a_reading_card_with_its_takeaways(): void
+    {
+        $publication = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'Klement on Investing',
+            'content' => '# China is decoupling from the West' . "\n\n" . str_repeat('word ', 460),
+        ]);
+        $article = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'newsletter',
+            'action' => 'received_post',
+            'target_id' => $publication->id,
+            'value' => null,
+            'event_metadata' => ['email_subject' => 'China is decoupling from the West'],
+            'time' => now()->subHour(),
+        ]);
+        Block::factory()->create([
+            'event_id' => $article->id,
+            'block_type' => 'newsletter_key_takeaways',
+            'metadata' => ['content' => json_encode([
+                '- **China\'s trade is shifting:** imports come from China-aligned countries.',
+                '- **The pivot sped up** after the pandemic.',
+                '- **Brazil and Russia gained.**',
+                '- **Germany, South Korea and Japan** lost the most.',
+                '- A fifth that the card leaves out.',
+            ])],
+        ]);
+
+        $this->digestLinking("**Klement on Investing:** [China's import sources shifted](https://spark.cronx.co/events/{$article->id}).");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('reading', $card['layout']);
+        $this->assertSame('Klement on Investing', $card['details']['publication']);
+        $this->assertSame('China is decoupling from the West', $card['details']['headline']);
+        $this->assertSame(2, $card['details']['read_minutes']);
+        $this->assertCount(4, $card['details']['takeaways']);
+        $this->assertSame('**China\'s trade is shifting:** imports come from China-aligned countries.', $card['details']['takeaways'][0]);
+    }
+
+    #[Test]
+    public function linked_events_without_a_value_that_are_not_articles_still_get_no_card(): void
+    {
+        $oura = $this->ouraIntegration();
+        $empty = $this->ouraEvent($oura, 'had_sleep_score', null, null);
+
+        $this->digestLinking("[no score yet](https://spark.cronx.co/events/{$empty->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->assertSame([], $this->digestPayload()['linked_events']);
+    }
+
+    private function calendarIntegration(): Integration
+    {
+        return Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'google-calendar',
+        ]);
+    }
+
+    private function calendarEvent(Integration $integration, string $title, ?string $content, int $minutes): Event
+    {
+        $entry = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'event',
+            'type' => 'calendar_event',
+            'title' => $title,
+            'content' => $content,
+        ]);
+
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'google-calendar',
+            'domain' => 'knowledge',
+            'action' => 'had_event',
+            'target_id' => $entry->id,
+            'value' => $minutes,
+            'value_multiplier' => 1,
+            'value_unit' => 'minutes',
+            'time' => now()->addHour(),
+        ]);
+    }
+
+    private function monzoPayment(Integration $integration, EventObject $account, EventObject $merchant, int $pence, Carbon $time): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'card_payment_to',
+            'actor_id' => $account->id,
+            'target_id' => $merchant->id,
+            'value' => $pence,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => $time,
+        ]);
+    }
+
+    private function ouraIntegration(): Integration
+    {
+        return Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'oura',
+        ]);
+    }
+
+    private function ouraEvent(Integration $integration, string $action, ?int $value, ?string $unit): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'oura',
+            'domain' => 'health',
+            'action' => $action,
+            'value' => $value,
+            'value_multiplier' => 1,
+            'value_unit' => $unit,
+            'time' => now(),
+        ]);
+    }
+
+    private function digestLinking(string $summary): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => now(),
+            'event_metadata' => ['period' => 'morning', 'title' => 'Morning Digest', 'summary' => $summary],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function digestPayload(): array
+    {
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $digest = $items->firstWhere('type', 'flint_digest');
+
+        $this->assertNotNull($digest, 'expected a flint_digest item in the feed');
+
+        return $digest['payload'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function firstAnomalyPayload(): array
+    {
+        $items = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'));
+        $anomaly = $items->firstWhere('type', 'anomaly');
+
+        $this->assertNotNull($anomaly, 'expected an anomaly item in the feed');
+
+        return $anomaly['payload'];
+    }
+
+    private function acknowledgedAnomaly(): MetricTrend
+    {
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+
+        // significant() sets the deviation as well as the type: the factory
+        // definition picks its deviation scale from the type it generated, so
+        // overriding type alone can leave a trend-scale value behind.
+        return MetricTrend::factory()->significant()->create([
+            'metric_statistic_id' => $stat->id,
+            'detected_at' => now(),
+            'acknowledged_at' => now(),
+        ]);
+    }
+}

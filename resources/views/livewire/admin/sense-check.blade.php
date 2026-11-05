@@ -1,0 +1,1340 @@
+<?php
+
+use App\Integrations\PluginRegistry;
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Support\AdminTenant;
+use App\Support\PulseCommands;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Url;
+use Livewire\Volt\Component;
+use Mary\Traits\Toast;
+
+use function Livewire\Volt\layout;
+
+layout('components.layouts.app');
+
+/**
+ * Every query on this page is scoped to the signed-in user.
+ *
+ * The `admin` middleware gates power-user tooling, not cross-tenant access:
+ * every sibling page under resources/views/livewire/admin/ already scopes the
+ * same way. Rows whose only owner was a hard-deleted parent — a block whose
+ * event row is gone, an event whose integration row is gone — have no
+ * resolvable owner and so cannot appear here at all. A cross-tenant integrity
+ * sweep belongs in an artisan command run by an operator, not in a per-user
+ * page.
+ */
+new class extends Component
+{
+    use Toast;
+
+    /** @var array<string, array<string, mixed>> */
+    public array $pluginActionTypes = [];
+
+    /** @var array<string, array<string>> */
+    public array $dbActionsByService = [];
+
+    /** @var array<string, array<string>> */
+    public array $dbBlockTypesByService = [];
+
+    /** @var array<string, array<string>> */
+    public array $dbObjectTypesByService = [];
+
+    /** @var array<string, array<string, mixed>> */
+    public array $allPluginBlockTypes = [];
+
+    /** @var array<string, int> */
+    public array $blockCountsByType = [];
+
+    #[Url]
+    public ?string $section = null;
+
+    /** @var array<string, bool> */
+    public array $collapse = [
+        'undefined_actions' => false,
+        'unknown_services' => false,
+        'undefined_block_types' => false,
+        'undefined_object_types' => false,
+        'orphaned_events' => false,
+        'orphaned_blocks' => false,
+        'orphaned_objects' => false,
+        'invalid_integrations' => false,
+        'plugin_config_issues' => false,
+        'configuration_audit' => false,
+        'embedding_health' => false,
+        'money_data_health' => false,
+        'data_fixes' => false,
+        'block_types_custom_layouts' => false,
+    ];
+
+    public function mount(): void
+    {
+        $this->loadData();
+
+        if ($this->section !== null && array_key_exists($this->section, $this->collapse)) {
+            $this->collapse[$this->section] = true;
+        }
+    }
+
+    public function toggle(string $key): void
+    {
+        $this->collapse[$key] = ! ($this->collapse[$key] ?? false);
+    }
+
+    /**
+     * Get all issues as structured JSON for export (action method for clipboard)
+     */
+    public function getIssuesJson(): string
+    {
+        return $this->issuesJson;
+    }
+
+    /**
+     * Get all issues as structured JSON for export
+     */
+    public function getIssuesJsonProperty(): string
+    {
+        $issues = [
+            'generated_at' => now()->toIso8601String(),
+            'summary' => [
+                'total_issue_types' => 0,
+                'total_issues' => 0,
+            ],
+            'issues' => [],
+        ];
+
+        // Undefined Actions
+        if (! empty($this->undefinedActions)) {
+            foreach ($this->undefinedActions as $item) {
+                $issues['issues'][] = [
+                    'category' => 'undefined_actions',
+                    'severity' => 'warning',
+                    'service' => $item['service'],
+                    'issue' => 'Actions present in database but not defined in plugin files',
+                    'missing_actions' => $item['actions'],
+                    'count' => count($item['actions']),
+                ];
+                $issues['summary']['total_issues'] += count($item['actions']);
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Unknown Services
+        if (! empty($this->unknownServices)) {
+            $issues['issues'][] = [
+                'category' => 'unknown_services',
+                'severity' => 'error',
+                'issue' => 'Unknown services in events',
+                'unknown_services' => $this->unknownServices,
+                'count' => count($this->unknownServices),
+            ];
+            $issues['summary']['total_issue_types']++;
+            $issues['summary']['total_issues'] += count($this->unknownServices);
+        }
+
+        // Undefined Block Types
+        if (! empty($this->undefinedBlockTypes)) {
+            foreach ($this->undefinedBlockTypes as $item) {
+                $issues['issues'][] = [
+                    'category' => 'undefined_block_types',
+                    'severity' => 'warning',
+                    'service' => $item['service'],
+                    'issue' => 'Block types present in database but not defined in plugin files',
+                    'missing_block_types' => $item['block_types'],
+                    'count' => count($item['block_types']),
+                ];
+                $issues['summary']['total_issues'] += count($item['block_types']);
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Undefined Object Types
+        if (! empty($this->undefinedObjectTypes)) {
+            foreach ($this->undefinedObjectTypes as $item) {
+                $issues['issues'][] = [
+                    'category' => 'undefined_object_types',
+                    'severity' => 'warning',
+                    'service' => $item['service'],
+                    'issue' => 'Object types present in events but not defined in plugin files',
+                    'missing_object_types' => $item['object_types'],
+                    'count' => count($item['object_types']),
+                ];
+                $issues['summary']['total_issues'] += count($item['object_types']);
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Orphaned Events
+        if ($this->orphanedEvents['count'] > 0) {
+            $issues['issues'][] = [
+                'category' => 'orphaned_events',
+                'severity' => 'error',
+                'issue' => 'Events without integrations',
+                'orphaned_event_ids' => $this->orphanedEvents['records']->pluck('id')->toArray(),
+                'count' => $this->orphanedEvents['count'],
+            ];
+            $issues['summary']['total_issue_types']++;
+            $issues['summary']['total_issues'] += $this->orphanedEvents['count'];
+        }
+
+        // Orphaned Blocks
+        if ($this->orphanedBlocks['count'] > 0) {
+            $issues['issues'][] = [
+                'category' => 'orphaned_blocks',
+                'severity' => 'error',
+                'issue' => 'Blocks without events',
+                'orphaned_block_ids' => $this->orphanedBlocks['records']->pluck('id')->toArray(),
+                'count' => $this->orphanedBlocks['count'],
+            ];
+            $issues['summary']['total_issue_types']++;
+            $issues['summary']['total_issues'] += $this->orphanedBlocks['count'];
+        }
+
+        // Orphaned Objects
+        if ($this->orphanedObjects['count'] > 0) {
+            $issues['issues'][] = [
+                'category' => 'orphaned_objects',
+                'severity' => 'error',
+                'issue' => 'Objects without event references',
+                'orphaned_object_ids' => $this->orphanedObjects['records']->pluck('id')->toArray(),
+                'count' => $this->orphanedObjects['count'],
+            ];
+            $issues['summary']['total_issue_types']++;
+            $issues['summary']['total_issues'] += $this->orphanedObjects['count'];
+        }
+
+        // Invalid Integrations
+        if (! empty($this->invalidIntegrations)) {
+            foreach ($this->invalidIntegrations as $item) {
+                $issues['issues'][] = [
+                    'category' => 'invalid_integrations',
+                    'severity' => 'error',
+                    'issue' => $item['issue'],
+                    'details' => $item['details'],
+                    'count' => $item['count'],
+                ];
+                $issues['summary']['total_issues'] += $item['count'];
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Deployment configuration findings (redacted, no credential values)
+        $configFindings = app(\App\Services\Diagnostics\ConfigurationAudit::class)->run()['findings'];
+        foreach ($configFindings as $finding) {
+            if (! in_array($finding['severity'], ['error', 'warning'], true)) {
+                continue;
+            }
+            $issues['issues'][] = [
+                'category' => 'configuration_audit',
+                'severity' => $finding['severity'],
+                'key' => $finding['key'],
+                'issue' => $finding['message'],
+                'count' => 1,
+            ];
+            $issues['summary']['total_issues']++;
+        }
+        if (count(array_filter($configFindings, fn ($f) => in_array($f['severity'], ['error', 'warning'], true))) > 0) {
+            $issues['summary']['total_issue_types']++;
+        }
+
+        // Plugin Config Issues
+        if (! empty($this->pluginConfigIssues)) {
+            foreach ($this->pluginConfigIssues as $item) {
+                $issues['issues'][] = [
+                    'category' => 'plugin_config_issues',
+                    'severity' => 'error',
+                    'plugin' => $item['plugin'],
+                    'issue' => 'Plugin configuration issues',
+                    'config_issues' => $item['issues'],
+                    'count' => count($item['issues']),
+                ];
+                $issues['summary']['total_issues'] += count($item['issues']);
+            }
+            $issues['summary']['total_issue_types']++;
+        }
+
+        return json_encode($issues, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * @return array<int, array{service: string, actions: array<int, string>}>
+     */
+    public function getUndefinedActionsProperty(): array
+    {
+        $results = [];
+        foreach ($this->dbActionsByService as $service => $actions) {
+            if (in_array($service, PluginRegistry::INTERNAL_SERVICES, true)) {
+                continue;
+            }
+            $pluginClass = PluginRegistry::getPlugin($service);
+            $defined = array_merge(
+                array_keys($this->pluginActionTypes[$service] ?? []),
+                $pluginClass ? PluginRegistry::getLegacyTypeNames($pluginClass, 'action_types') : [],
+            );
+            $missing = array_values(array_diff($actions, $defined));
+            if (! empty($missing)) {
+                $results[] = [
+                    'service' => $service,
+                    'actions' => $missing,
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getUnknownServicesProperty(): array
+    {
+        $servicesInDb = array_keys($this->dbActionsByService);
+        $servicesInPlugins = PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()->all();
+
+        return array_values(array_diff($servicesInDb, $servicesInPlugins, PluginRegistry::INTERNAL_SERVICES));
+    }
+
+    /**
+     * @return array<int, array{service: string, block_types: array<int, string>}>
+     */
+    public function getUndefinedBlockTypesProperty(): array
+    {
+        $results = [];
+        foreach ($this->dbBlockTypesByService as $service => $blockTypes) {
+            $pluginClass = PluginRegistry::getPlugin($service);
+            $defined = $pluginClass
+                ? array_merge(array_keys($pluginClass::getBlockTypes()), PluginRegistry::getLegacyTypeNames($pluginClass, 'block_types'))
+                : [];
+            $missing = array_values(array_diff($blockTypes, $defined));
+            if (! empty($missing)) {
+                $results[] = [
+                    'service' => $service,
+                    'block_types' => $missing,
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * @return array<int, array{service: string, object_types: array<int, string>}>
+     */
+    public function getUndefinedObjectTypesProperty(): array
+    {
+        $results = [];
+        $defined = PluginRegistry::getAllObjectTypeNames();
+        foreach ($this->dbObjectTypesByService as $service => $objectTypes) {
+            if (in_array($service, PluginRegistry::INTERNAL_SERVICES, true)) {
+                continue;
+            }
+            $missing = array_values(array_diff($objectTypes, $defined));
+            if (! empty($missing)) {
+                $results[] = [
+                    'service' => $service,
+                    'object_types' => $missing,
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * @return array{count: int, records: Illuminate\Database\Eloquent\Collection}
+     */
+    public function getOrphanedEventsProperty(): array
+    {
+        // integration() is a withTrashed() relation, so an event only counts as
+        // orphaned once the integration row is gone outright — which takes its
+        // user_id with it. The actor/target objects are the surviving ownership
+        // signal, because those carry user_id directly.
+        $orphanedEvents = Event::whereDoesntHave('integration')
+            ->where(fn ($q) => $q
+                ->whereHas('actor', AdminTenant::scoped())
+                ->orWhereHas('target', AdminTenant::scoped()))
+            ->with(['actor', 'target', 'blocks'])
+            ->get();
+
+        return [
+            'count' => $orphanedEvents->count(),
+            'records' => $orphanedEvents,
+        ];
+    }
+
+    /**
+     * @return array{count: int, records: Illuminate\Database\Eloquent\Collection}
+     */
+    public function getOrphanedBlocksProperty(): array
+    {
+        // event() is likewise withTrashed(), so these are blocks whose event row
+        // has gone. A block carries no user_id and no other foreign key, so a
+        // truly dangling one cannot be attributed to anybody and is shown to
+        // nobody — an operator-level integrity sweep, not a per-user page.
+        $orphanedBlocks = Block::whereDoesntHave('event')
+            ->whereIn('event_id', Event::withTrashed()->tap(AdminTenant::scopedForUser())->select('id'))
+            ->with('event')
+            ->get();
+
+        return [
+            'count' => $orphanedBlocks->count(),
+            'records' => $orphanedBlocks,
+        ];
+    }
+
+    /**
+     * @return array{count: int, records: Illuminate\Database\Eloquent\Collection}
+     */
+    public function getOrphanedObjectsProperty(): array
+    {
+        $orphanedObjects = AdminTenant::scope(EventObject::query())
+            ->unreferenced()
+            ->with('tags')
+            ->get();
+
+        return [
+            'count' => $orphanedObjects->count(),
+            'records' => $orphanedObjects,
+        ];
+    }
+
+    /**
+     * @return array<int, array{issue: string, count: int, details: array<string, mixed>}>
+     */
+    public function getInvalidIntegrationsProperty(): array
+    {
+        $issues = [];
+        // Integrations with unknown services
+        $unknownServices = Integration::query()->tap(AdminTenant::scoped())
+            ->whereNotIn(
+                'service',
+                PluginRegistry::getAllPlugins()->map(fn ($c) => $c::getIdentifier())->values()
+                    ->merge(PluginRegistry::INTERNAL_SERVICES)
+            )->get();
+
+        if ($unknownServices->count() > 0) {
+            $issues[] = [
+                'issue' => 'Integrations with unknown services',
+                'count' => $unknownServices->count(),
+                'details' => $unknownServices->groupBy('service')->map->count()->toArray(),
+            ];
+        }
+
+        // Integrations without groups
+        // The owner predicate has to sit outside the OR group, or the
+        // orWhereDoesntHave() would escape it and match every user's rows.
+        $noGroup = Integration::query()->tap(AdminTenant::scoped())
+            ->where(fn ($q) => $q->whereNull('integration_group_id')->orWhereDoesntHave('group'))
+            ->whereNotIn('service', PluginRegistry::INTERNAL_SERVICES)
+            ->get();
+
+        if ($noGroup->count() > 0) {
+            $issues[] = [
+                'issue' => 'Integrations without valid groups',
+                'count' => $noGroup->count(),
+                'details' => $noGroup->pluck('service')->countBy()->toArray(),
+            ];
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @return array<int, array{plugin: string, issues: array<int, string>}>
+     */
+    public function getPluginConfigIssuesProperty(): array
+    {
+        $issues = [];
+
+        foreach (PluginRegistry::getAllPlugins() as $identifier => $pluginClass) {
+            $pluginIssues = [];
+
+            try {
+                // Check required methods exist and return valid data
+                $emitsEvents = ! method_exists($pluginClass, 'emitsEvents') || $pluginClass::emitsEvents();
+                if ($emitsEvents && (! method_exists($pluginClass, 'getActionTypes') || empty($pluginClass::getActionTypes()))) {
+                    $pluginIssues[] = 'No action types defined';
+                }
+
+                if (! method_exists($pluginClass, 'getIcon') || empty($pluginClass::getIcon())) {
+                    $pluginIssues[] = 'Missing or empty icon';
+                }
+
+                if (! method_exists($pluginClass, 'getDomain')) {
+                    $pluginIssues[] = 'Missing getDomain method';
+                } else {
+                    $domain = $pluginClass::getDomain();
+                    if (! in_array($domain, PluginRegistry::getValidDomains())) {
+                        $pluginIssues[] = "Invalid domain: {$domain}";
+                    }
+                }
+
+                if (! method_exists($pluginClass, 'getAccentColor')) {
+                    $pluginIssues[] = 'Missing getAccentColor method';
+                }
+            } catch (Exception $e) {
+                $pluginIssues[] = 'Exception during validation: ' . $e->getMessage();
+            }
+
+            if (! empty($pluginIssues)) {
+                $issues[] = [
+                    'plugin' => $identifier,
+                    'issues' => $pluginIssues,
+                ];
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Get all block types with custom layout status, grouped by service
+     *
+     * @return array<string, array<int, array{type: string, display_name: string, has_custom_layout: bool, block_count: int, is_high_volume: bool, icon: string}>>
+     */
+    public function getBlockTypesWithCustomLayoutsProperty(): array
+    {
+        $highVolumeThreshold = 100;
+        $grouped = [];
+
+        foreach ($this->allPluginBlockTypes as $type => $data) {
+            $service = $data['service'];
+            $hasCustomLayout = view()->exists("blocks.types.{$type}");
+            $blockCount = $this->blockCountsByType[$type] ?? 0;
+            $isHighVolume = $blockCount > $highVolumeThreshold;
+
+            if (! isset($grouped[$service])) {
+                $grouped[$service] = [];
+            }
+
+            $grouped[$service][] = [
+                'type' => $type,
+                'display_name' => $data['display_name'],
+                'has_custom_layout' => $hasCustomLayout,
+                'block_count' => $blockCount,
+                'is_high_volume' => $isHighVolume,
+                'icon' => $data['icon'],
+            ];
+        }
+
+        // Sort by block count descending within each service
+        foreach ($grouped as $service => $types) {
+            usort($grouped[$service], fn ($a, $b) => $b['block_count'] <=> $a['block_count']);
+        }
+
+        // Sort services by total block count
+        uksort($grouped, function ($a, $b) use ($grouped) {
+            $totalA = array_sum(array_column($grouped[$a], 'block_count'));
+            $totalB = array_sum(array_column($grouped[$b], 'block_count'));
+
+            return $totalB <=> $totalA;
+        });
+
+        return $grouped;
+    }
+
+    /**
+     * Get embedding health statistics
+     *
+     * @return array{events: array, blocks: array, objects: array, overall_coverage: float, events_by_service: array, events_by_domain: array}
+     */
+    public function getEmbeddingHealthProperty(): array
+    {
+        $ownedEvents = fn () => Event::query()->tap(AdminTenant::scopedForUser());
+        $ownedBlocks = fn () => Block::whereHas('event.integration', AdminTenant::scoped());
+        $ownedObjects = fn () => EventObject::query()->tap(AdminTenant::scoped());
+
+        // Events stats
+        $totalEvents = $ownedEvents()->count();
+        $eventsWithEmbeddings = $ownedEvents()->whereNotNull('embeddings')->count();
+        $eventsCoverage = $totalEvents > 0 ? round(($eventsWithEmbeddings / $totalEvents) * 100, 1) : 0;
+
+        // Blocks stats
+        $totalBlocks = $ownedBlocks()->count();
+        $blocksWithEmbeddings = $ownedBlocks()->whereNotNull('embeddings')->count();
+        $blocksCoverage = $totalBlocks > 0 ? round(($blocksWithEmbeddings / $totalBlocks) * 100, 1) : 0;
+
+        // Objects stats
+        $totalObjects = $ownedObjects()->count();
+        $objectsWithEmbeddings = $ownedObjects()->whereNotNull('embeddings')->count();
+        $objectsCoverage = $totalObjects > 0 ? round(($objectsWithEmbeddings / $totalObjects) * 100, 1) : 0;
+
+        // Overall coverage
+        $totalAll = $totalEvents + $totalBlocks + $totalObjects;
+        $totalWithEmbeddings = $eventsWithEmbeddings + $blocksWithEmbeddings + $objectsWithEmbeddings;
+        $overallCoverage = $totalAll > 0 ? round(($totalWithEmbeddings / $totalAll) * 100, 1) : 0;
+
+        // Coverage by service
+        $eventsByService = $ownedEvents()->selectRaw('service, COUNT(*) as total, COUNT(embeddings) as with_embeddings')
+            ->groupBy('service')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->get()
+            ->map(function ($row) {
+                $coverage = $row->total > 0 ? round(($row->with_embeddings / $row->total) * 100, 1) : 0;
+
+                return [
+                    'service' => $row->service,
+                    'total' => $row->total,
+                    'with_embeddings' => $row->with_embeddings,
+                    'coverage' => $coverage,
+                ];
+            })
+            ->toArray();
+
+        // Coverage by domain
+        $eventsByDomain = $ownedEvents()->selectRaw('domain, COUNT(*) as total, COUNT(embeddings) as with_embeddings')
+            ->groupBy('domain')
+            ->orderByDesc('total')
+            ->get()
+            ->map(function ($row) {
+                $coverage = $row->total > 0 ? round(($row->with_embeddings / $row->total) * 100, 1) : 0;
+
+                return [
+                    'domain' => $row->domain,
+                    'total' => $row->total,
+                    'with_embeddings' => $row->with_embeddings,
+                    'coverage' => $coverage,
+                ];
+            })
+            ->toArray();
+
+        return [
+            'events' => [
+                'total' => $totalEvents,
+                'with_embeddings' => $eventsWithEmbeddings,
+                'coverage' => $eventsCoverage,
+            ],
+            'blocks' => [
+                'total' => $totalBlocks,
+                'with_embeddings' => $blocksWithEmbeddings,
+                'coverage' => $blocksCoverage,
+            ],
+            'objects' => [
+                'total' => $totalObjects,
+                'with_embeddings' => $objectsWithEmbeddings,
+                'coverage' => $objectsCoverage,
+            ],
+            'overall_coverage' => $overallCoverage,
+            'events_by_service' => $eventsByService,
+            'events_by_domain' => $eventsByDomain,
+        ];
+    }
+
+    /**
+     * Get all sense check sections organized with issues first, then clean sections
+     *
+     * @return array<int, array{key: string, title: string, description: string, icon: string, badge_class: string, issue_count: int, has_issues: bool, badge_value: string|null}>
+     */
+    public function getSenseCheckSectionsProperty(): array
+    {
+        // Calculate percentages for informational sections
+        $blockTypesGrouped = $this->blockTypesWithCustomLayouts;
+        $totalBlockTypes = array_sum(array_map('count', $blockTypesGrouped));
+        $blockTypesWithLayouts = collect($blockTypesGrouped)->flatten(1)->where('has_custom_layout', true)->count();
+        $blockTypesCoveragePercent = $totalBlockTypes > 0 ? round(($blockTypesWithLayouts / $totalBlockTypes) * 100, 1) : 0;
+
+        $embeddingHealth = $this->embeddingHealth;
+        $overallEmbeddingCoverage = $embeddingHealth['overall_coverage'];
+
+        $sections = [
+            [
+                'key' => 'undefined_actions',
+                'title' => 'Actions present in database but not defined in plugin files',
+                'description' => 'Distinct `events.action` that have no corresponding entry in plugin `getActionTypes()`.',
+                'icon' => 'fas.triangle-exclamation',
+                'issue_count' => count($this->undefinedActions),
+                'badge_value' => null,
+            ],
+            [
+                'key' => 'unknown_services',
+                'title' => 'Unknown services in events',
+                'description' => '`events.service` values that aren\'t registered in plugins.',
+                'icon' => 'o-question-mark-circle',
+                'issue_count' => count($this->unknownServices),
+                'badge_value' => null,
+            ],
+            [
+                'key' => 'undefined_block_types',
+                'title' => 'Block types present in database but not defined in plugin files',
+                'description' => 'Distinct `blocks.block_type` per service with no corresponding entry in plugin `getBlockTypes()`.',
+                'icon' => 'o-cube-transparent',
+                'issue_count' => count($this->undefinedBlockTypes),
+                'badge_value' => null,
+            ],
+            [
+                'key' => 'undefined_object_types',
+                'title' => 'Object types present in events but not defined in plugin files',
+                'description' => 'Distinct `objects.type` used as actor/target per service that no plugin declares in `getObjectTypes()`.',
+                'icon' => 'fas.tag',
+                'issue_count' => count($this->undefinedObjectTypes),
+                'badge_value' => null,
+            ],
+            [
+                'key' => 'orphaned_events',
+                'title' => 'Orphaned database records',
+                'description' => 'Events without integrations, blocks without events, and objects without references.',
+                'icon' => 'fas.trash',
+                'issue_count' => $this->orphanedEvents['count'] + $this->orphanedBlocks['count'] + $this->orphanedObjects['count'],
+                'badge_value' => null,
+            ],
+            [
+                'key' => 'invalid_integrations',
+                'title' => 'Invalid integration records',
+                'description' => 'Integrations with missing groups or unknown services.',
+                'icon' => 'fas.circle-xmark',
+                'issue_count' => count($this->invalidIntegrations),
+                'badge_value' => null,
+            ],
+            [
+                'key' => 'configuration_audit',
+                'title' => 'Deployment configuration audit',
+                'description' => 'Explicit variables, inherited defaults and actionable configuration findings (values and credentials are never displayed).',
+                'icon' => 'fas.shield-halved',
+                'issue_count' => count(array_filter(app(\App\Services\Diagnostics\ConfigurationAudit::class)->run()['findings'], fn ($f) => in_array($f['severity'], ['error', 'warning'], true))),
+                'badge_value' => null,
+            ],
+            [
+                'key' => 'plugin_config_issues',
+                'title' => 'Plugin configuration issues',
+                'description' => 'Missing required methods, invalid domains, or configuration errors in plugins.',
+                'icon' => 'fas.gear',
+                'issue_count' => count($this->pluginConfigIssues),
+                'badge_value' => null,
+            ],
+            [
+                'key' => 'money_data_health',
+                'title' => 'Money data health',
+                'description' => 'Duplicate bank accounts, archived pot snapshots, missing pot details and unnamed categories, with a preview before anything is applied.',
+                'icon' => 'fas.sterling-sign',
+                'issue_count' => count(app(\App\Services\Money\AccountCleanup::class)->plan((string) (AdminTenant::id() ?? Auth::id()))['steps']),
+                'badge_value' => null,
+            ],
+            [
+                'key' => 'data_fixes',
+                'title' => 'Data fixes',
+                'description' => 'One-off data migrations and backfills. Preview, then run.',
+                'icon' => 'fas.wrench',
+                'issue_count' => 0,
+                'badge_value' => (string) count(PulseCommands::all()),
+            ],
+            [
+                'key' => 'embedding_health',
+                'title' => 'Embedding Health Dashboard',
+                'description' => 'Monitor semantic search embedding coverage across events, blocks, and objects.',
+                'icon' => 'fas.wand-magic-sparkles',
+                'issue_count' => 0, // Informational only
+                'badge_value' => $overallEmbeddingCoverage . '%',
+            ],
+            [
+                'key' => 'block_types_custom_layouts',
+                'title' => 'Block Types with Custom Layouts',
+                'description' => 'Coverage of custom card layouts for block types across all plugins. Shows which block types have custom layouts and highlights high-volume types (>100 blocks) that could benefit from custom layouts.',
+                'icon' => 'fas.layer-group',
+                'issue_count' => 0, // Informational only
+                'badge_value' => $blockTypesCoveragePercent . '%',
+            ],
+        ];
+
+        // Add computed properties
+        foreach ($sections as &$section) {
+            $section['has_issues'] = $section['issue_count'] > 0;
+            $section['badge_class'] = $section['has_issues'] ? 'badge-error' : 'badge-success';
+        }
+
+        // Sort: sections with issues first, then clean sections
+        usort($sections, function ($a, $b) {
+            // First, sort by whether they have issues (issues first)
+            if ($a['has_issues'] && ! $b['has_issues']) {
+                return -1;
+            }
+            if (! $a['has_issues'] && $b['has_issues']) {
+                return 1;
+            }
+            // Within same issue status, sort by issue count (desc) or alphabetically
+            if ($a['has_issues'] && $b['has_issues']) {
+                return $b['issue_count'] <=> $a['issue_count'];
+            }
+
+            return strcmp($a['title'], $b['title']);
+        });
+
+        return $sections;
+    }
+
+    private function loadData(): void
+    {
+        // Plugin action types keyed by service
+        $this->pluginActionTypes = PluginRegistry::getAllPlugins()
+            ->mapWithKeys(function (string $pluginClass) {
+                $service = $pluginClass::getIdentifier();
+
+                return [
+                    $service => $pluginClass::getActionTypes(),
+                ];
+            })
+            ->toArray();
+
+        // DB actions grouped by service
+        $actions = Event::query()
+            ->tap(AdminTenant::scopedForUser())
+            ->select('service', 'action')
+            ->distinct()
+            ->get()
+            ->groupBy('service')
+            ->map(fn (Collection $rows) => $rows->pluck('action')->filter()->unique()->values()->all());
+
+        $this->dbActionsByService = $actions->toArray();
+
+        // DB block types grouped by service (via events)
+        $blockTypes = Block::query()
+            ->select('events.service', 'blocks.block_type')
+            ->join('events', 'events.id', '=', 'blocks.event_id')
+            ->whereHas('event.integration', AdminTenant::scoped())
+            ->whereNotNull('blocks.block_type')
+            ->distinct()
+            ->get()
+            ->groupBy('service')
+            ->map(fn (Collection $rows) => $rows->pluck('block_type')->filter()->unique()->values()->all());
+
+        $this->dbBlockTypesByService = $blockTypes->toArray();
+
+        // DB object types (actor/target) grouped by service (via events)
+        $actorTypes = Event::query()
+            ->tap(AdminTenant::scopedForUser())
+            ->select('events.service', 'ao.type as object_type')
+            ->leftJoin('objects as ao', 'ao.id', '=', 'events.actor_id')
+            ->whereNotNull('ao.type')
+            ->distinct()
+            ->get();
+
+        $targetTypes = Event::query()
+            ->tap(AdminTenant::scopedForUser())
+            ->select('events.service', 'to.type as object_type')
+            ->leftJoin('objects as to', 'to.id', '=', 'events.target_id')
+            ->whereNotNull('to.type')
+            ->distinct()
+            ->get();
+
+        $objectTypes = $actorTypes->concat($targetTypes)
+            ->groupBy('service')
+            ->map(fn (Collection $rows) => $rows->pluck('object_type')->filter()->unique()->values()->all());
+
+        $this->dbObjectTypesByService = $objectTypes->toArray();
+
+        // All plugin block types with their configurations
+        $this->allPluginBlockTypes = PluginRegistry::getAllPlugins()
+            ->flatMap(function (string $pluginClass) {
+                $service = $pluginClass::getIdentifier();
+                $blockTypes = $pluginClass::getBlockTypes();
+
+                return collect($blockTypes)->map(function ($config, $type) use ($service, $pluginClass) {
+                    return [
+                        'service' => $service,
+                        'type' => $type,
+                        'display_name' => $config['display_name'] ?? ucwords(str_replace('_', ' ', $type)),
+                        'icon' => $config['icon'] ?? 'o-cube',
+                        'plugin_class' => $pluginClass,
+                    ];
+                });
+            })
+            ->keyBy('type')
+            ->toArray();
+
+        // Block counts by type
+        $this->blockCountsByType = Block::query()
+            ->select('block_type', DB::raw('COUNT(*) as count'))
+            ->whereHas('event.integration', AdminTenant::scoped())
+            ->whereNotNull('block_type')
+            ->groupBy('block_type')
+            ->pluck('count', 'block_type')
+            ->toArray();
+    }
+}; ?>
+
+<div>
+    <x-header title="Pulse" separator>
+        <x-slot:actions>
+            <button
+                x-data
+                @click="$wire.getIssuesJson().then(json => {
+                    navigator.clipboard.writeText(json).then(() => {
+                        $dispatch('mary-toast', {
+                            type: 'success',
+                            title: 'Copied!',
+                            description: 'Issues JSON copied to clipboard',
+                            position: 'toast-top toast-end',
+                            timeout: 3000
+                        });
+                    });
+                })"
+                class="btn btn-primary btn-sm gap-2">
+                <x-icon name="o-clipboard-document" class="w-4 h-4" />
+                Copy Issues JSON
+            </button>
+        </x-slot:actions>
+    </x-header>
+
+    <div class="space-y-2">
+        @foreach ($this->senseCheckSections as $section)
+        <x-collapse wire:model="collapse.{{ $section['key'] }}" separator class="bg-base-100">
+            <x-slot:heading>
+                <div class="flex items-center gap-3 w-full" wire:click="toggle('{{ $section['key'] }}')">
+                    <x-icon :name="$section['icon']" class="w-5 h-5" />
+                    <span class="flex-1 text-left">{{ $section['title'] }}</span>
+                    @if ($section['has_issues'])
+                    <x-badge :value="$section['issue_count']" class="{{ $section['badge_class'] }}" />
+                    @elseif ($section['badge_value'])
+                    <x-badge :value="$section['badge_value']" class="{{ $section['badge_class'] }}" />
+                    @else
+                    <x-badge value="✓" class="{{ $section['badge_class'] }}" />
+                    @endif
+                </div>
+            </x-slot:heading>
+            <x-slot:content>
+                <div class="text-sm text-base-content/70 mb-4">{{ $section['description'] }}</div>
+
+                @if ($section['key'] === 'undefined_actions')
+                @php($items = $this->undefinedActions)
+                @if (empty($items))
+                <div class="alert alert-success">No inconsistencies found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-base-300 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold">{{ strtoupper($item['service']) }}</div>
+                            <span class="badge badge-warning">{{ count($item['actions']) }} missing</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($item['actions'] as $action)
+                            <a href="{{ route('admin.events.index', ['serviceFilter' => $item['service'], 'actionFilter' => $action]) }}"
+                                class="badge badge-outline hover:badge-warning transition-colors">
+                                {{ $action }}
+                            </a>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'unknown_services')
+                @php($items = $this->unknownServices)
+                @if (empty($items))
+                <div class="alert alert-success">All services are registered 🎉</div>
+                @else
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($items as $service)
+                    <a href="{{ route('admin.events.index', ['serviceFilter' => $service]) }}"
+                        class="badge badge-error hover:badge-error-hover transition-colors">
+                        {{ $service }}
+                    </a>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'undefined_block_types')
+                @php($items = $this->undefinedBlockTypes)
+                @if (empty($items))
+                <div class="alert alert-success">No inconsistencies found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-base-300 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold">{{ strtoupper($item['service']) }}</div>
+                            <span class="badge badge-warning">{{ count($item['block_types']) }} missing</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($item['block_types'] as $type)
+                            <a href="{{ route('admin.blocks.index', ['serviceFilter' => $item['service'], 'blockTypeFilter' => $type]) }}"
+                                class="badge badge-outline hover:badge-warning transition-colors">
+                                {{ $type }}
+                            </a>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'configuration_audit')
+                @php($audit = app(\App\Services\Diagnostics\ConfigurationAudit::class)->run())
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <span class="badge badge-outline">{{ $audit['summary']['total'] }} variables</span>
+                    <span class="badge badge-success">{{ $audit['summary']['explicit'] }} explicitly configured</span>
+                    <span class="badge badge-ghost">{{ $audit['summary']['default_or_unset'] }} default or unset</span>
+                </div>
+                @foreach ($audit['findings'] as $finding)
+                    <div class="alert mb-2 {{ $finding['severity'] === 'error' ? 'alert-error' : ($finding['severity'] === 'warning' ? 'alert-warning' : 'alert-info') }}">
+                        <span><strong>{{ $finding['key'] }}</strong> — {{ $finding['message'] }}</span>
+                    </div>
+                @endforeach
+                <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table class="table table-sm">
+                        <thead><tr><th>Variable</th><th>Source</th></tr></thead>
+                        <tbody>
+                            @foreach ($audit['variables'] as $variable)
+                                <tr><td class="font-mono">{{ $variable['name'] }}</td><td>{{ $variable['source'] === 'explicit' ? 'Explicit' : 'Default or unset' }}</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                @elseif ($section['key'] === 'undefined_object_types')
+                @php($items = $this->undefinedObjectTypes)
+                @if (empty($items))
+                <div class="alert alert-success">No inconsistencies found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-base-300 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold">{{ strtoupper($item['service']) }}</div>
+                            <span class="badge badge-warning">{{ count($item['object_types']) }} missing</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ($item['object_types'] as $type)
+                            <a href="{{ route('admin.objects.index', ['typeFilter' => $type]) }}"
+                                class="badge badge-outline hover:badge-warning transition-colors">
+                                {{ $type }}
+                            </a>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'orphaned_events')
+                @php($orphanedEvents = $this->orphanedEvents)
+                @php($orphanedBlocks = $this->orphanedBlocks)
+                @php($orphanedObjects = $this->orphanedObjects)
+                @if ($orphanedEvents['count'] === 0 && $orphanedBlocks['count'] === 0 && $orphanedObjects['count'] === 0)
+                <div class="alert alert-success">No orphaned records found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @if ($orphanedEvents['count'] > 0)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="font-semibold text-red-700">Events without integrations</div>
+                            <a href="{{ route('admin.events.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
+                                {{ $orphanedEvents['count'] }} found
+                            </a>
+                        </div>
+                        <div class="text-xs text-red-600 mb-2">All orphaned events:</div>
+                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2">
+                            @foreach ($orphanedEvents['records'] as $event)
+                            <x-event-ref :event="$event" />
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    @if ($orphanedBlocks['count'] > 0)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="font-semibold text-red-700">Blocks without events</div>
+                            <a href="{{ route('admin.blocks.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
+                                {{ $orphanedBlocks['count'] }} found
+                            </a>
+                        </div>
+                        <div class="text-xs text-red-600 mb-2">All orphaned blocks:</div>
+                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2">
+                            @foreach ($orphanedBlocks['records'] as $block)
+                            <x-block-ref :block="$block" />
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    @if ($orphanedObjects['count'] > 0)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="font-semibold text-red-700">Objects without event references</div>
+                            <a href="{{ route('admin.objects.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
+                                {{ $orphanedObjects['count'] }} found
+                            </a>
+                        </div>
+                        <div class="text-xs text-red-600 mb-2">All orphaned objects:</div>
+                        <div class="flex flex-wrap gap-2 max-h-96 overflow-y-auto p-2">
+                            @foreach ($orphanedObjects['records'] as $object)
+                            <x-object-ref :object="$object" />
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'invalid_integrations')
+                @php($items = $this->invalidIntegrations)
+                @if (empty($items))
+                <div class="alert alert-success">No invalid integrations found 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-red-700">{{ $item['issue'] }}</div>
+                            <a href="{{ route('integrations.index') }}" class="badge badge-error hover:badge-error-hover transition-colors">
+                                {{ $item['count'] }} found
+                            </a>
+                        </div>
+                        @if (!empty($item['details']))
+                        <div class="flex flex-wrap gap-1">
+                            @foreach ($item['details'] as $service => $count)
+                            <a href="{{ route('admin.events.index', ['serviceFilter' => $service]) }}"
+                                class="badge badge-outline hover:badge-warning transition-colors">
+                                {{ $service }}: {{ $count }}
+                            </a>
+                            @endforeach
+                        </div>
+                        @endif
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'plugin_config_issues')
+                @php($items = $this->pluginConfigIssues)
+                @if (empty($items))
+                <div class="alert alert-success">All plugins properly configured 🎉</div>
+                @else
+                <div class="space-y-3">
+                    @foreach ($items as $item)
+                    <div class="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-red-700">{{ strtoupper($item['plugin']) }}</div>
+                            <span class="badge badge-error">{{ count($item['issues']) }} issues</span>
+                        </div>
+                        <ul class="text-sm text-red-600 space-y-1">
+                            @foreach ($item['issues'] as $issue)
+                            <li>• {{ $issue }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'money_data_health')
+                <livewire:money.data-health />
+
+                @elseif ($section['key'] === 'data_fixes')
+                <livewire:admin.pulse-commands />
+
+                @elseif ($section['key'] === 'embedding_health')
+                @php($health = $this->embeddingHealth)
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="stat bg-gradient-to-br from-warning/5 to-warning/25 rounded-lg border border-warning/50">
+                        <div class="stat-title flex items-center gap-2">
+                            <x-icon name="fas.wand-magic-sparkles" class="w-4 h-4 text-warning" />
+                            Overall Coverage
+                        </div>
+                        <div class="stat-value {{ $health['overall_coverage'] > 80 ? 'text-success' : ($health['overall_coverage'] > 50 ? 'text-warning' : 'text-error') }}">
+                            {{ $health['overall_coverage'] }}%
+                        </div>
+                        <div class="stat-desc">Across all models</div>
+                    </div>
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Events</div>
+                        <div class="stat-value text-primary text-2xl">{{ number_format($health['events']['with_embeddings']) }}</div>
+                        <div class="stat-desc">{{ $health['events']['coverage'] }}% of {{ number_format($health['events']['total']) }}</div>
+                    </div>
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Blocks</div>
+                        <div class="stat-value text-secondary text-2xl">{{ number_format($health['blocks']['with_embeddings']) }}</div>
+                        <div class="stat-desc">{{ $health['blocks']['coverage'] }}% of {{ number_format($health['blocks']['total']) }}</div>
+                    </div>
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Objects</div>
+                        <div class="stat-value text-accent text-2xl">{{ number_format($health['objects']['with_embeddings']) }}</div>
+                        <div class="stat-desc">{{ $health['objects']['coverage'] }}% of {{ number_format($health['objects']['total']) }}</div>
+                    </div>
+                </div>
+
+                @if (!empty($health['events_by_service']))
+                <div class="mb-6">
+                    <h4 class="font-semibold mb-3 flex items-center gap-2">
+                        <x-icon name="o-server-stack" class="w-4 h-4" />
+                        Coverage by Service (Top 10)
+                    </h4>
+                    <div class="overflow-x-auto">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th class="text-right">Total Events</th>
+                                    <th class="text-right">With Embeddings</th>
+                                    <th class="text-right">Coverage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($health['events_by_service'] as $serviceData)
+                                <tr class="hover">
+                                    <td>
+                                        @php($pluginClass = \App\Integrations\PluginRegistry::getPlugin($serviceData['service']))
+                                        @if ($pluginClass)
+                                        <div class="flex items-center gap-2">
+                                            <x-icon :name="$pluginClass::getIcon()" class="w-4 h-4" />
+                                            {{ $pluginClass::getDisplayName() }}
+                                        </div>
+                                        @else
+                                        {{ $serviceData['service'] }}
+                                        @endif
+                                    </td>
+                                    <td class="text-right">{{ number_format($serviceData['total']) }}</td>
+                                    <td class="text-right">{{ number_format($serviceData['with_embeddings']) }}</td>
+                                    <td class="text-right">
+                                        <span class="badge {{ $serviceData['coverage'] > 90 ? 'badge-success' : ($serviceData['coverage'] > 70 ? 'badge-warning' : 'badge-error') }} badge-sm">
+                                            {{ $serviceData['coverage'] }}%
+                                        </span>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @endif
+
+                @if (!empty($health['events_by_domain']))
+                <div class="mb-6">
+                    <h4 class="font-semibold mb-3 flex items-center gap-2">
+                        <x-icon name="fas.globe" class="w-4 h-4" />
+                        Coverage by Domain
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        @foreach ($health['events_by_domain'] as $domainData)
+                        <div class="border border-base-300 rounded-lg p-3 bg-base-100">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="badge badge-outline">{{ $domainData['domain'] }}</div>
+                                <span class="badge {{ $domainData['coverage'] > 90 ? 'badge-success' : ($domainData['coverage'] > 70 ? 'badge-warning' : 'badge-error') }} badge-sm">
+                                    {{ $domainData['coverage'] }}%
+                                </span>
+                            </div>
+                            <div class="text-sm text-base-content/70">
+                                {{ number_format($domainData['with_embeddings']) }} / {{ number_format($domainData['total']) }} events
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+
+                @elseif ($section['key'] === 'block_types_custom_layouts')
+                @php($grouped = $this->blockTypesWithCustomLayouts)
+                @php($totalTypes = array_sum(array_map('count', $grouped)))
+                @php($typesWithLayouts = collect($grouped)->flatten(1)->where('has_custom_layout', true)->count())
+                @php($coveragePercent = $totalTypes > 0 ? round(($typesWithLayouts / $totalTypes) * 100, 1) : 0)
+
+                {{-- Summary Stats --}}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Total Block Types</div>
+                        <div class="stat-value text-primary">{{ $totalTypes }}</div>
+                        <div class="stat-desc">Across all plugins</div>
+                    </div>
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Custom Layouts</div>
+                        <div class="stat-value text-success">{{ $typesWithLayouts }}</div>
+                        <div class="stat-desc">Types with custom card layouts</div>
+                    </div>
+                    <div class="stat bg-base-200 rounded-lg">
+                        <div class="stat-title">Coverage</div>
+                        <div class="stat-value {{ $coveragePercent > 50 ? 'text-success' : 'text-warning' }}">{{ $coveragePercent }}%</div>
+                        <div class="stat-desc">{{ $totalTypes - $typesWithLayouts }} remaining</div>
+                    </div>
+                </div>
+
+                @if (empty($grouped))
+                <div class="alert alert-info">No block types found in plugins</div>
+                @else
+                <div class="space-y-4">
+                    @foreach ($grouped as $service => $types)
+                    @php($pluginClass = \App\Integrations\PluginRegistry::getPlugin($service))
+                    @php($serviceIcon = $pluginClass ? $pluginClass::getIcon() : 'o-cube')
+                    @php($serviceDisplayName = $pluginClass ? $pluginClass::getDisplayName() : strtoupper($service))
+                    @php($serviceTotalBlocks = array_sum(array_column($types, 'block_count')))
+                    @php($serviceCustomLayoutCount = collect($types)->where('has_custom_layout', true)->count())
+
+                    <div class="border border-base-300 rounded-lg p-4">
+                        {{-- Service Header --}}
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <x-icon :name="$serviceIcon" class="w-5 h-5" />
+                                <span class="font-semibold">{{ $serviceDisplayName }}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="badge badge-ghost badge-sm">{{ $serviceTotalBlocks }} blocks total</span>
+                                <span class="badge badge-success badge-sm">{{ $serviceCustomLayoutCount }}/{{ count($types) }} with layouts</span>
+                            </div>
+                        </div>
+
+                        {{-- Block Types Table --}}
+                        <div class="overflow-x-auto">
+                            <table class="table table-xs">
+                                <thead>
+                                    <tr>
+                                        <th>Block Type</th>
+                                        <th>Display Name</th>
+                                        <th class="text-center">Custom Layout?</th>
+                                        <th class="text-right">Block Count</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($types as $blockType)
+                                    <tr class="hover">
+                                        <td>
+                                            <div class="flex items-center gap-2">
+                                                <x-icon :name="$blockType['icon']" class="w-4 h-4" />
+                                                <code class="text-xs">{{ $blockType['type'] }}</code>
+                                            </div>
+                                        </td>
+                                        <td>{{ $blockType['display_name'] }}</td>
+                                        <td class="text-center">
+                                            @if ($blockType['has_custom_layout'])
+                                            <span class="badge badge-success badge-sm">✓</span>
+                                            @elseif ($blockType['is_high_volume'])
+                                            <span class="badge badge-warning badge-sm">✗</span>
+                                            @else
+                                            <span class="badge badge-ghost badge-sm">✗</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-right">
+                                            @if ($blockType['is_high_volume'])
+                                            <span class="badge badge-warning badge-sm">{{ number_format($blockType['block_count']) }}</span>
+                                            @else
+                                            <span class="text-sm">{{ number_format($blockType['block_count']) }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-right">
+                                            <a href="{{ route('admin.blocks.index', ['blockTypeFilter' => $blockType['type']]) }}"
+                                               class="btn btn-ghost btn-xs">
+                                                View Blocks
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+                @endif
+            </x-slot:content>
+        </x-collapse>
+        @endforeach
+    </div>
+</div>

@@ -1,0 +1,297 @@
+<?php
+
+namespace App\Models;
+
+use App\Events\Mobile\ActionProgressUpdated;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * ActionProgress Model
+ *
+ * Tracks the progress of long-running operations in the application.
+ * Supports any type of action through flexible action_type and action_id columns.
+ *
+ * Common action types:
+ * - deletion: Data deletion operations
+ * - migration: Database migrations
+ * - sync: Data synchronization
+ * - backup: Backup operations
+ * - export: Data export
+ * - import: Data import
+ * - bulk_operation: Bulk user operations
+ * - report: Report generation
+ * - maintenance: System maintenance
+ * - integration_test: API testing
+ *
+ * @property int $id
+ * @property int $user_id
+ * @property string $action_type
+ * @property string $action_id
+ * @property string $step
+ * @property string $message
+ * @property int $progress
+ * @property int $total
+ * @property array|null $details
+ * @property Carbon|null $completed_at
+ * @property Carbon|null $failed_at
+ * @property string|null $error_message
+ * @property array|null $updates
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ */
+class ActionProgress extends Model
+{
+    protected $fillable = [
+        'user_id',
+        'action_type',
+        'action_id',
+        'step',
+        'message',
+        'progress',
+        'total',
+        'details',
+        'updates',
+        'completed_at',
+        'failed_at',
+        'error_message',
+    ];
+
+    protected $attributes = [
+        'step' => 'in_progress',
+    ];
+
+    protected $casts = [
+        'details' => 'array',
+        'updates' => 'array',
+        'completed_at' => 'datetime',
+        'failed_at' => 'datetime',
+    ];
+
+    /**
+     * Create a new action progress record
+     *
+     * @param  string  $userId  The user ID performing the action
+     * @param  string  $actionType  The type of action (e.g., 'deletion', 'migration', 'sync')
+     * @param  string  $actionId  Unique identifier for this specific action instance
+     * @param  string  $step  Current step name (e.g., 'starting', 'processing', 'completed')
+     * @param  string  $message  Human-readable progress message
+     * @param  int  $progress  Current progress percentage (0-100)
+     * @param  int  $total  Total progress (usually 100)
+     * @param  array  $details  Additional metadata about the progress
+     */
+    public static function createProgress(
+        string $userId,
+        string $actionType,
+        string $actionId,
+        string $step,
+        string $message,
+        int $progress = 0,
+        int $total = 100,
+        array $details = []
+    ): self {
+        return self::create([
+            'user_id' => $userId,
+            'action_type' => $actionType,
+            'action_id' => $actionId,
+            'step' => $step,
+            'message' => $message,
+            'progress' => $progress,
+            'total' => $total,
+            'details' => $details,
+        ]);
+    }
+
+    /**
+     * Get the latest progress for a specific action
+     *
+     * @param  string  $userId  The user ID
+     * @param  string  $actionType  The action type
+     * @param  string  $actionId  The action ID
+     */
+    public static function getLatestProgress(
+        string $userId,
+        string $actionType,
+        string $actionId
+    ): ?self {
+        return self::where('user_id', $userId)
+            ->where('action_type', $actionType)
+            ->where('action_id', $actionId)
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * Clean up terminal progress records after the notification history window.
+     *
+     * This method should be called regularly (e.g., daily) to prevent
+     * the action_progress table from growing too large.
+     *
+     * @return int Number of records deleted
+     */
+    public static function cleanupOldRecords(): int
+    {
+        return self::where(function ($query) {
+            $query->whereNotNull('completed_at')->orWhereNotNull('failed_at');
+        })
+            ->where('updated_at', '<', now()->subDays(30))
+            ->delete();
+    }
+
+    /**
+     * Boot the model and set up automatic updates tracking
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::updating(function ($model) {
+            $model->trackProgressUpdate();
+        });
+
+        static::creating(function ($model) {
+            // Initialize updates array with the initial state
+            $model->updates = [[
+                'timestamp' => now()->toIso8601String(),
+                'step' => $model->step,
+                'message' => $model->message,
+                'percentage' => $model->progress,
+            ]];
+        });
+
+        static::saved(function (ActionProgress $model) {
+            // Receipts answer the request that made them; nothing needs a live bar.
+            if ($model->action_type === 'command') {
+                return;
+            }
+
+            if (
+                ! $model->wasRecentlyCreated
+                && ! $model->wasChanged(['progress', 'status', 'completed_at', 'failed_at', 'step', 'message'])
+            ) {
+                return;
+            }
+
+            event(ActionProgressUpdated::fromModel($model));
+        });
+    }
+
+    /**
+     * Command receipts (see ActionReceipt) are the app's own record of a run,
+     * not activity to show in the notification feed.
+     */
+    public function scopeActivity(Builder $query): Builder
+    {
+        return $query->where('action_type', '!=', 'command');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function isCompleted(): bool
+    {
+        return ! is_null($this->completed_at);
+    }
+
+    public function isFailed(): bool
+    {
+        return ! is_null($this->failed_at);
+    }
+
+    public function isInProgress(): bool
+    {
+        return ! $this->isCompleted() && ! $this->isFailed();
+    }
+
+    /**
+     * Update progress for an existing action
+     *
+     * @param  string  $step  Current step name
+     * @param  string  $message  Human-readable progress message
+     * @param  int  $progress  Current progress percentage (0-100)
+     * @param  array  $details  Additional metadata about the progress
+     */
+    public function updateProgress(
+        string $step,
+        string $message,
+        int $progress,
+        array $details = []
+    ): void {
+        $this->update([
+            'step' => $step,
+            'message' => $message,
+            'progress' => $progress,
+            'details' => $details,
+        ]);
+    }
+
+    /**
+     * Mark the action as completed
+     *
+     * @param  array  $details  Final completion details
+     */
+    public function markCompleted(array $details = []): void
+    {
+        $this->update([
+            'completed_at' => now(),
+            'step' => 'completed',
+            'progress' => $this->total,
+            'details' => array_merge($this->details ?? [], $details),
+        ]);
+    }
+
+    /**
+     * Mark the action as failed
+     *
+     * @param  string  $errorMessage  Error message describing the failure
+     * @param  array  $details  Additional error details
+     */
+    public function markFailed(string $errorMessage, array $details = []): void
+    {
+        $this->update([
+            'failed_at' => now(),
+            'error_message' => $errorMessage,
+            'step' => 'failed',
+            'details' => array_merge($this->details ?? [], $details),
+        ]);
+    }
+
+    /**
+     * Track progress updates by storing changes to percentage, step, or message
+     */
+    protected function trackProgressUpdate(): void
+    {
+        // Only track if percentage, step, or message have changed
+        $trackedFields = ['progress', 'step', 'message'];
+        $hasTrackedFieldChanged = false;
+
+        foreach ($trackedFields as $field) {
+            if ($this->isDirty($field)) {
+                $hasTrackedFieldChanged = true;
+                break;
+            }
+        }
+
+        if (! $hasTrackedFieldChanged) {
+            return;
+        }
+
+        // Get current updates array or initialize if null
+        $updates = $this->updates ?? [];
+
+        // Add new update record
+        $updates[] = [
+            'timestamp' => now()->toIso8601String(),
+            'step' => $this->step,
+            'message' => $this->message,
+            'percentage' => $this->progress,
+        ];
+
+        // Update the updates array
+        $this->updates = $updates;
+    }
+}

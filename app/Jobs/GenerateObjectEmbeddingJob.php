@@ -1,0 +1,108 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\EventObject;
+use App\Services\Ai\AiUsageContext;
+use App\Services\Ai\EmbeddingClient;
+use Exception;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+
+class GenerateObjectEmbeddingJob implements ShouldQueue
+{
+    use Queueable;
+
+    /**
+     * The number of times the job may be attempted.
+     *
+     * @var int
+     */
+    public $tries = 1;
+
+    /**
+     * The number of seconds to wait before retrying the job.
+     *
+     * @var int
+     */
+    public $backoff = 60;
+
+    /**
+     * Delete the job if its models no longer exist.
+     *
+     * @var bool
+     */
+    public $deleteWhenMissingModels = true;
+
+    /**
+     * Create a new job instance.
+     */
+    public function __construct(
+        public EventObject $object,
+        public bool $bypassCache = false,
+    ) {}
+
+    /**
+     * Execute the job.
+     */
+    public function handle(EmbeddingClient $embeddingService): void
+    {
+        try {
+            // Get searchable text from object
+            $searchableText = $this->object->getSearchableText();
+
+            if (empty(trim($searchableText))) {
+                Log::warning('Object has no searchable text, skipping embedding generation', [
+                    'object_id' => $this->object->id,
+                ]);
+
+                return;
+            }
+
+            // Generate embedding
+            $embedding = $embeddingService->embed($searchableText, ! $this->bypassCache, AiUsageContext::forModel($this->object));
+
+            // Get embedding metadata
+            $embeddingMetadata = $embeddingService->getEmbeddingMetadata();
+
+            // Merge embedding metadata into object metadata
+            $metadata = $this->object->metadata ?? [];
+            $metadata = array_merge($metadata, $embeddingMetadata);
+
+            // Store embedding and metadata in database
+            // Use withoutEvents() to prevent observers from triggering on this internal update
+            $this->object->withoutEvents(function () use ($embedding, $metadata) {
+                $this->object->update([
+                    'embeddings' => EmbeddingClient::formatForPostgres($embedding),
+                    'metadata' => $metadata,
+                ]);
+            });
+
+            Log::info('Generated embedding for object', [
+                'object_id' => $this->object->id,
+                'text_length' => strlen($searchableText),
+                'model' => $embeddingMetadata['embedding_model'],
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to generate embedding for object', [
+                'object_id' => $this->object->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(?Throwable $exception): void
+    {
+        Log::error('GenerateObjectEmbeddingJob failed after all retries', [
+            'object_id' => $this->object->id,
+            'error' => $exception?->getMessage(),
+        ]);
+    }
+}

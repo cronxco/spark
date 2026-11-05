@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Models\Block;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 class BlockFactory extends Factory
 {
@@ -16,17 +15,28 @@ class BlockFactory extends Factory
             'id' => $this->faker->uuid(),
             'event_id' => $this->faker->uuid(),
             'time' => $this->faker->dateTime(),
-            'integration_id' => $this->faker->uuid(),
             'title' => $this->faker->sentence(),
-            'content' => $this->faker->paragraph(),
+            'metadata' => [
+                'text' => $this->faker->paragraph(),
+            ],
             'url' => $this->faker->url(),
             'media_url' => $this->faker->imageUrl(),
             'value' => $this->faker->randomNumber(),
             'value_multiplier' => $this->faker->randomDigit(),
             'value_unit' => $this->faker->word(),
-            'embeddings' => '',
+            'embeddings' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ];
     }
-} 
+
+    /**
+     * Indicate that the block should have valid embeddings (1536 dimensions)
+     */
+    public function withEmbeddings(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'embeddings' => array_map(fn () => $this->faker->randomFloat(4, -1, 1), range(1, 1536)),
+        ]);
+    }
+}

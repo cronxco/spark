@@ -1,0 +1,605 @@
+<?php
+
+namespace Tests\Feature\Api\V1\Mobile;
+
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\Integration;
+use App\Models\User;
+use App\Support\SparkAbility;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\MobileSessionAbilities;
+use Tests\TestCase;
+
+class FlintDigestsControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected User $user;
+
+    protected Integration $integration;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['ios.mobile_api_enabled' => true]);
+
+        $this->user = User::factory()->create();
+
+        $this->integration = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'flint',
+            'instance_type' => 'digest',
+        ]);
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /flint/digests
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function index_returns_todays_latest_digest_by_default(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('event_id', $event->id)
+            ->assertJsonPath('period', 'morning');
+    }
+
+    #[Test]
+    public function index_returns_404_when_no_digest_exists(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests?date=2020-01-01')
+            ->assertNotFound()
+            ->assertJsonPath('error', 'No Flint digest found for 2020-01-01.');
+    }
+
+    #[Test]
+    public function index_filters_by_period(): void
+    {
+        $this->createDigestEvent('morning');
+        $pmEvent = $this->createDigestEvent('afternoon');
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests?period=afternoon')
+            ->assertOk()
+            ->assertJsonPath('event_id', $pmEvent->id)
+            ->assertJsonPath('period', 'afternoon');
+    }
+
+    #[Test]
+    public function index_returns_all_digests_when_all_flag_set(): void
+    {
+        $this->createDigestEvent('morning');
+        $this->createDigestEvent('afternoon');
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests?all=true')
+            ->assertOk()
+            ->assertJsonPath('count', 2)
+            ->assertJsonStructure(['date', 'count', 'digests']);
+    }
+
+    #[Test]
+    public function index_only_returns_digests_for_authenticated_user(): void
+    {
+        $other = User::factory()->create();
+        $otherIntegration = Integration::factory()->create([
+            'user_id' => $other->id,
+            'service' => 'flint',
+            'instance_type' => 'digest',
+        ]);
+
+        Event::factory()->create([
+            'integration_id' => $otherIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => Carbon::today()->midDay(),
+            'event_metadata' => ['period' => 'morning'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function index_returns_unanswered_question_count(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_user_question',
+            'title' => 'Q1',
+            'metadata' => ['question' => 'How are you?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_user_question',
+            'title' => 'Q2',
+            'metadata' => ['question' => 'Sleep well?', 'answer' => 'Yes', 'answer_note' => null, 'answered_at' => now()->toIso8601String()],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('unanswered_question_count', 1)
+            ->assertJsonPath('block_count', 2);
+    }
+
+    #[Test]
+    public function day_context_blocks_expose_structured_data_without_linkifying(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_day_context',
+            'title' => 'Today at a glance',
+            'metadata' => [
+                'day_context' => [
+                    'calendar' => [
+                        ['title' => 'Will · Office', 'all_day' => false, 'start' => '2026-05-10T09:00:00+01:00', 'person' => 'will'],
+                        ['title' => 'Dan · Office', 'all_day' => false, 'start' => '2026-05-10T09:00:00+01:00', 'person' => 'dan'],
+                    ],
+                    'birthdays' => [
+                        ['title' => "Daniel's birthday"],
+                    ],
+                    'weather' => ['location' => 'London', 'condition' => 'Overcast', 'temp_high_c' => 20, 'rain_probability_pct' => 38],
+                ],
+            ],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('blocks.0.day_context.calendar.0.person', 'will')
+            ->assertJsonPath('blocks.0.day_context.calendar.1.person', 'dan')
+            ->assertJsonPath('blocks.0.day_context.birthdays.0.title', "Daniel's birthday")
+            ->assertJsonMissingPath('blocks.0.day_context.birthdays.0.person')
+            ->assertJsonPath('blocks.0.day_context.weather.condition', 'Overcast')
+            ->assertJsonMissingPath('blocks.0.content');
+    }
+
+    #[Test]
+    public function content_blocks_expose_resolved_references_and_linkified_prose(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        $referenced = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'service' => 'testsvc',
+            'domain' => 'health',
+            'action' => 'morning_walk',
+            'time' => Carbon::today()->midDay(),
+        ]);
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_health_insight',
+            'title' => 'Health',
+            'metadata' => [
+                'content' => 'You did a Morning Walk before breakfast.',
+                'referenced_event_ids' => [$referenced->id],
+            ],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $response = $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('blocks.0.references.0.type', 'event')
+            ->assertJsonPath('blocks.0.references.0.id', $referenced->id)
+            ->assertJsonPath('blocks.0.references.0.title', 'Morning Walk')
+            ->assertJsonPath('blocks.0.references.0.domain', 'health');
+
+        $this->assertStringContainsString(
+            '[Morning Walk](https://spark.cronx.co/event/' . $referenced->id . ')',
+            $response->json('blocks.0.content'),
+        );
+    }
+
+    #[Test]
+    public function content_blocks_without_references_omit_the_key(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_editorial_note',
+            'title' => 'Note',
+            'metadata' => ['content' => 'Just a plain note.'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('blocks.0.content', 'Just a plain note.')
+            ->assertJsonMissingPath('blocks.0.references');
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /flint/digests/{id}
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function show_returns_digest_with_full_block_detail(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_user_question',
+            'title' => 'Sleep Check',
+            'metadata' => [
+                'question' => 'Did you sleep well?',
+                'topic' => 'health',
+                'priority' => 'high',
+                'answer_options' => ['Yes', 'No'],
+                'answer' => null,
+                'answer_note' => null,
+                'answered_at' => null,
+            ],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+            ->assertOk()
+            ->assertJsonPath('event_id', $event->id)
+            ->assertJsonPath('period', 'morning')
+            ->assertJsonPath('blocks.0.block_type', 'flint_user_question')
+            ->assertJsonPath('blocks.0.question', 'Did you sleep well?')
+            ->assertJsonMissingPath('blocks.0.priority')
+            ->assertJsonPath('blocks.0.answered', false);
+    }
+
+    #[Test]
+    public function show_returns_404_for_another_users_digest(): void
+    {
+        $other = User::factory()->create();
+        $otherIntegration = Integration::factory()->create([
+            'user_id' => $other->id,
+            'service' => 'flint',
+            'instance_type' => 'digest',
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $otherIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => Carbon::today()->midDay(),
+            'event_metadata' => ['period' => 'morning'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function show_returns_404_for_unknown_id(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests/00000000-0000-0000-0000-000000000000')
+            ->assertNotFound();
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /flint/questions/{block}/answer
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function answer_stores_the_users_response(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_user_question',
+            'title' => 'Mood Check',
+            'metadata' => ['question' => 'How are you?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+            'answer' => 'Good',
+            'answer_note' => 'Feeling productive today',
+        ])
+            ->assertOk()
+            ->assertJsonPath('block_id', $block->id)
+            ->assertJsonPath('answer', 'Good')
+            ->assertJsonPath('answer_note', 'Feeling productive today');
+
+        $this->assertEquals('Good', $block->fresh()->metadata['answer']);
+        $this->assertEquals('Feeling productive today', $block->fresh()->metadata['answer_note']);
+        $this->assertNotNull($block->fresh()->metadata['answered_at']);
+    }
+
+    #[Test]
+    public function answer_works_without_answer_note(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_user_question',
+            'title' => 'Quick Q',
+            'metadata' => ['question' => 'Yes or no?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+            'answer' => 'Yes',
+        ])
+            ->assertOk()
+            ->assertJsonPath('answer_note', null);
+    }
+
+    #[Test]
+    public function answer_requires_write_ability(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_user_question',
+            'title' => 'Q',
+            'metadata' => ['question' => 'Test?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+            'answer' => 'Yes',
+        ])->assertStatus(403);
+    }
+
+    #[Test]
+    public function answer_returns_403_for_block_owned_by_another_user(): void
+    {
+        $other = User::factory()->create();
+        $otherIntegration = Integration::factory()->create([
+            'user_id' => $other->id,
+            'service' => 'flint',
+            'instance_type' => 'digest',
+        ]);
+
+        $event = Event::factory()->create([
+            'integration_id' => $otherIntegration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => Carbon::today()->midDay(),
+            'event_metadata' => ['period' => 'morning'],
+        ]);
+
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_user_question',
+            'title' => 'Q',
+            'metadata' => ['question' => 'Test?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+            'answer' => 'Yes',
+        ])->assertStatus(403);
+    }
+
+    #[Test]
+    public function answer_returns_422_for_non_question_block(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_editorial_note',
+            'title' => 'Note',
+            'metadata' => ['content' => 'Some note'],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [
+            'answer' => 'Yes',
+        ])->assertStatus(422);
+    }
+
+    #[Test]
+    public function answer_validates_answer_is_required(): void
+    {
+        $event = $this->createDigestEvent('morning');
+
+        $block = Block::factory()->create([
+            'event_id' => $event->id,
+            'block_type' => 'flint_user_question',
+            'title' => 'Q',
+            'metadata' => ['question' => 'Test?', 'answer' => null, 'answer_note' => null, 'answered_at' => null],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/flint/questions/' . $block->id . '/answer', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['answer']);
+    }
+
+    #[Test]
+    public function answer_returns_401_when_unauthenticated(): void
+    {
+        $this->postJson('/api/v1/mobile/flint/questions/some-id/answer', [
+            'answer' => 'Yes',
+        ])->assertUnauthorized();
+    }
+
+    // -------------------------------------------------------------------------
+    // Opener field
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function opener_uses_the_explicit_field_when_the_skill_sends_one(): void
+    {
+        $this->createDigestEvent('morning', meta: [
+            'summary' => "Good morning!\n\nThis is the real lede sentence that is long enough to matter here.",
+            'opener' => 'The lede the skill chose itself.',
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('opener', 'The lede the skill chose itself.');
+    }
+
+    #[Test]
+    public function opener_falls_back_to_deriving_it_from_summary(): void
+    {
+        $this->createDigestEvent('morning', meta: [
+            'summary' => "Good morning!\n\nHEADLINE IN CAPS\n\nHere is the actual lede sentence, long enough to survive the short-paragraph filter easily.",
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath(
+                'opener',
+                'Here is the actual lede sentence, long enough to survive the short-paragraph filter easily.'
+            );
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /flint/digests/latest
+    // -------------------------------------------------------------------------
+
+    #[Test]
+    public function latest_returns_the_most_recent_digest_across_dates(): void
+    {
+        $this->createDigestEvent('evening', Carbon::yesterday());
+        $today = $this->createDigestEvent('morning', Carbon::today());
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest')
+            ->assertOk()
+            ->assertJsonPath('event_id', $today->id);
+    }
+
+    #[Test]
+    public function latest_before_todays_digest_returns_yesterdays(): void
+    {
+        $yesterday = $this->createDigestEvent('evening', Carbon::yesterday());
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest')
+            ->assertOk()
+            ->assertJsonPath('event_id', $yesterday->id)
+            ->assertJsonPath('period', 'evening');
+    }
+
+    #[Test]
+    public function latest_filters_by_kind(): void
+    {
+        $this->createDigestEvent('morning', meta: ['kind' => 'briefing']);
+        $roundup = $this->createDigestEvent('evening', meta: ['kind' => 'news_roundup']);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest?kind=news_roundup')
+            ->assertOk()
+            ->assertJsonPath('event_id', $roundup->id);
+    }
+
+    #[Test]
+    public function latest_returns_the_last_written_digest_when_a_day_has_several(): void
+    {
+        // Every digest is filed at the start of its local day, so the
+        // morning and evening briefings share `time`. The evening one is
+        // given the lower UUID so an `id` tiebreak would pick the morning.
+        $dayStart = Carbon::today()->startOfDay();
+        $this->createDigestEvent('morning', meta: ['kind' => 'briefing'], overrides: [
+            'id' => 'ffffffff-ffff-4fff-bfff-ffffffffffff',
+            'time' => $dayStart,
+            'created_at' => $dayStart->copy()->setTime(6, 20),
+        ]);
+        $evening = $this->createDigestEvent('evening', meta: ['kind' => 'briefing'], overrides: [
+            'id' => '00000000-0000-4000-8000-000000000000',
+            'time' => $dayStart,
+            'created_at' => $dayStart->copy()->setTime(18, 36),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest?kind=briefing')
+            ->assertOk()
+            ->assertJsonPath('event_id', $evening->id)
+            ->assertJsonPath('period', 'evening');
+
+        $this->getJson('/api/v1/mobile/flint/digests')
+            ->assertOk()
+            ->assertJsonPath('event_id', $evening->id);
+    }
+
+    #[Test]
+    public function latest_returns_404_when_no_digest_exists(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/flint/digests/latest')->assertNotFound();
+    }
+
+    /**
+     * `show` and `latest` used to read the date off the event's `time`; the
+     * digest's recorded `local_date` is the canonical day.
+     */
+    #[Test]
+    public function show_prefers_the_digests_recorded_local_date(): void
+    {
+        $event = $this->createDigestEvent('evening', Carbon::parse('2026-07-14'), ['local_date' => '2026-07-13']);
+
+        Sanctum::actingAs($this->user, MobileSessionAbilities::with(['ios:read']));
+
+        $this->getJson('/api/v1/mobile/flint/digests/' . $event->id)
+            ->assertOk()
+            ->assertJsonPath('date', '2026-07-13');
+    }
+
+    private function createDigestEvent(string $period = 'morning', ?Carbon $date = null, array $meta = [], array $overrides = []): Event
+    {
+        $date ??= Carbon::today();
+
+        return Event::factory()->create(array_merge([
+            'integration_id' => $this->integration->id,
+            'service' => 'flint',
+            'action' => 'had_summary',
+            'time' => $date->midDay(),
+            'event_metadata' => array_merge([
+                'period' => $period,
+                'title' => ucfirst($period) . ' Digest',
+            ], $meta),
+        ], $overrides));
+    }
+}

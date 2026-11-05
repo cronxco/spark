@@ -14,24 +14,26 @@
         "fivefilters/readability.php": "^3.3",
         "guzzlehttp/guzzle": "^7.10",
         "html2text/html2text": "^4.3",
-        "icehouse-ventures/laravel-chartjs": "^4.2",
         "intervention/image": "^3.11",
         "jenssegers/agent": "^2.6",
+        "laravel-notification-channels/apn": "^6",
         "laravel-notification-channels/webpush": "^10.3",
-        "laravel/framework": "^12.0",
+        "laravel/ai": "^1.3",
+        "laravel/framework": "^13.0",
         "laravel/horizon": "^5.30.3",
-        "laravel/mcp": "^0.5.9",
-        "laravel/octane": "^2.0",
+        "laravel/mcp": "^1.0",
+        "laravel/octane": "*",
+        "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.10.1",
+        "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.30",
-        "livewire/livewire": "^3.6.1",
+        "livewire/livewire": "^4.0",
         "livewire/volt": "^1.7",
-        "openai-php/laravel": "^0.18.0",
-        "owenvoke/blade-fontawesome": "^2.9",
+        "owenvoke/blade-fontawesome": "^3.3",
         "pgvector/pgvector": "^0.2.2",
         "pragmarx/version": "dev-master",
         "predis/predis": "^3.2",
+        "pusher/pusher-php-server": "^7.2",
         "revolution/laravel-bluesky": "^1.1",
         "robsontenorio/mary": "dev-main",
         "sentry/sentry-laravel": "^4.9",
@@ -40,7 +42,7 @@
         "spatie/laravel-activitylog": "^4",
         "spatie/laravel-medialibrary": "^11.17",
         "spatie/laravel-tags": "^4.10",
-        "symfony/emoji": "^7.3",
+        "symfony/emoji": "^8.0",
         "willscottuk/monzo-php": "dev-master",
         "wire-elements/pro": "^4.0",
         "zbateson/mail-mime-parser": "^3.0"
@@ -49,7 +51,7 @@
         "brianium/paratest": "^7.20.0",
         "deployer/deployer": "^7.5",
         "fakerphp/faker": "^1.23",
-        "laravel/boost": "^1.8",
+        "laravel/boost": "^2.9",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.18",
         "laravel/sail": "^1.44",
@@ -83,7 +85,11 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "files": [
+            "app/Support/helpers.php",
+            "app/Support/SentryAiHelpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -146,7 +152,7 @@
         },
         {
             "type": "vcs",
-            "url": "git@github.com:willscottuk/monzo-php.git"
+            "url": "git@github.com:cronxco/monzo-php.git"
         },
         {
             "type": "vcs",

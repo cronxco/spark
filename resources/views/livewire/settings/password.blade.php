@@ -5,8 +5,11 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Livewire\Volt\Component;
+use Mary\Traits\Toast;
 
 new class extends Component {
+    use Toast;
+
     public string $current_password = '';
     public string $password = '';
     public string $password_confirmation = '';
@@ -23,7 +26,6 @@ new class extends Component {
             ]);
         } catch (ValidationException $e) {
             $this->reset('current_password', 'password', 'password_confirmation');
-
             throw $e;
         }
 
@@ -33,46 +35,82 @@ new class extends Component {
 
         $this->reset('current_password', 'password', 'password_confirmation');
 
+        $this->success('Password updated successfully!');
         $this->dispatch('password-updated');
     }
 }; ?>
 
-<section class="w-full">
-    @include('partials.settings-heading')
+<div>
+    <x-header title="{{ __('Update Password') }}" subtitle="{{ __('Ensure your account is using a strong password') }}" separator />
 
-    <x-settings.layout :heading="__('Update password')" :subheading="__('Ensure your account is using a long, random password to stay secure')">
-        <form wire:submit="updatePassword" class="mt-6 space-y-6">
-            <flux:input
-                wire:model="current_password"
-                :label="__('Current password')"
-                type="password"
-                required
-                autocomplete="current-password"
-            />
-            <flux:input
-                wire:model="password"
-                :label="__('New password')"
-                type="password"
-                required
-                autocomplete="new-password"
-            />
-            <flux:input
-                wire:model="password_confirmation"
-                :label="__('Confirm Password')"
-                type="password"
-                required
-                autocomplete="new-password"
-            />
+    <div class="space-y-4 lg:space-y-6">
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="text-lg font-semibold mb-4">{{ __('Change Password') }}</h3>
 
-            <div class="flex items-center gap-4">
-                <div class="flex items-center justify-end">
-                    <flux:button variant="primary" type="submit" class="w-full">{{ __('Save') }}</flux:button>
-                </div>
-
-                <x-action-message class="me-3" on="password-updated">
-                    {{ __('Saved.') }}
-                </x-action-message>
+            <!-- Current Password -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('Current Password') }}</span>
+                </label>
+                <input
+                    wire:model="current_password"
+                    type="password"
+                    placeholder="Enter current password"
+                    class="input input-bordered w-full"
+                    required
+                    autocomplete="current-password"
+                />
+                <label class="label">
+                    <span class="label-text-alt">{{ __('Enter your current password to verify your identity') }}</span>
+                </label>
             </div>
-        </form>
-    </x-settings.layout>
-</section>
+
+            <!-- New Password -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('New Password') }}</span>
+                </label>
+                <input
+                    wire:model="password"
+                    type="password"
+                    placeholder="Enter new password"
+                    class="input input-bordered w-full"
+                    required
+                    autocomplete="new-password"
+                />
+                <label class="label">
+                    <span class="label-text-alt">{{ __('Enter your new password') }}</span>
+                </label>
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">{{ __('Confirm Password') }}</span>
+                </label>
+                <input
+                    wire:model="password_confirmation"
+                    type="password"
+                    placeholder="Confirm new password"
+                    class="input input-bordered w-full"
+                    required
+                    autocomplete="new-password"
+                />
+                <label class="label">
+                    <span class="label-text-alt">{{ __('Confirm your new password') }}</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end mt-4">
+                <x-button
+                    label="{{ __('Update Password') }}"
+                    wire:click="updatePassword"
+                    class="btn-primary"
+                    spinner="updatePassword"
+                />
+            </div>
+        </div>
+    </div>
+    </div>
+</div>

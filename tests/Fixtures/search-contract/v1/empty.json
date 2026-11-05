@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "query": "zzzz",
+  "mode": "default",
+  "execution": { "status": "complete", "fallback_reason": null },
+  "results": [],
+  "meta": { "count": 0, "limit": 20 }
+}
