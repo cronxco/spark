@@ -98,9 +98,9 @@ class ApiWebhookLoggingHelpersTest extends FrameworkTestCase
 
         $logContent = file_get_contents($logPath);
         $this->assertStringContainsString('API Response', $logContent);
-        $this->assertStringContainsString('\\"balance\\": 100', $logContent); // JSON preserved (escaped in log)
-        // Note: JSON strings in response bodies are not sanitized, only structured data
-        $this->assertStringContainsString('secret_token', $logContent); // Token remains as-is in JSON string
+        $this->assertStringContainsString('\\"balance\\":100', $logContent);
+        $this->assertStringContainsString('[REDACTED]', $logContent);
+        $this->assertStringNotContainsString('secret_token', $logContent);
     }
 
     #[Test]

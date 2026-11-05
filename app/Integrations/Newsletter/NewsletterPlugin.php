@@ -221,12 +221,56 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
 
     public function handleWebhook(Request $request, Integration $integration): void
     {
-        // Log the webhook payload
-        $payload = $request->all();
-        $headers = $request->headers->all();
-        $this->logWebhookPayload(static::getIdentifier(), $integration->id, $payload, $headers);
+        if (! $this->verifyWebhookSignature($request, $integration)) {
+            abort(401, 'Invalid webhook secret');
+        }
 
-        // Parse SNS notification
+        $payload = json_decode($request->getContent(), true);
+        if (! is_array($payload)) {
+            $payload = $request->all();
+        }
+
+        if (isset($payload['Type'])) {
+            $topicArn = config('services.newsletter.sns_topic_arn');
+            if (! is_string($topicArn) || $topicArn === '' || ($payload['TopicArn'] ?? null) !== $topicArn) {
+                abort(403, 'Untrusted SNS topic');
+            }
+
+            if (! $this->isTrustedSnsUrl($payload['SigningCertURL'] ?? null, $topicArn)) {
+                abort(403, 'Untrusted SNS certificate URL');
+            }
+
+            try {
+                $validSignature = $this->hasValidSnsSignature($payload);
+            } catch (Throwable $e) {
+                Log::warning('Newsletter: SNS signature validation failed', [
+                    'integration_id' => $integration->id,
+                ]);
+                abort(403, 'Invalid SNS signature');
+            }
+
+            if (! $validSignature) {
+                abort(403, 'Invalid SNS signature');
+            }
+
+            if ($payload['Type'] === 'SubscriptionConfirmation') {
+                if (! $this->isTrustedSnsUrl($payload['SubscribeURL'] ?? null, $topicArn)) {
+                    abort(403, 'Untrusted SNS subscription URL');
+                }
+                Http::withoutRedirecting()->timeout(10)->get($payload['SubscribeURL'])->throw();
+
+                return;
+            }
+
+            if ($payload['Type'] !== 'Notification') {
+                abort(400, 'Unsupported SNS message type');
+            }
+        }
+
+        $loggedPayload = $payload;
+        unset($loggedPayload['Signature'], $loggedPayload['Token'], $loggedPayload['SubscribeURL'], $loggedPayload['UnsubscribeURL']);
+        $this->logWebhookPayload(static::getIdentifier(), $integration->id, $loggedPayload, $request->headers->all());
+
         $snsMessage = $this->parseSnsNotification($request);
 
         if (! $snsMessage) {
@@ -284,6 +328,17 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
         return ['events' => []];
     }
 
+    protected function sanitizeHeaders(array $headers): array
+    {
+        foreach ($headers as $key => $value) {
+            if (in_array(strtolower($key), ['x-original-url', 'x-forwarded-uri', 'referer'])) {
+                $headers[$key] = ['[REDACTED]'];
+            }
+        }
+
+        return parent::sanitizeHeaders($headers);
+    }
+
     /**
      * Parse SNS notification and extract the message
      */
@@ -304,27 +359,6 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
             'type' => $payload['Type'] ?? null,
             'has_message' => isset($payload['Message']),
         ]);
-
-        // Check if this is an SNS subscription confirmation
-        if (isset($payload['Type']) && $payload['Type'] === 'SubscriptionConfirmation') {
-            Log::info('Newsletter: SNS subscription confirmation received', [
-                'subscribe_url' => $payload['SubscribeURL'] ?? null,
-            ]);
-
-            // Auto-confirm the subscription by hitting the SubscribeURL
-            if (isset($payload['SubscribeURL'])) {
-                try {
-                    Http::get($payload['SubscribeURL']);
-                    Log::info('Newsletter: SNS subscription confirmed');
-                } catch (Throwable $e) {
-                    Log::error('Newsletter: Failed to confirm SNS subscription', [
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-
-            return null;
-        }
 
         // Handle SNS Notification type
         if (isset($payload['Type']) && $payload['Type'] === 'Notification') {
@@ -352,6 +386,77 @@ class NewsletterPlugin extends WebhookPlugin implements SupportsTaskPipeline
         ]);
 
         return null;
+    }
+
+    private function hasValidSnsSignature(array $payload): bool
+    {
+        $algorithm = match ($payload['SignatureVersion'] ?? null) {
+            '1' => OPENSSL_ALGO_SHA1,
+            '2' => OPENSSL_ALGO_SHA256,
+            default => null,
+        };
+        $fields = match ($payload['Type'] ?? null) {
+            'Notification' => ['Message', 'MessageId', 'Subject', 'Timestamp', 'TopicArn', 'Type'],
+            'SubscriptionConfirmation', 'UnsubscribeConfirmation' => ['Message', 'MessageId', 'SubscribeURL', 'Timestamp', 'Token', 'TopicArn', 'Type'],
+            default => [],
+        };
+        if ($algorithm === null || $fields === [] || ! is_string($payload['Signature'] ?? null)) {
+            return false;
+        }
+
+        $signature = base64_decode($payload['Signature'], true);
+        if ($signature === false || $signature === '') {
+            return false;
+        }
+
+        // SNS signs these fields in byte-sort order, with one trailing newline.
+        $stringToSign = '';
+        foreach ($fields as $field) {
+            if ($field === 'Subject' && ! array_key_exists($field, $payload)) {
+                continue;
+            }
+            if (! is_string($payload[$field] ?? null)) {
+                return false;
+            }
+            $stringToSign .= $field . "\n" . $payload[$field] . "\n";
+        }
+
+        $url = $payload['SigningCertURL'];
+        $parts = parse_url($url);
+        if (! preg_match('~^/SimpleNotificationService-[a-zA-Z0-9-]+\\.pem$~', $parts['path'] ?? '') || isset($parts['query'])) {
+            return false;
+        }
+
+        // The caller restricts this URL to the configured topic's HTTPS SNS host.
+        $response = Http::withoutRedirecting()->timeout(10)->get($url);
+        $response->throw();
+        if ($response->status() !== 200) {
+            return false;
+        }
+        $publicKey = openssl_pkey_get_public($response->body());
+
+        return $publicKey !== false
+            && openssl_verify($stringToSign, $signature, $publicKey, $algorithm) === 1;
+    }
+
+    private function isTrustedSnsUrl(mixed $url, string $topicArn): bool
+    {
+        if (! is_string($url)) {
+            return false;
+        }
+        $arn = explode(':', $topicArn);
+        if (count($arn) !== 6 || $arn[0] !== 'arn' || $arn[1] !== 'aws' || $arn[2] !== 'sns') {
+            return false;
+        }
+        $parts = parse_url($url);
+
+        return is_array($parts)
+            && ($parts['scheme'] ?? null) === 'https'
+            && ($parts['host'] ?? null) === 'sns.' . $arn[3] . '.amazonaws.com'
+            && ! isset($parts['user'])
+            && ! isset($parts['pass'])
+            && (! isset($parts['port']) || $parts['port'] === 443)
+            && ! isset($parts['fragment']);
     }
 
     /**

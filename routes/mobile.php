@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\CapturedBookmarksController;
+use App\Http\Controllers\Api\V1\Mobile\ActionsController;
 use App\Http\Controllers\Api\V1\Mobile\AnomaliesController;
 use App\Http\Controllers\Api\V1\Mobile\ApiTokensController;
 use App\Http\Controllers\Api\V1\Mobile\BlocksController;
@@ -18,17 +19,21 @@ use App\Http\Controllers\Api\V1\Mobile\FlintNotesController;
 use App\Http\Controllers\Api\V1\Mobile\FlintQuestionsController;
 use App\Http\Controllers\Api\V1\Mobile\FlintReviewController;
 use App\Http\Controllers\Api\V1\Mobile\FlintRoutineHealthController;
+use App\Http\Controllers\Api\V1\Mobile\FlintSchedulesController;
 use App\Http\Controllers\Api\V1\Mobile\FlintTopicsController;
 use App\Http\Controllers\Api\V1\Mobile\HealthController;
 use App\Http\Controllers\Api\V1\Mobile\InsightDiscoveryController;
 use App\Http\Controllers\Api\V1\Mobile\IntegrationsController;
+use App\Http\Controllers\Api\V1\Mobile\IntentsController;
 use App\Http\Controllers\Api\V1\Mobile\KnowledgeReprocessingController;
 use App\Http\Controllers\Api\V1\Mobile\LiveActivitiesController;
 use App\Http\Controllers\Api\V1\Mobile\LocationsController;
+use App\Http\Controllers\Api\V1\Mobile\LogController;
 use App\Http\Controllers\Api\V1\Mobile\MapController;
 use App\Http\Controllers\Api\V1\Mobile\MeController;
 use App\Http\Controllers\Api\V1\Mobile\MetricsController;
 use App\Http\Controllers\Api\V1\Mobile\MoneyAccountsController;
+use App\Http\Controllers\Api\V1\Mobile\MoneyPlanController;
 use App\Http\Controllers\Api\V1\Mobile\NetWorthController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationPreferencesController;
 use App\Http\Controllers\Api\V1\Mobile\NotificationsController;
@@ -36,6 +41,7 @@ use App\Http\Controllers\Api\V1\Mobile\NotificationSettingsController;
 use App\Http\Controllers\Api\V1\Mobile\ObjectsController;
 use App\Http\Controllers\Api\V1\Mobile\PingController;
 use App\Http\Controllers\Api\V1\Mobile\PlacesController;
+use App\Http\Controllers\Api\V1\Mobile\ReceiptMatchingController;
 use App\Http\Controllers\Api\V1\Mobile\SearchController;
 use App\Http\Controllers\Api\V1\Mobile\SyncController;
 use App\Http\Controllers\Api\V1\Mobile\TagsController;
@@ -106,6 +112,7 @@ Route::patch('events/{id}/note', [EventsController::class, 'updateNote'])
     ->middleware(['spark.ability:data:write', 'if-match:event'])
     ->name('events.note.update');
 Route::get('objects/{id}', [ObjectsController::class, 'show'])->middleware('spark.ability:data:read')->name('objects.show');
+Route::get('people/{id}/timeline', [ObjectsController::class, 'timeline'])->middleware('spark.ability:data:read')->name('people.timeline');
 
 /*
  * Soft delete takes the entity's If-Match like every destructive write.
@@ -143,14 +150,14 @@ Route::get('tags', [TagsController::class, 'index'])->middleware('spark.ability:
 Route::get('tags/suggest', [TagsController::class, 'suggest'])->middleware('spark.ability:data:read')->name('tags.suggest');
 Route::get('tags/{id}', [TagsController::class, 'show'])->whereNumber('id')->middleware('spark.ability:data:read')->name('tags.show');
 Route::post('events/{id}/tags', [TagsController::class, 'storeEventTag'])
-    ->middleware(['spark.ability:data:write', 'if-match:event'])
+    ->middleware(['spark.ability:data:write', 'idempotent:tags.attach', 'if-match:event'])
     ->name('events.tags.store');
 Route::delete('events/{id}/tags/{tagId}', [TagsController::class, 'destroyEventTag'])
     ->whereNumber('tagId')
     ->middleware(['spark.ability:data:write', 'if-match:event'])
     ->name('events.tags.destroy');
 Route::post('objects/{id}/tags', [TagsController::class, 'storeObjectTag'])
-    ->middleware(['spark.ability:data:write', 'if-match:object'])
+    ->middleware(['spark.ability:data:write', 'idempotent:tags.attach', 'if-match:object'])
     ->name('objects.tags.store');
 Route::delete('objects/{id}/tags/{tagId}', [TagsController::class, 'destroyObjectTag'])
     ->whereNumber('tagId')
@@ -318,6 +325,39 @@ Route::post('captures', [CapturesController::class, 'store'])
     ->middleware('spark.ability:data:write')
     ->name('captures.store');
 
+Route::post('log', [LogController::class, 'store'])
+    ->middleware('spark.ability:data:write')
+    ->name('log.store');
+
+Route::post('log/intents/classify', [IntentsController::class, 'classify'])
+    ->middleware('spark.ability:data:write')
+    ->name('log.intents.classify');
+
+Route::post('log/intents', [IntentsController::class, 'commit'])
+    ->middleware('spark.ability:data:write')
+    ->name('log.intents.commit');
+
+/*
+ * Native Actions. The registry declares each action's capability, so these
+ * routes only require a mobile session; ActionsController checks the token
+ * against the action it is asked to list, run or undo.
+ */
+Route::get('actions', [ActionsController::class, 'index'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.index');
+Route::get('actions/resolve', [ActionsController::class, 'resolve'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.resolve');
+Route::get('actions/receipts/{id}', [ActionsController::class, 'receipt'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.receipts.show');
+Route::post('actions/receipts/{id}/undo', [ActionsController::class, 'undo'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.receipts.undo');
+Route::post('actions/{action}/run', [ActionsController::class, 'run'])
+    ->middleware('spark.ability:mobile:session')
+    ->name('actions.run');
+
 /*
 |--------------------------------------------------------------------------
 | API token management
@@ -364,6 +404,14 @@ Route::post('up-to-speed/unmark', UpToSpeedUnmarkController::class)
 | Flint digest endpoints
 |--------------------------------------------------------------------------
 */
+
+Route::get('flint/schedules', [FlintSchedulesController::class, 'index'])
+    ->middleware('spark.ability:flint:read')
+    ->name('flint.schedules.index');
+
+Route::put('flint/schedules/{routine}', [FlintSchedulesController::class, 'update'])
+    ->middleware('spark.ability:flint:write')
+    ->name('flint.schedules.update');
 
 Route::get('flint/digests', [FlintDigestsController::class, 'index'])
     ->middleware('spark.ability:flint:read')
@@ -415,6 +463,7 @@ Route::patch('flint/topics/{id}/tasks/{taskId}', [FlintTopicsController::class, 
 
 Route::get('flint/notes', [FlintNotesController::class, 'index'])->middleware('spark.ability:flint:read')->name('flint.notes.index');
 Route::post('flint/notes', [FlintNotesController::class, 'store'])->middleware('spark.ability:flint:write')->name('flint.notes.store');
+Route::post('flint/notes/acknowledge', [FlintNotesController::class, 'acknowledge'])->middleware('spark.ability:flint:write')->name('flint.notes.acknowledge');
 Route::delete('flint/notes/{id}', [FlintNotesController::class, 'destroy'])->middleware('spark.ability:flint:write')->name('flint.notes.destroy');
 
 Route::get('flint/routines/health', FlintRoutineHealthController::class)
@@ -426,6 +475,13 @@ Route::post('flint/review/{kind}/{id}', [FlintReviewController::class, 'act'])
     ->whereIn('kind', ['receipt_suggestion', 'receipt_auto_match', 'link_suggestion', 'auto_link'])
     ->middleware('spark.ability:flint:write')
     ->name('flint.review.act');
+Route::get('flint/receipts/unmatched', [ReceiptMatchingController::class, 'unmatched'])->middleware('spark.ability:flint:read');
+Route::get('flint/receipts/{id}/match', [ReceiptMatchingController::class, 'show'])->middleware('spark.ability:flint:read');
+Route::get('flint/receipts/{id}/transactions', [ReceiptMatchingController::class, 'search'])->middleware('spark.ability:flint:read');
+Route::post('flint/receipts/{id}/retry', [ReceiptMatchingController::class, 'retry'])->middleware('spark.ability:flint:write');
+Route::post('flint/receipts/{id}/link', [ReceiptMatchingController::class, 'link'])->middleware('spark.ability:flint:write');
+Route::post('flint/receipts/{id}/no-match', [ReceiptMatchingController::class, 'noMatch'])->middleware('spark.ability:flint:write');
+Route::delete('flint/receipts/{id}/match', [ReceiptMatchingController::class, 'unlink'])->middleware('spark.ability:flint:write');
 
 /*
 |--------------------------------------------------------------------------
@@ -458,9 +514,21 @@ Route::delete('money/accounts/{id}', [MoneyAccountsController::class, 'destroy']
     ->name('money.accounts.destroy');
 
 Route::post('money/accounts/{id}/balances', [MoneyAccountsController::class, 'addBalance'])
-    ->middleware(['spark.ability:finance:write', 'if-match:object'])
+    ->middleware(['spark.ability:finance:write', 'idempotent:money.balances.store', 'if-match:object'])
     ->name('money.accounts.balances.store');
 
 Route::get('money/net-worth', [NetWorthController::class, 'index'])
     ->middleware('spark.ability:finance:read')
     ->name('money.net-worth');
+
+require __DIR__ . '/knowledge.php';
+Route::get('money/plan', [MoneyPlanController::class, 'plan'])->middleware('spark.ability:finance:read')->name('money.plan');
+Route::get('money/spending', [MoneyPlanController::class, 'spending'])->middleware('spark.ability:finance:read')->name('money.spending');
+Route::get('money/budgets', [MoneyPlanController::class, 'budgetsIndex'])->middleware('spark.ability:finance:read')->name('money.budgets.index');
+Route::post('money/budgets', [MoneyPlanController::class, 'budgetsStore'])->middleware('spark.ability:finance:write')->name('money.budgets.store');
+Route::patch('money/budgets/{id}', [MoneyPlanController::class, 'budgetsUpdate'])->middleware('spark.ability:finance:write')->name('money.budgets.update');
+Route::delete('money/budgets/{id}', [MoneyPlanController::class, 'budgetsDestroy'])->middleware('spark.ability:finance:write')->name('money.budgets.destroy');
+Route::post('money/buffer/preview', [MoneyPlanController::class, 'bufferPreview'])->middleware('spark.ability:finance:write')->name('money.buffer.preview');
+Route::post('money/buffer', [MoneyPlanController::class, 'bufferStore'])->middleware('spark.ability:finance:write')->name('money.buffer.store');
+Route::patch('money/pots/{id}', [MoneyPlanController::class, 'potUpdate'])->middleware('spark.ability:finance:write')->name('money.pots.update');
+Route::patch('money/cards/{id}', [MoneyPlanController::class, 'cardUpdate'])->middleware('spark.ability:finance:write')->name('money.cards.update');

@@ -75,16 +75,22 @@ class SpotlightCommandsTest extends TestCase
     }
 
     #[Test]
-    public function global_commands_only_dispatch_events_that_have_a_global_listener(): void
+    public function global_commands_run_through_the_action_listener(): void
     {
-        $globallyHandled = ['trigger-all-integrations', 'run-flint-routine'];
-        $events = collect(GlobalActionsQuery::actions())->pluck('event')->filter();
+        $actions = GlobalActionsQuery::visible()->reject->isNavigation();
 
-        $this->assertNotEmpty($events);
+        $this->assertNotEmpty($actions);
 
-        foreach ($events as $event) {
-            $this->assertContains($event, $globallyHandled);
-        }
+        Queue::fake();
+        $alice = User::factory()->create();
+        $this->spotifyIntegrationFor($alice);
+
+        Volt::actingAs($alice)
+            ->test('global-progress-indicator')
+            ->dispatch('run-action', action: 'integrations.sync_all')
+            ->assertHasNoErrors();
+
+        Queue::assertPushed(SpotifyListeningPull::class, 1);
     }
 
     private function spotifyIntegrationFor(User $user, array $attributes = []): Integration

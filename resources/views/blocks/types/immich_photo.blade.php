@@ -9,6 +9,7 @@ $displayName = $pluginClass ? $pluginClass::getDisplayName() : 'Immich';
 
 $fileName = $block->metadata['type'] === 'VIDEO' ? '🎥 ' . $block->title : $block->title;
 $timestamp = $block->metadata['timestamp'] ?? $block->time;
+$timestamp = $timestamp ? \Carbon\Carbon::parse($timestamp) : null;
 $thumbnailUrl = $block->metadata['thumbnail_url'] ?? null;
 $viewUrl = $block->metadata['view_url'] ?? null;
 $isFavorite = $block->metadata['is_favorite'] ?? false;

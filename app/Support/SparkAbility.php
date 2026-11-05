@@ -87,6 +87,7 @@ final class SparkAbility
     public const MOBILE_WRITE = [
         'data:write',
         'finance:write',
+        'flint:run',
         'flint:write',
         'insights:write',
         'integrations:manage',

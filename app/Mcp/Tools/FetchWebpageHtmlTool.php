@@ -20,8 +20,9 @@ class FetchWebpageHtmlTool extends Tool
     protected string $description = <<<'MARKDOWN'
         Render a website in Spark's Playwright browser and return its current raw HTML.
 
-        Saved Fetch cookies for the target domain are used automatically when available, and
-        any refreshed cookies from the page are saved back to the caller's Fetch cookie store.
+        Uses the logged-in browser session when the caller has a Fetch integration and
+        default browser context reuse is enabled. Otherwise, uses saved Fetch cookies in
+        an isolated context. Refreshed target-domain cookies are saved to the caller's Fetch store.
         The response is limited to 1 MB of HTML and says explicitly if it was truncated.
     MARKDOWN;
 

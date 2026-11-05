@@ -345,6 +345,35 @@ CSV;
         $this->assertEquals($touchedInEvents[0]->target_id, $touchedInEvents[1]->target_id);
     }
 
+    #[Test]
+    public function it_handles_journeys_with_missing_start_times()
+    {
+        Queue::fake([LinkOysterJourneyEventsJob::class]);
+
+        $csvContent = <<<'CSV'
+
+Date,Start Time,End Time,Journey/Action,Charge,Credit,Balance,Note
+28-Nov-2025,,18:14,"Victoria (platforms 9-19) [National Rail] to East Croydon [National Rail]",8.80,,8.41,"We are not able to show where you touched in"
+28-Nov-2025,,,"Entered Wandle Park tram stop",.00,,8.41,""
+CSV;
+
+        $job = new ProcessOysterEmailJob($this->integration, null, $this->createMockEmail($csvContent));
+        $job->handle();
+
+        $touchedInEvents = Event::where('integration_id', $this->integration->id)
+            ->where('action', 'touched_in_at')
+            ->get();
+
+        $this->assertCount(1, $touchedInEvents);
+        $this->assertSame('2025-11-28T18:14:00Z', $touchedInEvents->first()->time->toIso8601ZuluString());
+
+        $touchedOut = Event::where('integration_id', $this->integration->id)
+            ->where('action', 'touched_out_at')
+            ->sole();
+
+        $this->assertSame('2025-11-28T18:14:00Z', $touchedOut->time->toIso8601ZuluString());
+    }
+
     /**
      * Create a mock email with CSV attachment
      */

@@ -140,6 +140,35 @@ class HealthDashboardControllerTest extends TestCase
     }
 
     #[Test]
+    public function hero_factors_list_every_contributor_lowest_first(): void
+    {
+        $this->stat('oura', 'had_readiness_score', 'percent', mean: 80, lower: 70, upper: 90);
+        $readiness = $this->event('oura', 'had_readiness_score', 83, 'percent', '2026-05-18 08:00:00');
+
+        foreach (['Hrv Balance' => 91, 'Previous Night' => 93, 'Recovery Index' => 100, 'Sleep Regularity' => 87, 'Activity Balance' => 81, 'Resting Heart Rate' => 49] as $title => $value) {
+            Block::factory()->create([
+                'event_id' => $readiness->id,
+                'block_type' => 'contributor',
+                'title' => $title,
+                'value' => $value,
+                'value_multiplier' => 1,
+                'value_unit' => 'percent',
+            ]);
+        }
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $factors = $this->getJson('/api/v1/mobile/health/dashboard?date=2026-05-18')
+            ->assertOk()
+            ->json('hero.factors');
+
+        $this->assertSame(
+            ['Resting Heart Rate', 'Activity Balance', 'Sleep Regularity', 'Hrv Balance', 'Previous Night', 'Recovery Index'],
+            array_column($factors, 'label'),
+        );
+    }
+
+    #[Test]
     public function apple_health_workouts_include_dashboard_workout_fields(): void
     {
         $workout = $this->event('apple_health', 'did_workout', 135.695, 'kcal', '2026-05-18 10:22:54', [
