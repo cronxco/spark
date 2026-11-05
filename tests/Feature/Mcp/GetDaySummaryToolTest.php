@@ -276,6 +276,9 @@ class GetDaySummaryToolTest extends TestCase
             'event_count' => 100,
         ]);
 
+        // A reading its source has stopped rewriting.
+        Event::query()->update(['updated_at' => now()->subDay()]);
+
         $service = app(DaySummaryService::class);
         $summary = $service->generateSummary($this->user, Carbon::today());
 
@@ -627,6 +630,11 @@ class GetDaySummaryToolTest extends TestCase
     #[Test]
     public function a_running_daily_total_is_not_low_until_the_day_is_over(): void
     {
+        // Stand hours are not on the anomaly list; opt this test in, with no settle period.
+        config(['metrics.metrics' => array_merge(config('metrics.metrics'), [
+            'apple_health.had_apple_stand_hour' => ['kind' => 'daily_total', 'accumulates' => true, 'anomalies' => true, 'higher_is_better' => true],
+        ])]);
+
         $health = $this->appleHealthIntegration();
         $tz = $this->timezone();
 

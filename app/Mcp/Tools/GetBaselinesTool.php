@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Mcp\Concerns\RequiresSparkAbility;
 use App\Mcp\Helpers\MetricIdentifierMap;
 use App\Models\MetricStatistic;
+use App\Services\Metrics\BaselineService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -22,7 +23,8 @@ class GetBaselinesTool extends Tool
      */
     protected string $description = <<<'MARKDOWN'
         Retrieve baseline statistics for one or more metrics.
-        Returns mean, stddev, min, max, normal bounds, and sample size.
+        Returns the usual value (mean, or median for amounts and durations), spread, min, max, normal bounds and sample size,
+        plus the 30-day display band and separate weekday or weekend baselines where the data shows a real difference.
         Accepts flexible identifiers: "oura.sleep_score", "oura.had_sleep_score.percent", etc.
         Omit metrics to get all available baselines — useful for discovering what metrics exist.
     MARKDOWN;
@@ -63,6 +65,7 @@ class GetBaselinesTool extends Tool
             }
         } else {
             $statistics = MetricStatistic::where('user_id', $user->id)
+                ->with('baselines')
                 ->orderBy('service')
                 ->orderBy('action')
                 ->get();
@@ -106,8 +109,6 @@ class GetBaselinesTool extends Tool
                 'sample_days' => $statistic->event_count,
                 'window_days' => $statistic->baseline_window_days ?? MetricStatistic::DEFAULT_WINDOW_DAYS,
                 'display_name' => $statistic->getDisplayName(),
-                'baseline_review_suggested' => $statistic->baseline_reset_suggested_at !== null,
-                'baseline_review_suggested_since' => $statistic->baseline_reset_suggested_at?->toDateString(),
                 'anomaly_high_suppressed_until' => $statistic->anomaly_high_suppressed_until?->toDateString(),
                 'anomaly_low_suppressed_until' => $statistic->anomaly_low_suppressed_until?->toDateString(),
             ];
@@ -125,8 +126,7 @@ class GetBaselinesTool extends Tool
             'sample_days' => $statistic->event_count,
             'window_days' => $statistic->baseline_window_days ?? MetricStatistic::DEFAULT_WINDOW_DAYS,
             'display_name' => $statistic->getDisplayName(),
-            'baseline_review_suggested' => $statistic->baseline_reset_suggested_at !== null,
-            'baseline_review_suggested_since' => $statistic->baseline_reset_suggested_at?->toDateString(),
+            'baseline' => app(BaselineService::class)->describe($statistic),
             'anomaly_high_suppressed_until' => $statistic->anomaly_high_suppressed_until?->toDateString(),
             'anomaly_low_suppressed_until' => $statistic->anomaly_low_suppressed_until?->toDateString(),
         ];

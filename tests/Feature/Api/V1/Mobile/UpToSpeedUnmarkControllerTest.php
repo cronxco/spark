@@ -300,7 +300,7 @@ class UpToSpeedUnmarkControllerTest extends TestCase
 
     private function anomaly(): MetricTrend
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
 
         // significant() sets the deviation as well as the type, so the anomaly
         // clears the feed's noise gate and can actually be seen to come back.

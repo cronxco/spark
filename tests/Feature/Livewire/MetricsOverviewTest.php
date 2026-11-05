@@ -3,7 +3,7 @@
 namespace Tests\Feature\Livewire;
 
 use App\Jobs\Metrics\CalculateMetricStatisticsJob;
-use App\Jobs\Metrics\DetectMetricTrendsJob;
+use App\Jobs\Metrics\GenerateMetricInsightsJob;
 use App\Livewire\MetricsOverview;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
@@ -93,14 +93,14 @@ class MetricsOverviewTest extends TestCase
     }
 
     #[Test]
-    public function detect_trends_dispatches_job(): void
+    public function insights_job_dispatches(): void
     {
         Queue::fake();
 
         $component = Livewire::test(MetricsOverview::class);
         $component->call('detectTrends');
 
-        Queue::assertPushed(DetectMetricTrendsJob::class);
+        Queue::assertPushed(GenerateMetricInsightsJob::class);
     }
 
     #[Test]

@@ -5,7 +5,8 @@ namespace App\Jobs\Metrics;
 use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\User;
-use Carbon\Carbon;
+use App\Services\Metrics\BaselineService;
+use App\Services\Metrics\MetricCatalogue;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -114,6 +115,12 @@ class CalculateMetricStatisticsJob implements ShouldBeUnique, ShouldQueue
             ->having(DB::raw('COUNT(*)'), '>=', 10) // At least 10 events
             ->get()
             ->filter(function ($metricData) {
+                // The all-tenant nightly run relearns the metrics that are judged;
+                // the rest are refreshed as their events arrive, or on request.
+                if ($this->userId === null && ! app(MetricCatalogue::class)->isJudgeable($metricData->service, $metricData->action)) {
+                    return false;
+                }
+
                 // Check if user has this metric disabled
                 $user = User::find($metricData->user_id);
                 if (! $user) {
@@ -150,161 +157,19 @@ class CalculateMetricStatisticsJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Calculate statistics for a specific metric
-     *
-     * Aggregates in SQL rather than pulling every historical event into PHP —
-     * `events` rows are large (they include a 1536-dim `embeddings` vector and
-     * JSON metadata columns), so `SELECT *` on a multi-million-row history
-     * dominated database egress and wall-time.
+     * Recompute the baselines for a specific metric. The maths lives in
+     * BaselineService, which the task pipeline shares.
      */
     protected function calculateMetricStatistics(string $userId, string $service, string $action, string $valueUnit, string $domain = 'health'): void
     {
-        $eventsTable = (new Event)->getTable();
-        $eventAlias = DB::getTablePrefix() . 'e';
-
-        // Mirrors Event::getFormattedValueAttribute() in SQL: null/0/1 multipliers
-        // pass the raw value through, everything else divides.
-        $formattedExpr = <<<SQL
-            CASE
-                WHEN {$eventAlias}.value_multiplier IS NULL OR {$eventAlias}.value_multiplier IN (0, 1)
-                    THEN {$eventAlias}.value::double precision
-                ELSE {$eventAlias}.value::double precision / {$eventAlias}.value_multiplier
-            END
-        SQL;
-
-        $windowDays = MetricStatistic::DEFAULT_WINDOW_DAYS;
-
-        // Financial metrics legitimately record zero values (e.g. a spending category
-        // with no transactions on a given day). All other domains treat zero as "no
-        // reading" and exclude those events from baseline statistics.
-        $zeroFilter = ($domain !== 'money') ? "FILTER (WHERE {$eventAlias}.value <> 0)" : '';
-
-        $row = DB::table($eventsTable . ' as e')
-            ->join('integrations as i', 'e.integration_id', '=', 'i.id')
-            ->where('i.user_id', $userId)
-            ->whereNull('i.deleted_at')
-            ->where('e.service', $service)
-            ->where('e.action', $action)
-            ->where('e.value_unit', $valueUnit)
-            ->whereNotNull('e.value')
-            ->whereNull('e.deleted_at')
-            ->where(fn ($query) => $query
-                ->whereNull('e.event_metadata->internal')
-                ->orWhere('e.event_metadata->internal', false))
-            ->where('e.time', '>=', now()->subDays($windowDays))
-            ->selectRaw(<<<SQL
-                COUNT(*) AS total_count,
-                MIN({$eventAlias}.time) AS first_event_at,
-                MAX({$eventAlias}.time) AS last_event_at,
-                COUNT(*) {$zeroFilter} AS formatted_count,
-                MIN({$formattedExpr}) {$zeroFilter} AS min_value,
-                MAX({$formattedExpr}) {$zeroFilter} AS max_value,
-                AVG({$formattedExpr}) {$zeroFilter} AS mean_value,
-                STDDEV_POP({$formattedExpr}) {$zeroFilter} AS stddev_value
-            SQL)
-            ->first();
-
-        $totalCount = (int) ($row->total_count ?? 0);
-
-        $identifier = ['user_id' => $userId, 'service' => $service, 'action' => $action, 'value_unit' => $valueUnit];
-
-        if ($totalCount < 10) {
-            Log::info('Insufficient events for metric within window', [
-                'user_id' => $userId,
-                'service' => $service,
-                'action' => $action,
-                'value_unit' => $valueUnit,
-                'count' => $totalCount,
-                'window_days' => $windowDays,
-            ]);
-
-            $this->clearMetricStatistics($identifier, $windowDays);
-
-            return;
-        }
-
-        $firstEventAt = $row->first_event_at ? Carbon::parse($row->first_event_at) : null;
-        $lastEventAt = $row->last_event_at ? Carbon::parse($row->last_event_at) : null;
-
-        if (! $firstEventAt || ! $lastEventAt) {
-            return;
-        }
-
-        $daysBetween = $firstEventAt->diffInDays($lastEventAt);
-
-        if ($daysBetween < 30) {
-            Log::info('Insufficient time range for metric within window', [
-                'user_id' => $userId,
-                'service' => $service,
-                'action' => $action,
-                'value_unit' => $valueUnit,
-                'days' => $daysBetween,
-                'window_days' => $windowDays,
-            ]);
-
-            $this->clearMetricStatistics($identifier, $windowDays);
-
-            return;
-        }
-
-        $formattedCount = (int) ($row->formatted_count ?? 0);
-
-        if ($formattedCount === 0 || $row->mean_value === null) {
-            return;
-        }
-
-        $mean = (float) $row->mean_value;
-        $stddev = (float) ($row->stddev_value ?? 0.0);
-
-        MetricStatistic::updateOrCreate(
-            $identifier,
-            [
-                'event_count' => $formattedCount,
-                'first_event_at' => $firstEventAt,
-                'last_event_at' => $lastEventAt,
-                'min_value' => (float) $row->min_value,
-                'max_value' => (float) $row->max_value,
-                'mean_value' => $mean,
-                'stddev_value' => $stddev,
-                'normal_lower_bound' => $mean - (2 * $stddev),
-                'normal_upper_bound' => $mean + (2 * $stddev),
-                'baseline_window_days' => $windowDays,
-                'last_calculated_at' => now(),
-            ]
-        );
-
-        Log::info('Calculated metric statistics', [
+        $statistic = MetricStatistic::firstOrNew([
             'user_id' => $userId,
             'service' => $service,
             'action' => $action,
             'value_unit' => $valueUnit,
-            'count' => $formattedCount,
-            'mean' => $mean,
-            'stddev' => $stddev,
-            'window_days' => $windowDays,
         ]);
-    }
 
-    /**
-     * Null out computed stats on an existing row so stale bounds are not used for anomaly detection.
-     *
-     * @param  array<string, string>  $identifier
-     */
-    protected function clearMetricStatistics(array $identifier, int $windowDays): void
-    {
-        MetricStatistic::where($identifier)->update([
-            'event_count' => 0,
-            'first_event_at' => null,
-            'last_event_at' => null,
-            'min_value' => null,
-            'max_value' => null,
-            'mean_value' => null,
-            'stddev_value' => null,
-            'normal_lower_bound' => null,
-            'normal_upper_bound' => null,
-            'baseline_window_days' => $windowDays,
-            'last_calculated_at' => now(),
-        ]);
+        app(BaselineService::class)->recompute($statistic);
     }
 
     /**

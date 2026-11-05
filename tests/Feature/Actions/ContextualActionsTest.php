@@ -3,7 +3,7 @@
 namespace Tests\Feature\Actions;
 
 use App\Jobs\Metrics\CalculateMetricStatisticsJob;
-use App\Jobs\Metrics\DetectMetricTrendsJob;
+use App\Jobs\Metrics\GenerateMetricInsightsJob;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
@@ -174,7 +174,7 @@ class ContextualActionsTest extends TestCase
             ->dispatch('run-action', action: 'metrics.detect_trends');
 
         Queue::assertPushed(CalculateMetricStatisticsJob::class, fn ($job) => $job->userId === $this->alice->id);
-        Queue::assertPushed(DetectMetricTrendsJob::class, fn ($job) => $job->userId === $this->alice->id);
+        Queue::assertPushed(GenerateMetricInsightsJob::class, fn ($job) => $job->userId === $this->alice->id);
     }
 
     #[Test]

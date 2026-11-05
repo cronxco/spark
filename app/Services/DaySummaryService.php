@@ -9,6 +9,8 @@ use App\Models\Integration;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use App\Models\User;
+use App\Services\Metrics\MetricCatalogue;
+use App\Services\Metrics\MetricCompleteness;
 use App\Support\MoneyDirection;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -94,6 +96,7 @@ class DaySummaryService
             'sync_status' => $syncStatus,
             'sections' => $sections,
             'anomalies' => $anomalies,
+            'insights' => $this->buildInsights($user, $localDate),
         ];
     }
 
@@ -867,6 +870,44 @@ class DaySummaryService
     }
 
     /**
+     * Insights stored for the date: a week against its 4-week trend, a day
+     * against what is typical, a week on one side of usual. The evidence
+     * (the day type that justified the wording, the comparison) is in each.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function buildInsights(User $user, Carbon $date): array
+    {
+        return MetricTrend::query()
+            ->whereHas('metricStatistic', fn ($q) => $q->where('user_id', $user->id))
+            ->insights()
+            ->unacknowledged()
+            ->whereBetween('detected_at', [$date->copy()->startOfDay(), $date->copy()->endOfDay()])
+            ->with('metricStatistic')
+            ->orderByDesc('significance_score')
+            ->limit((int) config('metrics.max_insights_per_day', 5))
+            ->get()
+            ->map(fn (MetricTrend $trend): array => [
+                'id' => $trend->id,
+                'metric' => $trend->metricStatistic->getIdentifier(),
+                'display_name' => $trend->metricStatistic->getDisplayName(),
+                'kind' => $trend->metadata['kind'] ?? null,
+                'direction' => $trend->getDirection(),
+                'valence' => $trend->metadata['valence'] ?? 'neutral',
+                'current_value' => round((float) $trend->current_value, 2),
+                'baseline_value' => round((float) $trend->baseline_value, 2),
+                'current_display' => $trend->metadata['current_display'] ?? null,
+                'delta_display' => $trend->metadata['delta_display'] ?? null,
+                'comparison' => $trend->metadata['comparison'] ?? null,
+                'day_label' => $trend->metadata['day_label'] ?? null,
+                'start_date' => $trend->start_date?->toDateString(),
+                'end_date' => $trend->end_date?->toDateString(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * Build unacknowledged anomalies for the date.
      */
     protected function buildAnomalies(User $user, Carbon $date): array
@@ -879,10 +920,16 @@ class DaySummaryService
             ->with('metricStatistic')
             ->get();
 
-        $trends = $trends->filter(function ($trend) {
+        $catalogue = app(MetricCatalogue::class);
+
+        $trends = $trends->filter(function ($trend) use ($catalogue) {
             $stat = $trend->metricStatistic;
             if (! $stat) {
                 return true;
+            }
+
+            if (! $catalogue->raisesAnomalies($stat->service, $stat->action)) {
+                return false;
             }
 
             $suppressionColumn = $trend->type === 'anomaly_high' ? 'anomaly_high_suppressed_until' : 'anomaly_low_suppressed_until';
@@ -963,6 +1010,7 @@ class DaySummaryService
         $presentation = $this->presentation();
 
         $entry['is_anomaly'] = $presentation->isAnomalous($statistic, $currentValue)
+            && app(MetricCompleteness::class)->isFinal($event->service, $event->action, $event->time, $this->timezone, null, $event->updated_at)
             && ! $this->anomalyIsPremature($statistic, $currentValue, $isRunningDailyTotal)
             && ! $this->anomalyIsSuppressed($statistic, $currentValue);
 

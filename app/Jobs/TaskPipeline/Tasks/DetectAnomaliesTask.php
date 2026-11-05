@@ -2,11 +2,12 @@
 
 namespace App\Jobs\TaskPipeline\Tasks;
 
-use App\Integrations\PluginRegistry;
 use App\Jobs\TaskPipeline\BaseTaskJob;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
-use Carbon\Carbon;
+use App\Services\Metrics\AnomalyPolicy;
+use App\Services\Metrics\MetricCatalogue;
+use App\Services\Metrics\MetricCompleteness;
 use Illuminate\Support\Facades\Log;
 
 class DetectAnomaliesTask extends BaseTaskJob
@@ -58,12 +59,21 @@ class DetectAnomaliesTask extends BaseTaskJob
             return;
         }
 
-        // A daily aggregate that is still filling up (Oura's heart-rate
-        // average is written at 03:00 from a few overnight readings, then
-        // rewritten through the day) is not a reading yet. Judging it early
-        // raised a "below its usual range" anomaly every morning, and the
-        // streak of those stale rows read as "4 days in a row".
-        if ($this->isDayStillAccumulating()) {
+        // Only listed metrics are judged. One that has dropped off the list
+        // (or was never on it) leaves nothing behind from earlier runs.
+        if (! app(MetricCatalogue::class)->raisesAnomalies($this->model->service, $this->model->action)) {
+            $this->clearAnomaliesForEvent($metricStatistic);
+
+            return;
+        }
+
+        // A value that is still filling up (Oura's heart-rate average is
+        // written at 03:00 from a few overnight readings, then rewritten
+        // through the day) or that its source is still revising is not a
+        // reading yet. Judging it early raised a "below its usual range"
+        // anomaly every morning, and the streak of those stale rows read as
+        // "4 days in a row".
+        if (! $this->isFinal()) {
             $this->clearAnomaliesForEvent($metricStatistic);
             $this->recordOutcome(self::OUTCOME_DAY_IN_PROGRESS);
 
@@ -85,20 +95,18 @@ class DetectAnomaliesTask extends BaseTaskJob
             return;
         }
 
-        // Check if value is outside normal bounds
-        $isAnomalyHigh = $value > $metricStatistic->normal_upper_bound;
-        $isAnomalyLow = $value < $metricStatistic->normal_lower_bound;
+        $verdict = app(AnomalyPolicy::class)->judge($metricStatistic, (float) $value);
 
-        if (! $isAnomalyHigh && ! $isAnomalyLow) {
-            // Back within range: an anomaly raised from an earlier value of
-            // this event no longer describes it.
+        if ($verdict === null) {
+            // Back within range, or a move in the good direction: an anomaly
+            // raised from an earlier value of this event no longer describes it.
             $this->clearAnomaliesForEvent($metricStatistic);
 
             return;
         }
 
-        // Determine anomaly type
-        $type = $isAnomalyHigh ? 'anomaly_high' : 'anomaly_low';
+        $type = $verdict['type'];
+        $deviation = $verdict['deviation'];
 
         // An earlier value of this event may have tipped the other way.
         $this->clearAnomaliesForEvent($metricStatistic, except: $type);
@@ -114,9 +122,6 @@ class DetectAnomaliesTask extends BaseTaskJob
             ->where('type', $type)
             ->whereJsonContains('metadata->event_id', $this->model->id)
             ->first();
-
-        // Calculate how many standard deviations away
-        $deviation = abs($value - $metricStatistic->mean_value) / $metricStatistic->stddev_value;
 
         if ($existingAnomaly) {
             // Already recorded: keep it describing the event's latest value.
@@ -161,29 +166,20 @@ class DetectAnomaliesTask extends BaseTaskJob
     }
 
     /**
-     * Whether this event is a daily aggregate for a day that has not ended
-     * yet in the user's timezone. Plugins opt in per action with
-     * `accumulates_through_day`.
+     * Whether the event's value is final: its day has ended (for metrics that
+     * fill in through the day) and its source has stopped rewriting it.
      */
-    protected function isDayStillAccumulating(): bool
+    protected function isFinal(): bool
     {
-        $plugin = PluginRegistry::getPlugin($this->model->service);
-        $config = $plugin ? ($plugin::getActionTypes()[$this->model->action] ?? []) : [];
-
-        if (! ($config['accumulates_through_day'] ?? false)) {
-            return false;
-        }
-
-        // Daily aggregates are stamped at 00:00 UTC on the day they cover.
-        // That day is over once it has ended both in UTC (where the source
-        // groups its readings) and in the user's timezone; west of UTC,
-        // converting the stamp would land on the previous local day.
-        $day = Carbon::parse($this->model->time)->utc()->toDateString();
         $timezone = $this->model->integration->user?->getTimezone() ?? 'UTC';
-        $dayEnd = Carbon::parse($day, 'UTC')->endOfDay()
-            ->max(Carbon::parse($day, $timezone)->endOfDay());
 
-        return now()->lessThanOrEqualTo($dayEnd);
+        return app(MetricCompleteness::class)->isFinal(
+            $this->model->service,
+            $this->model->action,
+            $this->model->time,
+            $timezone,
+            updatedAt: $this->model->updated_at,
+        );
     }
 
     /**

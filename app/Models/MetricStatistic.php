@@ -73,6 +73,11 @@ class MetricStatistic extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function baselines(): HasMany
+    {
+        return $this->hasMany(MetricBaseline::class);
+    }
+
     public function trends(): HasMany
     {
         return $this->hasMany(MetricTrend::class);

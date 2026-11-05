@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Integrations\PluginRegistry;
 use App\Models\EventObject;
 use App\Models\MetricStatistic;
+use App\Services\Metrics\AnomalyPolicy;
+use App\Services\Metrics\MetricCatalogue;
 
 /**
  * Resolves how a metric should be *named and shown*, from the plugin that
@@ -130,27 +132,14 @@ class MetricPresentation
     }
 
     /**
-     * Whether an observed value is outside this metric's normal range.
-     *
-     * Continuous metrics use the stored 2σ bounds. Ordinal metrics cannot:
-     * with a mean of 3.19 and a standard deviation of 0.49, the lower bound
-     * lands at 2.2, so *every* reading of "Adequate" is flagged as an anomaly
-     * even though it is the band immediately below the usual one. For those,
-     * ordinary variation is one band either side of the usual band, and only a
-     * bigger move is worth raising.
+     * Whether an observed value is worth raising: outside the metric's usual
+     * range, in the adverse direction, for a metric that is judged at all.
+     * The rules (bands for ordinal levels, no verdict without a spread) live
+     * in AnomalyPolicy, so every surface agrees.
      */
     public function isAnomalous(MetricStatistic $statistic, ?float $value): bool
     {
-        if ($value === null || ! $statistic->hasValidStatistics()) {
-            return false;
-        }
-
-        if ($this->isOrdinal($statistic)) {
-            return abs($value - round((float) $statistic->mean_value)) > 1;
-        }
-
-        return $value < (float) $statistic->normal_lower_bound
-            || $value > (float) $statistic->normal_upper_bound;
+        return app(AnomalyPolicy::class)->judge($statistic, $value) !== null;
     }
 
     /**
@@ -163,7 +152,8 @@ class MetricPresentation
      */
     public function valence(MetricStatistic $statistic, string $direction, ?EventObject $account = null): string
     {
-        $higherIsBetter = $this->actionType($statistic)['higher_is_better'] ?? null;
+        $higherIsBetter = $this->actionType($statistic)['higher_is_better']
+            ?? app(MetricCatalogue::class)->higherIsBetter($statistic->service, $statistic->action);
 
         if (is_callable($higherIsBetter)) {
             $higherIsBetter = $account ? $higherIsBetter($account) : null;

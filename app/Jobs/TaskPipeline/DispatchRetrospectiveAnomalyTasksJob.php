@@ -38,14 +38,15 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
         // 2. Events that didn't get real-time anomaly detection
         // 3. Daily aggregates left unjudged while their day was still filling
         //    up. Two days back covers a day that ends after this run in the
-        //    user's timezone.
+        //    user's timezone. Today is swept too, for values that were
+        //    deferred while their source was still revising them.
         Event::query()
             ->withoutInternal()
             ->whereNotNull('value')
             ->whereNotNull('value_unit')
             ->whereBetween('time', [
                 now()->subDays(2)->startOfDay(),
-                now()->subDay()->endOfDay(),
+                now()->endOfDay(),
             ])
             ->chunk(100, function ($events) use (&$count, $store) {
                 foreach ($events as $event) {
@@ -61,8 +62,9 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
                         continue;
                     }
 
-                    // The day before yesterday is only swept for deferred days
-                    if (! $deferred && $event->time->lt(now()->subDay()->startOfDay())) {
+                    // Only deferred values are swept outside yesterday
+                    $isYesterday = $event->time->between(now()->subDay()->startOfDay(), now()->subDay()->endOfDay());
+                    if (! $deferred && ! $isYesterday) {
                         continue;
                     }
 

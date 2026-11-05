@@ -7,8 +7,9 @@ use App\Jobs\Flint\TriggerFlintDigestRoutineJob;
 use App\Jobs\Flint\TriggerFlintRoutineJob;
 use App\Jobs\GoCardless\CheckGoCardlessConsentExpiry;
 use App\Jobs\Knowledge\MaintainTasks;
+use App\Jobs\Metrics\CalculateMetricStatisticsJob;
+use App\Jobs\Metrics\GenerateMetricInsightsJob;
 use App\Jobs\TaskPipeline\DispatchRetrospectiveAnomalyTasksJob;
-use App\Jobs\TaskPipeline\DispatchTrendDetectionTasksJob;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\EffectiveTimezoneResolver;
@@ -36,16 +37,23 @@ Schedule::job(new CheckIntegrationUpdates)
     ->onOneServer()
     ->sentryMonitor();
 
-// Detect metric trends daily via task pipeline
-Schedule::job(new DispatchTrendDetectionTasksJob)
-    ->daily()
+// Relearn what is usual for every metric each night (baselines, day types)
+Schedule::job(new CalculateMetricStatisticsJob)
+    ->dailyAt('03:30')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->sentryMonitor();
+
+// Work out the day's metric insights; hourly, so each shows once its data is final
+Schedule::job(new GenerateMetricInsightsJob)
+    ->hourlyAt(40)
     ->withoutOverlapping()
     ->onOneServer()
     ->sentryMonitor();
 
 // Detect retrospective metric anomalies daily via task pipeline
 Schedule::job(new DispatchRetrospectiveAnomalyTasksJob)
-    ->daily()
+    ->hourlyAt(25)
     ->withoutOverlapping()
     ->onOneServer()
     ->sentryMonitor();

@@ -162,7 +162,7 @@ class UpToSpeedReadControllerTest extends TestCase
     #[Test]
     public function marks_anomaly_as_caught_up(): void
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         $anomaly = MetricTrend::factory()->create([
             'metric_statistic_id' => $stat->id,
             'type' => 'anomaly_high',
@@ -185,7 +185,7 @@ class UpToSpeedReadControllerTest extends TestCase
     #[Test]
     public function marking_anomaly_twice_is_idempotent(): void
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         $anomaly = MetricTrend::factory()->create([
             'metric_statistic_id' => $stat->id,
             'type' => 'anomaly_high',
@@ -260,7 +260,7 @@ class UpToSpeedReadControllerTest extends TestCase
             'action' => 'had_summary',
         ]);
 
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         $anomaly = MetricTrend::factory()->create([
             'metric_statistic_id' => $stat->id,
             'type' => 'anomaly_high',
