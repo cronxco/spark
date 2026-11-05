@@ -22,6 +22,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Debug Logging Default
+    |--------------------------------------------------------------------------
+    |
+    | This option controls whether debug logging is enabled by default for
+    | all users. Users can override this setting in their profile settings.
+    |
+    */
+
+    'debug_logging_default' => env('APP_DEBUG_LOGGING_DEFAULT', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Deprecations Log Channel
     |--------------------------------------------------------------------------
     |
@@ -89,7 +101,7 @@ return [
             'handler_with' => [
                 'host' => env('PAPERTRAIL_URL'),
                 'port' => env('PAPERTRAIL_PORT'),
-                'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
+                'connectionString' => 'tls://' . env('PAPERTRAIL_URL') . ':' . env('PAPERTRAIL_PORT'),
             ],
             'processors' => [PsrLogMessageProcessor::class],
         ],
@@ -125,6 +137,29 @@ return [
 
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
+        ],
+
+        'info' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/info.log'),
+            'level' => 'info',
+            'days' => 1,
+            'replace_placeholders' => true,
+        ],
+
+        'api_debug' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/api_debug.log'),
+            'level' => 'debug',
+            'days' => 2,
+            'replace_placeholders' => true,
+        ],
+
+        'sentry_logs' => [
+            'driver' => 'sentry_logs',
+            // The minimum logging level at which this handler will be triggered
+            // Available levels: debug, info, notice, warning, error, critical, alert, emergency
+            'level' => env('LOG_LEVEL', 'info'), // defaults to `debug` if not set
         ],
 
     ],

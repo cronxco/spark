@@ -1,0 +1,16 @@
+parameters:
+    level: 5
+    paths:
+        - app
+        - tests
+    ignoreErrors:
+        - '#PHPDoc tag @var#'
+    
+services:
+    -
+        class: App\PHPStan\Rules\NoBlocksCreateRule
+        tags:
+            - phpstan.rules.rule
+            
+rules:
+    - App\PHPStan\Rules\NoBlocksCreateRule

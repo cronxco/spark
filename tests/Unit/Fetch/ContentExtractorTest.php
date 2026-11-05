@@ -1,0 +1,369 @@
+<?php
+
+namespace Tests\Unit\Fetch;
+
+use App\Integrations\Fetch\ContentExtractor;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+
+class ContentExtractorTest extends TestCase
+{
+    #[Test]
+    public function it_extracts_content_from_valid_html()
+    {
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Test Article</title>
+                <meta name="author" content="John Doe">
+            </head>
+            <body>
+                <article>
+                    <h1>Test Article Title</h1>
+                    <p>This is a paragraph with more than 100 characters to ensure it passes validation. We need enough content for the extraction to succeed and pass all validation checks.</p>
+                    <p>Another paragraph with substantial content to make sure we have enough text for the content extractor to work properly and successfully extract the content.</p>
+                </article>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com/article');
+
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('data', $result);
+        $this->assertNotEmpty($result['data']['title']);
+        $this->assertNotEmpty($result['data']['content']);
+        $this->assertNotEmpty($result['data']['text_content']);
+    }
+
+    #[Test]
+    public function it_fails_on_missing_title()
+    {
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <p>Content without a title and more text here to make it long enough for validation purposes. We need substantial content.</p>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('title', strtolower($result['reason']));
+    }
+
+    #[Test]
+    public function it_fails_on_insufficient_content()
+    {
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head><title>Short Content Test Article</title></head>
+            <body>
+                <p>Too short</p>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('content', strtolower($result['reason']));
+    }
+
+    #[Test]
+    public function it_detects_robot_check_in_title()
+    {
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head><title>Are you a robot? Please verify you are human to continue browsing this website</title></head>
+            <body>
+                <p>This content should be ignored because robot check detected. Adding more text here to ensure we have enough content for validation if it gets past the robot check detection phase.</p>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('robot', strtolower($result['reason']));
+    }
+
+    #[Test]
+    public function it_detects_paywall()
+    {
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head><title>Premium Article Behind Paywall</title></head>
+            <body>
+                <div class="paywall">
+                    <p>Subscribe to continue reading this article and more content like this one. This is a premium article that requires a subscription to read the full content and access all features.</p>
+                </div>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('paywall', strtolower($result['reason']));
+    }
+
+    #[Test]
+    public function it_can_skip_access_barrier_detection_for_authenticated_browser_captures(): void
+    {
+        $body = str_repeat('This is the full article content from an authenticated browser session. ', 10);
+        $html = <<<HTML
+            <!doctype html>
+            <html>
+                <head><title>Authenticated Article Capture</title></head>
+                <body>
+                    <article><p>{$body}</p></article>
+                    <div class="paywall">Already a subscriber? Sign in to read.</div>
+                </body>
+            </html>
+            HTML;
+
+        $normalFetch = ContentExtractor::extract($html, 'https://example.com/private');
+        $browserCapture = ContentExtractor::extractCaptured($html, 'https://example.com/private');
+
+        $this->assertFalse($normalFetch['success']);
+        $this->assertTrue($browserCapture['success']);
+        $this->assertStringContainsString('full article content', $browserCapture['data']['text_content']);
+    }
+
+    #[Test]
+    public function it_generates_consistent_content_hash()
+    {
+        $content1 = 'This is test content for hashing';
+        $content2 = 'This is test content for hashing';
+        $content3 = 'This is different content for hashing';
+
+        $hash1 = ContentExtractor::generateHash($content1);
+        $hash2 = ContentExtractor::generateHash($content2);
+        $hash3 = ContentExtractor::generateHash($content3);
+
+        $this->assertEquals($hash1, $hash2);
+        $this->assertNotEquals($hash1, $hash3);
+        $this->assertEquals(64, strlen($hash1)); // SHA256 produces 64 char hex string
+    }
+
+    #[Test]
+    public function it_detects_paywall_from_common_indicators()
+    {
+        $paywallIndicators = [
+            'subscribe to continue reading',
+            'sign up to read',
+            'create a free account',
+            'subscription required',
+            'subscribers only',
+        ];
+
+        foreach ($paywallIndicators as $indicator) {
+            $html = "
+                <!DOCTYPE html>
+                <html>
+                <head><title>Article Title</title></head>
+                <body>
+                    <p>{$indicator} to access this premium content and enjoy unlimited articles. Get started today with our flexible subscription plans.</p>
+                </body>
+                </html>
+            ";
+
+            $result = ContentExtractor::extract($html, 'https://example.com');
+
+            $this->assertFalse($result['success'], "Failed to detect paywall for: {$indicator}");
+            $this->assertStringContainsString('paywall', strtolower($result['reason']));
+        }
+    }
+
+    #[Test]
+    public function it_does_not_flag_a_full_article_with_a_single_stray_indicator()
+    {
+        $body = str_repeat('This is a long, substantial article body with plenty of real content that loads perfectly fine in a browser. ', 30);
+
+        $html = "
+            <!DOCTYPE html>
+            <html>
+            <head><title>A Real Article</title></head>
+            <body>
+                <article>
+                    <p>{$body}</p>
+                    <footer>Want a free trial? See our other plans.</footer>
+                </article>
+            </body>
+            </html>
+        ";
+
+        $result = ContentExtractor::extract($html, 'https://example.com/real');
+
+        $this->assertTrue($result['success'], 'A full article with one stray phrase should not be flagged as a paywall');
+    }
+
+    #[Test]
+    public function it_honours_per_domain_paywall_override()
+    {
+        config(['fetch.paywall.ignored_domains' => ['paywalled.example']]);
+
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head><title>Premium Article</title></head>
+            <body>
+                <div class="paywall">
+                    <p>Subscribe to continue reading this premium subscriber-only article behind a hard paywall.</p>
+                </div>
+            </body>
+            </html>
+        ';
+
+        $detected = ContentExtractor::detectPaywall($html, 'short', false, 'https://paywalled.example/post');
+
+        $this->assertFalse($detected, 'Ignored domains must never be flagged as paywalled');
+    }
+
+    #[Test]
+    public function it_extracts_author_information()
+    {
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Test Article With Author Information</title>
+                <meta name="author" content="Jane Smith">
+            </head>
+            <body>
+                <article>
+                    <h1>Article Title</h1>
+                    <p>This is substantial content for the article with more than enough characters to pass validation. We need to ensure there is sufficient text.</p>
+                </article>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com');
+
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('author', $result['data']);
+    }
+
+    #[Test]
+    public function it_handles_malformed_html_gracefully()
+    {
+        $html = '<html><body><p>Unclosed paragraph and broken HTML structure';
+
+        $result = ContentExtractor::extract($html, 'https://example.com');
+
+        // Should fail but not throw an exception
+        $this->assertArrayHasKey('success', $result);
+        $this->assertArrayHasKey('reason', $result);
+    }
+
+    #[Test]
+    public function it_allows_pages_with_recaptcha_library_but_substantial_content()
+    {
+        // Simulate NYTimes-like page: has reCAPTCHA library loaded (for comments)
+        // but article content is fully accessible
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>The Soothing British Radio Show That Blew My Mind</title>
+                <script src="https://www.google.com/recaptcha/api.js"></script>
+            </head>
+            <body>
+                <article>
+                    <h1>Article Title</h1>
+                    <p>This is a real article with substantial content that spans multiple paragraphs.
+                    The article discusses important topics and provides valuable information to readers.
+                    Even though this page loads the reCAPTCHA library for its comment system, the main
+                    article content is fully accessible and should be extracted successfully.</p>
+                    <p>More content here to ensure we have plenty of text extracted. This simulates a
+                    real news article that might be 1000+ words long with multiple paragraphs, images,
+                    and rich content. The presence of reCAPTCHA should not cause a false positive.</p>
+                    <p>Additional paragraphs continue the article with even more valuable information
+                    for the reader. This content is freely accessible and not behind any robot check
+                    or CAPTCHA challenge. The reCAPTCHA is only used for the comment form at the bottom.</p>
+                </article>
+                <div id="comments">
+                    <div class="g-recaptcha" data-sitekey="6LexampleKEY"></div>
+                </div>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com/article');
+
+        // Should succeed because we extracted substantial content (>500 chars)
+        $this->assertTrue($result['success'], 'Should extract content despite reCAPTCHA library presence');
+        $this->assertArrayHasKey('data', $result);
+        $this->assertGreaterThan(500, strlen($result['data']['text_content']));
+    }
+
+    #[Test]
+    public function it_detects_actual_recaptcha_challenge_page()
+    {
+        // This simulates an actual CAPTCHA challenge page with minimal content
+        $html = '
+            <!DOCTYPE html>
+            <html>
+            <head><title>Just a moment...</title></head>
+            <body>
+                <div class="cf-challenge">
+                    <form method="POST">
+                        <div class="g-recaptcha-response"></div>
+                        <p>Please verify you are human</p>
+                    </form>
+                </div>
+            </body>
+            </html>
+        ';
+
+        $result = ContentExtractor::extract($html, 'https://example.com');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('robot', strtolower($result['reason']));
+    }
+
+    #[Test]
+    public function it_parses_without_validating(): void
+    {
+        $html = '<html><head><title>Hi</title></head><body><article><p>Short.</p></article></body></html>';
+
+        $parsed = ContentExtractor::parse($html, 'https://example.com/a');
+
+        $this->assertTrue($parsed['success']);
+        $this->assertSame('Hi', $parsed['data']['title']);
+
+        $validated = ContentExtractor::validateParsed($parsed, $html, 'https://example.com/a');
+
+        $this->assertFalse($validated['success']);
+        $this->assertSame('Title too short: Hi', $validated['reason']);
+    }
+
+    #[Test]
+    public function it_validates_a_parsed_article_like_extract_does(): void
+    {
+        $html = '<html><head><title>A proper article title</title></head><body><article>'
+            . str_repeat('<p>Plenty of genuine article text so that validation accepts the extracted content.</p>', 5)
+            . '</article></body></html>';
+
+        $validated = ContentExtractor::validateParsed(ContentExtractor::parse($html, 'https://example.com/a'), $html, 'https://example.com/a');
+
+        $this->assertTrue($validated['success']);
+        $this->assertEquals(ContentExtractor::extract($html, 'https://example.com/a'), $validated);
+    }
+
+    #[Test]
+    public function it_passes_parse_failures_through_validation(): void
+    {
+        $failure = ['success' => false, 'reason' => 'Parse error: nope', 'data' => null];
+
+        $this->assertSame($failure, ContentExtractor::validateParsed($failure, '', 'https://example.com/a'));
+    }
+}

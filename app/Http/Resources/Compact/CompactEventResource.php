@@ -1,0 +1,268 @@
+<?php
+
+namespace App\Http\Resources\Compact;
+
+use App\Integrations\PluginRegistry;
+use App\Models\Block;
+use App\Models\Event;
+use App\Services\Mobile\EventRoute;
+use App\Support\MoneyDirection;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Str;
+
+/**
+ * @mixin Event
+ *
+ * Mobile-optimised event shape. Based on EventResource::toCondensedArray()
+ * but with a fixed contract — the iOS client decodes this into Swift structs,
+ * so the payload shape is load-bearing and should only change through
+ * explicit migration.
+ */
+class CompactEventResource extends JsonResource
+{
+    /**
+     * Block type that stores a user-authored note for an event. Mirrored in
+     * EventsController::updateNote, which writes/clears this block.
+     */
+    public const NOTE_BLOCK_TYPE = 'note';
+
+    /**
+     * How many block pills a list row shows before "+N", matching the web
+     * day timeline (`livewire/day.blade.php`).
+     */
+    public const BLOCK_REF_LIMIT = 3;
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        $data = [
+            'id' => $this->id,
+            'time' => $this->time?->toIso8601String(),
+            'service' => $this->service,
+            'domain' => $this->domain,
+            'action' => $this->action,
+            // Consecutive events sharing this key are the same run (e.g.
+            // twenty Spotify plays back to back) — the client groups on it
+            // directly instead of implementing its own run-length rule that
+            // has to agree with the web app's by coincidence.
+            'group_key' => $this->groupKey(),
+        ];
+
+        if ($this->value !== null) {
+            $data['value'] = $this->formatted_value;
+            $data['unit'] = $this->value_unit;
+            $data['display_value'] = format_event_display_value(
+                $this->formatted_value,
+                $this->value_unit,
+                $this->service,
+                $this->action,
+            );
+
+            // Resolved server-side so the client never infers in/out/internal
+            // from the action-name suffix.
+            if ($this->domain === 'money') {
+                $data['direction'] = MoneyDirection::for($this->resource);
+            }
+        }
+
+        if ($this->url) {
+            $data['url'] = $this->url;
+        }
+
+        // Only present when true. The points themselves come from GET /events/{id}/route.
+        if (app(EventRoute::class)->hasRoute($this->resource)) {
+            $data['has_route'] = true;
+        }
+
+        if ($this->relationLoaded('actor') && $this->actor) {
+            $data['actor'] = [
+                'id' => $this->actor->id,
+                'title' => $this->actor->title,
+                'concept' => $this->actor->concept,
+                'type' => $this->actor->type,
+                'media_url' => $this->actor->media_url,
+            ];
+        }
+
+        if ($this->relationLoaded('target') && $this->target) {
+            $data['target'] = [
+                'id' => $this->target->id,
+                'title' => $this->displayTargetTitle(),
+                'concept' => $this->target->concept,
+                'type' => $this->target->type,
+                'media_url' => $this->displayTargetMediaUrl(),
+            ];
+        }
+
+        // The integration instance the event came from ("F1", "Receipts"),
+        // drawn as the first pill on a timeline row, as on the web.
+        if ($this->relationLoaded('integration') && $this->integration) {
+            $data['integration'] = [
+                'id' => $this->integration->id,
+                'name' => $this->integration->name,
+                'service' => $this->integration->service,
+            ];
+        }
+
+        if ($this->relationLoaded('tags')) {
+            $data['tags'] = $this->tags->map(fn ($tag) => [
+                'id' => (string) $tag->id,
+                'name' => $tag->name,
+                'type' => $tag->type,
+            ])->values()->all();
+        }
+
+        if ($this->relationLoaded('blocks')) {
+            $tldr = $this->blocks->first(
+                fn ($block) => str_contains($block->block_type, 'tldr'),
+            );
+
+            if ($tldr) {
+                $data['tldr'] = $tldr->getContent();
+            }
+
+            // User-authored note lives in a dedicated `note` block. It surfaces as a
+            // top-level `note` field (the iOS detail screen has its own note editor)
+            // and is excluded from the generic blocks grid below to avoid duplication.
+            // The blocks relation is withTrashed(), so ignore soft-deleted note
+            // blocks (a cleared note) when surfacing the current note.
+            $note = $this->blocks->first(
+                fn ($block) => $block->block_type === self::NOTE_BLOCK_TYPE && $block->deleted_at === null,
+            );
+
+            if ($note) {
+                $data['note'] = $note->getContent();
+            }
+
+            // Full blocks array only in the detail endpoint. The feed uses withCount('blocks')
+            // which sets blocks_count, signalling list mode where the array would be too heavy.
+            if (! isset($this->blocks_count)) {
+                $blocks = $this->blocks->reject(
+                    fn ($block) => $block->block_type === self::NOTE_BLOCK_TYPE,
+                );
+                $data['blocks'] = CompactBlockResource::collection($blocks)->resolve($request);
+            } else {
+                // List mode: a light pill per block for the timeline row, the
+                // first few only, with the total so the client can say "+N".
+                $visible = $this->blocks
+                    ->filter(fn (Block $block) => $block->deleted_at === null && $block->block_type !== self::NOTE_BLOCK_TYPE)
+                    ->values();
+
+                $data['block_refs'] = $visible
+                    ->take(self::BLOCK_REF_LIMIT)
+                    ->map(fn (Block $block) => $this->blockRef($block))
+                    ->all();
+                $data['block_refs_total'] = $visible->count();
+            }
+        }
+
+        if (isset($this->blocks_count)) {
+            $data['blocks_count'] = $this->blocks_count;
+        }
+
+        $actionConfig = $this->actionConfig();
+        $data['display_name'] = $actionConfig['display_name'] ?? format_action_title($this->action);
+        $data['display_with_object'] = (bool) ($actionConfig['display_with_object'] ?? true);
+        $data['hidden'] = (bool) ($actionConfig['hidden'] ?? false);
+
+        return $data;
+    }
+
+    /**
+     * @return array{id: string, block_type: string, title: string, display_value?: string}
+     */
+    private function blockRef(Block $block): array
+    {
+        $ref = [
+            'id' => (string) $block->id,
+            'block_type' => $block->block_type,
+            'title' => $block->title ?: $this->blockTypeDisplayName((string) $block->block_type),
+        ];
+
+        if ($block->value !== null) {
+            $ref['display_value'] = format_block_value_display(
+                $block->formatted_value,
+                $block->value_unit,
+                $block->value_multiplier,
+            );
+        }
+
+        return $ref;
+    }
+
+    private function blockTypeDisplayName(string $blockType): string
+    {
+        foreach ($this->pluginLookupKeys() as $service) {
+            $pluginClass = PluginRegistry::getPlugin($service);
+            $name = $pluginClass ? ($pluginClass::getBlockTypes()[$blockType]['display_name'] ?? null) : null;
+
+            if (is_string($name) && $name !== '') {
+                return $name;
+            }
+        }
+
+        return Str::headline($blockType);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function actionConfig(): array
+    {
+        foreach ($this->pluginLookupKeys() as $service) {
+            $pluginClass = PluginRegistry::getPlugin($service);
+
+            if (! $pluginClass) {
+                continue;
+            }
+
+            $actionConfig = $pluginClass::getActionTypes()[$this->action] ?? null;
+
+            if ($actionConfig !== null) {
+                return $actionConfig;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * The run a consecutive-events grouping should key on: same service,
+     * same action, same actor. Twenty Spotify plays by the same account
+     * share a key; a card payment on two different accounts doesn't.
+     */
+    private function groupKey(): string
+    {
+        return implode(':', [
+            $this->service ?? '',
+            $this->action ?? '',
+            $this->actor_id ?? '',
+        ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function pluginLookupKeys(): array
+    {
+        $services = [$this->service];
+
+        if ($this->relationLoaded('integration') && $this->integration?->service) {
+            $services[] = $this->integration->service;
+        }
+
+        return collect($services)
+            ->filter(fn ($service) => is_string($service) && $service !== '')
+            ->flatMap(fn (string $service) => [
+                $service,
+                str_replace('_', '-', $service),
+                str_replace('-', '_', $service),
+            ])
+            ->unique()
+            ->values()
+            ->all();
+    }
+}

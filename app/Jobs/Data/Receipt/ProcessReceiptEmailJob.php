@@ -1,0 +1,523 @@
+<?php
+
+namespace App\Jobs\Data\Receipt;
+
+use App\Integrations\Receipt\ReceiptExtractor;
+use App\Integrations\Receipt\ReceiptTimeResolver;
+use App\Jobs\Concerns\EnhancedIdempotency;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Services\Ai\AiUsageContext;
+use App\Services\CurrencyConversionService;
+use App\Services\EffectiveTimezoneResolver;
+use Exception;
+use Html2Text\Html2Text;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Smalot\PdfParser\Parser as PdfParser;
+use Throwable;
+use ZBateson\MailMimeParser\MailMimeParser;
+
+class ProcessReceiptEmailJob implements ShouldQueue
+{
+    use Dispatchable, EnhancedIdempotency, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $timeout = 300; // 5 minutes for email processing + AI
+
+    public $tries = 3;
+
+    public $backoff = [60, 300, 900];
+
+    public function __construct(
+        public Integration $integration,
+        public ?string $s3ObjectKey = null,
+        public ?string $rawEmailContent = null
+    ) {}
+
+    public function handle(): void
+    {
+        Log::info('Receipt: Processing receipt email', [
+            'integration_id' => $this->integration->id,
+            's3_object_key' => $this->s3ObjectKey,
+            'has_raw_content' => ! empty($this->rawEmailContent),
+        ]);
+
+        try {
+            // Get email content - either from raw content or S3
+            if (! empty($this->rawEmailContent)) {
+                $emailContent = $this->rawEmailContent;
+            } elseif (! empty($this->s3ObjectKey)) {
+                $emailContent = $this->downloadEmailFromS3($this->s3ObjectKey);
+            } else {
+                throw new Exception('No email content or S3 key provided');
+            }
+
+            // Parse email to extract text
+            $parsedEmail = $this->parseEmail($emailContent);
+
+            $sourceId = $this->receiptSourceId($parsedEmail['message_id'], $emailContent);
+
+            if ($this->receiptAlreadyExists($sourceId)) {
+                Log::info('Receipt: Skipping email already processed', [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $sourceId,
+                ]);
+
+                return;
+            }
+
+            // Extract receipt data using OpenAI
+            $extractor = app(ReceiptExtractor::class);
+            $receiptData = $extractor->extract(
+                $parsedEmail['combined_text'],
+                $parsedEmail['subject'],
+                $parsedEmail['from'],
+                new AiUsageContext(
+                    $this->integration->user,
+                    'receipt_extract',
+                    'receipt',
+                    $this->integration,
+                ),
+            );
+
+            // Check if this was identified as not a valid receipt
+            if (isset($receiptData['is_valid_receipt']) && $receiptData['is_valid_receipt'] === false) {
+                Log::info('Receipt: Skipping non-receipt email', [
+                    'integration_id' => $this->integration->id,
+                    'subject' => $parsedEmail['subject'],
+                    'from' => $parsedEmail['from'],
+                    'rejection_reason' => $receiptData['rejection_reason'] ?? 'unknown',
+                ]);
+
+                // Don't create any events for non-receipts
+                return;
+            }
+
+            // Create receipt event and related data. Matching runs from the
+            // Task Pipeline's match_receipt_to_transaction task on creation.
+            try {
+                $receiptEvent = $this->createReceiptEvent($receiptData, $parsedEmail, $sourceId);
+            } catch (UniqueConstraintViolationException) {
+                Log::info('Receipt: Another delivery of this email created the receipt first', [
+                    'integration_id' => $this->integration->id,
+                    'source_id' => $sourceId,
+                ]);
+
+                return;
+            }
+
+            Log::info('Receipt: Successfully processed receipt email', [
+                'integration_id' => $this->integration->id,
+                's3_object_key' => $this->s3ObjectKey,
+                'receipt_event_id' => $receiptEvent->id,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Receipt: Failed to process email', [
+                'integration_id' => $this->integration->id,
+                's3_object_key' => $this->s3ObjectKey,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    public function uniqueId(): string
+    {
+        $contentHash = $this->s3ObjectKey
+            ? md5($this->s3ObjectKey)
+            : md5($this->rawEmailContent ?? '');
+
+        return 'process_receipt_email_' . $this->integration->id . '_' . $contentHash;
+    }
+
+    /**
+     * A stable identity for this email within the integration, so a redelivery
+     * finds the receipt it already created. Uses the Message-ID header, falling
+     * back to the S3 object key and then the raw content.
+     */
+    private function receiptSourceId(string $messageId, string $emailContent): string
+    {
+        $messageId = strtolower(trim($messageId, " \t\n\r\0\x0B<>"));
+
+        $identity = match (true) {
+            $messageId !== '' => 'message:' . $messageId,
+            ! empty($this->s3ObjectKey) => 's3:' . $this->s3ObjectKey,
+            default => 'content:' . hash('sha256', $emailContent),
+        };
+
+        return 'receipt_' . hash('sha256', $identity);
+    }
+
+    private function receiptAlreadyExists(string $sourceId): bool
+    {
+        return Event::withTrashed()
+            ->where('integration_id', $this->integration->id)
+            ->where('source_id', $sourceId)
+            ->exists();
+    }
+
+    /**
+     * Download email file from S3
+     */
+    private function downloadEmailFromS3(string $objectKey): string
+    {
+        $disk = Storage::disk('s3-receipts');
+
+        if (! $disk->exists($objectKey)) {
+            throw new Exception("Email file not found in S3: {$objectKey}");
+        }
+
+        $content = $disk->get($objectKey);
+
+        Log::info('Receipt: Downloaded email from S3', [
+            's3_object_key' => $objectKey,
+            'size_bytes' => strlen($content),
+        ]);
+
+        return $content;
+    }
+
+    /**
+     * Parse email content to extract text, subject, from, etc.
+     *
+     * This uses zbateson/mail-mime-parser to parse the MIME structure
+     */
+    private function parseEmail(string $emailContent): array
+    {
+        try {
+            // Use MailMimeParser to parse the email
+            $parser = new MailMimeParser;
+            $message = $parser->parse($emailContent, false);
+
+            // Extract basic fields
+            $subject = $message->getHeaderValue('subject') ?: 'No Subject';
+            $from = $message->getHeaderValue('from') ?: '';
+            $date = $message->getHeaderValue('date') ?: now()->toRfc2822String();
+            $messageId = $message->getHeaderValue('message-id') ?: '';
+
+            // Extract text content
+            $textPlain = $message->getTextContent() ?: '';
+            $textHtml = $message->getHtmlContent() ?: '';
+
+            // Convert HTML to plain text if needed
+            if ($textHtml && ! $textPlain) {
+                $textPlain = $this->htmlToText($textHtml);
+            }
+
+            // Extract PDF attachments and parse them
+            $pdfText = '';
+            $attachments = $message->getAllAttachmentParts();
+            foreach ($attachments as $attachment) {
+                if ($attachment->getContentType() === 'application/pdf') {
+                    $pdfContent = $attachment->getContent();
+                    $pdfText .= $this->extractPdfText($pdfContent);
+                }
+            }
+
+            // Combine all text sources
+            $combinedText = trim($textPlain . "\n\n" . $pdfText);
+
+            Log::info('Receipt: Parsed email', [
+                'subject' => $subject,
+                'from' => $from,
+                'message_id' => $messageId,
+                'text_length' => strlen($combinedText),
+                'attachments_count' => count($attachments),
+            ]);
+
+            return [
+                'subject' => $subject,
+                'from' => $from,
+                'date' => $date,
+                'message_id' => $messageId,
+                'text_plain' => $textPlain,
+                'text_html' => $textHtml,
+                'pdf_text' => $pdfText,
+                'combined_text' => $combinedText,
+            ];
+        } catch (Exception $e) {
+            Log::error('Receipt: Email parsing failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new Exception('Failed to parse email: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Convert HTML to plain text using html2text
+     */
+    private function htmlToText(string $html): string
+    {
+        try {
+            $converter = new Html2Text($html);
+
+            return $converter->getText();
+        } catch (Exception $e) {
+            Log::warning('Receipt: HTML conversion failed, using strip_tags', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return strip_tags($html);
+        }
+    }
+
+    /**
+     * Extract text from PDF using smalot/pdfparser
+     */
+    private function extractPdfText(string $pdfContent): string
+    {
+        try {
+            $parser = new PdfParser;
+            $pdf = $parser->parseContent($pdfContent);
+            $text = $pdf->getText();
+
+            Log::info('Receipt: Extracted text from PDF', [
+                'text_length' => strlen($text),
+            ]);
+
+            return $text;
+        } catch (Exception $e) {
+            Log::warning('Receipt: PDF parsing failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return '';
+        }
+    }
+
+    /**
+     * Create receipt event and related objects/blocks
+     */
+    private function createReceiptEvent(array $receiptData, array $parsedEmail, string $sourceId): Event
+    {
+        // Create merchant EventObject
+        $merchant = EventObject::updateOrCreate(
+            [
+                'user_id' => $this->integration->user_id,
+                'concept' => 'merchant',
+                'type' => 'receipt_merchant',
+                'title' => $receiptData['merchant']['name'],
+            ],
+            [
+                'time' => now(),
+                'content' => implode(', ', array_filter([
+                    $receiptData['merchant']['address'] ?? null,
+                    $receiptData['merchant']['phone'] ?? null,
+                ])),
+                'metadata' => [
+                    'address' => $receiptData['merchant']['address'] ?? null,
+                    'phone' => $receiptData['merchant']['phone'] ?? null,
+                    'tax_id' => $receiptData['merchant']['tax_id'] ?? null,
+                    'merchant_id' => $receiptData['merchant']['merchant_id'] ?? null,
+                    'normalized_name' => strtolower($receiptData['merchant']['name']),
+                    'raw_email_s3_key' => $this->s3ObjectKey,
+                ],
+            ]
+        );
+
+        // Create user actor EventObject
+        $actor = EventObject::firstOrCreate(
+            [
+                'user_id' => $this->integration->user_id,
+                'concept' => 'user',
+                'type' => 'user',
+                'title' => 'Me',
+            ],
+            [
+                'time' => now(),
+                'metadata' => [],
+            ]
+        );
+
+        $transaction = $receiptData['transaction_metadata'] ?? [];
+        $printedDate = $transaction['transaction_date'] ?? null;
+        $fallbackTimezone = app(EffectiveTimezoneResolver::class)->timezoneForDate(
+            $this->integration->user,
+            is_string($printedDate) ? substr($printedDate, 0, 10) : now()->toDateString(),
+        );
+        $resolvedTime = app(ReceiptTimeResolver::class)->resolve(
+            $transaction,
+            $parsedEmail['date'],
+            $fallbackTimezone,
+            now(),
+        );
+        $transactionTime = $resolvedTime['time'];
+        // Matching windows must use the same normalized instant as the event/blocks.
+        $matchingHints = $receiptData['matching_hints'] ?? [];
+        $matchingHints['suggested_date_range'] = [
+            'start' => $transactionTime->copy()->subHours(2)->toIso8601String(),
+            'end' => $transactionTime->copy()->addHours(2)->toIso8601String(),
+        ];
+
+        // Create receipt event
+        $event = Event::create([
+            'source_id' => $sourceId,
+            'time' => $transactionTime,
+            'integration_id' => $this->integration->id,
+            'actor_id' => $actor->id,
+            'actor_metadata' => [],
+            'service' => 'receipt',
+            'domain' => 'money',
+            'action' => 'had_receipt_from',
+            'value' => $receiptData['transaction_summary']['total_amount'],
+            'value_multiplier' => 100,
+            'value_unit' => $receiptData['transaction_summary']['currency'],
+            'event_metadata' => [
+                'receipt_metadata' => $receiptData['receipt_metadata'],
+                'transaction_metadata' => $receiptData['transaction_metadata'],
+                'transaction_summary' => $receiptData['transaction_summary'],
+                'matching_hints' => $matchingHints,
+                'time_resolution' => $resolvedTime['metadata'],
+                'raw_extraction' => $receiptData, // Store full extraction for debugging
+                'email_message_id' => $parsedEmail['message_id'],
+                'raw_email_s3_key' => $this->s3ObjectKey,
+            ],
+            'target_id' => $merchant->id,
+            'target_metadata' => [],
+        ]);
+
+        // Add currency conversion metadata if not GBP
+        $currency = $receiptData['transaction_summary']['currency'];
+        $baseCurrency = config('services.currency.base_currency', 'GBP');
+        $originalAmount = $receiptData['transaction_summary']['total_amount'] ?? null;
+
+        if (is_numeric($originalAmount) && strtoupper((string) $currency) !== strtoupper($baseCurrency)) {
+            try {
+                $conversionService = app(CurrencyConversionService::class);
+                $originalAmount = (int) round((float) $originalAmount);
+
+                // Convert to base currency (GBP)
+                $convertedAmount = $conversionService->convert(
+                    $originalAmount,
+                    $currency,
+                    $baseCurrency,
+                    $transactionTime
+                );
+
+                // Get the exchange rate used
+                $rate = $conversionService->getRate($currency, $baseCurrency, $transactionTime);
+
+                // Store conversion metadata
+                $metadata = $event->event_metadata;
+                $metadata['currency_conversion'] = [
+                    'original_currency' => strtoupper($currency),
+                    'original_amount' => $originalAmount,
+                    'converted_to_gbp' => $convertedAmount,
+                    'exchange_rate' => $rate,
+                    'conversion_date' => $transactionTime->toDateString(),
+                    'rate_source' => config('services.currency.api_provider', 'exchangerate'),
+                ];
+
+                $event->update(['event_metadata' => $metadata]);
+
+                Log::info('Currency conversion added to receipt', [
+                    'event_id' => $event->id,
+                    'from' => $currency,
+                    'to' => $baseCurrency,
+                    'original_amount' => $originalAmount,
+                    'converted_amount' => $convertedAmount,
+                    'rate' => $rate,
+                ]);
+            } catch (Throwable $e) {
+                // Log but don't fail the job if conversion fails
+                Log::warning('Failed to convert receipt currency', [
+                    'event_id' => $event->id,
+                    'currency' => $currency,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Create line item blocks (only if there are line items with descriptions)
+        $lineItems = $receiptData['line_items'] ?? [];
+        foreach ($lineItems as $item) {
+            // Skip line items without descriptions or prices
+            if (empty($item['description']) || ! isset($item['total_price'])) {
+                continue;
+            }
+
+            $event->createBlock([
+                'time' => $transactionTime,
+                'block_type' => 'receipt_line_item',
+                'title' => $item['description'],
+                'value' => $item['total_price'],
+                'value_multiplier' => 100,
+                'value_unit' => $receiptData['transaction_summary']['currency'],
+                'metadata' => [
+                    'sequence' => $item['sequence'] ?? null,
+                    'quantity' => $item['quantity'] ?? null,
+                    'unit' => $item['unit'] ?? null,
+                    'unit_price' => $item['unit_price'] ?? null,
+                    'category' => $item['category'] ?? null,
+                    'sku' => $item['sku'] ?? null,
+                    'tax_rate' => $item['tax_rate'] ?? null,
+                ],
+            ]);
+        }
+
+        // Create tax summary block (only if there's tax data)
+        $taxTotal = $receiptData['transaction_summary']['tax_total'] ?? null;
+        $taxRate = $receiptData['transaction_summary']['tax_rate'] ?? null;
+        if ($taxTotal !== null && $taxTotal > 0) {
+            $event->createBlock([
+                'time' => $transactionTime,
+                'block_type' => 'receipt_tax_summary',
+                'title' => 'Tax Summary',
+                'value' => $taxTotal,
+                'value_multiplier' => 100,
+                'value_unit' => $receiptData['transaction_summary']['currency'],
+                'metadata' => [
+                    'tax_rate' => $taxRate,
+                    'subtotal' => $receiptData['transaction_summary']['subtotal'] ?? null,
+                    'discount_total' => $receiptData['transaction_summary']['discount_total'] ?? 0,
+                    'tip_amount' => $receiptData['transaction_summary']['tip_amount'] ?? 0,
+                ],
+            ]);
+        }
+
+        // Create payment method block (only if there's meaningful payment data)
+        $paymentMethod = $receiptData['transaction_metadata']['payment_method'] ?? null;
+        $cardLast4 = $receiptData['transaction_metadata']['card_last_4'] ?? null;
+        $receiptNumber = $receiptData['transaction_metadata']['receipt_number'] ?? null;
+        $terminalId = $receiptData['transaction_metadata']['terminal_id'] ?? null;
+
+        // Only create if we have at least one meaningful field (not just 'unknown')
+        $hasPaymentData = ($paymentMethod && $paymentMethod !== 'unknown')
+            || $cardLast4
+            || $receiptNumber
+            || $terminalId;
+
+        if ($hasPaymentData) {
+            $event->createBlock([
+                'time' => $transactionTime,
+                'block_type' => 'receipt_payment_method',
+                'title' => 'Payment Method',
+                'metadata' => [
+                    'payment_method' => $paymentMethod,
+                    'card_last_4' => $cardLast4,
+                    'receipt_number' => $receiptNumber,
+                    'terminal_id' => $terminalId,
+                ],
+            ]);
+        }
+
+        Log::info('Receipt: Created receipt event and blocks', [
+            'event_id' => $event->id,
+            'merchant' => $merchant->title,
+            'amount' => $event->value,
+            'currency' => $event->value_unit,
+            'line_items_count' => count($receiptData['line_items'] ?? []),
+        ]);
+
+        return $event;
+    }
+}

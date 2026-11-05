@@ -1,0 +1,8 @@
+---
+description: Class Structure
+globs:
+alwaysApply: true
+---
+- Use typed properties, not docblocks:
+- Constructor property promotion when all properties can be promoted:
+- One trait per line:

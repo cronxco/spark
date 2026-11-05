@@ -1,0 +1,373 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\Mobile;
+
+use App\Http\Controllers\Controller;
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\User;
+use App\Services\Api\ResourceVersion;
+use App\Services\Mobile\EventLookup;
+use App\Services\Mobile\ObjectLookup;
+use App\Support\OwnedTagQuery;
+use App\Support\TagName;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Spatie\Tags\Tag;
+
+class TagsController extends Controller
+{
+    private const DEFAULT_LIMIT = 30;
+
+    private const MAX_LIMIT = 100;
+
+    /** The `type` a tag without one is listed and filtered under. */
+    private const UNTYPED = 'untyped';
+
+    public function __construct(
+        protected EventLookup $eventLookup,
+        protected ObjectLookup $objectLookup,
+        protected ResourceVersion $versions,
+    ) {}
+
+    public function index(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'type' => ['nullable', 'string', 'max:255'],
+            'cursor' => ['nullable', 'string'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_LIMIT],
+        ]);
+
+        $allTags = $this->withTotals(
+            $this->tagQuery($request->user(), $validated['q'] ?? null)->get(),
+        )->sortBy([['total_count', 'desc'], ['id', 'asc']])->values();
+
+        $type = $validated['type'] ?? null;
+        $tags = $type === null
+            ? $allTags
+            : $allTags->filter(fn (Tag $tag) => ($tag->type ?? self::UNTYPED) === $type)->values();
+
+        [$page, $nextCursor, $hasMore] = $this->paginate(
+            $tags,
+            $validated['cursor'] ?? null,
+            (int) ($validated['limit'] ?? self::DEFAULT_LIMIT),
+        );
+
+        $response = [
+            'data' => $page->map(fn (Tag $tag) => $this->tagPayload($tag))->values(),
+            'next_cursor' => $nextCursor,
+            'has_more' => $hasMore,
+        ];
+
+        if (($validated['cursor'] ?? null) === null) {
+            $response['types'] = $this->typeTotals($allTags);
+        }
+
+        return response()->json($response);
+    }
+
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'cursor' => ['nullable', 'string'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_LIMIT],
+        ]);
+
+        $tag = $this->tagQuery($request->user())
+            ->where('tags.id', $id)
+            ->first();
+
+        if (! $tag) {
+            return response()->json(['message' => 'Tag not found.'], 404);
+        }
+
+        $tag = $this->withTotals(collect([$tag]))->first();
+        $limit = (int) ($validated['limit'] ?? self::DEFAULT_LIMIT);
+        $offset = $this->cursorOffset($validated['cursor'] ?? null);
+        $items = $this->taggedItems($request->user(), $tag, $offset + $limit + 1);
+        [$page, $nextCursor, $hasMore] = $this->paginate(
+            $items,
+            $validated['cursor'] ?? null,
+            $limit,
+        );
+
+        return response()->json([
+            'tag' => $this->tagPayload($tag),
+            'data' => $page->map(fn (array $item) => $item['payload'])->values(),
+            'next_cursor' => $nextCursor,
+            'has_more' => $hasMore,
+        ]);
+    }
+
+    public function suggest(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:25'],
+        ]);
+        $queryText = trim((string) ($validated['q'] ?? ''));
+        $limit = (int) ($validated['limit'] ?? 10);
+
+        $lower = mb_strtolower($queryText);
+        $tags = $this->withTotals(
+            $this->tagQuery($request->user(), $queryText)->get(),
+        )->sortBy(function (Tag $tag) use ($lower) {
+            $name = mb_strtolower((string) $tag->name);
+            $matchRank = match (true) {
+                $lower === '' => 0,
+                $name === $lower => 0,
+                str_starts_with($name, $lower) => 1,
+                default => 2,
+            };
+
+            return [
+                $matchRank,
+                -((int) $tag->total_count),
+                (string) $tag->id,
+            ];
+        })->take($limit)->values();
+
+        return response()->json([
+            'data' => $tags->map(fn (Tag $tag) => $this->tagPayload($tag))->values(),
+        ]);
+    }
+
+    public function storeEventTag(Request $request, string $id): JsonResponse
+    {
+        $event = $this->eventLookup->find($request->user(), $id);
+        if (! $event) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        return $this->attach($request, $event);
+    }
+
+    public function destroyEventTag(Request $request, string $id, string $tagId): JsonResponse
+    {
+        $event = $this->eventLookup->find($request->user(), $id);
+        if (! $event) {
+            return response()->json(['message' => 'Event not found.'], 404);
+        }
+
+        return $this->detach($event, $tagId);
+    }
+
+    public function storeObjectTag(Request $request, string $id): JsonResponse
+    {
+        $object = $this->objectLookup->find($request->user(), $id);
+        if (! $object) {
+            return response()->json(['message' => 'Object not found.'], 404);
+        }
+
+        return $this->attach($request, $object);
+    }
+
+    public function destroyObjectTag(Request $request, string $id, string $tagId): JsonResponse
+    {
+        $object = $this->objectLookup->find($request->user(), $id);
+        if (! $object) {
+            return response()->json(['message' => 'Object not found.'], 404);
+        }
+
+        return $this->detach($object, $tagId);
+    }
+
+    /**
+     * One entry per tag type: how many tags it has and how often they are used.
+     *
+     * @return array<int, array{type: string, tags_count: int, total_count: int}>
+     */
+    private function typeTotals(Collection $tags): array
+    {
+        return $tags
+            ->groupBy(fn (Tag $tag) => $tag->type ?? self::UNTYPED)
+            ->map(fn (Collection $group, string $type) => [
+                'type' => $type,
+                'tags_count' => $group->count(),
+                'total_count' => (int) $group->sum('total_count'),
+            ])
+            ->sortBy([['total_count', 'desc'], ['type', 'asc']])
+            ->values()
+            ->all();
+    }
+
+    private function attach(Request $request, Event|EventObject $entity): JsonResponse
+    {
+        // A retry with the same Idempotency-Key is replayed by the
+        // `idempotent` route middleware ahead of the If-Match check, so it
+        // never reaches here to attach (or create) the tag twice.
+        $validated = $request->validate([
+            'tag_id' => ['nullable', 'integer'],
+            'name' => ['required_without:tag_id', 'nullable', 'string', 'max:255'],
+            'type' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        if (isset($validated['tag_id'])) {
+            $tag = $this->tagQuery($request->user())
+                ->whereKey($validated['tag_id'])
+                ->first();
+
+            if (! $tag) {
+                return response()->json(['message' => 'Tag not found.'], 404);
+            }
+        } else {
+            [$name, $type] = $this->normaliseTag(
+                (string) $validated['name'],
+                $validated['type'] ?? null,
+            );
+            if ($name === '') {
+                return response()->json(['message' => 'The tag name field is required.'], 422);
+            }
+
+            $tag = Tag::findOrCreate($name, $type);
+        }
+
+        $entity->attachTags([$tag]);
+        $entity->touch();
+        $entity->load('tags');
+
+        return response()->json([
+            'tag' => $this->tagPayload($tag),
+            'tags' => $entity->tags->map(fn (Tag $item) => $this->tagPayload($item))->values(),
+        ], 201)->header('ETag', $this->versions->etag($entity->fresh()));
+    }
+
+    private function detach(Event|EventObject $entity, string $tagId): JsonResponse
+    {
+        $tag = Tag::find($tagId);
+        if (! $tag || ! $entity->tags()->where('tags.id', $tagId)->exists()) {
+            return response()->json(['message' => 'Tag not found on entity.'], 404);
+        }
+
+        $entity->detachTags([$tag]);
+        $entity->touch();
+        $entity->load('tags');
+
+        return response()->json([
+            'tags' => $entity->tags->map(fn (Tag $item) => $this->tagPayload($item))->values(),
+        ])->header('ETag', $this->versions->etag($entity->fresh()));
+    }
+
+    private function tagQuery(User $user, ?string $search = null): Builder
+    {
+        return OwnedTagQuery::for($user, $search);
+    }
+
+    private function withTotals(Collection $tags): Collection
+    {
+        return $tags->each(function (Tag $tag) {
+            $tag->setAttribute(
+                'total_count',
+                (int) $tag->events_count + (int) $tag->objects_count,
+            );
+        });
+    }
+
+    private function taggedItems(User $user, Tag $tag, int $maximumItems): Collection
+    {
+        $integrationIds = $user->integrations()->pluck('id');
+
+        $events = Event::query()
+            ->withAnyTags([$tag])
+            ->whereIn('integration_id', $integrationIds)
+            ->with(['actor', 'target'])
+            ->latest('time')
+            ->limit($maximumItems)
+            ->get()
+            ->map(fn (Event $event) => [
+                'sort_time' => $event->time ?? $event->created_at,
+                'payload' => [
+                    'kind' => 'event',
+                    'id' => (string) $event->id,
+                    'title' => $event->target?->title ?? $event->actor?->title ?? format_action_title($event->action),
+                    'subtitle' => $event->time?->toIso8601String(),
+                    'domain' => $event->domain,
+                ],
+            ]);
+
+        $objects = EventObject::query()
+            ->withAnyTags([$tag])
+            ->where('user_id', $user->id)
+            ->latest('time')
+            ->limit($maximumItems)
+            ->get()
+            ->map(fn (EventObject $object) => [
+                'sort_time' => $object->time ?? $object->created_at,
+                'payload' => [
+                    'kind' => 'object',
+                    'id' => (string) $object->id,
+                    'title' => $object->title,
+                    'subtitle' => $object->concept,
+                    'concept' => $object->concept,
+                ],
+            ]);
+
+        $blocks = Block::query()
+            ->join('taggables', function ($join) {
+                $join->on('taggables.taggable_id', '=', 'blocks.id')
+                    ->where('taggables.taggable_type', Block::class);
+            })
+            ->where('taggables.tag_id', $tag->id)
+            ->whereHas('event', fn (Builder $events) => $events->whereIn('integration_id', $integrationIds))
+            ->latest('time')
+            ->limit($maximumItems)
+            ->select('blocks.*')
+            ->get()
+            ->map(fn (Block $block) => [
+                'sort_time' => $block->time ?? $block->created_at,
+                'payload' => [
+                    'kind' => 'block',
+                    'id' => (string) $block->id,
+                    'title' => $block->title,
+                    'subtitle' => $block->block_type,
+                    'block_type' => $block->block_type,
+                ],
+            ]);
+
+        return $events
+            ->concat($objects)
+            ->concat($blocks)
+            ->sortByDesc('sort_time')
+            ->values();
+    }
+
+    private function tagPayload(Tag $tag): array
+    {
+        return [
+            'id' => (string) $tag->id,
+            'name' => $tag->name,
+            'type' => $tag->type,
+            'events_count' => (int) ($tag->events_count ?? 0),
+            'objects_count' => (int) ($tag->objects_count ?? 0),
+            'total_count' => (int) ($tag->total_count ?? 0),
+        ];
+    }
+
+    private function normaliseTag(string $value, ?string $type): array
+    {
+        return TagName::normalise($value, $type);
+    }
+
+    private function paginate(Collection $items, ?string $cursor, int $limit): array
+    {
+        $limit = max(1, min($limit, self::MAX_LIMIT));
+        $offset = $this->cursorOffset($cursor);
+        $page = $items->slice($offset, $limit)->values();
+        $nextOffset = $offset + $page->count();
+        $hasMore = $nextOffset < $items->count();
+        $nextCursor = $hasMore
+            ? rtrim(strtr(base64_encode((string) $nextOffset), '+/', '-_'), '=')
+            : null;
+
+        return [$page, $nextCursor, $hasMore];
+    }
+
+    private function cursorOffset(?string $cursor): int
+    {
+        return $cursor ? max(0, (int) base64_decode(strtr($cursor, '-_', '+/'), true)) : 0;
+    }
+}

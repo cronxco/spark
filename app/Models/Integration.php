@@ -2,47 +2,726 @@
 
 namespace App\Models;
 
+use App\Casts\EncryptedJsonSecrets;
+use App\Integrations\PluginRegistry;
+use App\Services\IntegrationRuns\IntegrationRunService;
+use App\Traits\RedactsLoggedProperties;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Integration extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity, RedactsLoggedProperties, SoftDeletes;
+
+    /** The longest a failing integration waits between attempts. */
+    public const MAX_FAILURE_BACKOFF_MINUTES = 1440;
+
+    private const CONFIGURATION_SQL = "(CASE WHEN jsonb_typeof(configuration) = 'object' THEN configuration ELSE '{}'::jsonb END)";
+
+    public $incrementing = false;
 
     protected $table = 'integrations';
+
     protected $keyType = 'string';
-    public $incrementing = false;
 
     protected $fillable = [
         'user_id',
+        'integration_group_id',
         'service',
         'name',
+        'instance_type',
         'account_id',
-        'access_token',
-        'refresh_token',
-        'expiry',
-        'refresh_expiry',
+        'configuration',
+        'last_triggered_at',
+        'last_successful_update_at',
+        'migration_batch_id',
     ];
 
+    /**
+     * `configuration` is `jsonb` and is read through SQL JSON paths (the ten
+     * `configuration->migration_*` updates in the migration jobs), so encrypting
+     * the whole column would break them. EncryptedJsonSecrets encrypts only the
+     * secret leaves — the api_key several plugins keep here — and leaves the
+     * JSON structurally valid, so those paths keep working. Run
+     * `integrations:encrypt-credentials` to convert existing plaintext rows.
+     */
     protected $casts = [
-        'expiry' => 'datetime',
-        'refresh_expiry' => 'datetime',
+        // tokens now live on IntegrationGroup
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+        'configuration' => EncryptedJsonSecrets::class,
+        'last_triggered_at' => 'datetime',
+        'last_successful_update_at' => 'datetime',
     ];
 
-    protected static function booted()
+    /**
+     * Get integrations that need updating
+     * Note: This scope is approximate since update_frequency_minutes is now in configurationa
+     * For exact filtering, use the needsUpdate() method on individual models
+     */
+    public static function scopeNeedsUpdate($query)
+    {
+        return $query->external()->where(function ($q) {
+            $q->whereNull('last_successful_update_at')
+                ->orWhereRaw('last_successful_update_at + INTERVAL \'1 minute\' * 15 < NOW()');
+        });
+    }
+
+    /**
+     * Get OAuth integrations that need updating
+     */
+    public static function scopeOAuthNeedsUpdate($query)
+    {
+        return $query->external()->whereIn('service', PluginRegistry::getOAuthPlugins()->keys())
+            ->needsUpdate();
+    }
+
+    protected static function booted(): void
     {
         static::creating(function ($model) {
             if (empty($model->id)) {
                 $model->id = Str::uuid();
             }
         });
+
+        static::deleted(function (Integration $integration): void {
+            if (! $integration->integration_group_id) {
+                return;
+            }
+
+            $group = $integration->group;
+
+            if (! $group) {
+                return;
+            }
+
+            if ($group->integrations()->exists()) {
+                return;
+            }
+
+            $group->delete();
+        });
+
+        static::forceDeleted(function (Integration $integration): void {
+            if (! $integration->integration_group_id) {
+                return;
+            }
+
+            $group = $integration->group;
+
+            if (! $group) {
+                return;
+            }
+
+            if ($group->integrations()->exists()) {
+                return;
+            }
+
+            $group->delete();
+        });
+    }
+
+    public function scopeExternal(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query->whereNull('instance_type')->orWhere('instance_type', '!=', 'internal');
+        });
+    }
+
+    public function scopeInternal(Builder $query): Builder
+    {
+        return $query->where('instance_type', 'internal');
+    }
+
+    public function isInternal(): bool
+    {
+        return $this->instance_type === 'internal';
+    }
+
+    /**
+     * Get the update frequency in minutes from configuration
+     */
+    public function getUpdateFrequencyMinutes(): int
+    {
+        $config = $this->configuration ?? [];
+
+        return $config['update_frequency_minutes'] ?? 15;
+    }
+
+    /**
+     * Whether this instance is a task instance
+     */
+    public function isTaskInstance(): bool
+    {
+        return ($this->instance_type === 'task') || ($this->service === 'task');
+    }
+
+    /**
+     * Whether the scheduler may run this Task instance. Task instances run on
+     * schedule only once `use_schedule` is explicitly switched on; a missing
+     * setting means off, so instances created before scheduling worked stay
+     * idle until someone opts each one in.
+     */
+    public function runsTaskOnSchedule(): bool
+    {
+        $useSchedule = ($this->configuration ?? [])['use_schedule'] ?? null;
+
+        return filter_var($useSchedule, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === true;
+    }
+
+    /**
+     * Whether this instance is paused
+     */
+    public function isPaused(): bool
+    {
+        $config = $this->configuration ?? [];
+
+        return (bool) ($config['paused'] ?? false);
+    }
+
+    /**
+     * Whether this instance should use schedule times instead of frequency
+     */
+    public function useSchedule(): bool
+    {
+        $config = $this->configuration ?? [];
+
+        return (bool) ($config['use_schedule'] ?? false);
+    }
+
+    /**
+     * Get configured schedule times as HH:mm strings
+     *
+     * @return array<int, string>
+     */
+    public function getScheduleTimes(): array
+    {
+        $config = $this->configuration ?? [];
+        $times = $config['schedule_times'] ?? [];
+        if (! is_array($times)) {
+            return [];
+        }
+
+        // Filter to valid HH:mm entries
+        return array_values(array_filter($times, static function ($t) {
+            if (! is_string($t)) {
+                return false;
+            }
+
+            return (bool) preg_match('/^\d{2}:\d{2}$/', $t);
+        }));
+    }
+
+    /**
+     * Get schedule timezone (IANA), default to UTC
+     */
+    public function getScheduleTimezone(): string
+    {
+        $config = $this->configuration ?? [];
+        $tz = $config['schedule_timezone'] ?? config('app.timezone', 'UTC');
+
+        return is_string($tz) && $tz !== '' ? $tz : (config('app.timezone', 'UTC'));
     }
 
     public function user()
     {
         return $this->belongsTo(User::class);
     }
-} 
+
+    public function group()
+    {
+        return $this->belongsTo(IntegrationGroup::class, 'integration_group_id');
+    }
+
+    /**
+     * Get the time of the most recent event for this integration
+     */
+    public function getLastEventTime(): ?Carbon
+    {
+        $lastEvent = Event::where('integration_id', $this->id)
+            ->orderBy('time', 'desc')
+            ->first();
+
+        return $lastEvent ? Carbon::parse($lastEvent->time) : null;
+    }
+
+    /**
+     * Check if this integration is stale or overdue
+     * - For webhook/manual integrations: checks if no events received within configured time
+     * - For OAuth integrations: checks if overdue for scheduled update
+     */
+    public function isStale(): bool
+    {
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        if (! $pluginClass) {
+            return false;
+        }
+
+        $timeUntilStaleMinutes = $pluginClass::getTimeUntilStaleMinutes();
+
+        // For webhook/manual integrations, check event staleness
+        if ($timeUntilStaleMinutes !== null) {
+            $lastEventTime = $this->getLastEventTime();
+            if (! $lastEventTime) {
+                return true; // No events yet, consider stale
+            }
+
+            $staleThreshold = Carbon::now()->subMinutes($timeUntilStaleMinutes);
+
+            return $lastEventTime->lessThan($staleThreshold);
+        }
+
+        // For OAuth integrations, check if overdue for update
+        // An integration is overdue if it's due for an update but not currently processing
+        if ($this->isPaused() || $this->isProcessing()) {
+            return false;
+        }
+
+        return $this->isDue();
+    }
+
+    /**
+     * Check if this integration needs to be updated (schedule overrides frequency)
+     */
+    public function needsUpdate(): bool
+    {
+        // For webhook and manual integrations, check staleness instead of update schedule
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        if ($pluginClass) {
+            $serviceType = $pluginClass::getServiceType();
+            if (in_array($serviceType, ['webhook', 'manual'])) {
+                return $this->isStale();
+            }
+        }
+
+        return $this->isDue();
+    }
+
+    /**
+     * Get the next scheduled update time
+     */
+    public function getNextUpdateTime(): ?Carbon
+    {
+        if ($this->isPaused()) {
+            return null;
+        }
+
+        if ($retryAt = $this->failureRetryAt()) {
+            return $retryAt;
+        }
+
+        if ($this->useSchedule()) {
+            return $this->getNextScheduledRun();
+        }
+
+        if (! $this->last_successful_update_at) {
+            return null;
+        }
+
+        return $this->last_successful_update_at->copy()->addMinutes($this->getUpdateFrequencyMinutes());
+    }
+
+    /**
+     * Compute the next scheduled run time in UTC if using schedule
+     */
+    public function getNextScheduledRun(?Carbon $now = null): ?Carbon
+    {
+        if (! $this->useSchedule()) {
+            return null;
+        }
+
+        $times = $this->getScheduleTimes();
+        if (empty($times)) {
+            return null;
+        }
+
+        $tz = $this->getScheduleTimezone();
+        $nowTz = $now ? (clone $now)->setTimezone($tz) : Carbon::now($tz);
+
+        // Build times for today in tz
+        $candidates = [];
+        foreach ($times as $t) {
+            [$h, $m] = [substr($t, 0, 2), substr($t, 3, 2)];
+            $candidates[] = Carbon::createFromTime((int) $h, (int) $m, 0, $tz)
+                ->setDate($nowTz->year, $nowTz->month, $nowTz->day);
+        }
+
+        usort($candidates, static function (Carbon $a, Carbon $b) {
+            return $a->getTimestamp() <=> $b->getTimestamp();
+        });
+
+        foreach ($candidates as $candidate) {
+            if ($candidate->greaterThan($nowTz)) {
+                return $candidate->clone()->setTimezone('UTC');
+            }
+        }
+
+        // Otherwise, first time tomorrow
+        $first = $candidates[0]->clone()->addDay();
+
+        return $first->setTimezone('UTC');
+    }
+
+    /**
+     * Compute the first scheduled run that occurs strictly after the given moment
+     */
+    public function getNextScheduledRunAfter(Carbon $after): ?Carbon
+    {
+        if (! $this->useSchedule()) {
+            return null;
+        }
+
+        $times = $this->getScheduleTimes();
+        if (empty($times)) {
+            return null;
+        }
+
+        $tz = $this->getScheduleTimezone();
+        $cursorTz = $after->copy()->setTimezone($tz);
+
+        // Build candidates for today and tomorrow relative to the "after" timestamp
+        $candidates = [];
+        foreach ($times as $t) {
+            [$h, $m] = [substr($t, 0, 2), substr($t, 3, 2)];
+            $today = Carbon::createFromTime((int) $h, (int) $m, 0, $tz)
+                ->setDate($cursorTz->year, $cursorTz->month, $cursorTz->day);
+            $tomorrow = $today->copy()->addDay();
+            $candidates[] = $today;
+            $candidates[] = $tomorrow;
+        }
+
+        usort($candidates, static function (Carbon $a, Carbon $b) {
+            return $a->getTimestamp() <=> $b->getTimestamp();
+        });
+
+        foreach ($candidates as $candidate) {
+            if ($candidate->greaterThan($cursorTz)) {
+                return $candidate->clone()->setTimezone('UTC');
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Human-friendly schedule summary (e.g., "4× daily at 04:10, 10:10, 16:10, 22:10 (Europe/London)")
+     */
+    public function getScheduleSummary(): ?string
+    {
+        if (! $this->useSchedule()) {
+            return null;
+        }
+
+        $times = $this->getScheduleTimes();
+        if (empty($times)) {
+            return null;
+        }
+
+        $tz = $this->getScheduleTimezone();
+        $count = count($times);
+        $timesList = implode(', ', $times);
+
+        return $count . '× daily at ' . $timesList . ' (' . $tz . ')';
+    }
+
+    /**
+     * Whether the integration is due to run now
+     */
+    public function isDue(?Carbon $now = null): bool
+    {
+        if ($this->isPaused()) {
+            return false;
+        }
+
+        $nowUtc = $now ? (clone $now)->setTimezone('UTC') : Carbon::now('UTC');
+
+        $retryAt = $this->failureRetryAt();
+        if ($retryAt && $nowUtc->lessThan($retryAt)) {
+            return false;
+        }
+
+        if ($this->useSchedule()) {
+            if (! $this->last_successful_update_at) {
+                return true;
+            }
+
+            // Determine the next run strictly after last success, and compare to now
+            $nextAfterSuccess = $this->getNextScheduledRunAfter($this->last_successful_update_at->copy());
+
+            return $nextAfterSuccess !== null && $nowUtc->greaterThanOrEqualTo($nextAfterSuccess);
+        }
+
+        // Frequency-based fallback
+        if (! $this->last_successful_update_at) {
+            return true;
+        }
+
+        $nextUpdateTime = $this->last_successful_update_at->copy()->addMinutes($this->getUpdateFrequencyMinutes());
+
+        return $nowUtc->greaterThanOrEqualTo($nextUpdateTime);
+    }
+
+    /**
+     * Simple throttle guard to avoid immediate re-triggering
+     */
+    public function shouldThrottle(): bool
+    {
+        if (! $this->last_triggered_at) {
+            return false;
+        }
+
+        $windowMinutes = (int) $this->getUpdateFrequencyMinutes();
+        $windowMinutes = max(5, min(30, $windowMinutes));
+
+        return $this->last_triggered_at->addMinutes($windowMinutes)->isFuture();
+    }
+
+    /**
+     * Mark the integration as triggered
+     */
+    public function markAsTriggered(): void
+    {
+        $this->update(['last_triggered_at' => now()]);
+    }
+
+    /**
+     * Mark the integration as successfully updated
+     */
+    public function markAsSuccessfullyUpdated(): void
+    {
+        $this->update([
+            'last_successful_update_at' => now(),
+            'last_triggered_at' => now(),
+        ]);
+
+        if (isset(($this->configuration ?? [])['failure_backoff'])) {
+            $this->writeFailureBackoff(new Expression(self::CONFIGURATION_SQL . " - 'failure_backoff'"));
+        }
+    }
+
+    /**
+     * Mark the integration as failed
+     */
+    public function markAsFailed(): void
+    {
+        // Clear the triggered state so it can be retried once its backoff
+        // passes. Don't update last_successful_update_at since the update failed.
+        $this->update(['last_triggered_at' => null]);
+
+        $configuration = self::CONFIGURATION_SQL;
+        $count = "COALESCE(({$configuration}->'failure_backoff'->>'count')::int, 0) + 1";
+        $failedAt = $this->getConnection()->escape(now()->toIso8601String());
+        $this->writeFailureBackoff(new Expression(
+            "jsonb_set({$configuration}, '{failure_backoff}', jsonb_build_object('count', {$count}, 'failed_at', {$failedAt}::text), true)"
+        ));
+    }
+
+    /**
+     * When a failing integration may next be attempted, or null when it has
+     * not failed since its last success. Without this, a permanent failure
+     * (a revoked bank consent, a deleted account) made the integration due
+     * again on the next scheduler tick, so it was retried and re-reported
+     * every few minutes indefinitely. The wait doubles from the update
+     * interval with each consecutive failure, up to a day. The count lives
+     * in `configuration.failure_backoff` and is cleared on success.
+     */
+    public function failureRetryAt(): ?Carbon
+    {
+        $backoff = ($this->configuration ?? [])['failure_backoff'] ?? null;
+        $failures = (int) ($backoff['count'] ?? 0);
+        if ($failures < 1 || empty($backoff['failed_at'])) {
+            return null;
+        }
+        $failedAt = Carbon::parse($backoff['failed_at'])->setTimezone('UTC');
+        if ($this->last_successful_update_at && $this->last_successful_update_at->gte($failedAt)) {
+            return null;
+        }
+
+        $base = max(15, $this->getUpdateFrequencyMinutes());
+        $minutes = min($base * (2 ** min($failures - 1, 10)), self::MAX_FAILURE_BACKOFF_MINUTES);
+
+        return $failedAt->addMinutes($minutes);
+    }
+
+    /**
+     * The summary of the latest batched update run, or null before the first.
+     *
+     * A run still in flight after IntegrationRunService::STALL_AFTER_MINUTES
+     * is reported as failed, so a lost batch cannot read as "updating" forever.
+     *
+     * @return array{batch_id: ?string, status: string, requested_at: ?string, started_at: ?string, finished_at: ?string, processed_jobs: int, failed_jobs: int, error: ?string}|null
+     */
+    public function lastRun(): ?array
+    {
+        $run = ($this->configuration ?? [])['last_run'] ?? null;
+
+        if (! is_array($run) || ! is_string($run['status'] ?? null)) {
+            return null;
+        }
+
+        $summary = [
+            'batch_id' => isset($run['batch_id']) ? (string) $run['batch_id'] : null,
+            'status' => $run['status'],
+            'requested_at' => $run['requested_at'] ?? null,
+            'started_at' => $run['started_at'] ?? null,
+            'finished_at' => $run['finished_at'] ?? null,
+            'processed_jobs' => (int) ($run['processed_jobs'] ?? 0),
+            'failed_jobs' => (int) ($run['failed_jobs'] ?? 0),
+            'error' => $run['error'] ?? null,
+        ];
+
+        if (in_array($summary['status'], IntegrationRunService::IN_FLIGHT, true)) {
+            $requestedAt = is_string($summary['requested_at']) ? Carbon::make($summary['requested_at']) : null;
+
+            if (! $requestedAt || $requestedAt->lt(now()->subMinutes(IntegrationRunService::STALL_AFTER_MINUTES))) {
+                $summary['status'] = IntegrationRunService::STATUS_FAILED;
+                $summary['error'] ??= 'The update did not finish.';
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Whether a batched update run has been requested and not yet finished
+     * processing.
+     */
+    public function hasRunInFlight(): bool
+    {
+        $run = $this->lastRun();
+
+        return $run !== null && in_array($run['status'], IntegrationRunService::IN_FLIGHT, true);
+    }
+
+    /**
+     * Check if this integration is currently being processed: a run still
+     * fetching or processing, or a recent trigger with no success after it.
+     */
+    public function isProcessing(): bool
+    {
+        if ($this->hasRunInFlight()) {
+            return true;
+        }
+
+        if (! $this->last_triggered_at) {
+            return false;
+        }
+
+        // Bound the "processing" window to avoid indefinite lockout if a job fails/crashes.
+        // Use update_frequency_minutes where available, clamped to [5, 30] minutes.
+        $windowMinutes = (int) $this->getUpdateFrequencyMinutes();
+        $windowMinutes = max(5, min(30, $windowMinutes));
+
+        $triggerIsRecent = $this->last_triggered_at->gt(now()->subMinutes($windowMinutes));
+        $triggerAfterLastSuccess = ! $this->last_successful_update_at
+            || $this->last_triggered_at->gt($this->last_successful_update_at);
+
+        return $triggerIsRecent && $triggerAfterLastSuccess;
+    }
+
+    /**
+     * One status vocabulary for the Updates page and the mobile API.
+     *
+     * `stale` belongs to push and manual sources that have gone quiet: there is
+     * nothing Spark can trigger, so it is reported but never counted as an issue.
+     * `needs_update` allows the every-minute scheduler a short grace period
+     * before an overdue pull integration is flagged.
+     *
+     * @param  Carbon|null  $lastEventTime  Pre-fetched latest event time for push/manual sources, to avoid a query per row.
+     * @return 'paused'|'processing'|'stale'|'needs_update'|'up_to_date'
+     */
+    public function statusKey(?Carbon $lastEventTime = null): string
+    {
+        if ($this->isPaused()) {
+            return 'paused';
+        }
+
+        if ($this->isProcessing()) {
+            return 'processing';
+        }
+
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        $staleAfterMinutes = $pluginClass ? $pluginClass::getTimeUntilStaleMinutes() : null;
+
+        if ($staleAfterMinutes !== null) {
+            $lastEventTime ??= $this->getLastEventTime();
+
+            return ! $lastEventTime || $lastEventTime->lessThan(now()->subMinutes($staleAfterMinutes))
+                ? 'stale'
+                : 'up_to_date';
+        }
+
+        // Backing off after a failure is not "up to date".
+        if ($this->failureRetryAt() !== null) {
+            return 'needs_update';
+        }
+
+        if (! $this->isDue()) {
+            return 'up_to_date';
+        }
+
+        $nextUpdateTime = $this->getNextUpdateTime();
+
+        if ($nextUpdateTime && $nextUpdateTime->greaterThan(now()->subMinutes(2))) {
+            return 'up_to_date';
+        }
+
+        return 'needs_update';
+    }
+
+    /**
+     * Get the anomaly detection mode for this integration
+     * Returns one of: 'realtime', 'retrospective', 'disabled', or null if not configured
+     */
+    public function getAnomalyDetectionMode(): ?string
+    {
+        $pluginClass = PluginRegistry::getPlugin($this->service);
+        if (! $pluginClass) {
+            return null;
+        }
+
+        $instanceTypes = $pluginClass::getInstanceTypes();
+        if (! isset($instanceTypes[$this->instance_type]['anomaly_detection_mode'])) {
+            return null;
+        }
+
+        return $instanceTypes[$this->instance_type]['anomaly_detection_mode'];
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->useLogName('changelog')
+            ->logFillable()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->dontLogIfAttributesChangedOnly(['updated_at', 'last_triggered_at', 'last_successful_update_at']);
+    }
+
+    /**
+     * Get the first block of the integration's UUID for log filenames
+     */
+    public function getUuidBlock(): string
+    {
+        return explode('-', $this->id)[0] ?? $this->id;
+    }
+
+    /**
+     * Writes `configuration.failure_backoff` in SQL, so it cannot clobber
+     * keys other writers change concurrently (see IntegrationRunService).
+     */
+    private function writeFailureBackoff(Expression $configuration): void
+    {
+        static::withTrashed()->whereKey($this->getKey())->update(['configuration' => $configuration]);
+        $this->setAttribute('configuration', static::withTrashed()->whereKey($this->getKey())->first()?->configuration);
+        $this->syncOriginalAttribute('configuration');
+    }
+}
