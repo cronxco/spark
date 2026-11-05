@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\Relationship;
 use App\Models\User;
+use App\Services\Flint\FlintDeadLinks;
 use App\Services\Flint\FlintRunCompletionService;
 use App\Services\Flint\FlintRunToken;
 use App\Services\Flint\RoutineConfig;
@@ -107,6 +108,7 @@ class FlintDigestService
             ? app(FlintRunToken::class)->verify($data['run_token'], $user, $date->toDateString(), $period)
             : null;
         $this->validateRoutineContract($data, $run);
+        [$data, $unlinked] = $this->stripDeadLinks($user, $data);
         // Without a run token there is no run to key on, and a fresh uuid made
         // every retry write another digest. The natural key is what a person
         // would call the same digest: this user's briefing for this date,
@@ -152,7 +154,45 @@ class FlintDigestService
             app(FlintRunCompletionService::class)->complete($user, $run, $result['event_id'], requireAccepted: false);
         }
 
+        if ($unlinked !== []) {
+            $result['unlinked_event_ids'] = $unlinked;
+            $result['warning'] = 'These event links did not resolve to one of your events and were replaced with their words: '
+                . implode(', ', $unlinked) . '. Copy event ids from tool results; never retype them.';
+        }
+
         return $result;
+    }
+
+    /**
+     * The input with every Spark event link that leads nowhere reduced to its
+     * words, in the summary and in every block's prose.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{0: array<string, mixed>, 1: array<int, string>}
+     */
+    private function stripDeadLinks(User $user, array $data): array
+    {
+        $links = new FlintDeadLinks($user);
+        $removed = [];
+        $strip = function (?string $text) use ($links, &$removed): ?string {
+            $result = $links->strip($text);
+            array_push($removed, ...$result['removed']);
+
+            return $result['text'];
+        };
+
+        if (isset($data['summary'])) {
+            $data['summary'] = $strip($data['summary']);
+        }
+        foreach ($data['blocks'] ?? [] as $index => $block) {
+            foreach (['content', 'question'] as $field) {
+                if (isset($block[$field])) {
+                    $data['blocks'][$index][$field] = $strip($block[$field]);
+                }
+            }
+        }
+
+        return [$data, array_values(array_unique($removed))];
     }
 
     /**

@@ -28,6 +28,7 @@ class SkillToolLedger
         public readonly int $maxToolCalls,
         public readonly bool $dryRun = false,
         public readonly ?ActionProgress $progress = null,
+        public readonly ?string $runToken = null,
     ) {}
 
     public function limitReached(): bool
