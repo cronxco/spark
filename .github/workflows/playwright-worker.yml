@@ -1,0 +1,48 @@
+name: Playwright worker
+on:
+  pull_request:
+    paths:
+      - docker/playwright/**
+      - .github/workflows/playwright-worker.yml
+  push:
+    branches: [dev, main]
+    paths:
+      - docker/playwright/**
+      - .github/workflows/playwright-worker.yml
+permissions:
+  contents: read
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install worker dependencies
+        working-directory: docker/playwright
+        run: npm install --ignore-scripts --package-lock=false
+      - name: Test URL safety
+        working-directory: docker/playwright
+        run: npm test
+      - name: Check worker routes
+        working-directory: docker/playwright
+        env:
+          CHROME_CDP_URL: http://127.0.0.1:9
+        run: |
+          set -euo pipefail
+          node index.js > /tmp/playwright-worker.log 2>&1 &
+          worker_pid=$!
+          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health > /tmp/worker-health.json; then
+              break
+            fi
+            sleep 1
+          done
+          node -e 'const h = require("/tmp/worker-health.json"); require("node:assert/strict").equal(h.status, "degraded"); require("node:assert/strict").equal(h.connected, false)'
+          status=$(curl -sS -o /tmp/worker-fetch.json -w '%{http_code}' -H 'Content-Type: application/json' -d '{"url":"https://example.com"}' http://127.0.0.1:3000/fetch)
+          test "$status" = 503
