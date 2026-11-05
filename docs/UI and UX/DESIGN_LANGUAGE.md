@@ -80,7 +80,7 @@ Use semantic tokens, never raw ramp steps or system colours (`Color.red`, `text-
 | Role | Use | Rule |
 |---|---|---|
 | `primary` (spark-5 amber) | The one action on a screen, the active tab, progress, hero values in dark mode | A **fill** in light mode. Never text on a light ground (1.6:1). Text on it is `primary-content` / `sparkOnAccent`. In dark mode it is also the hero value colour (3.6). |
-| `accent` (ocean-5 light, sky-3 dark) | Links, quiet emphasis | Reads as text in both themes (8:1+). |
+| `accent` (ocean-5 light, sky-3 dark) | Links, disclosure controls ("See the week", "Editorial note"), quiet emphasis | Reads as text in both themes (8:1+). On iOS, `Color.sparkLink` (Will, 2026-11-05). |
 | `success`, `warning`, `error`, `info` | Status that needs a reaction | Fills in light mode, text only in dark. Pair with a glyph and words. |
 | Domain tints | Which part of life a thing belongs to | One per domain; see 3.2. |
 | `mood-2` … `mood-10` | Check-in scores | Fills only. Position and label carry the value. |
@@ -112,7 +112,9 @@ Contrast figures are against `ash-1` in light and `slate-5` in dark. Online shar
 
 ### 3.3 Highlights in prose
 
-Facts that Flint or a summary picks out inside running text (in Up to Speed, digests and recaps) take one `highlight` token, whatever their domain: ocean-5 `#244f83` in light (8.1:1 on ash-1) and spark-5 `#FFBF00` in dark (11.1:1 on slate-5), at semibold weight. On iOS this is `Color.sparkHighlight`, which replaces `.sparkAccent` as the tint passed to `SparkLongFormContentView`. On the web it is `--color-highlight` in both daisyUI themes. Never use spark-5 as text on a light ground.
+Facts that Flint or a summary picks out inside running text (in Up to Speed, digests and recaps) take one `highlight` token, whatever their domain: ocean-5 `#244f83` in light (8.1:1 on ash-1) and spark-5 `#FFBF00` in dark (11.1:1 on slate-5), at semibold weight. On iOS this is `Color.sparkHighlight`, the default link tint of `SparkRichContentText` and `SparkLongFormContentView`. On the web it is `--color-highlight` in both daisyUI themes. Never use spark-5 as text on a light ground.
+
+**Links inside a sentence (Will, 2026-11-05).** A phrase Flint links inside a sentence, including a question used as a screen's headline ("That £159 Criterion Theatre Trust payment is the one…"), takes the highlight token rather than a reference pill. A tap opens the linked item's peek card (7.5), whose button goes on to its detail page. The markdown is always rendered: a link never shows as source. Where Flint prose appears as a plain label (a list of open questions), the link text stays and the markup is dropped.
 
 ### 3.4 Change and comparison
 
@@ -130,6 +132,7 @@ Anything a model wrote sits on a **generated surface** so it can be told apart f
 - One generated surface per card. Inside a list of generated items (takeaways, key points), the card carries the surface and the rows stay plain.
 - **Full-width band (Will, 2026-10-30).** On reading pages with a lot of generated text, such as a news article with its summary, key points and takeaways, the surface can run the full width of the page as a band instead of sitting in a card. The band has the same gradient, no corner radius, and the 1px ember-5 hairline along the top and bottom only, with no side borders. The two rules match in colour and weight, so this is not a one-sided edge (5.3). Text inside keeps the page's side gutter, and the eyebrow rule above still applies. Use the card where generated text sits among other cards in a grid or feed, and the band where it is part of the reading flow. Never nest one in the other, and keep section spacing (5.1) between two bands so they never touch.
 - No model names, word counts or character counts.
+- **Up to Speed story screens are exempt (Will, 2026-11-05).** Every screen in the Up to Speed flow is Flint speaking, and the Flint byline (avatar, name and context) at the top of each screen already marks the voice. Their prose sits on the screen's ground with no generated surface, card or band. A generated card still applies where Flint's text sits among other content outside the flow, such as a summary block in a feed or on a detail page.
 - On iOS this is `.sparkGeneratedSurface(radius:)` in SparkUI/Materials. It is opaque content, not glass, and under Increase Contrast it keeps the hairline at full strength. On the web it is a `.surface-generated` class in `app.css`, built from `--color-spark` and `--color-ember` tokens. The band is `.surface-generated-band` on the web (the same background with `border-y`, no radius, breaking out of the page container) and `.sparkGeneratedBand()` on iOS (the background ignores the horizontal safe area; the content does not).
 
 ### 3.6 Hero values
@@ -352,7 +355,7 @@ Block cards appear on event detail pages (`/events/{event}`, every block linked 
 
 The current web `x-*-ref` and `<x-tag-ref>` components are the primary design for both platforms. iOS follows them.
 
-**A reference** is the smallest view of an integration, object, block or event: a pill with a leading glyph and the title. **The service label is opt-in (Will, 2026-10-30):** by default an object or event reference shows only its title, and a screen adds the integration ("Had Physical Effort" with "Apple Health" as a smaller label inside the pill) only where the reader could not otherwise tell which integration it came from, such as a cross-integration list. The peek card always names the integration in its facts, so nothing is lost. On the web it is `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium` with its colour at 10% fill and 20% border, the glyph at `size-3` and 70% opacity, and the title truncated at about 200px. On iOS it is `EntityRefChip`. Use a reference wherever a card would be too much: in prose, in relationship and "linked" lists, for an event's actor and target, and for the integration behind an item.
+**A reference** is the smallest view of an integration, object, block or event: a pill with a leading glyph and the title. **The service label is opt-in (Will, 2026-10-30):** by default an object or event reference shows only its title, and a screen adds the integration ("Had Physical Effort" with "Apple Health" as a smaller label inside the pill) only where the reader could not otherwise tell which integration it came from, such as a cross-integration list. The peek card always names the integration in its facts, so nothing is lost. On the web it is `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-sm font-medium` with its colour at 10% fill and 20% border, the glyph at `size-3` and 70% opacity, and the title truncated at about 200px. On iOS it is `EntityRefChip`. Use a reference wherever a card would be too much: in a row under a passage of prose, in relationship and "linked" lists, for an event's actor and target, and for the integration behind an item. A link inside a sentence takes the highlight token instead (3.3).
 
 **A tag** is a fully rounded outline badge (`badge badge-outline badge-{colour}` on the web): the border and text in its colour, no fill, with the tag type's glyph at 70% opacity (`fas.microphone` for an artist, `fas.compact-disc` for an album, `fab.spotify` for a Spotify context; `fas.tag` otherwise) and the tag name, truncated at a word boundary near 20 characters. On the web it is `<x-tag-ref>`; on iOS, `TagChip`. An item can show all its tags; they wrap.
 
@@ -653,15 +656,14 @@ From iOS:
 
 Things in the current code that break these rules, for the convergence threads to fix. The list is not exhaustive; anything else that breaks a rule above is a deviation too.
 
-1. **Amber text on light grounds.** Flint prose highlights (`SparkLongFormContentView(tint: .sparkAccent)` in `RecapScreen` and `FlintDigestScreen`) set spark-5 text on the light wash at about 1.6:1. The Up to Speed briefing is the visible case. Use the `highlight` token from 3.3: ocean-5 in light, spark-5 in dark.
-2. **`MetricCard.Trend` colours by direction**: up is always green and down is always red, so lower spend shows red. Add polarity (3.4).
-3. **Media glyph differs within iOS**: `EntityPresentation.icon` currently returns `iphone` for media and `integrationIcon` returns `play.circle.fill`. Both should use the shared `fas.circle-play` glyph through `EntityPresentation` (3.2, 6).
-4. **No `online` tint on iOS**: it falls through to `sparkAccent`, so calendar and email events look like money. Add ocean (3.2).
-5. **`DomainChip`** uses system colours for its tints, sets the unselected label in the tint (1.6:1 for money), and sits on glass. Use the domain fill, the domain ink for the label, and a content surface (12.4).
-6. **`Block.mediaUrl` is decoded and stored but never drawn.** The image-led pattern needs it.
-7. **Raw durations**: the compact API sends `formatted_value` unchanged for `sleep_stage` and `duration`, so iOS can show seconds. Format on the client (9).
-8. **Web custom layouts draw the whole card** on `dev`. spark#1284 moves all 64 onto `<x-block-card.shell>` (7.4); until it merges, the old chrome is still live. That PR also sets `online` to neutral, which changes to ocean (3.2).
-9. **iOS references and tags have no peek card.** `EntityRefChip` and `TagChip` either navigate on tap or show only a context menu, and `EntityRefChip` sits on glass. Add the tap-to-peek popover and use the reference shape from 7.5.
+1. **`MetricCard.Trend` colours by direction**: up is always green and down is always red, so lower spend shows red. Add polarity (3.4).
+2. **Media glyph differs within iOS**: `EntityPresentation.icon` currently returns `iphone` for media and `integrationIcon` returns `play.circle.fill`. Both should use the shared `fas.circle-play` glyph through `EntityPresentation` (3.2, 6).
+3. **No `online` tint on iOS**: it falls through to `sparkAccent`, so calendar and email events look like money. Add ocean (3.2).
+4. **`DomainChip`** uses system colours for its tints, sets the unselected label in the tint (1.6:1 for money), and sits on glass. Use the domain fill, the domain ink for the label, and a content surface (12.4).
+5. **`Block.mediaUrl` is decoded and stored but never drawn.** The image-led pattern needs it.
+6. **Raw durations**: the compact API sends `formatted_value` unchanged for `sleep_stage` and `duration`, so iOS can show seconds. Format on the client (9).
+7. **Web custom layouts draw the whole card** on `dev`. spark#1284 moves all 64 onto `<x-block-card.shell>` (7.4); until it merges, the old chrome is still live. That PR also sets `online` to neutral, which changes to ocean (3.2).
+8. **iOS references and tags have no peek card.** `EntityRefChip` and `TagChip` either navigate on tap or show only a context menu, and `EntityRefChip` sits on glass. Add the tap-to-peek popover and use the reference shape from 7.5.
 
 ## 15. Checklist for a new screen
 

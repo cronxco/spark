@@ -121,6 +121,8 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                 'value_formatter' => '{{ round($value) }} <span class="text-[0.875em]">bpm</span>',
                 'value_unit' => 'bpm',
                 'hidden' => false,
+                // Written at ~03:00 from overnight readings, then rewritten through the day.
+                'accumulates_through_day' => true,
             ],
             'did_workout' => [
                 'icon' => 'fas.dumbbell',
