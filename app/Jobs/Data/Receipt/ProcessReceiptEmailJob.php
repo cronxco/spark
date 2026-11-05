@@ -22,6 +22,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Smalot\PdfParser\Parser as PdfParser;
+use Throwable;
 use ZBateson\MailMimeParser\MailMimeParser;
 
 class ProcessReceiptEmailJob implements ShouldQueue
@@ -318,8 +319,6 @@ class ProcessReceiptEmailJob implements ShouldQueue
                     'tax_id' => $receiptData['merchant']['tax_id'] ?? null,
                     'merchant_id' => $receiptData['merchant']['merchant_id'] ?? null,
                     'normalized_name' => strtolower($receiptData['merchant']['name']),
-                    'is_matched' => false,
-                    'needs_review' => false,
                     'raw_email_s3_key' => $this->s3ObjectKey,
                 ],
             ]
@@ -389,11 +388,12 @@ class ProcessReceiptEmailJob implements ShouldQueue
         // Add currency conversion metadata if not GBP
         $currency = $receiptData['transaction_summary']['currency'];
         $baseCurrency = config('services.currency.base_currency', 'GBP');
+        $originalAmount = $receiptData['transaction_summary']['total_amount'] ?? null;
 
-        if (strtoupper($currency) !== strtoupper($baseCurrency)) {
+        if (is_numeric($originalAmount) && strtoupper((string) $currency) !== strtoupper($baseCurrency)) {
             try {
                 $conversionService = app(CurrencyConversionService::class);
-                $originalAmount = $receiptData['transaction_summary']['total_amount'];
+                $originalAmount = (int) round((float) $originalAmount);
 
                 // Convert to base currency (GBP)
                 $convertedAmount = $conversionService->convert(
@@ -427,7 +427,7 @@ class ProcessReceiptEmailJob implements ShouldQueue
                     'converted_amount' => $convertedAmount,
                     'rate' => $rate,
                 ]);
-            } catch (Exception $e) {
+            } catch (Throwable $e) {
                 // Log but don't fail the job if conversion fails
                 Log::warning('Failed to convert receipt currency', [
                     'event_id' => $event->id,

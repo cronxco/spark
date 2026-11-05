@@ -58,7 +58,9 @@ foreach ($accentColors as $key => $color) {
 }
 
 // Event counts
-$eventCount = $object->actorEvents()->count() + $object->targetEvents()->count();
+$eventCount = isset($object->actor_events_count, $object->target_events_count)
+    ? $object->actor_events_count + $object->target_events_count
+    : $object->actorEvents()->count() + $object->targetEvents()->count();
 $relationshipCount = $object->allRelationships()->count();
 
 // People have their own page; every other object links to the object show page
@@ -119,7 +121,7 @@ $linkHref = $href ?? $detailHref;
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$objectIcon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{!! $text ?? $object->title !!}</span>
+        <span class="max-w-[200px] truncate">{!! $text ?? e($object->title) !!}</span>
         @if ($showType && $object->type)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $typeDisplay }}</span>
         @endif
@@ -135,7 +137,7 @@ $linkHref = $href ?? $detailHref;
                border border-{{ $accentColor }}/20 transition-all duration-150 cursor-pointer"
     >
         <x-icon :name="$objectIcon" class="w-3 h-3 opacity-70" />
-        <span class="max-w-[200px] truncate">{!! $text ?? $object->title !!}</span>
+        <span class="max-w-[200px] truncate">{!! $text ?? e($object->title) !!}</span>
         @if ($showType && $object->type)
             <span class="badge badge-xs badge-ghost opacity-70">{{ $typeDisplay }}</span>
         @endif
@@ -148,7 +150,7 @@ $linkHref = $href ?? $detailHref;
         href="{{ $linkHref }}"
         wire:navigate
         class="font-medium hover:text-{{ $accentColor }} transition-colors cursor-pointer"
-    >{!! $text ?? $object->title !!}</a>
+    >{!! $text ?? e($object->title) !!}</a>
 
     {{-- Mobile: popover trigger only --}}
     <button
@@ -156,7 +158,7 @@ $linkHref = $href ?? $detailHref;
         type="button"
         @click="toggle()"
         class="font-medium hover:text-{{ $accentColor }} transition-colors cursor-pointer bg-transparent border-0 p-0 text-left"
-    >{!! $text ?? $object->title !!}</button>
+    >{!! $text ?? e($object->title) !!}</button>
     @endif
 
     {{-- Popover Card --}}

@@ -6,12 +6,14 @@ namespace App\Services\Ai;
  * What a skill run produced, for logging and TaskExecution metadata.
  *
  * Deliberately carries no part of the request: the MCP server URL embeds a
- * bearer token, so nothing derived from it is kept here.
+ * bearer token, so nothing derived from it is kept here. `responseId` is the
+ * laravel/ai invocation id.
  */
 class SkillRunResult
 {
     /**
      * @param  array<int, string>  $toolsCalled
+     * @param  array<int, array{tool: string, arguments: mixed}>  $capturedWrites  Writes a dry run declined, kept out of toArray() so they never reach logs.
      */
     public function __construct(
         public readonly string $skill,
@@ -20,8 +22,8 @@ class SkillRunResult
         public readonly int $inputTokens,
         public readonly int $outputTokens,
         public readonly ?string $responseId = null,
-        public readonly ?SkillContinuation $continuation = null,
         public readonly ?string $eventId = null,
+        public readonly array $capturedWrites = [],
     ) {}
 
     /**

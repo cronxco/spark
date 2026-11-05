@@ -2,11 +2,12 @@
 
 namespace App\Livewire;
 
-use App\Integrations\Receipt\ReceiptTransactionMatcher;
 use App\Models\Event;
-use App\Models\Relationship;
+use App\Services\Receipt\ReceiptMatchingActions;
+use App\Services\Receipt\ReceiptMatchState;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use InvalidArgumentException;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -27,6 +28,8 @@ class Receipts extends Component
     public ?string $selectedReceiptId = null;
 
     public bool $showMatchModal = false;
+
+    public string $transactionSearch = '';
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -64,6 +67,7 @@ class Receipts extends Component
 
     public function openMatchModal(string $receiptId): void
     {
+        abort_unless($this->findOwnedEvent($receiptId)?->service === 'receipt', 404);
         $this->selectedReceiptId = $receiptId;
         $this->showMatchModal = true;
     }
@@ -88,15 +92,13 @@ class Receipts extends Component
             return;
         }
 
-        $matcher = new ReceiptTransactionMatcher;
-        $confidence = $this->calculateMatchConfidence($receipt, $transaction);
+        try {
+            app(ReceiptMatchingActions::class)->link($receipt, $transaction);
+        } catch (InvalidArgumentException $exception) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => $exception->getMessage()]);
 
-        $matcher->createReceiptRelationship(
-            $receipt,
-            $transaction,
-            $confidence,
-            'manual'
-        );
+            return;
+        }
 
         $this->dispatch('notify', [
             'type' => 'success',
@@ -114,26 +116,39 @@ class Receipts extends Component
             return;
         }
 
-        // Find and delete the receipt_for relationship
-        Relationship::where('from_type', Event::class)
-            ->where('from_id', $receiptId)
-            ->where('type', 'receipt_for')
-            ->delete();
-
-        // Update merchant metadata
-        $merchant = $receipt->target;
-        if ($merchant) {
-            $metadata = $merchant->metadata ?? [];
-            $metadata['is_matched'] = false;
-            $metadata['needs_review'] = false;
-            unset($metadata['matched_transaction_id'], $metadata['matched_at']);
-            $merchant->update(['metadata' => $metadata]);
-        }
+        app(ReceiptMatchingActions::class)->unlink($receipt);
 
         $this->dispatch('notify', [
             'type' => 'success',
             'message' => 'Match removed successfully',
         ]);
+    }
+
+    public function retryMatch(string $receiptId): void
+    {
+        $receipt = $this->findOwnedEvent($receiptId);
+        abort_unless($receipt?->service === 'receipt', 404);
+        try {
+            app(ReceiptMatchingActions::class)->retry($receipt);
+        } catch (InvalidArgumentException $exception) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => $exception->getMessage()]);
+
+            return;
+        }
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Searching for a transaction']);
+    }
+
+    public function markNoMatch(string $receiptId): void
+    {
+        $receipt = $this->findOwnedEvent($receiptId);
+        abort_unless($receipt?->service === 'receipt', 404);
+        try {
+            app(ReceiptMatchingActions::class)->markNoMatch($receipt);
+        } catch (InvalidArgumentException $exception) {
+            $this->dispatch('notify', ['type' => 'error', 'message' => $exception->getMessage()]);
+
+            return;
+        }
     }
 
     public function deleteReceipt(string $receiptId): void
@@ -155,31 +170,20 @@ class Receipts extends Component
 
     public function getReceiptsProperty()
     {
-        $query = Event::where('service', 'receipt')
-            ->where('domain', 'money')
-            ->where('action', 'had_receipt_from')
-            ->whereHas('integration', fn ($q) => $q->where('user_id', Auth::id()))
-            ->with(['target', 'blocks', 'integration']);
+        $query = $this->receiptQuery()->with(['target', 'blocks', 'integration']);
 
         // Apply status filter
         if ($this->statusFilter === 'matched') {
-            $query->whereHas('target', function ($q) {
-                $q->whereJsonContains('metadata->is_matched', true);
-            });
+            $query->whereIn('id', ReceiptMatchState::links()->select('from_id'));
         } elseif ($this->statusFilter === 'unmatched') {
-            $query->whereHas('target', function ($q) {
-                $q->where(function ($subQuery) {
-                    $subQuery->whereJsonContains('metadata->is_matched', false)
-                        ->orWhereNull('metadata->is_matched');
-                })->where(function ($subQuery) {
-                    $subQuery->whereJsonContains('metadata->needs_review', false)
-                        ->orWhereNull('metadata->needs_review');
+            $query->whereNotIn('id', ReceiptMatchState::links()->select('from_id'))
+                ->where(function ($q) {
+                    $q->whereNull('event_metadata->receipt_matching->status')
+                        ->orWhere('event_metadata->receipt_matching->status', '!=', 'suggestions');
                 });
-            });
         } elseif ($this->statusFilter === 'review') {
-            $query->whereHas('target', function ($q) {
-                $q->whereJsonContains('metadata->needs_review', true);
-            });
+            $query->whereNotIn('id', ReceiptMatchState::links()->select('from_id'))
+                ->where('event_metadata->receipt_matching->status', 'suggestions');
         }
 
         // Apply search filter
@@ -199,9 +203,29 @@ class Receipts extends Component
 
     public function render(): View
     {
+        $selected = $this->selectedReceiptId ? $this->findOwnedEvent($this->selectedReceiptId) : null;
+        $candidates = $selected ? ReceiptMatchState::candidates($selected) : [];
+
         return view('livewire.receipts', [
             'receipts' => $this->receipts,
+            'stats' => [
+                'total' => $this->receiptQuery()->count(),
+                'matched' => $this->receiptQuery()->whereIn('id', ReceiptMatchState::links()->select('from_id'))->count(),
+                'review' => $this->receiptQuery()->whereNotIn('id', ReceiptMatchState::links()->select('from_id'))
+                    ->where('event_metadata->receipt_matching->status', 'suggestions')->count(),
+            ],
+            'selectedReceipt' => $selected,
+            'candidateTransactions' => $selected ? Event::forUser(Auth::id())->whereIn('id', collect($candidates)->pluck('transaction_id'))->with('target')->get() : collect(),
+            'searchTransactions' => $selected && $this->showMatchModal
+                ? app(ReceiptMatchingActions::class)->search($selected, $this->transactionSearch)
+                : collect(),
         ]);
+    }
+
+    private function receiptQuery()
+    {
+        return Event::where('service', 'receipt')->where('domain', 'money')->where('action', 'had_receipt_from')
+            ->whereHas('integration', fn ($q) => $q->where('user_id', Auth::id()));
     }
 
     /**
@@ -213,23 +237,5 @@ class Receipts extends Component
         return Event::whereKey($id)
             ->whereHas('integration', fn ($q) => $q->where('user_id', Auth::id()))
             ->first();
-    }
-
-    private function calculateMatchConfidence(Event $receipt, Event $transaction): float
-    {
-        // Simple confidence calculation for manual matches
-        $score = 0.5; // Base score for manual match
-
-        // Amount match
-        if ($receipt->value === $transaction->value) {
-            $score += 0.3;
-        }
-
-        // Time proximity (within same day)
-        if ($receipt->time->isSameDay($transaction->time)) {
-            $score += 0.2;
-        }
-
-        return min(1.0, $score);
     }
 }

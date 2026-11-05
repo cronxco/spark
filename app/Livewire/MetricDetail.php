@@ -56,6 +56,12 @@ class MetricDetail extends Component
         $this->trendsLoaded = true;
     }
 
+    public function reloadTrends(): void
+    {
+        $this->trendsLoaded = false;
+        $this->loadTrends();
+    }
+
     public function acknowledgeTrend(string $trendId): void
     {
         $trend = MetricTrend::findOrFail($trendId);
@@ -66,17 +72,6 @@ class MetricDetail extends Component
         }
 
         $trend->acknowledge();
-    }
-
-    public function acknowledgeAllTrends(): void
-    {
-        // Acknowledge all unacknowledged trends for this metric
-        MetricTrend::where('metric_statistic_id', $this->metric->id)
-            ->whereNull('acknowledged_at')
-            ->get()
-            ->each(fn ($trend) => $trend->acknowledge());
-
-        $this->dispatch('trends-acknowledged');
     }
 
     public function calculateMetricStatistics(): void
@@ -145,9 +140,8 @@ class MetricDetail extends Component
     protected function getListeners(): array
     {
         return [
-            // Spotlight command events
-            'acknowledge-all-trends' => 'acknowledgeAllTrends',
-            'calculate-metric-statistics' => 'calculateMetricStatistics',
+            // Spotlight runs registry actions outside this component
+            'action-ran' => 'reloadTrends',
         ];
     }
 }

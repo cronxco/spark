@@ -2,7 +2,9 @@
 
 namespace App\Jobs\Data\Untappd;
 
+use App\Integrations\Untappd\AlcoholUnits;
 use App\Jobs\Base\BaseProcessingJob;
+use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Services\Media\MediaDownloadHelper;
@@ -107,6 +109,10 @@ class UntappdBeerDetailData extends BaseProcessingJob
         ]);
 
         $beer->update(['metadata' => $metadata]);
+
+        // Check-ins enriched before the beer's ABV was known get their units now
+        Event::where('target_id', $beer->id)->where('service', 'untappd')->with('target')->get()
+            ->each(fn (Event $event) => AlcoholUnits::applyTo($event));
 
         logger()->info('Beer metadata updated successfully', [
             'beer_id' => $beer->id,

@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Bus;
+use Throwable;
 
 class GenerateDayNotes implements ShouldQueue
 {
@@ -109,6 +110,17 @@ class GenerateDayNotes implements ShouldQueue
                 ];
                 $progress->update(['details' => $details]);
             }
+        }
+    }
+
+    /**
+     * Mark the progress record failed so the admin page offers a retry rather
+     * than staying "In Progress" for ever.
+     */
+    public function failed(Throwable $exception): void
+    {
+        if ($this->progressId) {
+            ActionProgress::find($this->progressId)?->markFailed($exception->getMessage());
         }
     }
 }

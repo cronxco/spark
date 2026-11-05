@@ -8,9 +8,14 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Notifications\IntegrationAuthenticationFailed;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Session;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use Tests\TestCase;
@@ -260,6 +265,67 @@ class GoogleCalendarIntegrationTest extends TestCase
     }
 
     #[Test]
+    public function oauth_callback_accepts_a_reconnect_started_outside_the_browser_session(): void
+    {
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response([
+                'access_token' => 'new_access_token',
+                'refresh_token' => 'new_refresh_token',
+                'expires_in' => 3600,
+            ]),
+            'https://www.googleapis.com/calendar/v3/calendars/primary' => Http::response(['id' => 'test@example.com']),
+        ]);
+
+        $plugin = new GoogleCalendarPlugin;
+        parse_str((string) parse_url($plugin->getOAuthUrl($this->group), PHP_URL_QUERY), $query);
+
+        // The app starts the flow over the API; the browser finishing consent has another session
+        Session::flush();
+        $request = Request::create('/integrations/google-calendar/callback', 'GET', ['code' => 'auth_code', 'state' => $query['state']]);
+
+        $plugin->handleOAuthCallback($request, $this->group->fresh());
+
+        $group = $this->group->fresh();
+        $this->assertSame('new_access_token', $group->access_token);
+        $this->assertSame('new_refresh_token', $group->refresh_token);
+        $this->assertArrayNotHasKey('oauth_csrf_hash', $group->auth_metadata ?? []);
+
+        $this->expectExceptionMessage('Invalid CSRF token');
+        $plugin->handleOAuthCallback($request, $group);
+    }
+
+    #[Test]
+    public function oauth_callback_rejects_a_state_whose_token_was_never_issued(): void
+    {
+        $plugin = new GoogleCalendarPlugin;
+        $plugin->getOAuthUrl($this->group);
+        Session::flush();
+
+        $state = encrypt(['group_id' => $this->group->id, 'csrf_token' => 'forged', 'code_verifier' => 'verifier']);
+        $request = Request::create('/integrations/google-calendar/callback', 'GET', ['code' => 'auth_code', 'state' => $state]);
+
+        $this->expectExceptionMessage('Invalid CSRF token');
+        $plugin->handleOAuthCallback($request, $this->group->fresh());
+    }
+
+    #[Test]
+    public function failed_mobile_reconnect_clears_the_mobile_flag(): void
+    {
+        $this->group->update(['auth_metadata' => [
+            'mobile_reauth_origin' => true,
+            'mobile_reauth_attempt_id' => 'attempt-1',
+        ]]);
+        $state = encrypt(['group_id' => $this->group->id, 'csrf_token' => 'forged', 'code_verifier' => 'verifier']);
+
+        $this->actingAs($this->user)->get(route('integrations.oauth.callback', [
+            'service' => 'google-calendar', 'code' => 'auth_code', 'state' => $state,
+        ]))->assertRedirect('spark://integrations/reauth-complete?status=error&attempt_id=attempt-1');
+
+        $this->assertArrayNotHasKey('mobile_reauth_origin', $this->group->fresh()->auth_metadata ?? []);
+        $this->assertSame('test_access_token', $this->group->fresh()->access_token);
+    }
+
+    #[Test]
     public function process_event_data_creates_timed_event(): void
     {
         $now = Carbon::now();
@@ -329,6 +395,42 @@ class GoogleCalendarIntegrationTest extends TestCase
         $locationBlock = $blocks->where('block_type', 'event_location')->first();
         $this->assertNotNull($locationBlock);
         $this->assertEquals('Conference Room A', $locationBlock->metadata['location']);
+    }
+
+    #[Test]
+    public function process_event_data_stores_whole_minutes_for_durations_with_seconds(): void
+    {
+        $start = Carbon::now()->addDay()->setTime(17, 45);
+        $rawData = [
+            'events' => [
+                [
+                    'id' => 'travel_1',
+                    'summary' => 'Train to Glasgow',
+                    'status' => 'confirmed',
+                    'start' => ['dateTime' => $start->toIso8601String()],
+                    // 89 minutes 27 seconds, as Google Maps travel entries are
+                    'end' => ['dateTime' => $start->copy()->addSeconds(5367)->toIso8601String()],
+                ],
+                [
+                    'id' => 'event_after',
+                    'summary' => 'Dinner',
+                    'status' => 'confirmed',
+                    'start' => ['dateTime' => $start->copy()->addHours(3)->toIso8601String()],
+                    'end' => ['dateTime' => $start->copy()->addHours(4)->toIso8601String()],
+                ],
+            ],
+            'calendar_id' => 'primary',
+            'calendar_name' => 'Primary Calendar',
+        ];
+
+        (new GoogleCalendarPlugin)->processEventData($this->integration, $rawData);
+
+        $travel = Event::where('integration_id', $this->integration->id)
+            ->where('event_metadata->google_event_id', 'travel_1')
+            ->first();
+        $this->assertNotNull($travel);
+        $this->assertSame(89, (int) $travel->value);
+        $this->assertSame(2, Event::where('integration_id', $this->integration->id)->count());
     }
 
     #[Test]
@@ -563,10 +665,10 @@ class GoogleCalendarIntegrationTest extends TestCase
             'source_id' => 'google_calendar_primary_old_event_' . $now->timestamp,
             'actor_id' => $calendarObject->id,
             'target_id' => $eventObject->id,
-            'service' => 'google_calendar',
+            'service' => 'google-calendar',
             'domain' => 'health',
             'action' => 'had_event',
-            'time' => $now,
+            'time' => $now->copy()->addHours(3),
             'value' => 60,
             'event_metadata' => ['google_event_id' => 'old_event'],
         ]);
@@ -705,5 +807,129 @@ class GoogleCalendarIntegrationTest extends TestCase
             // Extract timeMin and timeMax from the request
             return str_contains($query, 'timeMin') && str_contains($query, 'timeMax');
         });
+    }
+
+    #[Test]
+    public function revoked_refresh_token_notifies_and_stops_before_fetching_events(): void
+    {
+        $notification = new IntegrationAuthenticationFailed($this->integration, 'expired');
+        $this->assertTrue($notification->isIncidentAlert());
+        $this->assertSame('integration_authentication_failed:' . $this->integration->id, $notification->getGroupKey());
+        Notification::fake();
+        $this->group->update(['expiry' => now()->subHour()]);
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response(['error' => 'invalid_grant'], 400),
+        ]);
+
+        try {
+            (new GoogleCalendarPlugin)->pullEventData($this->integration);
+            $this->fail('Revoked refresh tokens must fail the fetch.');
+        } catch (Exception $e) {
+            $this->assertSame('Failed to refresh Google Calendar token', $e->getMessage());
+        }
+
+        Notification::assertSentTo($this->user, IntegrationAuthenticationFailed::class);
+        Http::assertSentCount(1);
+        $this->assertSame('test_access_token', $this->group->fresh()->access_token);
+    }
+
+    #[Test]
+    public function failed_event_response_is_not_an_empty_success(): void
+    {
+        Http::fake([
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events*' => Http::response([], 403),
+        ]);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to fetch Google Calendar events: 403');
+        (new GoogleCalendarPlugin)->pullEventData($this->integration);
+    }
+
+    #[Test]
+    public function expired_token_without_refresh_token_stops_before_requesting_events(): void
+    {
+        $this->group->update(['expiry' => now()->subHour(), 'refresh_token' => null]);
+        Http::fake();
+
+        try {
+            (new GoogleCalendarPlugin)->pullEventData($this->integration);
+            $this->fail('Missing refresh tokens must fail the fetch.');
+        } catch (Exception $e) {
+            $this->assertStringContainsString('no refresh token available', $e->getMessage());
+        }
+
+        Http::assertNothingSent();
+    }
+
+    #[Test]
+    public function reconciliation_preserves_historical_events_missing_from_calendar(): void
+    {
+        $calendar = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $target = EventObject::factory()->create(['user_id' => $this->user->id]);
+        $past = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'source_id' => 'google_calendar_primary_historical',
+            'actor_id' => $calendar->id,
+            'target_id' => $target->id,
+            'time' => now()->subDay(),
+        ]);
+        $future = Event::factory()->create([
+            'integration_id' => $this->integration->id,
+            'source_id' => 'google_calendar_primary_future',
+            'actor_id' => $calendar->id,
+            'target_id' => $target->id,
+            'time' => now()->addDay(),
+        ]);
+
+        (new GoogleCalendarPlugin)->processEventData($this->integration, [
+            'events' => [],
+            'calendar_id' => 'primary',
+            'calendar_name' => 'Primary Calendar',
+            'sync_window' => [
+                'time_min' => now()->subDays(7)->toIso8601String(),
+                'time_max' => now()->addDays(30)->toIso8601String(),
+            ],
+        ]);
+
+        $this->assertNotSoftDeleted('events', ['id' => $past->id]);
+        $this->assertSoftDeleted('events', ['id' => $future->id]);
+    }
+
+    #[Test]
+    public function process_event_data_records_rsvp_and_event_type(): void
+    {
+        $now = Carbon::now();
+        $timed = fn (string $id, array $extra) => [
+            'id' => $id, 'summary' => "Event {$id}", 'status' => 'confirmed',
+            'start' => ['dateTime' => $now->copy()->addHour()->toIso8601String()],
+            'end' => ['dateTime' => $now->copy()->addHours(2)->toIso8601String()],
+            ...$extra,
+        ];
+        $rawData = [
+            'events' => [
+                $timed('declined', ['attendees' => [
+                    ['email' => 'other@example.com', 'responseStatus' => 'accepted'],
+                    ['email' => 'me@example.com', 'self' => true, 'responseStatus' => 'declined'],
+                ]]),
+                $timed('focus', ['eventType' => 'focusTime', 'transparency' => 'opaque', 'organizer' => ['self' => true]]),
+            ],
+            'calendar_id' => 'primary',
+            'calendar_name' => 'Primary Calendar',
+            'sync_window' => [
+                'time_min' => $now->copy()->subDays(7)->toIso8601String(),
+                'time_max' => $now->copy()->addDays(30)->toIso8601String(),
+            ],
+        ];
+
+        (new GoogleCalendarPlugin)->processEventData($this->integration, $rawData);
+
+        $declined = Event::where('event_metadata->google_event_id', 'declined')->firstOrFail()->event_metadata;
+        $this->assertSame('declined', $declined['response_status']);
+        $this->assertSame(2, $declined['attendee_count']);
+
+        $focus = Event::where('event_metadata->google_event_id', 'focus')->firstOrFail()->event_metadata;
+        $this->assertSame('focusTime', $focus['event_type']);
+        $this->assertSame('accepted', $focus['response_status']);
+        $this->assertSame('opaque', $focus['transparency']);
     }
 }

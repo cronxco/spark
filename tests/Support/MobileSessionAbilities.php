@@ -12,7 +12,7 @@ final class MobileSessionAbilities
         }
 
         if (in_array('ios:write', $abilities, true)) {
-            $abilities = [...$abilities, 'mobile:session', 'data:write', 'finance:write', 'flint:write', 'insights:write', 'integrations:manage', 'integrations:sync', 'notifications:write', 'tokens:revoke'];
+            $abilities = [...$abilities, 'mobile:session', 'data:write', 'finance:write', 'flint:run', 'flint:write', 'insights:write', 'integrations:manage', 'integrations:sync', 'notifications:write', 'tokens:revoke'];
         }
 
         return array_values(array_unique($abilities));

@@ -1,5 +1,14 @@
 <?php
 
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Models\IntegrationGroup;
+use App\Models\Place;
+use App\Models\Relationship;
+use App\Models\User;
+use App\Support\AdminTenant;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
@@ -80,9 +89,41 @@ new class extends Component
         ];
     }
 
+    /**
+     * Activity rows belonging to the tenant the admin pages are scoped to:
+     * things the tenant did, or changes to records the tenant owns.
+     */
+    private function tenantActivities()
+    {
+        $tenantId = AdminTenant::id();
+
+        if ($tenantId === null) {
+            return Activity::query();
+        }
+
+        return Activity::query()->where(function ($q) use ($tenantId) {
+            $q->where(fn ($c) => $c->where('causer_type', User::class)->where('causer_id', $tenantId))
+                ->orWhere(fn ($c) => $c->where('subject_type', User::class)->where('subject_id', $tenantId))
+                ->orWhere(fn ($c) => $c->where('subject_type', Event::class)
+                    ->whereIn('subject_id', Event::withTrashed()->forUser($tenantId)->select('events.id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', Block::class)
+                    ->whereIn('subject_id', Block::withTrashed()->whereHas('event.integration', fn ($i) => $i->where('user_id', $tenantId))->select('blocks.id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', EventObject::class)
+                    ->whereIn('subject_id', EventObject::withTrashed()->where('user_id', $tenantId)->select('id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', Integration::class)
+                    ->whereIn('subject_id', Integration::withTrashed()->where('user_id', $tenantId)->select('id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', IntegrationGroup::class)
+                    ->whereIn('subject_id', IntegrationGroup::withTrashed()->where('user_id', $tenantId)->select('id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', Relationship::class)
+                    ->whereIn('subject_id', Relationship::where('user_id', $tenantId)->select('id')))
+                ->orWhere(fn ($c) => $c->where('subject_type', Place::class)
+                    ->whereIn('subject_id', Place::where('user_id', $tenantId)->select('id')));
+        });
+    }
+
     public function getActivities()
     {
-        $query = Activity::with(['subject', 'causer']);
+        $query = $this->tenantActivities()->with(['subject', 'causer']);
 
         // Apply search filter - optimized for better index usage
         if ($this->search) {
@@ -112,31 +153,34 @@ new class extends Component
         }
 
         // Apply sorting
-        $sortColumn = $this->sortBy['column'] ?? 'created_at';
-        $sortDirection = $this->sortBy['direction'] ?? 'desc';
+        $sortableColumns = collect($this->headers())->where('sortable', true)->pluck('key')->all();
+        $sortColumn = in_array($this->sortBy['column'] ?? null, $sortableColumns, true) ? $this->sortBy['column'] : 'created_at';
+        $sortDirection = ($this->sortBy['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query->orderBy($sortColumn, $sortDirection);
 
-        return $query->paginate($this->perPage);
+        $perPage = in_array($this->perPage, [10, 25, 50, 100], true) ? $this->perPage : 25;
+
+        return $query->paginate($perPage);
     }
 
     public function getUniqueLogNames()
     {
-        return Cache::remember('activity_log_unique_log_names', 3600, function () {
-            return Activity::distinct()->pluck('log_name')->filter()->sort()->values()->toArray();
+        return Cache::remember('activity_log_unique_log_names_' . AdminTenant::id(), 3600, function () {
+            return $this->tenantActivities()->distinct()->pluck('log_name')->filter()->sort()->values()->toArray();
         });
     }
 
     public function getUniqueEvents()
     {
-        return Cache::remember('activity_log_unique_events', 3600, function () {
-            return Activity::distinct()->pluck('event')->filter()->sort()->values()->toArray();
+        return Cache::remember('activity_log_unique_events_' . AdminTenant::id(), 3600, function () {
+            return $this->tenantActivities()->distinct()->pluck('event')->filter()->sort()->values()->toArray();
         });
     }
 
     public function getUniqueSubjectTypes()
     {
-        return Cache::remember('activity_log_unique_subject_types', 3600, function () {
-            return Activity::distinct()->pluck('subject_type')->filter()->sort()->values()->toArray();
+        return Cache::remember('activity_log_unique_subject_types_' . AdminTenant::id(), 3600, function () {
+            return $this->tenantActivities()->distinct()->pluck('subject_type')->filter()->sort()->values()->toArray();
         });
     }
 
@@ -234,7 +278,7 @@ new class extends Component
 
     public function showActivityDetails(string $activityId): void
     {
-        $this->selectedActivity = Activity::with(['subject', 'causer'])->find($activityId);
+        $this->selectedActivity = $this->tenantActivities()->with(['subject', 'causer'])->find($activityId);
         $this->showModal = true;
     }
 
@@ -283,157 +327,18 @@ new class extends Component
 ?>
 
 <div>
-    <x-header title="Activity Log" subtitle="View and monitor system activity" separator>
+    <x-header title="Activity Log" separator>
     </x-header>
 
     <div class="space-y-4 lg:space-y-6">
-        <!-- Desktop Filters -->
-        <div class="hidden lg:block card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="flex flex-row gap-4">
-                    <!-- Search -->
-                    <div class="form-control flex-1">
-                        <label class="label">
-                            <span class="label-text">Search</span>
-                        </label>
-                        <input
-                            type="text"
-                            class="input input-bordered w-full"
-                            placeholder="Search activity..."
-                            wire:model.live.debounce.300ms="search" />
-                    </div>
-
-                    <!-- Log Name Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Log Name</span>
-                        </label>
-                        <select class="select select-bordered" wire:model.live="logNameFilter">
-                            <option value="">All Log Names</option>
-                            @foreach ($this->getUniqueLogNames() as $logName)
-                            <option value="{{ $logName }}">{{ $logName }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Event Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Event</span>
-                        </label>
-                        <select class="select select-bordered" wire:model.live="eventFilter">
-                            <option value="">All Events</option>
-                            @foreach ($this->getUniqueEvents() as $event)
-                            <option value="{{ $event }}">{{ $this->prettifyEvent($event) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Subject Type Filter -->
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Subject Type</span>
-                        </label>
-                        <select class="select select-bordered" wire:model.live="subjectTypeFilter">
-                            <option value="">All Types</option>
-                            @foreach ($this->getUniqueSubjectTypes() as $subjectType)
-                            <option value="{{ $subjectType }}">{{ $this->prettifySubjectType($subjectType) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Clear Filters Button -->
-                    @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
-                    <div class="form-control content-end">
-                        <label class="label">
-                            <span class="label-text">&nbsp;</span>
-                        </label>
-                        <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="fas.xmark" class="w-4 h-4" />
-                            Clear
-                        </button>
-                    </div>
-                    @endif
-                </div>
-            </div>
-        </div>
-
-        <!-- Mobile Filters -->
-        <div class="lg:hidden">
-            <x-collapse separator class="bg-base-200">
-                <x-slot:heading>
-                    <div class="flex items-center gap-2">
-                        <x-icon name="fas.filter" class="w-5 h-5" />
-                        Filters
-                        @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
-                        <x-badge value="Active" class="badge-success badge-xs" />
-                        @endif
-                    </div>
-                </x-slot:heading>
-                <x-slot:content>
-                    <div class="flex flex-col gap-4">
-                        <!-- Search -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Search</span>
-                            </label>
-                            <input
-                                type="text"
-                                class="input input-bordered w-full"
-                                placeholder="Search activity..."
-                                wire:model.live.debounce.300ms="search" />
-                        </div>
-
-                        <!-- Log Name Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Log Name</span>
-                            </label>
-                            <select class="select select-bordered w-full" wire:model.live="logNameFilter">
-                                <option value="">All Log Names</option>
-                                @foreach ($this->getUniqueLogNames() as $logName)
-                                <option value="{{ $logName }}">{{ $logName }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Event Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Event</span>
-                            </label>
-                            <select class="select select-bordered w-full" wire:model.live="eventFilter">
-                                <option value="">All Events</option>
-                                @foreach ($this->getUniqueEvents() as $event)
-                                <option value="{{ $event }}">{{ $this->prettifyEvent($event) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Subject Type Filter -->
-                        <div class="form-control">
-                            <label class="label">
-                                <span class="label-text">Subject Type</span>
-                            </label>
-                            <select class="select select-bordered w-full" wire:model.live="subjectTypeFilter">
-                                <option value="">All Types</option>
-                                @foreach ($this->getUniqueSubjectTypes() as $subjectType)
-                                <option value="{{ $subjectType }}">{{ $this->prettifySubjectType($subjectType) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Clear Filters Button -->
-                        @if ($search || $logNameFilter || $eventFilter || $subjectTypeFilter)
-                        <button class="btn btn-outline" wire:click="clearFilters">
-                            <x-icon name="fas.xmark" class="w-4 h-4" />
-                            Clear Filters
-                        </button>
-                        @endif
-                    </div>
-                </x-slot:content>
-            </x-collapse>
-        </div>
+        <x-admin.filter-bar
+            search-placeholder="Search activity..."
+            :active="$search || $logNameFilter || $eventFilter || $subjectTypeFilter"
+            :filters="[
+                ['model' => 'logNameFilter', 'label' => 'Log', 'placeholder' => 'All logs', 'options' => collect($this->getUniqueLogNames())->mapWithKeys(fn ($v) => [$v => $v])],
+                ['model' => 'eventFilter', 'label' => 'Event', 'placeholder' => 'All events', 'options' => collect($this->getUniqueEvents())->mapWithKeys(fn ($v) => [$v => $this->prettifyEvent($v)])],
+                ['model' => 'subjectTypeFilter', 'label' => 'Subject', 'placeholder' => 'All subjects', 'options' => collect($this->getUniqueSubjectTypes())->mapWithKeys(fn ($v) => [$v => $this->prettifySubjectType($v)])],
+            ]" />
 
         <!-- Activities Table -->
         <div class="card bg-base-200 shadow">

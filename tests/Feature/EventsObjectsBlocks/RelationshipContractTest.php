@@ -36,7 +36,11 @@ class RelationshipContractTest extends TestCase
             ->assertOk()
             ->json('data');
 
-        $this->assertEqualsCanonicalizing(RelationshipTypeRegistry::getTypeKeys(), array_column($types, 'type'));
+        $creatable = array_keys(array_filter(RelationshipTypeRegistry::getTypes(), fn (array $config) => $config['user_creatable'] ?? true));
+        $this->assertEqualsCanonicalizing($creatable, array_column($types, 'type'));
+        $this->assertNotContains('task_project', array_column($types, 'type'));
+        $this->assertNotContains('task_thread', array_column($types, 'type'));
+        $this->assertNotContains('task_context', array_column($types, 'type'));
         $this->assertArrayHasKey('supports_value', $types[0]);
     }
 

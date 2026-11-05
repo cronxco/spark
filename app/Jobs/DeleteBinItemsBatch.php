@@ -8,6 +8,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -15,7 +16,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class DeleteBinItemsBatch implements ShouldQueue
+class DeleteBinItemsBatch implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -24,12 +25,21 @@ class DeleteBinItemsBatch implements ShouldQueue
     public int $tries = 3;
 
     /**
-     * The user ID to filter records by
+     * The user ID to filter records by, or null to delete every user's records (God Mode)
      */
     public function __construct(
-        private string $userId,
+        private ?string $userId,
         private int $batchSize = 100
     ) {}
+
+    /**
+     * One pending batch per user, so a double-click on Delete All does not
+     * start two self-renewing chains.
+     */
+    public function uniqueId(): string
+    {
+        return $this->userId ?? 'all';
+    }
 
     /**
      * Execute the job.
@@ -90,7 +100,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     {
         $query = Block::onlyTrashed()
             ->whereHas('event.integration', function ($q) {
-                $q->where('user_id', $this->userId);
+                $q->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId));
             });
 
         return $this->processBatch($query, 'blocks');
@@ -103,7 +113,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     {
         $events = Event::onlyTrashed()
             ->whereHas('integration', function ($q) {
-                $q->where('user_id', $this->userId);
+                $q->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId));
             })
             ->limit($this->batchSize)
             ->get();
@@ -138,7 +148,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     private function deleteIntegrations(): int
     {
         $integrations = Integration::onlyTrashed()
-            ->where('user_id', $this->userId)
+            ->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId))
             ->limit($this->batchSize)
             ->get();
 
@@ -176,7 +186,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     private function deleteIntegrationGroups(): int
     {
         $groups = IntegrationGroup::onlyTrashed()
-            ->where('user_id', $this->userId)
+            ->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId))
             ->limit($this->batchSize)
             ->get();
 
@@ -218,7 +228,7 @@ class DeleteBinItemsBatch implements ShouldQueue
     private function deleteObjects(): int
     {
         $objects = EventObject::onlyTrashed()
-            ->where('user_id', $this->userId)
+            ->when($this->userId !== null, fn ($q) => $q->where('user_id', $this->userId))
             ->limit($this->batchSize)
             ->get();
 

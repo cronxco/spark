@@ -39,7 +39,7 @@ class IntegrationBlocksQuery
                             ->orWhere('block_type', 'ilike', "%{$query}%");
                     });
                 })
-                ->latest('block_time')
+                ->orderByRaw('time DESC NULLS LAST')
                 ->limit(10)
                 ->get();
 
@@ -59,9 +59,11 @@ class IntegrationBlocksQuery
                 }
 
                 // Add date
-                $dateFormat = $block->block_time->format('M j, Y');
-                $humanDate = $block->block_time->diffForHumans();
-                $subtitleParts[] = "{$dateFormat} ({$humanDate})";
+                if ($block->time) {
+                    $dateFormat = $block->time->format('M j, Y');
+                    $humanDate = $block->time->diffForHumans();
+                    $subtitleParts[] = "{$dateFormat} ({$humanDate})";
+                }
 
                 $subtitle = implode(' • ', $subtitleParts);
 
@@ -78,7 +80,7 @@ class IntegrationBlocksQuery
                 }
 
                 // Boost priority for recent blocks
-                $priority = $block->block_time->isAfter(now()->subWeek()) ? 1 : 2;
+                $priority = $block->time?->isAfter(now()->subWeek()) ? 1 : 2;
 
                 return SpotlightResult::make()
                     ->setTitle($blockTitle)
