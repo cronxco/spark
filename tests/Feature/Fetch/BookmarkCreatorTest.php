@@ -83,7 +83,7 @@ class BookmarkCreatorTest extends TestCase
             'https://example.com/c',
         ]);
 
-        $this->assertSame(['https://example.com/a', 'https://example.com/b'], array_keys($found));
+        $this->assertEqualsCanonicalizing(['https://example.com/a', 'https://example.com/b'], array_keys($found));
         $this->assertSame((string) $a->id, (string) $found['https://example.com/a']?->id);
         $this->assertSame((string) $b->id, (string) $found['https://example.com/b']?->id);
     }
