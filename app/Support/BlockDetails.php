@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Block;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Throwable;
 
 /**
@@ -142,7 +143,7 @@ final class BlockDetails
 
     private static function date(mixed $value): ?string
     {
-        if (! is_string($value) && ! $value instanceof \DateTimeInterface) {
+        if (! is_string($value) && ! $value instanceof DateTimeInterface) {
             return null;
         }
 
