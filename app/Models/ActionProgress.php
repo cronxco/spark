@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Events\Mobile\ActionProgressUpdated;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -161,6 +162,11 @@ class ActionProgress extends Model
         });
 
         static::saved(function (ActionProgress $model) {
+            // Receipts answer the request that made them; nothing needs a live bar.
+            if ($model->action_type === 'command') {
+                return;
+            }
+
             if (
                 ! $model->wasRecentlyCreated
                 && ! $model->wasChanged(['progress', 'status', 'completed_at', 'failed_at', 'step', 'message'])
@@ -170,6 +176,15 @@ class ActionProgress extends Model
 
             event(ActionProgressUpdated::fromModel($model));
         });
+    }
+
+    /**
+     * Command receipts (see ActionReceipt) are the app's own record of a run,
+     * not activity to show in the notification feed.
+     */
+    public function scopeActivity(Builder $query): Builder
+    {
+        return $query->where('action_type', '!=', 'command');
     }
 
     public function user(): BelongsTo

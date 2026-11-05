@@ -104,7 +104,7 @@ class LinkTransactions extends Command
         );
 
         if ($totalStats['pending'] > 0) {
-            $this->info("\nVisit /admin/pending-links to review pending matches");
+            $this->info("\nReview pending matches in Flint");
         }
 
         return Command::SUCCESS;

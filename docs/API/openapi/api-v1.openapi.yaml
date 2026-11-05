@@ -185,6 +185,12 @@ paths:
       summary: Cursor-paginated list of the user's tags
       parameters:
         - { name: q, in: query, schema: { type: string, maxLength: 255 } }
+        - {
+            name: type,
+            in: query,
+            description: "One tag type; `untyped` lists tags with no type",
+            schema: { type: string, maxLength: 255 },
+          }
         - { name: cursor, in: query, schema: { type: string } }
         - {
             name: limit,
@@ -203,6 +209,15 @@ paths:
                     { type: array, items: { $ref: "#/components/schemas/Tag" } }
                   next_cursor: { type: [string, "null"] }
                   has_more: { type: boolean }
+                  types:
+                    description: First page only. Tag count and usage per type, ignoring `type`.
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string }
+                        tags_count: { type: integer }
+                        total_count: { type: integer }
 
   /tags/suggest:
     get:

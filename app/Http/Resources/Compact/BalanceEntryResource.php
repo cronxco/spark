@@ -21,6 +21,7 @@ class BalanceEntryResource extends JsonResource
             'balance' => $this->resolveBalance(),
             'currency' => $this->value_unit ?? 'GBP',
             'time' => $this->time?->toIso8601String(),
+            'date' => $this->time?->copy()->utc()->toDateString(),
             'notes' => $this->event_metadata['notes'] ?? null,
         ];
     }

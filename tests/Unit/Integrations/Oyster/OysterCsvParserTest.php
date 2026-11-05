@@ -229,6 +229,24 @@ CSV;
     }
 
     #[Test]
+    public function it_converts_british_summer_time_to_utc()
+    {
+        $csv = <<<'CSV'
+
+Date,Start Time,End Time,Journey/Action,Charge,Credit,Balance,Note
+10-Oct-2026,14:13,14:20,"Wimbledon [National Rail] to Earlsfield [National Rail]",.00,,8.41,""
+10-Oct-2026,12:17,,"Entered Wandle Park tram stop",.00,,8.41,""
+CSV;
+
+        $result = $this->parser->parse($csv);
+
+        $this->assertSame('2026-10-10T13:13:00Z', $result['journeys'][0]['start_datetime']->toIso8601ZuluString());
+        $this->assertSame('2026-10-10T13:20:00Z', $result['journeys'][0]['end_datetime']->toIso8601ZuluString());
+        $this->assertSame('2026-10-10T11:17:00Z', $result['journeys'][1]['start_datetime']->toIso8601ZuluString());
+        $this->assertSame('2026-10-10 11:17:00', $result['journeys'][1]['start_datetime']->format('Y-m-d H:i:s'));
+    }
+
+    #[Test]
     public function it_handles_empty_csv()
     {
         $csv = '';
@@ -261,5 +279,23 @@ CSV;
 
         // Last entry should be tram at Wandle Park
         $this->assertEquals('Wandle Park', $result['journeys'][3]['origin']);
+    }
+
+    #[Test]
+    public function it_handles_a_journey_with_an_empty_start_time()
+    {
+        $csv = <<<'CSV'
+
+Date,Start Time,End Time,Journey/Action,Charge,Credit,Balance,Note
+28-Nov-2025,,18:14,"Victoria to East Croydon",8.80,,8.41,"We are not able to show where you touched in"
+CSV;
+
+        $result = $this->parser->parse($csv);
+
+        $journey = $result['journeys'][0];
+
+        $this->assertNull($journey['start_datetime']);
+        $this->assertNotNull($journey['end_datetime']);
+        $this->assertEquals('18:14', $journey['end_datetime']->format('H:i'));
     }
 }

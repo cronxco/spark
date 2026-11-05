@@ -243,7 +243,7 @@ abstract class WebhookPlugin implements IntegrationPlugin
                 'metadata' => $objectData['metadata'] ?? [],
                 'url' => $objectData['url'] ?? null,
                 'image_url' => $objectData['image_url'] ?? null,
-                'embeddings' => $objectData['embeddings'] ?? null,
+                ...(isset($objectData['embeddings']) ? ['embeddings' => $objectData['embeddings']] : []),
             ]
         );
     }

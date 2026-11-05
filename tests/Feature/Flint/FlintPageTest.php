@@ -350,6 +350,45 @@ class FlintPageTest extends TestCase
     }
 
     #[Test]
+    public function money_routines_can_have_their_own_driver(): void
+    {
+        Volt::test('flint.index')
+            ->set('drivers.money_weekly', 'webhook')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSee('Money weekly check')
+            ->assertSee('Money monthly close');
+
+        $this->assertSame('webhook', $this->user->refresh()->settings['flint']['drivers']['money_weekly']);
+    }
+
+    #[Test]
+    public function the_money_switches_are_saved_from_the_page(): void
+    {
+        Volt::test('flint.index')
+            ->assertSet('moneyWeeklyEnabled', false)
+            ->set('moneyWeeklyEnabled', true)
+            ->call('save')
+            ->assertDispatched('save-flint-schedules');
+
+        $settings = $this->user->refresh()->settings['flint'];
+        $this->assertTrue($settings['money_weekly_enabled']);
+        $this->assertFalse($settings['money_close_enabled']);
+    }
+
+    #[Test]
+    public function every_routine_has_a_card_with_run_options(): void
+    {
+        Volt::test('flint.index')
+            ->assertSee('Morning briefing')
+            ->assertSee('Evening briefing')
+            ->assertSee('Money monthly close')
+            ->assertSee('Run with Webhook')
+            ->assertSee('Run with OpenAI')
+            ->assertDontSee('Digest schedule');
+    }
+
+    #[Test]
     public function an_unknown_driver_is_rejected(): void
     {
         Volt::test('flint.index')
@@ -397,6 +436,38 @@ class FlintPageTest extends TestCase
         $this->assertTrue($settings['news_roundup_enabled']);
         $this->assertArrayNotHasKey('digests_enabled', $settings);
         $this->assertSame('keep me', $settings['some_other_key']);
+    }
+
+    #[Test]
+    public function it_shows_cards_for_the_metric_events_a_paragraph_links_to(): void
+    {
+        $oura = Integration::factory()->create(['user_id' => $this->user->id, 'service' => 'oura']);
+        $score = Event::factory()->create([
+            'integration_id' => $oura->id,
+            'service' => 'oura',
+            'domain' => 'health',
+            'action' => 'had_sleep_score',
+            'value' => 66,
+            'value_multiplier' => 1,
+            'value_unit' => 'percent',
+        ]);
+        $sleep = Event::factory()->create([
+            'integration_id' => $oura->id,
+            'service' => 'oura',
+            'domain' => 'health',
+            'action' => 'slept_for',
+            'value' => 28500,
+            'value_multiplier' => 1,
+            'value_unit' => 'seconds',
+        ]);
+
+        $this->createDigest(['summary' => "Good morning.\n\nYou had [7h55 of sleep](https://spark.cronx.co/events/{$sleep->id}) "
+            . "and a [sleep score of 66](https://spark.cronx.co/events/{$score->id})."]);
+
+        Volt::test('flint.index')
+            ->set('activeTab', 'today')
+            ->assertSeeInOrder(['Good morning.', 'Sleep', '7h 55m', 'Sleep score', '66'])
+            ->assertSee(route('events.show', $score->id), false);
     }
 
     private function createDigest(array $metadata = [], ?Carbon $time = null): Event

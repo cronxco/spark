@@ -41,10 +41,10 @@ class DeleteOrphanedObjectsBatchJob extends BaseBatchDeletionJob
 
     private function findOrphanedObjects(User $user)
     {
-        // Find objects that are no longer referenced by any events
+        // These are force-deleted, so an object that is still linked through a
+        // relationship (a place, linked URL or Flint note) must not count.
         return EventObject::where('user_id', $user->id)
-            ->whereDoesntHave('actorEvents')
-            ->whereDoesntHave('targetEvents')
+            ->unreferenced()
             ->get();
     }
 }

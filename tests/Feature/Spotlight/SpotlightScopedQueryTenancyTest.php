@@ -118,6 +118,27 @@ class SpotlightScopedQueryTenancyTest extends TestCase
         $this->assertCount(0, $this->runWithToken(IntegrationObjectsQuery::class, $bobsEvent->integration_id));
     }
 
+    /**
+     * spark#1032: the query ordered by a `block_time` column that doesn't
+     * exist on `blocks`, so selecting an integration threw a SQL error.
+     */
+    #[Test]
+    public function integration_blocks_lists_your_own_blocks_newest_first(): void
+    {
+        $event = $this->eventFor($this->alice);
+        Block::factory()->create(['event_id' => $event->id, 'title' => 'Undated', 'time' => null]);
+        Block::factory()->create(['event_id' => $event->id, 'title' => 'Older', 'time' => now()->subMonth()]);
+        Block::factory()->create(['event_id' => $event->id, 'title' => 'Newer', 'time' => now()->subDay()]);
+
+        $this->actingAs($this->alice);
+
+        $titles = collect($this->runWithToken(IntegrationBlocksQuery::class, $event->integration_id))
+            ->map(fn (object $result): ?string => $this->resultTitle($result))
+            ->all();
+
+        $this->assertSame(['Newer', 'Older', 'Undated'], $titles);
+    }
+
     #[Test]
     public function metric_token_queries_ignore_another_users_metric(): void
     {
@@ -194,6 +215,22 @@ class SpotlightScopedQueryTenancyTest extends TestCase
         };
 
         return ($this->callable($queryClass::make()))('', $token);
+    }
+
+    /**
+     * Read a SpotlightResult's title, whether the package exposes it through
+     * an accessor or only as a property.
+     */
+    private function resultTitle(object $result): ?string
+    {
+        if (method_exists($result, 'getTitle')) {
+            return $result->getTitle();
+        }
+
+        $property = (new ReflectionObject($result))->getProperty('title');
+        $property->setAccessible(true);
+
+        return $property->getValue($result);
     }
 
     /**

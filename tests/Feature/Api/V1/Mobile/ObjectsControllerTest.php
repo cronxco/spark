@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
+use App\Models\Relationship;
 use App\Models\User;
 use App\Support\SparkAbility;
 use Carbon\Carbon;
@@ -78,6 +79,49 @@ class ObjectsControllerTest extends TestCase
             ->assertJsonPath('id', $object->id)
             ->assertJsonPath('title', 'Test Shop')
             ->assertJsonStructure(['id', 'concept', 'type', 'title', 'recent_events']);
+    }
+
+    #[Test]
+    public function person_timeline_returns_tagged_events_and_a_calendar(): void
+    {
+        $person = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'person', 'type' => 'person', 'title' => 'Dan']);
+        $event = Event::factory()->create(['integration_id' => $this->integration->id, 'time' => '2026-10-05 10:00:00']);
+        Relationship::create([
+            'user_id' => $this->user->id,
+            'from_type' => EventObject::class,
+            'from_id' => $person->id,
+            'to_type' => Event::class,
+            'to_id' => $event->id,
+            'type' => 'with',
+        ]);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->getJson("/api/v1/mobile/people/{$person->id}/timeline?month=2026-10")
+            ->assertOk()
+            ->assertJsonPath('event_count', 1)
+            ->assertJsonPath('events.0.id', $event->id)
+            ->assertJsonPath('calendar.2026-10-05', 1);
+
+        $this->getJson("/api/v1/mobile/people/{$person->id}/timeline?date=2026-10-06")
+            ->assertOk()
+            ->assertJsonCount(0, 'events');
+
+        $merchant = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'merchant']);
+        $this->getJson("/api/v1/mobile/people/{$merchant->id}/timeline")->assertNotFound();
+    }
+
+    #[Test]
+    public function person_calendar_does_not_overflow_a_shorter_month_on_the_31st(): void
+    {
+        $this->travelTo(Carbon::parse('2026-01-31 12:00:00'));
+        $person = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'person', 'type' => 'person']);
+        Event::factory()->create(['integration_id' => $this->integration->id, 'target_id' => $person->id, 'time' => '2026-02-05 12:00:00']);
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->getJson("/api/v1/mobile/people/{$person->id}/timeline?month=2026-02")
+            ->assertOk()
+            ->assertJsonPath('month', '2026-02')
+            ->assertJsonPath('calendar.2026-02-05', 1);
     }
 
     #[Test]

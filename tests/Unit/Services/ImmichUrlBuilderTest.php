@@ -37,7 +37,7 @@ class ImmichUrlBuilderTest extends FrameworkTestCase
     {
         $url = $this->builder->getThumbnailUrl('https://immich.example.com', 'asset-123');
 
-        $this->assertEquals('https://immich.example.com/api/asset/thumbnail/asset-123?size=preview', $url);
+        $this->assertEquals('https://immich.example.com/api/assets/asset-123/thumbnail?size=preview', $url);
     }
 
     #[Test]
@@ -45,7 +45,7 @@ class ImmichUrlBuilderTest extends FrameworkTestCase
     {
         $url = $this->builder->getThumbnailUrl('https://immich.example.com', 'asset-123', 'thumbnail');
 
-        $this->assertEquals('https://immich.example.com/api/asset/thumbnail/asset-123?size=thumbnail', $url);
+        $this->assertEquals('https://immich.example.com/api/assets/asset-123/thumbnail?size=thumbnail', $url);
     }
 
     #[Test]
@@ -53,7 +53,7 @@ class ImmichUrlBuilderTest extends FrameworkTestCase
     {
         $url = $this->builder->getThumbnailUrl('https://immich.example.com/', 'asset-123', 'preview');
 
-        $this->assertEquals('https://immich.example.com/api/asset/thumbnail/asset-123?size=preview', $url);
+        $this->assertEquals('https://immich.example.com/api/assets/asset-123/thumbnail?size=preview', $url);
     }
 
     #[Test]
@@ -117,6 +117,6 @@ class ImmichUrlBuilderTest extends FrameworkTestCase
     {
         $url = $this->builder->getThumbnailUrl('https://example.com/immich/', 'asset-123', 'preview');
 
-        $this->assertEquals('https://example.com/immich/api/asset/thumbnail/asset-123?size=preview', $url);
+        $this->assertEquals('https://example.com/immich/api/assets/asset-123/thumbnail?size=preview', $url);
     }
 }

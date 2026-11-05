@@ -2,11 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Integrations\Outline\OutlineApi;
 use App\Jobs\Outline\OutlineData;
+use App\Jobs\Outline\PinTodayDayNote;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\Integration;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -136,7 +140,7 @@ class OutlineIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function moved_tasks_with_same_titles_can_be_recreated_after_soft_delete(): void
+    public function moved_tasks_keep_their_ids_without_creating_tombstones(): void
     {
         $integration = $this->makeIntegration();
 
@@ -174,10 +178,103 @@ class OutlineIntegrationTest extends TestCase
 
         $blocks = $event->blocks()->withTrashed()->get();
 
-        $this->assertSame(4, $blocks->count());
+        $this->assertSame(2, $blocks->count());
         $this->assertSame(2, $blocks->whereNull('deleted_at')->count());
-        $this->assertSame(2, $blocks->whereNotNull('deleted_at')->count());
+        $this->assertSame(0, $blocks->whereNotNull('deleted_at')->count());
         $this->assertSame(['Other', 'Reused'], $blocks->whereNull('deleted_at')->pluck('title')->sort()->values()->all());
+    }
+
+    #[Test]
+    public function empty_outline_pages_stop_even_with_a_next_path(): void
+    {
+        Http::fake([
+            '*' => Http::response(['data' => [], 'pagination' => ['nextPath' => '/api/documents.search?offset=100']], 200),
+        ]);
+        $api = new OutlineApi($this->makeIntegration());
+        $this->assertSame([], $api->searchDocumentsLimited(['query' => '2026-10']));
+        Http::assertSentCount(1);
+    }
+
+    #[Test]
+    public function outline_total_stops_before_requesting_empty_pages(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'data' => [['id' => 'doc']],
+                'pagination' => ['nextPath' => '/api/documents.search?offset=100', 'offset' => 0, 'limit' => 100, 'total' => 31],
+            ], 200),
+        ]);
+
+        $api = new OutlineApi($this->makeIntegration());
+        $this->assertCount(1, $api->searchDocumentsLimited(['query' => '2026-10']));
+        Http::assertSentCount(1);
+    }
+
+    #[Test]
+    public function pin_job_joins_sibling_documents_and_removes_only_old_daynote_pins(): void
+    {
+        $integration = $this->makeIntegration();
+        $title = now('UTC')->format('Y-m-d: l');
+        Http::fake([
+            '*documents.search*' => Http::response(['data' => [['document' => ['id' => 'today', 'title' => $title]]]], 200),
+            '*pins.list*' => Http::response(['data' => [
+                'pins' => [
+                    ['id' => 'old-pin', 'documentId' => 'old'],
+                    ['id' => 'project-pin', 'documentId' => 'project'],
+                ],
+                'documents' => [
+                    ['id' => 'old', 'title' => '2026-01-01: Thursday'],
+                    ['id' => 'project', 'title' => 'Spark Product'],
+                ],
+            ]], 200),
+            '*pins.delete*' => Http::response(['success' => true], 200),
+            '*pins.create*' => Http::response(['data' => ['id' => 'today-pin']], 200),
+        ]);
+
+        (new PinTodayDayNote($integration))->handle();
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'pins.delete') && $request['id'] === 'old-pin');
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'pins.delete') && $request['id'] === 'project-pin');
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'pins.create') && $request['documentId'] === 'today');
+        $this->assertNotEmpty($integration->fresh()->configuration['last_pin_success_at']);
+    }
+
+    #[Test]
+    public function failed_pin_creation_is_rethrown_and_does_not_record_success(): void
+    {
+        $integration = $this->makeIntegration();
+        Http::fake([
+            '*documents.search*' => Http::response(['data' => [['document' => ['id' => 'today', 'title' => now('UTC')->format('Y-m-d: l')]]]], 200),
+            '*pins.list*' => Http::response(['data' => ['pins' => [], 'documents' => []]], 200),
+            '*pins.create*' => Http::response(['error' => 'maximum_pins'], 400),
+        ]);
+
+        try {
+            (new PinTodayDayNote($integration))->handle();
+            $this->fail('Pin creation errors must fail the job.');
+        } catch (Exception $e) {
+            $this->assertStringContainsString('Outline API error: 400', $e->getMessage());
+        }
+
+        $config = $integration->fresh()->configuration;
+        $this->assertNotEmpty($config['last_pin_attempt_at']);
+        $this->assertArrayNotHasKey('last_pin_success_at', $config);
+    }
+
+    #[Test]
+    public function duplicate_titles_stay_separate_and_markers_preserve_identity_on_rename(): void
+    {
+        $integration = $this->makeIntegration();
+        $doc = ['id' => 'duplicate-doc', 'title' => 'Checklist', 'collectionId' => 'col', 'createdAt' => now()->toIso8601String(),
+            'text' => "- [ ] Same title\n- [ ] Same title"];
+        (new OutlineData($integration, ['documents' => [$doc]]))->handle();
+        $blocks = Block::where('metadata->outline_document_id', 'duplicate-doc')->get();
+        $this->assertCount(2, $blocks);
+        $first = $blocks->first();
+        $doc['text'] = '- [ ] Renamed [Open in Spark](' . route('knowledge.task', $first->id) . ")\n- [ ] Same title";
+        (new OutlineData($integration, ['documents' => [$doc]]))->handle();
+        $this->assertSame('Renamed', $first->fresh()->title);
+        $this->assertSame(2, Block::where('metadata->outline_document_id', 'duplicate-doc')->count());
     }
 
     private function makeIntegration(array $config = []): Integration

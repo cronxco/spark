@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Relationship;
 use App\Models\User;
+use App\Services\Knowledge\TaskService;
 use App\Services\Mobile\BlockLookup;
 use App\Services\Mobile\EventLookup;
 use App\Services\Mobile\ObjectLookup;
@@ -14,6 +15,7 @@ use App\Services\RelationshipTypeRegistry;
 use App\Services\SourceFieldGuard;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Spatie\Tags\Tag;
 
 /**
@@ -70,6 +72,9 @@ class EntityMutationService
         if (! $object) {
             return null;
         }
+        if ($object->concept === 'knowledge' && in_array($object->type, ['project', 'task_series', 'task_proposal'], true)) {
+            throw ValidationException::withMessages(['title' => 'Manage this item in Knowledge.']);
+        }
         $this->sourceFields->assertEditable($object, $attributes);
         $object->update($this->only($attributes, ['title', 'type', 'concept', 'url']));
 
@@ -83,6 +88,9 @@ class EntityMutationService
             return null;
         }
         $this->sourceFields->assertEditable($block, $attributes);
+        if (in_array($block->block_type, TaskService::TYPES, true)) {
+            throw ValidationException::withMessages(['title' => 'Manage this task in Knowledge so its history and source stay in sync.']);
+        }
         $block->update($this->only($attributes, ['title', 'block_type', 'value', 'value_multiplier', 'value_unit', 'time', 'url']));
 
         return $block->fresh(['event.integration', 'event.actor', 'event.target']);
@@ -132,7 +140,7 @@ class EntityMutationService
         $toKind = (string) ($attributes['to_kind'] ?? '');
         $to = $this->entity($user, $toKind, (string) ($attributes['to_id'] ?? ''));
         $type = (string) ($attributes['type'] ?? '');
-        if (! $from || ! $to || ! isset(RelationshipTypeRegistry::getTypes()[$type]) || ($from::class === $to::class && $from->id === $to->id)) {
+        if (! $from || ! $to || ! isset(RelationshipTypeRegistry::getTypes()[$type]) || ! (RelationshipTypeRegistry::getTypes()[$type]['user_creatable'] ?? true) || ($from::class === $to::class && $from->id === $to->id)) {
             return null;
         }
 
@@ -150,7 +158,7 @@ class EntityMutationService
     public function deleteRelationship(User $user, string $id): bool
     {
         $relationship = Relationship::query()->where('user_id', $user->id)->find($id);
-        if (! $relationship) {
+        if (! $relationship || ! (RelationshipTypeRegistry::getTypes()[$relationship->type]['user_creatable'] ?? true)) {
             return false;
         }
         $relationship->from?->touch();
@@ -188,6 +196,7 @@ class EntityMutationService
     public function relationshipTypes(): array
     {
         return collect(RelationshipTypeRegistry::getTypes())
+            ->filter(fn (array $config) => $config['user_creatable'] ?? true)
             ->map(fn (array $config, string $type) => [
                 'type' => $type,
                 'display_name' => $config['display_name'],

@@ -82,7 +82,9 @@ class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
 
         // Get all pins ONCE
         $pinsData = $api->listPins(100);
-        $pins = (array) ($pinsData['pins'] ?? ($pinsData['data'] ?? []));
+        $pinPayload = $pinsData['data'] ?? $pinsData;
+        $pins = (array) ($pinPayload['pins'] ?? []);
+        $documents = collect($pinPayload['documents'] ?? [])->keyBy('id');
 
         Log::info('PinTodayDayNote: loaded pins', [
             'total_pins' => count($pins),
@@ -95,7 +97,7 @@ class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
         foreach ($pins as $pin) {
             $docId = $pin['documentId'] ?? null;
             $pinId = $pin['id'] ?? null;
-            $doc = $pin['document'] ?? null; // Use embedded data!
+            $doc = $pin['document'] ?? $documents->get($docId);
 
             if (! $docId || ! $pinId || ! $doc) {
                 continue;
@@ -163,7 +165,7 @@ class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
                 'max_allowed' => $maxPinsAllowed,
             ]);
 
-            return;
+            throw new Exception('Outline pin limit reached; unable to pin today note');
         }
 
         // Only pin if not already pinned
@@ -192,12 +194,7 @@ class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
                         'result' => $pinResult,
                     ]);
 
-                    // Track failed attempt
-                    $integration->update([
-                        'configuration' => array_merge($integration->configuration ?? [], [
-                            'last_pin_attempt_at' => now()->toISOString(),
-                        ]),
-                    ]);
+                    throw new Exception('Outline rejected pin creation');
                 }
             } catch (Exception $e) {
                 Log::error('PinTodayDayNote: error pinning today note', [
@@ -211,6 +208,8 @@ class PinTodayDayNote implements ShouldBeUnique, ShouldQueue
                         'last_pin_attempt_at' => now()->toISOString(),
                     ]),
                 ]);
+
+                throw $e;
             }
         } else {
             Log::info('PinTodayDayNote: skipping pin (already pinned)');

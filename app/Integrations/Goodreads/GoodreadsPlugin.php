@@ -31,7 +31,7 @@ class GoodreadsPlugin extends ManualPlugin
 
     public static function getDescription(): string
     {
-        return 'Track your reading activity from Goodreads RSS feeds.';
+        return 'Track your Goodreads shelves and reading progress using your signed-in browser session.';
     }
 
     public static function getGroupConfigurationSchema(): array
@@ -43,11 +43,12 @@ class GoodreadsPlugin extends ManualPlugin
                 'required' => true,
                 'description' => 'Your Goodreads user ID (found in your profile URL)',
             ],
-            'api_key' => [
+            'source_timezone' => [
                 'type' => 'string',
-                'label' => 'RSS API Key',
+                'label' => 'Goodreads Display Timezone',
                 'required' => true,
-                'description' => 'Your Goodreads RSS feed API key',
+                'default' => 'America/Los_Angeles',
+                'description' => 'Timezone used by dates displayed on Goodreads (for example America/Los_Angeles or Europe/London). This can differ from your home timezone.',
             ],
         ];
     }
@@ -181,20 +182,16 @@ class GoodreadsPlugin extends ManualPlugin
         ];
     }
 
-    /**
-     * Build RSS URL for shelf feeds
-     */
-    public static function buildShelfUrl(string $userId, string $apiKey, string $shelf): string
+    public static function buildShelfPageUrl(string $userId, string $shelf, int $page = 1): string
     {
-        return "https://www.goodreads.com/review/list_rss/{$userId}?key={$apiKey}&shelf={$shelf}";
+        return 'https://www.goodreads.com/review/list/' . rawurlencode($userId) . '?' . http_build_query([
+            'shelf' => $shelf, 'sort' => 'date_updated', 'order' => 'd', 'view' => 'table', 'per_page' => 50, 'page' => $page,
+        ]);
     }
 
-    /**
-     * Build RSS URL for user updates feed
-     */
-    public static function buildUpdatesUrl(string $userId, string $apiKey): string
+    public static function buildStatusPageUrl(string $userId, int $page = 1): string
     {
-        return "https://www.goodreads.com/user/updates_rss/{$userId}?key={$apiKey}";
+        return 'https://www.goodreads.com/user_status/list/' . rawurlencode($userId) . '?page=' . $page;
     }
 
     /**
@@ -238,6 +235,11 @@ class GoodreadsPlugin extends ManualPlugin
         if (isset($initialConfig['api_key'])) {
             $groupConfig['api_key'] = $initialConfig['api_key'];
             unset($instanceConfig['api_key']);
+        }
+
+        if (isset($initialConfig['source_timezone'])) {
+            $groupConfig['source_timezone'] = $initialConfig['source_timezone'];
+            unset($instanceConfig['source_timezone']);
         }
 
         // Update group auth_metadata if we have group-level config
