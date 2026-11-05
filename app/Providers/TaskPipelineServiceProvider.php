@@ -158,9 +158,9 @@ class TaskPipelineServiceProvider extends ServiceProvider
             queue: 'tasks',
             priority: 80,
             runOnCreate: true,
-            runOnUpdate: false,
+            runOnUpdate: true, // Re-judge when the value changes, so a daily aggregate that fills in later clears its early anomaly
             shouldRun: function ($model) {
-                if (! $model->value || ! $model->value_unit) {
+                if ($model->value === null || ! $model->value_unit) {
                     return false;
                 }
 

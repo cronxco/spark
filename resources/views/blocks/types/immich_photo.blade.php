@@ -2,6 +2,8 @@
 
 @php
 $isVideo = ($block->metadata['type'] ?? null) === 'VIDEO';
+$timestamp = $block->metadata['timestamp'] ?? $block->time;
+$timestamp = $timestamp ? \Carbon\Carbon::parse($timestamp) : null;
 $thumbnailUrl = $block->metadata['thumbnail_url'] ?? null;
 $isFavorite = $block->metadata['is_favorite'] ?? false;
 $people = $block->metadata['people'] ?? [];
@@ -9,6 +11,9 @@ $camera = collect([$block->metadata['camera_make'] ?? null, $block->metadata['ca
 @endphp
 
 <x-block-card.shell :block="$block" :label="$isVideo ? 'Video' : 'Photo'">
+    @if ($timestamp)
+        <x-uk-date :date="$timestamp" :show-time="true" class="text-xs text-base-content/70" />
+    @endif
     <div class="w-full h-48 rounded-lg overflow-hidden bg-domain-media/10 flex items-center justify-center">
         @if ($thumbnailUrl)
             <img src="{{ $thumbnailUrl }}" alt="{{ $block->title }}" class="w-full h-full object-cover" loading="lazy">

@@ -70,7 +70,7 @@
                         <x-icon name="fas.ellipsis-vertical" class="w-3.5 h-3.5" />
                     </button>
                     <ul tabindex="0" class="dropdown-content menu z-20 mt-1 w-48 rounded-box bg-base-100 p-1 font-normal text-sm shadow">
-                        @if ($block->event)
+                        @if ($block->event?->getKey())
                             <li><a href="{{ route('events.show', $block->event) }}" wire:navigate>Open event</a></li>
                         @endif
                         <li><a href="{{ route('blocks.show', $block) }}" wire:navigate>Open block</a></li>

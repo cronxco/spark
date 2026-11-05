@@ -275,7 +275,1337 @@ if (! function_exists('format_money')) {
     function format_money(float|int $amount, ?string $currency = null, int $decimals = 2): string
     {
         $currency = strtoupper($currency ?: 'GBP');
-        $symbol = ['GBP' => '£', 'USD' => '$', 'EUR' => '€', 'JPY' => '¥'][$currency] ?? $currency . ' ';
+        $symbol = ['GBP' => '£', 'USD' => '
+     *
+     * Improvements:
+     * - 'percentage' unit replaced with '%'
+     * - Currency codes (GBP, USD, EUR) replaced with symbols (£, $, €)
+     * - Time in seconds converted to duration format (e.g., 2h5m, 2m30s)
+     * - Space added between value and unit for other cases
+     *
+     * @param  float|int  $formattedValue  The formatted_value (after division by value_multiplier)
+     * @param  string|null  $unit  The value_unit
+     * @param  float|int|null  $valueMultiplier  The value_multiplier (for decimal places)
+     * @return string The formatted value for display
+     */
+    function format_block_value_display(
+        float|int $formattedValue,
+        ?string $unit,
+        float|int|null $valueMultiplier = null
+    ): string {
+        // Determine decimal places
+        $decimals = ($valueMultiplier && $valueMultiplier > 1) ? 2 : 0;
+        $numericValue = number_format($formattedValue, $decimals);
+
+        // No unit - just return the value
+        if (! $unit) {
+            return $numericValue;
+        }
+
+        // Handle percent
+        if (strtolower($unit) === 'percent') {
+            return $numericValue . '%';
+        }
+
+        // Handle currency codes
+        $currencySymbols = [
+            'GBP' => '£',
+            'USD' => '$',
+            'EUR' => '€',
+        ];
+
+        if (isset($currencySymbols[$unit])) {
+            return $currencySymbols[$unit] . $numericValue;
+        }
+
+        // Handle time in seconds - convert to duration format
+        if (strtolower($unit) === 'seconds' || strtolower($unit) === 's') {
+            return format_duration($formattedValue);
+        }
+
+        // Default: space between value and unit
+        return $numericValue . ' ' . $unit;
+    }
+}
+
+if (! function_exists('format_event_value_display')) {
+    /**
+     * Format an event's or block's value for display using plugin-defined formatters.
+     *
+     * @param  mixed  $value  The formatted_value (after division by value_multiplier)
+     * @param  string|null  $unit  The value_unit
+     * @param  string|null  $service  The service identifier (e.g., 'oura', 'monzo')
+     * @param  string|null  $action  The action type (for events) or block_type (for blocks)
+     * @param  string|null  $typeKey  Either 'action' or 'block' to know which config to check
+     * @return string The formatted value for display
+     */
+    function format_event_value_display(
+        mixed $value,
+        ?string $unit,
+        ?string $service = null,
+        ?string $action = null,
+        ?string $typeKey = 'action'
+    ): string {
+        if ($value === null) {
+            return '';
+        }
+
+        // Try to get custom formatter from plugin definition
+        if ($service && $action) {
+            $pluginClass = PluginRegistry::getPlugin($service);
+            if ($pluginClass) {
+                // Get the appropriate type configuration
+                $types = $typeKey === 'block'
+                    ? $pluginClass::getBlockTypes()
+                    : $pluginClass::getActionTypes();
+
+                if (isset($types[$action]['value_formatter'])) {
+                    $formatter = $types[$action]['value_formatter'];
+
+                    // Render the Blade template with available context
+                    try {
+                        $rendered = Blade::render(
+                            $formatter,
+                            [
+                                'value' => $value,
+                                'unit' => $unit ?? '',
+                            ]
+                        );
+
+                        return trim($rendered);
+                    } catch (Throwable $e) {
+                        // Log error and fall through to default formatting
+                        Log::warning('Failed to render value_formatter', [
+                            'service' => $service,
+                            'action' => $action,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+                    }
+                }
+            }
+        }
+
+        // Default fallback: simple concatenation. Ratio and percent units
+        // attach to the number ("4/5", "80%"), everything else gets a space.
+        if (! $unit) {
+            return (string) $value;
+        }
+
+        $separator = str_starts_with($unit, '/') || $unit === '%' ? '' : ' ';
+
+        return (string) $value . $separator . $unit;
+    }
+}
+
+if (! function_exists('format_event_display_value')) {
+    /**
+     * Duration-aware display formatter for event values.
+     *
+     * Extends format_event_value_display() by first checking whether the unit
+     * is a duration (ms/s/m/h and aliases) and converting to a compact string
+     * like "2h5m" before falling through to plugin Blade formatters. Both the
+     * webapp (Day::formatValueDisplay) and the mobile API resource call this
+     * so they can never diverge.
+     */
+    function format_event_display_value(mixed $value, ?string $unit, ?string $service = null, ?string $action = null): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        $durationUnits = [
+            'ms', 'millisecond', 'milliseconds',
+            's', 'sec', 'secs', 'second', 'seconds',
+            'm', 'min', 'mins', 'minute', 'minutes',
+            'h', 'hr', 'hrs', 'hour', 'hours',
+        ];
+
+        if ($unit && in_array(strtolower($unit), $durationUnits, true)) {
+            $u = strtolower($unit);
+            $numeric = (float) $value;
+
+            if (in_array($u, ['ms', 'millisecond', 'milliseconds'], true)) {
+                $seconds = $numeric / 1000.0;
+            } elseif (in_array($u, ['m', 'min', 'mins', 'minute', 'minutes'], true)) {
+                $seconds = $numeric * 60.0;
+            } elseif (in_array($u, ['h', 'hr', 'hrs', 'hour', 'hours'], true)) {
+                $seconds = $numeric * 3600.0;
+            } else {
+                $seconds = $numeric;
+            }
+
+            if ($seconds < 1) {
+                return ((int) round($seconds * 1000)) . 'ms';
+            }
+
+            return format_duration($seconds);
+        }
+
+        return format_event_value_display($value, $unit, $service, $action, 'action');
+    }
+}
+
+/**
+ * Sanitize headers for logging (remove sensitive data)
+ */
+if (! function_exists('sanitizeHeaders')) {
+    function sanitizeHeaders(array $headers): array
+    {
+        $sensitiveHeaders = ['authorization', 'x-api-key', 'x-auth-token', 'x-signature', 'x-hub-signature', 'cookie', 'set-cookie', 'x-webhook-secret', 'session-id'];
+        $sanitized = [];
+
+        foreach ($headers as $key => $value) {
+            $lowerKey = strtolower($key);
+            if (in_array($lowerKey, $sensitiveHeaders)) {
+                $sanitized[$key] = ['[REDACTED]'];
+            } elseif (is_array($value)) {
+                $sanitized[$key] = $value; // Headers are already arrays from Laravel
+            } else {
+                $sanitized[$key] = [$value];
+            }
+        }
+
+        return $sanitized;
+    }
+}
+
+/**
+ * Sanitize data for logging (remove sensitive data)
+ */
+if (! function_exists('sensitive_log_keys')) {
+    /**
+     * Field names whose value is a credential or secret wherever it appears.
+     *
+     * Shared by sanitizeData() and the Sentry redaction hooks so there is one
+     * list to maintain rather than two that drift apart.
+     *
+     * @return array<int, string>
+     */
+    function sensitive_log_keys(): array
+    {
+        return [
+            'password', 'token', 'secret', 'key', 'auth', 'signature', 'api_key',
+            'access_token', 'refresh_token', 'authorization', 'webhook_secret',
+            'server_url', 'cronxtools_url', 'you_mcp_url', 'you_mcp_key', 'cookies',
+            // `plaintext` is the one-time Sanctum bearer token returned by
+            // ApiTokensController::store.
+            'plaintext', 'plain_text_token', 'bearer', 'access', 'refresh', 'id_token',
+            'iban', 'bban', 'account_number', 'sort_code', 'maskedpan', 'resourceid',
+        ];
+    }
+}
+
+if (! function_exists('is_log_safe_token_key')) {
+    /**
+     * Keys that contain "token" but hold pagination cursors or usage counts,
+     * not credentials. Keeping them visible lets pagination be debugged.
+     */
+    function is_log_safe_token_key(string $lowerKey): bool
+    {
+        return (bool) preg_match('/^(?:next_?(?:page_?|sync_?)?token|page_?token|sync_?token|(?:prompt|completion|total|input|output|cached|reasoning)_tokens)$/', $lowerKey);
+    }
+}
+
+if (! function_exists('sanitizeData')) {
+    function sanitizeData(array $data): array
+    {
+        $sensitiveKeys = sensitive_log_keys();
+        $sanitized = [];
+
+        foreach ($data as $key => $value) {
+            $lowerKey = strtolower((string) $key);
+            if (in_array($lowerKey, $sensitiveKeys, true) || (preg_match('/(?:token|password|secret|signature)/i', $lowerKey) && ! is_log_safe_token_key($lowerKey))) {
+                $sanitized[$key] = '[REDACTED]';
+            } elseif (is_array($value)) {
+                $sanitized[$key] = sanitizeData($value);
+            } elseif (is_string($value)) {
+                $sanitized[$key] = redact_sensitive_urls($value);
+            } else {
+                $sanitized[$key] = $value;
+            }
+        }
+
+        return $sanitized;
+    }
+}
+
+/**
+ * Redact credentials that live inside a URL rather than a header.
+ */
+if (! function_exists('redact_sensitive_urls')) {
+    /**
+     * The CronxTools MCP URL carries its bearer token in the URL itself, so it
+     * is a credential wherever it appears — including embedded in a longer
+     * string such as a serialised request body.
+     */
+    function redact_sensitive_urls(string $value): string
+    {
+        foreach (['cronxtools_url', 'you_mcp_url'] as $key) {
+            $value = redact_sensitive_url($value, config("services.flint_routine.{$key}"));
+        }
+
+        return $value;
+    }
+}
+
+if (! function_exists('redact_sensitive_url')) {
+    /**
+     * Redact every appearance of one MCP server URL, plain or encoded.
+     */
+    function redact_sensitive_url(string $value, mixed $url): string
+    {
+        if (! is_string($url) || $url === '') {
+            return $value;
+        }
+
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return str_replace($url, '[REDACTED_MCP_URL]', $value);
+        }
+
+        $authority = preg_quote($parts['host'], '~')
+            . (isset($parts['port']) ? ':' . (int) $parts['port'] : '');
+        $encodedAuthority = preg_quote($parts['host'], '~')
+            . (isset($parts['port']) ? '%3A' . (int) $parts['port'] : '');
+        $scheme = preg_quote($parts['scheme'], '~');
+        $patterns = [
+            '~' . $scheme . '://' . $authority . '(?:/[^\s"\'<>]*)?~i',
+            '~' . $scheme . ':\\\\/\\\\/' . $authority . '(?:\\\\/[^\s"\'<>]*)?~i',
+            '~' . $scheme . '%3A%2F%2F' . $encodedAuthority . '(?:%2F[^\s&"\'<>]*)?~i',
+        ];
+
+        return preg_replace($patterns, '[REDACTED_MCP_URL]', $value) ?? $value;
+    }
+}
+
+if (! function_exists('redact_sensitive_data')) {
+    /**
+     * Redact secrets from anything on its way to Sentry.
+     *
+     * Two passes: values under a credential-named key are replaced outright,
+     * and every remaining string is scanned for credential-bearing URLs. The
+     * key-based pass matters because the URL scan alone is blind to a bearer
+     * token sitting in a field called `plaintext`.
+     */
+    function redact_sensitive_data(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            return redact_sensitive_urls($value);
+        }
+        if (is_array($value)) {
+            $sensitiveKeys = sensitive_log_keys();
+
+            foreach ($value as $key => $item) {
+                $value[$key] = in_array(strtolower((string) $key), $sensitiveKeys, true)
+                    ? '[REDACTED]'
+                    : redact_sensitive_data($item);
+            }
+        }
+
+        return $value;
+    }
+}
+
+if (! function_exists('redact_sentry_event')) {
+    function redact_sentry_event(Event $event): Event
+    {
+        $event->setRequest(redact_sensitive_data($event->getRequest()));
+        $event->setExtra(redact_sensitive_data($event->getExtra()));
+        foreach ($event->getContexts() as $name => $context) {
+            $event->setContext($name, redact_sensitive_data($context));
+        }
+        if ($event->getMessage() !== null) {
+            $event->setMessage(
+                redact_sensitive_urls($event->getMessage()),
+                redact_sensitive_data($event->getMessageParams()),
+                $event->getMessageFormatted() ? redact_sensitive_urls($event->getMessageFormatted()) : null,
+            );
+        }
+        if ($event->getTransaction() !== null) {
+            $event->setTransaction(redact_sensitive_urls($event->getTransaction()));
+        }
+        foreach ($event->getExceptions() as $exception) {
+            $exception->setValue(redact_sensitive_urls($exception->getValue()));
+        }
+
+        $breadcrumbs = array_map(function (Breadcrumb $breadcrumb): Breadcrumb {
+            $copy = $breadcrumb;
+            if ($breadcrumb->getMessage() !== null) {
+                $copy = $copy->withMessage(redact_sensitive_urls($breadcrumb->getMessage()));
+            }
+            foreach ($breadcrumb->getMetadata() as $key => $metadata) {
+                $copy = $copy->withMetadata($key, in_array(strtolower((string) $key), sensitive_log_keys(), true)
+                    ? '[REDACTED]'
+                    : redact_sensitive_data($metadata));
+            }
+
+            return $copy;
+        }, $event->getBreadcrumbs());
+        $event->setBreadcrumb($breadcrumbs);
+
+        foreach ($event->getSpans() as $span) {
+            if ($span->getDescription() !== null) {
+                $span->setDescription(redact_sensitive_urls($span->getDescription()));
+            }
+            $span->setData(redact_sensitive_data($span->getData()));
+        }
+
+        return $event;
+    }
+}
+
+if (! function_exists('redact_sentry_log')) {
+    function redact_sentry_log(SentryLog $log): SentryLog
+    {
+        $log->setBody(redact_sensitive_urls($log->getBody()));
+        $sensitiveKeys = sensitive_log_keys();
+        foreach ($log->attributes()->all() as $key => $value) {
+            $log->setAttribute(
+                $key,
+                in_array(strtolower((string) $key), $sensitiveKeys, true)
+                    ? '[REDACTED]'
+                    : redact_sensitive_data($value),
+            );
+        }
+
+        return $log;
+    }
+}
+
+if (! function_exists('redact_sentry_breadcrumb')) {
+    function redact_sentry_breadcrumb(Breadcrumb $breadcrumb): Breadcrumb
+    {
+        $copy = $breadcrumb;
+        if ($breadcrumb->getMessage() !== null) {
+            $copy = $copy->withMessage(redact_sensitive_urls($breadcrumb->getMessage()));
+        }
+        foreach ($breadcrumb->getMetadata() as $key => $value) {
+            $copy = $copy->withMetadata($key, in_array(strtolower((string) $key), sensitive_log_keys(), true)
+                ? '[REDACTED]'
+                : redact_sensitive_data($value));
+        }
+
+        return $copy;
+    }
+}
+
+/**
+ * Generate API log filename with new format: api_{service}_{first_block_of_uuid}.log
+ */
+if (! function_exists('generate_api_log_filename')) {
+    function generate_api_log_filename(string $service, string $integrationId = '', bool $perInstance = false): string
+    {
+        $serviceSlug = str_replace([' ', '-', '_'], '_', $service);
+
+        if ($perInstance && ! empty($integrationId)) {
+            // Extract first block of UUID (first 8 characters before first hyphen)
+            $uuidBlock = explode('-', $integrationId)[0] ?? $integrationId;
+
+            return "api_{$serviceSlug}_{$uuidBlock}.log";
+        }
+
+        return "api_{$serviceSlug}.log";
+    }
+}
+
+if (! function_exists('get_integration_log_channel')) {
+    /**
+     * Get or create a dynamic log channel for a specific integration instance
+     *
+     * @param  string  $service  The service identifier (e.g., 'monzo', 'slack')
+     * @param  string  $integrationId  The integration ID
+     * @param  bool  $perInstance  Whether to create per-instance channels (true) or per-service (false)
+     * @return string The channel name to use
+     */
+    function get_integration_log_channel(string $service, string $integrationId = '', bool $perInstance = false): string
+    {
+        $baseConfig = [
+            'driver' => 'daily',
+            'level' => 'debug',
+            'days' => 2,
+            'replace_placeholders' => true,
+        ];
+
+        $filename = generate_api_log_filename($service, $integrationId, $perInstance);
+        $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
+
+        $baseConfig['path'] = storage_path('logs/' . $filename);
+
+        // Create the channel dynamically if it doesn't exist
+        if (! config('logging.channels.' . $channelName)) {
+            Log::build($baseConfig);
+        }
+
+        return $channelName;
+    }
+}
+
+if (! function_exists('log_integration_api_request')) {
+    /**
+     * Log an API request for a specific integration
+     * Logs to integration instance channel as debug (if enabled)
+     */
+    function log_integration_api_request(
+        string $service,
+        string $method,
+        string $endpoint,
+        array $headers = [],
+        array $data = [],
+        string $integrationId = '',
+        bool $perInstance = false
+    ): void {
+        // Try to load the integration (only if it looks like a valid UUID)
+        if (! empty($integrationId) && preg_match('/^[a-f0-9\-]{36}$/i', $integrationId)) {
+            $integration = Integration::find($integrationId);
+            if ($integration) {
+                log_to_integration($integration, 'debug', 'API Request', [
+                    'service' => $service,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'headers' => array_map(function ($header) {
+                        return is_array($header) ? $header : [$header];
+                    }, sanitizeHeaders($headers)),
+                    'data' => sanitizeData($data),
+                    'timestamp' => now()->toISOString(),
+                ]);
+
+                return;
+            }
+        }
+
+        // Fallback to old behavior if integration not found
+        $baseConfig = [
+            'driver' => 'daily',
+            'level' => 'debug',
+            'days' => 2,
+            'replace_placeholders' => true,
+        ];
+
+        $filename = generate_api_log_filename($service, $integrationId, $perInstance);
+        $channelName = pathinfo($filename, PATHINFO_FILENAME);
+        $baseConfig['path'] = storage_path('logs/' . $filename);
+
+        $logger = Log::build($baseConfig);
+
+        // If the logger is null (can happen in tests with spies), use the default Log facade
+        if (is_null($logger)) {
+            Log::debug('API Request', [
+                'service' => $service,
+                'integration_id' => $integrationId ?: null,
+                'method' => $method,
+                'endpoint' => $endpoint,
+                'headers' => array_map(function ($header) {
+                    return is_array($header) ? $header : [$header];
+                }, sanitizeHeaders($headers)),
+                'data' => sanitizeData($data),
+                'timestamp' => now()->toISOString(),
+            ]);
+
+            return;
+        }
+
+        $logger->debug('API Request', [
+            'service' => $service,
+            'integration_id' => $integrationId ?: null,
+            'method' => $method,
+            'endpoint' => $endpoint,
+            'headers' => array_map(function ($header) {
+                return is_array($header) ? $header : [$header];
+            }, sanitizeHeaders($headers)),
+            'data' => sanitizeData($data),
+            'timestamp' => now()->toISOString(),
+        ]);
+    }
+}
+
+if (! function_exists('sanitize_api_response_body')) {
+    /**
+     * Sanitize the complete response before truncation can make JSON invalid.
+     * Token endpoints and non-JSON bodies are omitted rather than logged raw.
+     */
+    function sanitize_api_response_body(string $endpoint, string $body): string
+    {
+        $path = parse_url($endpoint, PHP_URL_PATH) ?: $endpoint;
+        if (preg_match('~(?:^|/)(?:token|oauth_token|access_token)(?:/|$)~i', $path)) {
+            return '[REDACTED TOKEN RESPONSE]';
+        }
+
+        $decoded = json_decode($body, true);
+        if (! is_array($decoded)) {
+            return $body === '' ? '' : '[NON-JSON RESPONSE OMITTED]';
+        }
+
+        $sanitized = json_encode(sanitizeData($decoded), JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($sanitized === false) {
+            return '[RESPONSE OMITTED]';
+        }
+
+        return strlen($sanitized) > 10000
+            ? substr($sanitized, 0, 10000) . '... [TRUNCATED]'
+            : $sanitized;
+    }
+}
+
+if (! function_exists('log_integration_api_response')) {
+    /**
+     * Log an API response for a specific integration
+     * Logs to integration instance channel as debug (if enabled)
+     */
+    function log_integration_api_response(
+        string $service,
+        string $method,
+        string $endpoint,
+        int $statusCode,
+        string $body,
+        array $headers = [],
+        string $integrationId = '',
+        bool $perInstance = false
+    ): void {
+        // Try to load the integration (only if it looks like a valid UUID)
+        if (! empty($integrationId) && preg_match('/^[a-f0-9\-]{36}$/i', $integrationId)) {
+            $integration = Integration::find($integrationId);
+            if ($integration) {
+                log_to_integration($integration, 'debug', 'API Response', [
+                    'service' => $service,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'status_code' => $statusCode,
+                    'headers' => array_map(function ($header) {
+                        return is_array($header) ? $header : [$header];
+                    }, sanitizeHeaders($headers)),
+                    'response_body' => sanitize_api_response_body($endpoint, $body),
+                    'timestamp' => now()->toISOString(),
+                ]);
+
+                return;
+            }
+        }
+
+        // Fallback to old behavior if integration not found
+        $baseConfig = [
+            'driver' => 'daily',
+            'level' => 'debug',
+            'days' => 2,
+            'replace_placeholders' => true,
+        ];
+
+        $filename = generate_api_log_filename($service, $integrationId, $perInstance);
+        $channelName = pathinfo($filename, PATHINFO_FILENAME);
+        $baseConfig['path'] = storage_path('logs/' . $filename);
+
+        $logger = Log::build($baseConfig);
+
+        // If the logger is null (can happen in tests with spies), use the default Log facade
+        if (is_null($logger)) {
+            Log::debug('API Response', [
+                'service' => $service,
+                'integration_id' => $integrationId ?: null,
+                'method' => $method,
+                'endpoint' => $endpoint,
+                'status_code' => $statusCode,
+                'headers' => array_map(function ($header) {
+                    return is_array($header) ? $header : [$header];
+                }, sanitizeHeaders($headers)),
+                'response_body' => sanitize_api_response_body($endpoint, $body),
+                'timestamp' => now()->toISOString(),
+            ]);
+
+            return;
+        }
+
+        $logger->debug('API Response', [
+            'service' => $service,
+            'integration_id' => $integrationId ?: null,
+            'method' => $method,
+            'endpoint' => $endpoint,
+            'status_code' => $statusCode,
+            'headers' => array_map(function ($header) {
+                return is_array($header) ? $header : [$header];
+            }, sanitizeHeaders($headers)),
+            'response_body' => sanitize_api_response_body($endpoint, $body),
+            'timestamp' => now()->toISOString(),
+        ]);
+    }
+}
+
+if (! function_exists('log_integration_webhook')) {
+    /**
+     * Log a webhook payload for a specific integration
+     */
+    function log_integration_webhook(
+        string $service,
+        string $integrationId,
+        array $payload,
+        array $headers = [],
+        bool $perInstance = false
+    ): void {
+        $baseConfig = [
+            'driver' => 'daily',
+            'level' => 'debug',
+            'days' => 2,
+            'replace_placeholders' => true,
+        ];
+
+        $filename = generate_api_log_filename($service, $integrationId, $perInstance);
+        $channelName = pathinfo($filename, PATHINFO_FILENAME); // Remove .log extension for channel name
+        $baseConfig['path'] = storage_path('logs/' . $filename);
+
+        $logger = Log::build($baseConfig);
+        $logger->debug('Webhook Payload', [
+            'service' => $service,
+            'integration_id' => $integrationId,
+            'headers' => array_map(function ($header) {
+                return is_array($header) ? $header : [$header];
+            }, sanitizeHeaders($headers)),
+            'payload' => sanitizeData($payload),
+            'timestamp' => now()->toISOString(),
+        ]);
+    }
+}
+
+if (! function_exists('should_log_debug')) {
+    /**
+     * Check if debug logging should be enabled for a user
+     */
+    function should_log_debug(User $user): bool
+    {
+        return $user->hasDebugLoggingEnabled();
+    }
+}
+
+if (! function_exists('log_to_user')) {
+    /**
+     * Log a message to user's log channel
+     */
+    function log_to_user(User $user, string $level, string $message, array $context = []): void
+    {
+        LoggingService::logToUser($user, $level, $message, $context);
+    }
+}
+
+if (! function_exists('log_to_group')) {
+    /**
+     * Log a message to integration group's log channel
+     */
+    function log_to_group(IntegrationGroup $group, string $level, string $message, array $context = []): void
+    {
+        LoggingService::logToGroup($group, $level, $message, $context);
+    }
+}
+
+if (! function_exists('log_to_integration')) {
+    /**
+     * Log a message to integration instance's log channel
+     */
+    function log_to_integration(Integration $integration, string $level, string $message, array $context = []): void
+    {
+        LoggingService::logToIntegration($integration, $level, $message, $context);
+    }
+}
+
+if (! function_exists('log_hierarchical')) {
+    /**
+     * Log a message hierarchically: integration → group → user
+     * Debug logs only go to integration (if enabled), info/warning/error cascade up
+     */
+    function log_hierarchical(Integration $integration, string $level, string $message, array $context = []): void
+    {
+        LoggingService::logHierarchical($integration, $level, $message, $context);
+    }
+}
+
+if (! function_exists('truncate_to_words')) {
+    /**
+     * Truncate text to a specified number of words
+     */
+    function truncate_to_words(string $text, int $wordLimit = 150): string
+    {
+        $words = str_word_count($text, 2);
+        if (count($words) <= $wordLimit) {
+            return $text;
+        }
+
+        $positions = array_keys($words);
+        $truncatePosition = $positions[$wordLimit] ?? strlen($text);
+
+        return substr($text, 0, $truncatePosition) . '...';
+    }
+}
+
+if (! function_exists('karakeep_add_bookmark')) {
+    /**
+     * Add a bookmark to Karakeep instance
+     * This function posts to Karakeep and returns immediately without triggering a sync.
+     * The bookmark will be synced on the next scheduled pull.
+     *
+     * @param  string  $url  The URL to bookmark
+     * @param  string|null  $title  Optional title for the bookmark
+     * @param  array  $tags  Optional array of tag names to apply
+     * @return array|null Returns bookmark data on success, null on failure
+     */
+    function karakeep_add_bookmark(string $url, ?string $title = null, array $tags = []): ?array
+    {
+        $karakeepUrl = config('services.karakeep.url');
+        $accessToken = config('services.karakeep.access_token');
+
+        if (! $karakeepUrl || ! $accessToken) {
+            Log::error('Karakeep configuration missing', [
+                'has_url' => ! empty($karakeepUrl),
+                'has_token' => ! empty($accessToken),
+            ]);
+
+            return null;
+        }
+
+        try {
+            $payload = ['url' => $url];
+
+            if ($title) {
+                $payload['title'] = $title;
+            }
+
+            if (! empty($tags)) {
+                $payload['tags'] = $tags;
+            }
+
+            $response = Http::withToken($accessToken)
+                ->post(rtrim($karakeepUrl, '/') . '/api/v1/bookmarks', $payload);
+
+            if ($response->successful()) {
+                Log::info('Successfully added bookmark to Karakeep', [
+                    'url' => $url,
+                    'title' => $title,
+                    'tags' => $tags,
+                ]);
+
+                return $response->json();
+            }
+
+            Log::error('Failed to add bookmark to Karakeep', [
+                'url' => $url,
+                'status' => $response->status(),
+                'response' => $response->body(),
+            ]);
+
+            return null;
+        } catch (Exception $e) {
+            Log::error('Exception while adding bookmark to Karakeep', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+}
+
+if (! function_exists('get_domain_from_url')) {
+    /**
+     * Extract the base domain from a URL (without subdomain, protocol, port, or path).
+     * Examples:
+     *   - http://emptycity.substack.com/p/article → substack.com
+     *   - https://www.bbc.co.uk/culture/article → bbc.co.uk
+     *   - https://www.google.com:8080/search?q=test → google.com
+     *   - api.github.com/users → github.com
+     *
+     * @param  string  $url  The URL to parse
+     * @return string|null The base domain or null if invalid
+     */
+    function get_domain_from_url(string $url): ?string
+    {
+        // Add protocol if not present to help parse_url work correctly
+        if (! preg_match('~^(?:f|ht)tps?://~i', $url)) {
+            $url = 'http://' . $url;
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (! $host) {
+            return null;
+        }
+
+        // Split the host into parts
+        $parts = explode('.', $host);
+        $numParts = count($parts);
+
+        // Handle edge cases
+        if ($numParts < 2) {
+            return $host;
+        }
+
+        // Common two-part TLDs that need special handling
+        $twoPartTlds = [
+            'co.uk', 'gov.uk', 'org.uk', 'ac.uk', 'sch.uk', 'net.uk',
+            'co.za', 'gov.za', 'org.za', 'net.za', 'ac.za',
+            'co.nz', 'gov.nz', 'org.nz', 'net.nz', 'ac.nz',
+            'co.jp', 'gov.jp', 'org.jp', 'ne.jp', 'ac.jp',
+            'com.au', 'gov.au', 'org.au', 'net.au', 'edu.au',
+            'co.in', 'gov.in', 'org.in', 'net.in', 'ac.in',
+            'com.br', 'gov.br', 'org.br', 'net.br', 'edu.br',
+            'co.kr', 'gov.kr', 'org.kr', 'ne.kr', 'ac.kr',
+        ];
+
+        // Check if we have a two-part TLD (e.g., co.uk)
+        if ($numParts >= 3) {
+            $possibleTld = $parts[$numParts - 2] . '.' . $parts[$numParts - 1];
+            if (in_array($possibleTld, $twoPartTlds, true)) {
+                // Return domain.co.uk format (last 3 parts)
+                return $parts[$numParts - 3] . '.' . $possibleTld;
+            }
+        }
+
+        // Default: Get the last two parts (domain.tld)
+        $domain = $parts[$numParts - 2] . '.' . $parts[$numParts - 1];
+
+        return $domain;
+    }
+}
+
+if (! function_exists('normalize_icon_for_spotlight')) {
+    /**
+     * Normalize icon names to Wire Elements Spotlight format.
+     * Strips library prefixes from both Heroicons and FontAwesome icons.
+     *
+     * @param  string|null  $icon  The icon name (possibly with prefix)
+     * @return string|null The normalized icon name for Spotlight
+     */
+    function normalize_icon_for_spotlight(?string $icon): ?string
+    {
+        if (! $icon) {
+            return null;
+        }
+
+        // Keep Font Awesome icons as-is (fas.icon-name or far.icon-name or fab.icon-name)
+        if (str_starts_with($icon, 'fas.') || str_starts_with($icon, 'far.') || str_starts_with($icon, 'fab.')) {
+            return $icon; // Return as-is, will be handled by FA icon classes
+        }
+
+        if (preg_match('/^fa[srb]-/', $icon)) {
+            // Convert fas-icon-name to fas.icon-name format
+            return str_replace(['fas-', 'far-', 'fab-'], ['fas.', 'far.', 'fab.'], $icon);
+        }
+
+        // Heroicons: o-icon-name or s-icon-name -> icon-name
+        return preg_replace('/^[os]-/', '', $icon);
+    }
+}
+
+if (! function_exists('heroicon_to_fontawesome')) {
+    /**
+     * Convert a Heroicon name to its FontAwesome equivalent.
+     *
+     * @param  string  $heroiconName  The Heroicon name (e.g., 'fas-heart')
+     * @return string The FontAwesome icon name (e.g., 'fas-heart')
+     */
+    function heroicon_to_fontawesome(string $heroiconName): string
+    {
+        static $mappings = null;
+
+        if ($mappings === null) {
+            $mappings = config('icons.heroicon_to_fontawesome_map', []);
+        }
+
+        // Check explicit mapping first
+        if (isset($mappings[$heroiconName])) {
+            return $mappings[$heroiconName];
+        }
+
+        // Auto-convert: o-icon-name -> fas.icon-name
+        $baseName = preg_replace('/^[os]-/', '', $heroiconName);
+
+        return 'fas.' . $baseName;
+    }
+}
+
+if (! function_exists('icon_name')) {
+    /**
+     * Get the appropriate icon name based on current library preference.
+     * Converts between Heroicon and FontAwesome formats as needed.
+     *
+     * @param  string  $name  The icon name (any format)
+     * @return string The icon name in the preferred format
+     */
+    function icon_name(string $name): string
+    {
+        $library = config('icons.default_library', 'fontawesome');
+
+        // Already in correct format (dot notation for FontAwesome: fas.icon-name)
+        if ($library === 'fontawesome' && preg_match('/^fa[srb]\./', $name)) {
+            return $name;
+        }
+        if ($library === 'heroicons' && preg_match('/^[os]-/', $name)) {
+            return $name;
+        }
+
+        // Convert Heroicon to FontAwesome if needed
+        if ($library === 'fontawesome' && preg_match('/^[os]-/', $name)) {
+            return heroicon_to_fontawesome($name);
+        }
+
+        return $name;
+    }
+}
+
+if (! function_exists('get_card_brand_icon')) {
+    /**
+     * Get the FontAwesome brand icon for a payment card scheme.
+     *
+     * @param  string|null  $cardScheme  The card scheme (e.g., 'mastercard', 'visa')
+     * @return string The FontAwesome icon name
+     */
+    function get_card_brand_icon(?string $cardScheme): string
+    {
+        $brands = config('icons.card_brand_icons', []);
+        $scheme = strtolower($cardScheme ?? '');
+
+        return $brands[$scheme] ?? $brands['default'] ?? 'fas-credit-card';
+    }
+}
+
+if (! function_exists('get_financial_icon')) {
+    /**
+     * Get a financial-specific FontAwesome icon.
+     *
+     * @param  string  $type  The financial icon type (e.g., 'piggy_bank', 'wallet')
+     * @return string The FontAwesome icon name
+     */
+    function get_financial_icon(string $type): string
+    {
+        $icons = config('icons.financial_icons', []);
+
+        return $icons[$type] ?? 'fas-money-bill';
+    }
+}
+
+if (! function_exists('get_integration_brand_icon')) {
+    /**
+     * Get the brand icon for a third-party integration.
+     *
+     * @param  string  $service  The service identifier (e.g., 'github', 'spotify')
+     * @return string|null The FontAwesome brand icon or null if not available
+     */
+    function get_integration_brand_icon(string $service): ?string
+    {
+        $brands = config('icons.integration_brand_icons', []);
+        $service = strtolower($service);
+
+        return $brands[$service] ?? null;
+    }
+}
+
+if (! function_exists('get_media_url')) {
+    /**
+     * Get the media URL for a model, falling back to media_url field if no Media Library attachment exists.
+     *
+     * @param  Model&HasMedia  $model
+     * @param  string  $collection  The media collection to check
+     * @param  string  $conversion  The conversion name (thumbnail, medium, webp, or empty for original)
+     * @return string|null The media URL or null if no media found
+     */
+    function get_media_url(
+        $model,
+        string $collection = 'downloaded_images',
+        string $conversion = ''
+    ): ?string {
+        // Check for Media Library attachment first
+        if (method_exists($model, 'getFirstMedia')) {
+            $media = $model->getFirstMedia($collection);
+
+            if ($media) {
+                // For S3, use temporary signed URLs
+                if (config('media-library.disk_name') === 's3') {
+                    $urlExpiry = now()->addMinutes(60);
+
+                    if ($conversion) {
+                        return $media->getTemporaryUrl($urlExpiry, $conversion);
+                    }
+
+                    return $media->getTemporaryUrl($urlExpiry);
+                }
+
+                // For local/public disks, use regular URLs
+                if ($conversion) {
+                    return $media->getUrl($conversion);
+                }
+
+                return $media->getUrl();
+            }
+        }
+
+        // Fallback to media_url field (backward compatibility during migration)
+        if (isset($model->media_url) && ! empty($model->media_url)) {
+            return $model->media_url;
+        }
+
+        return null;
+    }
+}
+
+if (! function_exists('get_media_temporary_url')) {
+    /**
+     * Get a temporary signed URL for media (for private S3 buckets).
+     *
+     * @param  Model&HasMedia  $model
+     * @param  string  $collection  The media collection to check
+     * @param  string  $conversion  The conversion name (thumbnail, medium, webp, or empty for original)
+     * @param  int  $expirationMinutes  How long the URL should be valid (default: 60 minutes)
+     * @return string|null The temporary URL or null if no media found
+     */
+    function get_media_temporary_url(
+        $model,
+        string $collection = 'downloaded_images',
+        string $conversion = '',
+        int $expirationMinutes = 60
+    ): ?string {
+        if (! method_exists($model, 'getFirstMedia')) {
+            return null;
+        }
+
+        $media = $model->getFirstMedia($collection);
+
+        if (! $media) {
+            // Fallback to regular media_url if no Media Library attachment
+            if (isset($model->media_url) && ! empty($model->media_url)) {
+                return $model->media_url;
+            }
+
+            return null;
+        }
+
+        // For local/public disks, just return the regular URL
+        if (config('media-library.disk_name') !== 's3') {
+            if ($conversion) {
+                return $media->getUrl($conversion);
+            }
+
+            return $media->getUrl();
+        }
+
+        // For S3, generate temporary URL
+        if ($conversion) {
+            return $media->getTemporaryUrl(
+                now()->addMinutes($expirationMinutes),
+                $conversion
+            );
+        }
+
+        return $media->getTemporaryUrl(
+            now()->addMinutes($expirationMinutes)
+        );
+    }
+}
+
+if (! function_exists('render_media_responsive')) {
+    /**
+     * Render a media object as responsive HTML using Spatie's responsive images.
+     * Falls back to regular img tag if no media found.
+     *
+     * @param  Model&HasMedia  $model
+     * @param  string  $collection  The media collection to check
+     * @param  array  $attributes  Additional HTML attributes (class, alt, etc.)
+     * @param  bool  $useSignedUrls  Whether to use signed URLs for S3 (default: true)
+     * @return string|null The HTML output or null if no media found
+     */
+    function render_media_responsive(
+        $model,
+        string $collection = 'downloaded_images',
+        array $attributes = [],
+        bool $useSignedUrls = true
+    ): ?string {
+        if (! method_exists($model, 'getFirstMedia')) {
+            return null;
+        }
+
+        $media = $model->getFirstMedia($collection);
+
+        if (! $media) {
+            // Fallback to media_url if no Media Library attachment
+            if (isset($model->media_url) && ! empty($model->media_url)) {
+                $attrs = collect($attributes)
+                    ->map(fn ($value, $key) => sprintf('%s="%s"', $key, e($value)))
+                    ->implode(' ');
+
+                return sprintf('<img src="%s" %s />', e($model->media_url), $attrs);
+            }
+
+            return null;
+        }
+
+        // For S3 with signed URLs enabled, build responsive HTML manually
+        if ($useSignedUrls && config('media-library.disk_name') === 's3') {
+            // Build responsive HTML with signed URLs (string cast doesn't work with S3)
+            return render_media_object_responsive($media, $attributes, 60);
+        }
+
+        // For local/public disks or when signed URLs disabled, use regular rendering
+        $html = (string) $media;
+
+        if (! empty($attributes)) {
+            $doc = new DOMDocument;
+            $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
+            @$doc->loadHTML($html, $libxmlFlags);
+            $img = $doc->getElementsByTagName('img')->item(0);
+
+            if ($img) {
+                foreach ($attributes as $key => $value) {
+                    $img->setAttribute($key, $value);
+                }
+
+                return $doc->saveHTML($img);
+            }
+        }
+
+        return $html;
+    }
+}
+
+if (! function_exists('get_media_object_url')) {
+    /**
+     * Get URL from a Media object (signed for S3, direct for local)
+     *
+     * @param  Media  $media  The media object
+     * @param  string  $conversion  Optional conversion name (thumbnail, medium, webp, etc.)
+     * @param  int  $expirationMinutes  URL expiration in minutes for S3 (default: 60)
+     * @return string The media URL
+     */
+    function get_media_object_url(
+        $media,
+        string $conversion = '',
+        int $expirationMinutes = 60
+    ): string {
+        // For S3, use temporary signed URLs
+        if (config('media-library.disk_name') === 's3') {
+            $urlExpiry = now()->addMinutes($expirationMinutes);
+
+            if ($conversion && $media->hasGeneratedConversion($conversion)) {
+                return $media->getTemporaryUrl($urlExpiry, $conversion);
+            }
+
+            if ($conversion) {
+                // Conversion requested but not available, return original
+                return $media->getTemporaryUrl($urlExpiry);
+            }
+
+            return $media->getTemporaryUrl($urlExpiry);
+        }
+
+        // For local/public disks, use regular URLs
+        if ($conversion && $media->hasGeneratedConversion($conversion)) {
+            return $media->getUrl($conversion);
+        }
+
+        if ($conversion) {
+            // Conversion requested but not available, return original
+            return $media->getUrl();
+        }
+
+        return $media->getUrl();
+    }
+}
+
+if (! function_exists('render_media_object_responsive')) {
+    /**
+     * Render a Media object as responsive HTML using Spatie's responsive images.
+     * Works directly with Media objects (not models).
+     *
+     * @param  Media  $media  The media object
+     * @param  array  $attributes  Additional HTML attributes (class, alt, etc.)
+     * @param  int  $expirationMinutes  URL expiration in minutes for S3 (default: 60)
+     * @return string The HTML output
+     */
+    function render_media_object_responsive(
+        $media,
+        array $attributes = [],
+        int $expirationMinutes = 60
+    ): string {
+        // For S3 with signed URLs
+        if (config('media-library.disk_name') === 's3') {
+            // Spatie's string cast generates responsive HTML but needs signed URLs
+            // We'll build the HTML manually with signed URLs for S3
+            $baseUrl = get_media_object_url($media, '', $expirationMinutes);
+            $thumbnailUrl = $media->hasGeneratedConversion('thumbnail')
+                ? get_media_object_url($media, 'thumbnail', $expirationMinutes)
+                : $baseUrl;
+            $mediumUrl = $media->hasGeneratedConversion('medium')
+                ? get_media_object_url($media, 'medium', $expirationMinutes)
+                : $baseUrl;
+
+            // Build srcset if conversions exist
+            $srcset = [];
+            if ($media->hasGeneratedConversion('thumbnail')) {
+                $srcset[] = $thumbnailUrl . ' 300w';
+            }
+            if ($media->hasGeneratedConversion('medium')) {
+                $srcset[] = $mediumUrl . ' 800w';
+            }
+            $srcset[] = $baseUrl . ' ' . ($media->getCustomProperty('width') ?? '1200') . 'w';
+
+            $srcsetAttr = implode(', ', $srcset);
+
+            // Default sizes if not provided
+            if (! isset($attributes['sizes'])) {
+                $attributes['sizes'] = '(max-width: 300px) 300px, (max-width: 800px) 800px, 100vw';
+            }
+
+            $attrs = collect($attributes)
+                ->map(fn ($value, $key) => sprintf('%s="%s"', $key, e($value)))
+                ->implode(' ');
+
+            return sprintf(
+                '<img src="%s" srcset="%s" %s />',
+                e($baseUrl),
+                e($srcsetAttr),
+                $attrs
+            );
+        }
+
+        // For local/public disks, use Spatie's native responsive image generation
+        $html = (string) $media;
+
+        if (! empty($attributes)) {
+            $doc = new DOMDocument;
+            $libxmlFlags = defined('LIBXML_HTML_NOIMPLIED') ? LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD : 0;
+            @$doc->loadHTML($html, $libxmlFlags);
+            $img = $doc->getElementsByTagName('img')->item(0);
+
+            if ($img) {
+                foreach ($attributes as $key => $value) {
+                    $img->setAttribute($key, $value);
+                }
+
+                return $doc->saveHTML($img);
+            }
+        }
+
+        return $html;
+    }
+}
+
+if (! function_exists('render_markdown')) {
+    /**
+     * Render untrusted markdown to HTML.
+     *
+     * Every string this is given originates outside Spark — newsletter bodies,
+     * fetched articles, bookmark summaries, and Flint prose written *about*
+     * them. The digest summary was already rendered with these options while
+     * block bodies two files away were not, so raw HTML and javascript: links
+     * passed straight through on one surface and not the other. There is no
+     * case where we want the permissive behaviour, so there is one function.
+     */
+    function render_markdown(?string $markdown): string
+    {
+        if ($markdown === null || trim($markdown) === '') {
+            return '';
+        }
+
+        return Str::markdown($markdown, [
+            'html_input' => 'strip',
+            'allow_unsafe_links' => false,
+        ]);
+    }
+}
+, 'EUR' => '€', 'JPY' => '¥'][$currency] ?? $currency . ' ';
 
         return $symbol . number_format($amount, $decimals);
     }
