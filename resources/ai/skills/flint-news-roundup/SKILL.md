@@ -71,12 +71,13 @@ Check each of these before calling `create-flint-digest`:
    consultation or savings package with nothing yet decided ranks below a real story.
 2. **No repeats within two days** unless a new decision or event happened. A new angle,
    new reactions or a deeper explainer on a story carded yesterday or the day before is
-   not a development.
+   not a development. **The same goes for the day briefing's reading desk:** a piece the
+   briefing already summarised in the last two days is not a fresh story (Step 4).
 3. **No disclaimers.** No "X, not Y" clauses whose only job is to say what something is
    not ("probing, not confirmed compromises", "estimates, not cash"). State what is
    known; put a real uncertainty in one `Not yet known:` clause at most.
-4. **Every fact sourced**, cards in the shape Step 10 sets out, Run notes last and under
-   200 words.
+4. **Every fact sourced**, cards in the shape Step 10 sets out, Run notes last and
+   about 250 words at most.
 5. **The run token** copied from the payload into `create-flint-digest` exactly.
 
 ---
@@ -156,6 +157,13 @@ Another outlet's explanation, a new quotation or the same figures recast is not
 enough. Nor is a new angle on the same event: on 22 and 23 October the same PHP flaw
 ran on consecutive days as "emergency shutdowns" and then "AI found the flaws". Record
 the development against the last published account.
+
+**Check every candidate against the day briefings too, not only the lead.** From the
+morning and evening briefings in the same history, list every event ID linked in their
+`WHAT I'VE BEEN READING FOR YOU` sections. A candidate whose feed `event_id` is on that
+list, or that covers the same piece, needs a material development like any other repeat.
+On 1 Nov 2026 the roundup carded a comet-impact study that the previous evening's
+briefing had already summarised, using the same single newsletter and no new research.
 
 Use Topics for context and maintenance, not automatic priority. Review the
 three-day mix for repeated subjects and geographic concentration; a continuing
@@ -454,7 +462,7 @@ across card fields.
 ### The editorial note
 
 **Always include a `flint_editorial_note` block**, titled `"Run notes"`, and put
-it **last**. Keep it **under 200 words**: one short line per item below, no prose
+it **last**. Keep it to **about 250 words at most**: one short line per item below, no prose
 paragraphs. Record:
 
 - the source counts from Step 3 — newsletters, fetches, bookmarks;
@@ -551,7 +559,7 @@ the thing ships — mark it `resolved` in the same run. Do not leave it for
 - [ ] Structured cards, distinct titles, field limits and final summary order checked.
 - [ ] Every disagreement between named parties sits in `contested`, not in key points.
 - [ ] No story repeats one carded in the last two days without a new decision or event.
-- [ ] No "X, not Y" disclaimer clauses; Run notes under 200 words.
+- [ ] No "X, not Y" disclaimer clauses; Run notes about 250 words at most.
 - [ ] Styleguide fetched; Run notes last with selection, sweep and budget outcomes.
 - [ ] Trigger token preserved when supplied; relevant Topics maintained; no questions.
 - [ ] Topic `content` rewritten to 150 words or fewer, one story per topic, no caveat
