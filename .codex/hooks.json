@@ -1,0 +1,15 @@
+{
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "vendor/bin/sail bin duster fix 2>&1 | tail -5"
+                    }
+                ]
+            }
+        ]
+    }
+}

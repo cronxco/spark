@@ -1,0 +1,2081 @@
+<?php
+
+namespace App\Integrations\Monzo;
+
+use App\Integrations\Base\OAuthPlugin;
+use App\Integrations\Contracts\SupportsSweeps;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
+use App\Models\IntegrationGroup;
+use App\Services\GeocodingService;
+use App\Services\PlaceDetectionService;
+use Carbon\Carbon;
+use Exception;
+use Illuminate\Http\Client\Response;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Throwable;
+
+class MonzoPlugin extends OAuthPlugin implements SupportsSweeps
+{
+    // Cache of account_id => type to avoid repeated HTTP calls per transaction
+    private static array $accountTypeCache = [];
+
+    protected string $apiBase = 'https://api.monzo.com';
+
+    protected string $authBase = 'https://auth.monzo.com';
+
+    protected string $clientId;
+
+    protected string $clientSecret;
+
+    protected string $redirectUri;
+
+    public function __construct()
+    {
+        $this->clientId = config('services.monzo.client_id') ?? '';
+        $this->clientSecret = config('services.monzo.client_secret') ?? '';
+        $this->redirectUri = config('services.monzo.redirect') ?? route('integrations.oauth.callback', ['service' => 'monzo']);
+
+        if (app()->environment() !== 'testing' && (empty($this->clientId) || empty($this->clientSecret))) {
+            throw new InvalidArgumentException('Monzo OAuth credentials are not configured');
+        }
+    }
+
+    /**
+     * @return array{label: string, window: string, period_hours: int, config_key: string}
+     */
+    public static function getSweepSchedule(): array
+    {
+        return [
+            'label' => 'Daily sweep',
+            'window' => 'last 30 days',
+            'period_hours' => 22,
+            'config_key' => 'monzo_last_sweep_at',
+        ];
+    }
+
+    public static function getIdentifier(): string
+    {
+        return 'monzo';
+    }
+
+    public static function getDisplayName(): string
+    {
+        return 'Monzo';
+    }
+
+    public static function getDescription(): string
+    {
+        return 'Connect your Monzo bank account to sync transactions and balances.';
+    }
+
+    public static function getConfigurationSchema($instanceType = null): array
+    {
+        if ($instanceType === 'transactions') {
+            return [
+                'update_frequency_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Update Frequency (minutes)',
+                    'required' => true,
+                    'min' => 5,
+                    'default' => 30, // 30 minutes default
+                ],
+                'include_pot_transfers' => [
+                    'type' => 'array',
+                    'label' => 'Include Pot Transfers',
+                    'description' => 'Process pot transfer transactions',
+                    'options' => [
+                        'enabled' => 'Enabled',
+                    ],
+                ],
+            ];
+        } else {
+            return [
+                'update_frequency_minutes' => [
+                    'type' => 'integer',
+                    'label' => 'Update Frequency (minutes)',
+                    'required' => true,
+                    'min' => 5,
+                    'default' => 30, // 30 minutes default
+                ],
+            ];
+        }
+    }
+
+    public static function getInstanceTypes(): array
+    {
+        return [
+            'accounts' => [
+                'label' => 'Accounts (Master)',
+                'schema' => self::getConfigurationSchema(),
+            ],
+            'transactions' => [
+                'label' => 'Transactions',
+                'schema' => self::getConfigurationSchema('transactions'),
+            ],
+            'pots' => [
+                'label' => 'Pots',
+                'schema' => self::getConfigurationSchema(),
+            ],
+            'balances' => [
+                'label' => 'Balances',
+                'schema' => self::getConfigurationSchema(),
+            ],
+        ];
+    }
+
+    public static function getIcon(): string
+    {
+        return 'fas.credit-card';
+    }
+
+    public static function getAccentColor(): string
+    {
+        return 'primary';
+    }
+
+    public static function getDomain(): string
+    {
+        return 'money';
+    }
+
+    public static function supportsMigration(): bool
+    {
+        return true;
+    }
+
+    public static function getActionTypes(): array
+    {
+        return [
+            'had_balance' => [
+                'icon' => 'fas.sterling-sign',
+                'display_name' => 'Balance Update',
+                'description' => 'Account balance was updated',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'higher_is_better' => true,
+                'hidden' => true,
+                'exclude_from_flint' => true,
+            ],
+            'salary_received_from' => [
+                'icon' => 'fas.money-bills',
+                'display_name' => 'Salary Received',
+                'description' => 'Salary payment received from employer',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'declined_payment_to' => [
+                'icon' => 'fas.circle-xmark',
+                'display_name' => 'Declined Payment',
+                'description' => 'Card payment was declined',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'card_payment_to' => [
+                'icon' => 'fas.credit-card',
+                'display_name' => 'Card Payment',
+                'description' => 'Payment made with Monzo card',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'card_refund_from' => [
+                'icon' => 'fas.rotate-left',
+                'display_name' => 'Card Refund',
+                'description' => 'Refund received on Monzo card',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'pot_transfer_to' => [
+                'icon' => 'fas.piggy-bank',
+                'display_name' => 'Pot Transfer',
+                'description' => 'Money transferred to a Monzo pot',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'pot_withdrawal_to' => [
+                'icon' => 'fas.piggy-bank',
+                'display_name' => 'Pot Withdrawal',
+                'description' => 'Money withdrawn from a Monzo pot',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'interest_repaid' => [
+                'icon' => 'fas.percent',
+                'display_name' => 'Interest Repaid',
+                'description' => 'Interest payment made',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'interest_earned' => [
+                'icon' => 'fas.percent',
+                'display_name' => 'Interest Earned',
+                'description' => 'Interest received',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'monzo_flex_payment' => [
+                'icon' => 'fas.money-bill-transfer',
+                'display_name' => 'Monzo Flex Payment',
+                'description' => 'Payment made for Monzo Flex',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'monzo_flex_loan' => [
+                'icon' => 'fas.hand-holding-dollar',
+                'display_name' => 'Monzo Flex Loan',
+                'description' => 'Money borrowed via Monzo Flex',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'direct_debit_to' => [
+                'icon' => 'fas.repeat',
+                'display_name' => 'Direct Debit',
+                'description' => 'Direct debit payment',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'direct_credit_from' => [
+                'icon' => 'fas.money-bill-transfer',
+                'display_name' => 'Direct Credit',
+                'description' => 'Direct credit received',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'monzo_me_to' => [
+                'icon' => 'fas.user-minus',
+                'display_name' => 'Monzo Me Sent',
+                'description' => 'Money sent via Monzo Me',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'monzo_me_from' => [
+                'icon' => 'fas.user-plus',
+                'display_name' => 'Monzo Me Received',
+                'description' => 'Money received via Monzo Me',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'bank_transfer_to' => [
+                'icon' => 'fas.building-columns',
+                'display_name' => 'Bank Transfer Sent',
+                'description' => 'Money sent via bank transfer',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'bank_transfer_from' => [
+                'icon' => 'fas.building-columns',
+                'display_name' => 'Bank Transfer Received',
+                'description' => 'Money received via bank transfer',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'fee_paid_for' => [
+                'icon' => 'fas.circle-minus',
+                'display_name' => 'Fee Paid',
+                'description' => 'Fee charged by Monzo',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'fee_refunded_for' => [
+                'icon' => 'fas.circle-plus',
+                'display_name' => 'Fee Refunded',
+                'description' => 'Fee refunded by Monzo',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'other_debit_to' => [
+                'icon' => 'fas.minus',
+                'display_name' => 'Other Debit',
+                'description' => 'Other outgoing transaction',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'other_credit_from' => [
+                'icon' => 'fas.plus',
+                'display_name' => 'Other Credit',
+                'description' => 'Other incoming transaction',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getBlockTypes(): array
+    {
+        return [
+            'balance' => [
+                'icon' => 'fas.sterling-sign',
+                'display_name' => 'Balance',
+                'description' => 'Account balance information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'spent_today' => [
+                'icon' => 'fas.sterling-sign',
+                'display_name' => 'Spent Today',
+                'description' => 'Amount spent today for this account',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'balance_change' => [
+                'icon' => 'fas.rotate',
+                'display_name' => 'Balance Change',
+                'description' => 'Change in balance since previous day',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'pot' => [
+                'icon' => 'fas.piggy-bank',
+                'display_name' => 'Pot',
+                'description' => 'Monzo savings pot information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'foreign_exchange' => [
+                'icon' => 'fas.globe',
+                'display_name' => 'Foreign Exchange',
+                'description' => 'Local vs transaction currency breakdown',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'virtual_card' => [
+                'icon' => 'fas.credit-card',
+                'display_name' => 'Virtual Card',
+                'description' => 'Virtual card details used for this payment',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'bank_transfer' => [
+                'icon' => 'fas.building-columns',
+                'display_name' => 'Bank Transfer',
+                'description' => 'External bank transfer details',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+            'transaction' => [
+                'icon' => 'fas.rotate',
+                'display_name' => 'Transaction',
+                'description' => 'Transaction information',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'merchant' => [
+                'icon' => 'fas.store',
+                'display_name' => 'Merchant',
+                'description' => 'Merchant information for transaction',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
+            'pot_transfer' => [
+                'icon' => 'fas.piggy-bank',
+                'display_name' => 'Pot Transfer',
+                'description' => 'Money transfer to or from a Monzo pot',
+                'display_with_object' => true,
+                'value_unit' => 'GBP',
+                'value_formatter' => '<span class="text-[0.875em]">£</span>{{ number_format($value, 2) }}',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    public static function getObjectTypes(): array
+    {
+        return [
+            'monzo_counterparty' => [
+                'icon' => 'fas.user',
+                'display_name' => 'Counterparty',
+                'description' => 'A Monzo transaction counterparty',
+                'hidden' => false,
+            ],
+            'monzo_account' => [
+                'icon' => 'fas.credit-card',
+                'display_name' => 'Monzo Account',
+                'description' => 'A Monzo bank account',
+                'hidden' => false,
+            ],
+            'day' => [
+                'icon' => 'fas.calendar-day',
+                'display_name' => 'Day',
+                'description' => 'A calendar day',
+                'hidden' => false,
+            ],
+            'monzo_pot' => [
+                'icon' => 'fas.piggy-bank',
+                'display_name' => 'Monzo Pot',
+                'description' => 'An active Monzo savings pot',
+                'hidden' => false,
+            ],
+            'monzo_archived_pot' => [
+                'icon' => 'fas.box-archive',
+                'display_name' => 'Archived Monzo Pot',
+                'description' => 'A deleted or archived Monzo savings pot',
+                'hidden' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Turn a salary detection back into a normal credit. Sticks across re-syncs.
+     */
+    public static function rejectSalary(Event $event): void
+    {
+        $event->update([
+            'action' => 'direct_credit_from',
+            'event_metadata' => array_merge($event->event_metadata ?? [], ['salary_rejected' => true]),
+        ]);
+    }
+
+    public function getBaseUrl(): string
+    {
+        return $this->apiBase;
+    }
+
+    public function getOAuthUrl(IntegrationGroup $group): string
+    {
+        $csrfToken = Str::random(32);
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
+        Session::put($sessionKey, $csrfToken);
+
+        $state = encrypt([
+            'group_id' => $group->id,
+            'user_id' => $group->user_id,
+            'csrf_token' => $csrfToken,
+        ]);
+
+        $params = [
+            'client_id' => $this->clientId,
+            'redirect_uri' => $this->redirectUri,
+            'response_type' => 'code',
+            'state' => $state,
+        ];
+
+        return $this->authBase . '?' . http_build_query($params);
+    }
+
+    public function handleOAuthCallback(Request $request, IntegrationGroup $group): void
+    {
+        $error = $request->get('error');
+        if ($error) {
+            throw new Exception('Monzo authorization failed: ' . $error);
+        }
+
+        $code = (string) $request->get('code');
+        $state = (string) $request->get('state');
+        if (! $code || ! $state) {
+            throw new Exception('Invalid OAuth callback');
+        }
+
+        $stateData = decrypt($state);
+        if ((string) ($stateData['group_id'] ?? '') !== (string) $group->id) {
+            throw new Exception('Invalid state parameter');
+        }
+        $sessionKey = 'oauth_csrf_' . session_id() . '_' . $group->id;
+        $expectedCsrf = Session::get($sessionKey);
+        if (($stateData['csrf_token'] ?? null) !== $expectedCsrf) {
+            throw new Exception('Invalid CSRF token');
+        }
+
+        // Log the API request
+        $this->logApiRequest('POST', '/oauth2/token', [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ], [
+            'client_id' => $this->clientId,
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => $this->redirectUri,
+        ]);
+
+        $response = Http::asForm()->post($this->apiBase . '/oauth2/token', [
+            'grant_type' => 'authorization_code',
+            'client_id' => $this->clientId,
+            'client_secret' => $this->clientSecret,
+            'redirect_uri' => $this->redirectUri,
+            'code' => $code,
+        ]);
+
+        // Log the API response
+        $this->logApiResponse('POST', '/oauth2/token', $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            Log::error('Monzo token exchange failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            throw new Exception('Failed to exchange code for tokens');
+        }
+
+        $data = $response->json();
+        $group->update([
+            'access_token' => $data['access_token'] ?? null,
+            'refresh_token' => $data['refresh_token'] ?? null,
+            'expiry' => isset($data['expires_in']) ? now()->addSeconds((int) $data['expires_in']) : null,
+        ]);
+
+        // Fetch account id to store on group for convenience
+        $account = $this->getPrimaryAccount($group);
+        if ($account) {
+            $group->update([
+                'account_id' => $account['id'],
+            ]);
+        }
+    }
+
+    public function fetchData(Integration $integration): void
+    {
+        // Check if we should perform a sweep for this integration
+        $this->performSweepIfNeeded($integration);
+
+        // Only do the work relevant to this instance type to avoid duplicate events across instances
+        $instanceType = $integration->instance_type ?: 'transactions';
+        if ($instanceType === 'accounts') {
+            // Master instance: do not create any events; only seeding is done via migration
+            return;
+        }
+        $accounts = $this->listAccounts($integration);
+        if (empty($accounts)) {
+            return;
+        }
+        foreach ($accounts as $account) {
+            if ($instanceType === 'transactions') {
+                $this->processRecentTransactions($integration, $account);
+            } elseif ($instanceType === 'balances') {
+                $this->processBalanceSnapshot($integration, $account);
+            } elseif ($instanceType === 'pots' || $instanceType === 'accounts') {
+                // For pots/accounts, only upsert shared objects; do not create transaction or balance events
+                $this->processPotsSnapshot($integration, $account);
+                // Ensure account objects exist under master
+                $this->upsertAccountObject($integration, $account);
+            }
+        }
+    }
+
+    public function addBalanceBlocks(Event $event, Integration $integration, array $account, string $date, int $balance, int $spendToday): void
+    {
+        // Spent Today block
+        $event->createBlock([
+            'time' => $event->time,
+            'block_type' => 'spent_today',
+            'title' => 'Spent Today',
+            'metadata' => [],
+            'media_url' => null,
+            'value' => abs($spendToday),
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+        ]);
+
+        // Balance Change vs previous day
+        $actorId = $event->actor_id;
+        $prev = Event::where('integration_id', $integration->id)
+            ->where('service', 'monzo')
+            ->where('action', 'had_balance')
+            ->where('actor_id', $actorId)
+            ->where('time', '<', $date . ' 00:00:00')
+            ->orderBy('time', 'desc')
+            ->first();
+        if ($prev) {
+            $prevVal = (int) abs($prev->value ?? 0);
+            $currentVal = (int) abs($balance);
+            $delta = $currentVal - $prevVal; // cents
+            if ($delta !== 0) {
+                $event->createBlock([
+                    'time' => $event->time,
+                    'block_type' => 'balance_change',
+                    'title' => 'Balance Change',
+                    'metadata' => ['direction' => $delta > 0 ? 'Up' : 'Down'],
+                    'media_url' => null,
+                    'value' => abs($delta),
+                    'value_multiplier' => 100,
+                    'value_unit' => 'GBP',
+                ]);
+            }
+        }
+    }
+
+    // Migration helpers used by ProcessIntegrationPage
+    public function processTransactionItem(Integration $integration, array $tx, string $accountId): void
+    {
+        $accountObject = $this->upsertAccountObject($integration, ['id' => $accountId, 'type' => 'uk_retail']);
+        $master = $this->resolveMasterIntegration($integration);
+        $scheme = $tx['scheme'] ?? null;
+        $amount = (int) ($tx['amount'] ?? 0);
+
+        // For pot transactions, the pot ID is in metadata->pot_id (counterparty is empty)
+        // For other transactions, pot ID might be in counterparty fields
+        $potId = null;
+        if ($scheme === 'uk_retail_pot') {
+            $potId = $tx['metadata']['pot_id'] ?? null;
+        } else {
+            $potId = $tx['counterparty']['account_id'] ?? $tx['counterparty']['id'] ?? $tx['counterparty'] ?? null;
+        }
+
+        $potObject = null;
+        if ($potId) {
+            $potObject = EventObject::where('user_id', $integration->user_id)
+                ->where('concept', 'account')
+                ->whereIn('type', ['monzo_pot', 'monzo_archived_pot'])
+                ->whereJsonContains('metadata->pot_id', $potId)
+                ->first();
+        }
+
+        // Determine actor and target based on transaction type
+        $actor = null;
+        $target = null;
+
+        if ($scheme === 'uk_retail_pot' && $potObject) {
+            // Pot transfer: set actor/target based on direction
+            if ($amount < 0) {
+                // pot_transfer_to: Money leaving account going to pot (actor:account, target:pot)
+                $actor = $accountObject;
+                $target = $potObject;
+            } else {
+                // pot_withdrawal_to: Money leaving pot going to account (actor:pot, target:account)
+                $actor = $potObject;
+                $target = $accountObject;
+            }
+        } else {
+            // Non-pot transaction: account is always actor
+            $actor = $accountObject;
+
+            if ($potObject) {
+                // Counterparty is a pot (shouldn't happen for non-uk_retail_pot, but handle anyway)
+                $target = $potObject;
+            } else {
+                // Fallback: create/find generic counterparty
+                $targetTitle = $tx['merchant']['name'] ?? ($tx['description'] ?? 'Unknown');
+                $merchantId = $tx['merchant']['id'] ?? null;
+                $metadata = [
+                    'merchant_id' => $merchantId,
+                    'category' => $tx['category'] ?? null,
+                    'currency' => $tx['currency'] ?? 'GBP',
+                ];
+
+                // Use firstOrCreate to avoid updating 'time' on every transaction
+                $target = EventObject::firstOrCreate(
+                    [
+                        'user_id' => $integration->user_id,
+                        'concept' => 'counterparty',
+                        'type' => 'monzo_counterparty',
+                        'title' => $targetTitle,
+                    ],
+                    [
+                        'integration_id' => $master->id,
+                        'time' => $tx['created'] ?? now(),
+                        'content' => $tx['description'] ?? null,
+                        'metadata' => $metadata,
+                    ]
+                );
+
+                // Only update metadata if we have a merchant_id
+                // This prevents refunds (which have no merchant_id) from overwriting metadata from the original payment
+                if ($merchantId !== null) {
+                    $target->update(['metadata' => $metadata]);
+                }
+            }
+        }
+
+        // A rejected salary detection stays a normal transaction on every re-sync
+        $salaryRejected = Event::where('integration_id', $integration->id)
+            ->where('source_id', (string) ($tx['id'] ?? ''))
+            ->where('event_metadata->salary_rejected', true)
+            ->exists();
+
+        $action = $this->setAction($tx, ! $salaryRejected);
+
+        $event = Event::updateOrCreate(
+            [
+                'integration_id' => $integration->id,
+                'source_id' => (string) ($tx['id'] ?? Str::uuid()),
+            ],
+            [
+                'time' => $tx['created'] ?? now(),
+                'actor_id' => $actor->id,
+                'service' => 'monzo',
+                'domain' => self::getDomain(),
+                'action' => $action,
+                'value' => abs((int) ($tx['amount'] ?? 0)), // integer cents
+                'value_multiplier' => 100,
+                'value_unit' => $tx['currency'] ?? 'GBP',
+                'event_metadata' => [
+                    'category' => $tx['category'] ?? null,
+                    'scheme' => $tx['scheme'] ?? null,
+                    'notes' => $tx['notes'] ?? null,
+                    'include_in_spending' => $tx['include_in_spending'] ?? null,
+                    'decline_reason' => $tx['decline_reason'] ?? null,
+                    'settled' => $tx['settled'] ?? null,
+                    'amount_is_pending' => $tx['amount_is_pending'] ?? null,
+                    'local_amount' => $tx['local_amount'] ?? null,
+                    'local_currency' => $tx['local_currency'] ?? null,
+                    'raw' => $tx,
+                ] + ($salaryRejected ? ['salary_rejected' => true] : []),
+                'target_id' => $target->id,
+            ]
+        );
+
+        $this->tagTransactionEvent($event, $tx, $master->configuration['category_names'] ?? []);
+        $this->maybeAddTransactionBlocks($event, $tx);
+        $this->setLocationFromTransaction($event, $target, $tx);
+    }
+
+    /**
+     * Move money from a current account into a pot. Monzo treats a repeated dedupe_id as the same
+     * request, so retrying with the same id can never move the money twice.
+     *
+     * @return array{ok: bool, status: int, error: ?string, body: array<string, mixed>}
+     */
+    public function depositIntoPot(Integration $integration, string $potId, string $sourceAccountId, int $amountPence, string $dedupeId): array
+    {
+        $path = '/pots/' . $potId . '/deposit';
+        $payload = ['source_account_id' => $sourceAccountId, 'amount' => $amountPence, 'dedupe_id' => $dedupeId];
+
+        $this->logApiRequest('PUT', $path, ['Authorization' => '[REDACTED]'], $payload, $integration->id);
+        $resp = Http::withHeaders($this->authHeaders($integration))->asForm()->put($this->apiBase . $path, $payload);
+        $this->logApiResponse('PUT', $path, $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
+        return [
+            'ok' => $resp->successful(),
+            'status' => $resp->status(),
+            'error' => $resp->successful() ? null : (string) ($resp->json('message') ?? $resp->json('code') ?? 'Monzo refused the deposit'),
+            'body' => (array) $resp->json(),
+        ];
+    }
+
+    public function upsertPotObject(Integration $integration, array $pot): EventObject
+    {
+        $master = $this->resolveMasterIntegration($integration);
+
+        // Determine account type based on deletion status
+        $isDeleted = (bool) ($pot['deleted'] ?? false);
+        $accountType = $isDeleted ? 'monzo_archived_pot' : 'monzo_pot';
+        $potId = $pot['id'] ?? null;
+
+        // First try to find existing pot by pot_id in metadata
+        $potObject = null;
+        if ($potId) {
+            $potObject = EventObject::where('user_id', $integration->user_id)
+                ->where('concept', 'account')
+                ->whereIn('type', ['monzo_pot', 'monzo_archived_pot'])
+                ->whereJsonContains('metadata->pot_id', $potId)
+                ->first();
+        }
+
+        // If found, update it; otherwise create new
+        if ($potObject) {
+            // Preserve user-edited fields when updating from API
+            $existingMetadata = $potObject->metadata ?? [];
+            $potName = $pot['name'] ?? 'Pot';
+
+            // Fields that user can edit and should be preserved
+            $preservedFields = [
+                'account_number',
+                'sort_code',
+                'interest_rate',
+                'start_date',
+                'is_negative_balance',
+            ];
+
+            // Build new metadata
+            $newMetadata = [
+                'name' => $potName,
+                'provider' => 'Monzo',
+                'account_type' => 'savings_account',
+                'pot_id' => $potId,
+                'deleted' => $isDeleted,
+                'currency' => 'GBP',
+                'monzo' => $this->potDetails($pot) ?: ($existingMetadata['monzo'] ?? []),
+            ];
+
+            // Preserve Spark-owned keys that the API knows nothing about
+            foreach (['money', 'snapshot_cleanup'] as $sparkKey) {
+                if (isset($existingMetadata[$sparkKey])) {
+                    $newMetadata[$sparkKey] = $existingMetadata[$sparkKey];
+                }
+            }
+
+            // Preserve user-edited fields
+            foreach ($preservedFields as $field) {
+                if (isset($existingMetadata[$field])) {
+                    $newMetadata[$field] = $existingMetadata[$field];
+                }
+            }
+
+            // If user has customized the name, provider, or account_type, preserve it
+            if (isset($existingMetadata['name']) && $existingMetadata['name'] !== ($pot['name'] ?? null)) {
+                $newMetadata['name'] = $existingMetadata['name'];
+            }
+            if (isset($existingMetadata['provider']) && $existingMetadata['provider'] !== 'Monzo') {
+                $newMetadata['provider'] = $existingMetadata['provider'];
+            }
+            // Preserve account_type if it differs from default savings_account
+            if (isset($existingMetadata['account_type']) && $existingMetadata['account_type'] !== 'savings_account') {
+                $newMetadata['account_type'] = $existingMetadata['account_type'];
+            }
+
+            // Use custom title if it was changed from the default
+            $updateTitle = ($potObject->title === ($pot['name'] ?? 'Pot'))
+                ? $newMetadata['name']
+                : $potObject->title;
+
+            $potObject->update([
+                'type' => $accountType,
+                'title' => $updateTitle,
+                'integration_id' => $master->id,
+                'time' => $pot['created'] ?? now(),
+                'content' => (string) ($pot['balance'] ?? 0),
+                'metadata' => $newMetadata,
+                'url' => null,
+                'media_url' => null,
+            ]);
+
+            return $potObject;
+        }
+
+        // Create new pot object
+        return EventObject::create([
+            'user_id' => $integration->user_id,
+            'concept' => 'account',
+            'type' => $accountType,
+            'title' => $pot['name'] ?? 'Pot',
+            'integration_id' => $master->id,
+            'time' => $pot['created'] ?? now(),
+            'content' => (string) ($pot['balance'] ?? 0),
+            'metadata' => [
+                'name' => $pot['name'] ?? 'Pot',
+                'provider' => 'Monzo',
+                'account_type' => 'savings_account',
+                'pot_id' => $potId,
+                'deleted' => $isDeleted,
+                'currency' => 'GBP',
+                'monzo' => $this->potDetails($pot),
+            ],
+            'url' => null,
+            'media_url' => null,
+        ]);
+    }
+
+    /**
+     * The pot fields Monzo returns that Spark keeps (everything but name, balance and id).
+     *
+     * @param  array<string, mixed>  $pot
+     * @return array<string, mixed>
+     */
+    public function potDetails(array $pot): array
+    {
+        $details = [];
+        foreach ([
+            'goal_amount', 'type', 'style', 'current_account_id', 'product_id', 'round_up',
+            'round_up_multiplier', 'is_tax_pot', 'locked', 'isa_wrapper', 'available_for_bills',
+            'charity_id', 'created', 'updated',
+        ] as $field) {
+            if (array_key_exists($field, $pot) && $pot[$field] !== null) {
+                $details[$field] = $pot[$field];
+            }
+        }
+
+        return $details;
+    }
+
+    public function upsertAccountObject(Integration $integration, array $account): EventObject
+    {
+        $title = match ($account['type'] ?? null) {
+            'uk_retail' => 'Current Account',
+            'uk_retail_joint' => 'Joint Account',
+            'uk_monzo_flex' => 'Monzo Flex',
+            'uk_prepaid' => 'Monzo OG',
+            'uk_reward_account' => 'Monzo Rewards',
+            'uk_rewards' => 'Monzo Rewards',
+            default => 'Monzo Account',
+        };
+
+        $accountType = match ($account['type'] ?? null) {
+            'uk_retail' => 'current_account',
+            'uk_retail_joint' => 'current_account',
+            'uk_monzo_flex' => 'credit_card',
+            'uk_prepaid' => 'current_account',
+            'uk_reward_account' => 'savings_account',
+            'uk_rewards' => 'savings_account',
+            default => 'other',
+        };
+
+        $master = $this->resolveMasterIntegration($integration);
+        $accountId = $account['id'] ?? null;
+
+        $newMetadata = [
+            'name' => $title,
+            'provider' => 'Monzo',
+            'account_type' => $accountType,
+            'account_id' => $accountId,
+            'currency' => $account['currency'] ?? 'GBP',
+            'raw' => $account,
+        ];
+
+        // First try to find existing account by account_id in metadata
+        $accountObject = null;
+        if ($accountId) {
+            $accountObject = EventObject::where('user_id', $integration->user_id)
+                ->where('concept', 'account')
+                ->where('type', 'monzo_account')
+                ->whereJsonContains('metadata->account_id', $accountId)
+                ->first();
+        }
+
+        // If found, only update if we have complete account data (not minimal stub data)
+        if ($accountObject) {
+            // Check if this is complete account data or just a minimal stub (id + type only)
+            $hasCompleteData = count($account) > 2 || isset($account['created']) || isset($account['product_type']);
+
+            if ($hasCompleteData) {
+                // Preserve user-edited fields when updating from API
+                $existingMetadata = $accountObject->metadata ?? [];
+
+                // Fields that user can edit and should be preserved
+                $preservedFields = [
+                    'account_number',
+                    'sort_code',
+                    'interest_rate',
+                    'start_date',
+                    'is_negative_balance',
+                ];
+
+                // Merge: start with new metadata, then preserve user-edited fields if they exist
+                $metadata = $newMetadata;
+                foreach ($preservedFields as $field) {
+                    if (isset($existingMetadata[$field])) {
+                        $metadata[$field] = $existingMetadata[$field];
+                    }
+                }
+
+                // If user has customized the name, provider, or account_type, preserve it
+                if (isset($existingMetadata['name']) && $existingMetadata['name'] !== ($existingMetadata['raw']['name'] ?? null)) {
+                    $metadata['name'] = $existingMetadata['name'];
+                }
+                if (isset($existingMetadata['provider']) && $existingMetadata['provider'] !== 'Monzo') {
+                    $metadata['provider'] = $existingMetadata['provider'];
+                }
+                // Preserve account_type if it differs from what the API would set
+                if (isset($existingMetadata['account_type']) && $existingMetadata['account_type'] !== $accountType) {
+                    $metadata['account_type'] = $existingMetadata['account_type'];
+                }
+
+                // Use custom title if it was changed from the default
+                $defaultTitle = $title;
+                $currentTitle = $accountObject->title;
+                $updateTitle = ($currentTitle === $defaultTitle || $currentTitle === ($existingMetadata['name'] ?? null))
+                    ? $metadata['name']
+                    : $currentTitle;
+
+                // We have full account data from the API, safe to update
+                $accountObject->update([
+                    'title' => $updateTitle,
+                    'metadata' => $metadata,
+                ]);
+            }
+            // If we don't have complete data, return existing object without updating
+
+            return $accountObject;
+        }
+
+        // Create new account object (only if we don't have an existing one)
+        return EventObject::create([
+            'user_id' => $integration->user_id,
+            'concept' => 'account',
+            'type' => 'monzo_account',
+            'title' => $title,
+            'integration_id' => $master->id,
+            'time' => now(),
+            'content' => null,
+            'metadata' => $newMetadata,
+        ]);
+    }
+
+    public function convertData(array $externalData, Integration $integration): array
+    {
+        return [];
+    }
+
+    public function listAccounts(Integration $integration): array
+    {
+        $response = $this->makeAuthenticatedMonzoRequest('GET', '/accounts', [], $integration);
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        return $response->json('accounts') ?? [];
+    }
+
+    /**
+     * Pull account data for pull jobs
+     */
+    public function pullAccountData(Integration $integration): array
+    {
+        return $this->listAccounts($integration);
+    }
+
+    /**
+     * Pull balance data for pull jobs
+     */
+    public function pullBalanceData(Integration $integration): array
+    {
+        $accounts = $this->listAccounts($integration);
+
+        if (empty($accounts)) {
+            return [];
+        }
+
+        $allBalances = [];
+
+        foreach ($accounts as $account) {
+            // Log the API request
+            $this->logApiRequest('GET', '/balance', [
+                'Authorization' => '[REDACTED]',
+            ], [
+                'account_id' => $account['id'],
+            ], $integration->id);
+
+            $response = Http::withHeaders($this->authHeaders($integration))
+                ->get($this->getBaseUrl() . '/balance', [
+                    'account_id' => $account['id'],
+                ]);
+
+            // Log the API response
+            $this->logApiResponse('GET', '/balance', $response->status(), $response->body(), $response->headers(), $integration->id);
+
+            if (! $response->successful()) {
+                throw new Exception('Failed to fetch balance from Monzo API: ' . $response->body());
+            }
+
+            $balanceData = $response->json();
+            $balanceData['_account'] = $account;
+            $allBalances[$account['id']] = $balanceData;
+        }
+
+        return $allBalances;
+    }
+
+    /**
+     * Pull pot data for pull jobs
+     */
+    public function pullPotData(Integration $integration): array
+    {
+        $accounts = $this->listAccounts($integration);
+
+        if (empty($accounts)) {
+            return [];
+        }
+
+        $allPots = [];
+
+        foreach ($accounts as $account) {
+            // Log the API request
+            $this->logApiRequest('GET', '/pots', [
+                'Authorization' => '[REDACTED]',
+            ], [
+                'current_account_id' => $account['id'],
+            ], $integration->id);
+
+            $response = Http::withHeaders($this->authHeaders($integration))
+                ->get($this->getBaseUrl() . '/pots', [
+                    'current_account_id' => $account['id'],
+                ]);
+
+            // Log the API response
+            $this->logApiResponse('GET', '/pots', $response->status(), $response->body(), $response->headers(), $integration->id);
+
+            if (! $response->successful()) {
+                throw new Exception('Failed to fetch pots from Monzo API: ' . $response->body());
+            }
+
+            $pots = $response->json('pots') ?? [];
+            $allPots[$account['id']] = $pots;
+        }
+
+        return $allPots;
+    }
+
+    /**
+     * Pull transaction data for pull jobs
+     */
+    public function pullTransactionData(Integration $integration): array
+    {
+        $accounts = $this->listAccounts($integration);
+
+        if (empty($accounts)) {
+            return [];
+        }
+
+        $allTransactions = [];
+
+        $config = $integration->configuration ?? [];
+        $isDailySweep = false;
+        $lastSweepAt = isset($config['monzo_last_sweep_at']) ? Carbon::parse($config['monzo_last_sweep_at']) : null;
+        if (! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22))) {
+            $isDailySweep = true;
+        }
+
+        foreach ($accounts as $account) {
+            // Incremental: 1 day; Sweep: 30 days
+            $daysBack = $isDailySweep ? 30 : 1;
+            $sinceIso = now()->subDays($daysBack)->toIso8601String();
+
+            // Log the API request
+            $this->logApiRequest('GET', '/transactions', [
+                'Authorization' => '[REDACTED]',
+            ], [
+                'account_id' => $account['id'],
+                'expand[]' => 'merchant',
+                'since' => $sinceIso,
+                'limit' => 100,
+            ], $integration->id);
+
+            $response = Http::withHeaders($this->authHeaders($integration))
+                ->get($this->getBaseUrl() . '/transactions', [
+                    'account_id' => $account['id'],
+                    'expand[]' => 'merchant',
+                    'since' => $sinceIso,
+                    'limit' => 100,
+                ]);
+
+            // Log the API response
+            $this->logApiResponse('GET', '/transactions', $response->status(), $response->body(), $response->headers(), $integration->id);
+
+            if (! $response->successful()) {
+                throw new Exception('Failed to fetch transactions from Monzo API: ' . $response->body());
+            }
+
+            $transactions = $response->json('transactions') ?? [];
+
+            $batch = $transactions;
+            $cursor = null;
+            while (count($batch) === 100) {
+                $nextCursor = end($batch)['id'] ?? null;
+                if (! $nextCursor || $nextCursor === $cursor) {
+                    throw new Exception('Monzo transaction pagination did not advance');
+                }
+                $cursor = $nextCursor;
+                $nextResp = Http::withHeaders($this->authHeaders($integration))
+                    ->get($this->getBaseUrl() . '/transactions', [
+                        'account_id' => $account['id'],
+                        'expand[]' => 'merchant',
+                        'since' => $cursor,
+                        'limit' => 100,
+                    ]);
+                $this->logApiResponse('GET', '/transactions', $nextResp->status(), $nextResp->body(), $nextResp->headers(), $integration->id);
+                if (! $nextResp->successful()) {
+                    throw new Exception('Failed to fetch transaction page from Monzo API');
+                }
+                $batch = $nextResp->json('transactions') ?? [];
+                $transactions = array_merge($transactions, $batch);
+            }
+            $allTransactions[$account['id']] = $transactions;
+        }
+
+        if ($isDailySweep) {
+            $config['monzo_last_sweep_at'] = now()->toIso8601String();
+            $integration->update(['configuration' => $config]);
+        }
+
+        return $allTransactions;
+    }
+
+    public function getAuthHeaders(Integration $integration): array
+    {
+        return $this->authHeaders($integration);
+    }
+
+    public function authHeaders(Integration $integration): array
+    {
+        $group = $integration->group;
+        $token = $integration->access_token; // legacy fallback only
+
+        if ($group) {
+            // Check if token is expired and refresh if needed
+            if ($group->expiry && $group->expiry->isPast()) {
+                try {
+                    $this->refreshToken($group);
+                } catch (Exception $e) {
+                    Log::warning('Token refresh failed in authHeaders, using existing token', [
+                        'group_id' => $group->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Continue with existing token - will likely fail but allows graceful degradation
+                }
+            }
+            $token = $group->access_token;
+        }
+
+        return [
+            'Authorization' => 'Bearer ' . $token,
+        ];
+    }
+
+    public function resolveMasterIntegration(Integration $integration): Integration
+    {
+        $group = $integration->group;
+        $master = Integration::where('integration_group_id', $group->id)
+            ->where('service', static::getIdentifier())
+            ->where('instance_type', 'accounts')
+            ->first();
+        if (! $master) {
+            $master = $this->createInstance($group, 'accounts');
+        }
+
+        return $master;
+    }
+
+    /**
+     * Perform a sweep if needed for any instance type
+     */
+    protected function performSweepIfNeeded(Integration $integration): void
+    {
+        $config = $integration->configuration ?? [];
+        $lastSweepAt = isset($config['monzo_last_sweep_at']) ? Carbon::parse($config['monzo_last_sweep_at']) : null;
+        $doSweep = ! $lastSweepAt || $lastSweepAt->lt(now()->subHours(22));
+
+        if ($doSweep) {
+            Log::info('Monzo sweep triggered', [
+                'integration_id' => $integration->id,
+                'instance_type' => $integration->instance_type,
+                'last_sweep_at' => $lastSweepAt?->toIso8601String(),
+            ]);
+
+            // Perform sweep for all data types
+            $this->performDataSweep($integration);
+
+            // Update sweep timestamp
+            $config['monzo_last_sweep_at'] = now()->toIso8601String();
+            $integration->update(['configuration' => $config]);
+
+            Log::info('Monzo sweep completed', [
+                'integration_id' => $integration->id,
+                'instance_type' => $integration->instance_type,
+            ]);
+        }
+    }
+
+    /**
+     * Perform the actual data sweep across all Monzo data types
+     */
+    protected function performDataSweep(Integration $integration): void
+    {
+        $accounts = $this->listAccounts($integration);
+
+        if (empty($accounts)) {
+            Log::warning('Monzo sweep: no accounts found', [
+                'integration_id' => $integration->id,
+            ]);
+
+            return;
+        }
+
+        try {
+            $totalTransactions = 0;
+            $totalBalances = 0;
+            $totalPots = 0;
+
+            foreach ($accounts as $account) {
+                // Sweep transactions (30 days)
+                $sinceIso = now()->subDays(30)->toIso8601String();
+
+                // Log the API request
+                $this->logApiRequest('GET', '/transactions', [
+                    'Authorization' => '[REDACTED]',
+                ], [
+                    'account_id' => $account['id'],
+                    'expand[]' => 'merchant',
+                    'since' => $sinceIso,
+                    'limit' => 100,
+                ], $integration->id);
+
+                $response = Http::withHeaders($this->authHeaders($integration))
+                    ->get($this->getBaseUrl() . '/transactions', [
+                        'account_id' => $account['id'],
+                        'expand[]' => 'merchant',
+                        'since' => $sinceIso,
+                        'limit' => 100,
+                    ]);
+
+                // Log the API response
+                $this->logApiResponse('GET', '/transactions', $response->status(), $response->body(), $response->headers(), $integration->id);
+
+                if (! $response->successful()) {
+                    throw new Exception('Failed to fetch transactions from Monzo API: ' . $response->body());
+                }
+
+                $transactions = $response->json();
+                $transactionItems = $transactions['transactions'] ?? [];
+                foreach ($transactionItems as $transaction) {
+                    $this->processTransactionItem($integration, $transaction, $account['id']);
+                    $totalTransactions++;
+                }
+
+                // Sweep balance snapshots
+                $this->processBalanceSnapshot($integration, $account);
+                $totalBalances++;
+
+                // Sweep pots
+                $this->processPotsSnapshot($integration, $account);
+                $totalPots++;
+            }
+
+            Log::info('Monzo data sweep completed successfully', [
+                'integration_id' => $integration->id,
+                'accounts_count' => count($accounts),
+                'transactions_count' => $totalTransactions,
+                'balances_count' => $totalBalances,
+                'pots_count' => $totalPots,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Monzo data sweep failed', [
+                'integration_id' => $integration->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
+        }
+    }
+
+    protected function getRequiredScopes(): string
+    {
+        // Monzo OAuth scopes needed for read-only ingestion
+        return implode(' ', [
+            'accounts:read',
+            'transactions:read',
+            'balance:read',
+            'pots:read',
+        ]);
+    }
+
+    /**
+     * Override parent refreshToken method to use Monzo-specific endpoint
+     */
+    protected function refreshToken(IntegrationGroup $group): void
+    {
+        $clientId = $this->clientId;
+        $clientSecret = $this->clientSecret;
+        $refreshToken = $group->refresh_token;
+
+        if (empty($clientId) || empty($clientSecret) || empty($refreshToken)) {
+            Log::warning('Monzo refresh skipped due to missing credentials or refresh_token', [
+                'group_id' => $group->id,
+            ]);
+
+            return;
+        }
+
+        // Log the API request
+        $this->logApiRequest('POST', '/oauth2/token', [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+        ], [
+            'grant_type' => 'refresh_token',
+            'client_id' => $clientId,
+        ]);
+
+        $response = Http::asForm()->post($this->apiBase . '/oauth2/token', [
+            'grant_type' => 'refresh_token',
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'refresh_token' => $refreshToken,
+        ]);
+
+        // Log the API response
+        $this->logApiResponse('POST', '/oauth2/token', $response->status(), $response->body(), $response->headers());
+
+        if (! $response->successful()) {
+            Log::error('Monzo token refresh failed', [
+                'group_id' => $group->id,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            throw new Exception('Failed to refresh Monzo token');
+        }
+
+        $data = $response->json();
+        $group->update([
+            'access_token' => $data['access_token'] ?? null,
+            'refresh_token' => $data['refresh_token'] ?? $group->refresh_token,
+            'expiry' => isset($data['expires_in']) ? now()->addSeconds((int) $data['expires_in']) : null,
+        ]);
+
+        Log::info('Monzo token refreshed successfully', [
+            'group_id' => $group->id,
+            'expires_at' => $group->expiry?->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * Make an authenticated request with automatic token refresh on 401
+     */
+    protected function makeAuthenticatedMonzoRequest(string $method, string $endpoint, array $params = [], ?Integration $integration = null): Response
+    {
+        $url = $this->apiBase . $endpoint;
+
+        // Log the API request
+        $this->logApiRequest($method, $endpoint, [
+            'Authorization' => '[REDACTED]',
+        ], $params, $integration?->id);
+
+        // Make the initial request
+        $http = Http::withHeaders($this->authHeaders($integration));
+        $response = match ($method) {
+            'GET' => $http->get($url, $params),
+            'POST' => $http->post($url, $params),
+            'PUT' => $http->put($url, $params),
+            'DELETE' => $http->delete($url, $params),
+            default => throw new Exception("Unsupported HTTP method: {$method}"),
+        };
+
+        // Log the API response
+        $this->logApiResponse($method, $endpoint, $response->status(), $response->body(), $response->headers(), $integration?->id);
+
+        // Handle 401 unauthorized - try to refresh token and retry once
+        if ($response->status() === 401 && $integration?->group) {
+            Log::info('Monzo API returned 401, attempting token refresh', [
+                'integration_id' => $integration->id,
+                'method' => $method,
+                'endpoint' => $endpoint,
+            ]);
+
+            try {
+                $this->refreshToken($integration->group);
+
+                // Retry the request with new token
+                $http = Http::withHeaders($this->authHeaders($integration));
+                $response = match ($method) {
+                    'GET' => $http->get($url, $params),
+                    'POST' => $http->post($url, $params),
+                    'PUT' => $http->put($url, $params),
+                    'DELETE' => $http->delete($url, $params),
+                    default => throw new Exception("Unsupported HTTP method: {$method}"),
+                };
+
+                $this->logApiResponse($method, $endpoint, $response->status(), $response->body(), $response->headers(), $integration->id);
+            } catch (Exception $e) {
+                Log::error('Monzo token refresh failed during API request', [
+                    'integration_id' => $integration?->id,
+                    'method' => $method,
+                    'endpoint' => $endpoint,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $response;
+    }
+
+    protected function fetchAccountInfoForGroup(IntegrationGroup $group): void
+    {
+        $account = $this->getPrimaryAccount($group);
+        if ($account) {
+            $group->update([
+                'account_id' => $account['id'],
+            ]);
+        }
+    }
+
+    protected function getPrimaryAccount(IntegrationGroup $group): ?array
+    {
+        // Check if token is expired and refresh if needed
+        if ($group->expiry && $group->expiry->isPast()) {
+            $this->refreshToken($group);
+        }
+
+        // Log the API request
+        $this->logApiRequest('GET', '/accounts', [
+            'Authorization' => '[REDACTED]',
+        ], [], $group->id);
+
+        $resp = Http::withToken((string) $group->access_token)
+            ->get($this->apiBase . '/accounts');
+
+        // Log the API response
+        $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $group->id);
+
+        // Handle 401 unauthorized - try to refresh token and retry once
+        if ($resp->status() === 401) {
+            Log::info('Monzo API returned 401 in getPrimaryAccount, attempting token refresh', [
+                'group_id' => $group->id,
+            ]);
+
+            try {
+                $this->refreshToken($group);
+
+                // Retry the request with new token
+                $resp = Http::withToken((string) $group->access_token)
+                    ->get($this->apiBase . '/accounts');
+
+                $this->logApiResponse('GET', '/accounts', $resp->status(), $resp->body(), $resp->headers(), $group->id);
+            } catch (Exception $e) {
+                Log::error('Monzo token refresh failed during getPrimaryAccount', [
+                    'group_id' => $group->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
+            }
+        }
+
+        if (! $resp->successful()) {
+            return null;
+        }
+        $accounts = $resp->json('accounts') ?? [];
+        foreach ($accounts as $acc) {
+            if (($acc['type'] ?? '') === 'uk_retail') {
+                return $acc;
+            }
+        }
+
+        return $accounts[0] ?? null;
+    }
+
+    protected function processPotsSnapshot(Integration $integration, array $account): void
+    {
+        // Log the API request
+        $this->logApiRequest('GET', '/pots', [
+            'Authorization' => '[REDACTED]',
+        ], [
+            'current_account_id' => $account['id'],
+        ], $integration->id);
+
+        $resp = Http::withHeaders($this->authHeaders($integration))
+            ->get($this->apiBase . '/pots', [
+                'current_account_id' => $account['id'],
+            ]);
+
+        // Log the API response
+        $this->logApiResponse('GET', '/pots', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
+        if (! $resp->successful()) {
+            return;
+        }
+        $pots = $resp->json('pots') ?? [];
+        $date = now()->toDateString();
+
+        // Create the target "day" object once for pot balance events
+        $dayObject = EventObject::firstOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'day',
+                'type' => 'day',
+                'title' => $date,
+            ],
+            [
+                'integration_id' => $integration->id,
+                'time' => $date . ' 00:00:00',
+                'content' => null,
+                'metadata' => [],
+            ]
+        );
+
+        foreach ($pots as $pot) {
+            // Upsert the pot object
+            $potObject = $this->upsertPotObject($integration, $pot);
+            if ($pot['deleted'] ?? false) {
+                continue;
+            }
+
+            // Create balance event for the pot
+            $balance = (int) ($pot['balance'] ?? 0); // Monzo API returns balance in pence
+            $sourceId = 'monzo_pot_balance_' . $pot['id'] . '_' . $date;
+
+            Event::updateOrCreate(
+                [
+                    'integration_id' => $integration->id,
+                    'source_id' => $sourceId,
+                ],
+                [
+                    'time' => $date . ' 23:59:59',
+                    'actor_id' => $potObject->id,
+                    'service' => 'monzo',
+                    'domain' => self::getDomain(),
+                    'action' => 'had_balance',
+                    'value' => abs($balance), // integer pence
+                    'value_multiplier' => 100, // 100 pence = £1
+                    'value_unit' => 'GBP',
+                    'event_metadata' => [
+                        'pot_id' => $pot['id'] ?? null,
+                        'pot_name' => $pot['name'] ?? 'Pot',
+                        'snapshot_date' => $date,
+                    ],
+                    'target_id' => $dayObject->id,
+                ]
+            );
+        }
+    }
+
+    protected function processBalanceSnapshot(Integration $integration, array $account): void
+    {
+        // Log the API request
+        $this->logApiRequest('GET', '/balance', [
+            'Authorization' => '[REDACTED]',
+        ], [
+            'account_id' => $account['id'],
+        ], $integration->id);
+
+        $resp = Http::withHeaders($this->authHeaders($integration))
+            ->get($this->apiBase . '/balance', [
+                'account_id' => $account['id'],
+            ]);
+
+        // Log the API response
+        $this->logApiResponse('GET', '/balance', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
+        if (! $resp->successful()) {
+            return;
+        }
+        $json = $resp->json();
+        $balance = (int) ($json['balance'] ?? 0); // cents
+        $spendToday = (int) ($json['spend_today'] ?? 0); // cents
+        $date = now()->toDateString();
+
+        // Create the target "day" object once (target_id is NOT NULL in events)
+        $dayObject = EventObject::firstOrCreate(
+            [
+                'user_id' => $integration->user_id,
+                'concept' => 'day',
+                'type' => 'day',
+                'title' => $date,
+            ],
+            [
+                'integration_id' => $integration->id,
+                'time' => $date . ' 00:00:00',
+                'content' => null,
+                'metadata' => [],
+            ]
+        );
+
+        $event = Event::updateOrCreate(
+            [
+                'integration_id' => $integration->id,
+                'source_id' => 'monzo_balance_' . $account['id'] . '_' . $date,
+            ],
+            [
+                'time' => $date . ' 23:59:59',
+                'actor_id' => $this->upsertAccountObject($integration, $account)->id,
+                'service' => 'monzo',
+                'domain' => self::getDomain(),
+                'action' => 'had_balance',
+                'value' => abs($balance), // integer cents
+                'value_multiplier' => 100,
+                'value_unit' => 'GBP',
+                'event_metadata' => [
+                    'spent_today' => $spendToday / 100,
+                ],
+                'target_id' => $dayObject->id,
+            ]
+        );
+
+        // Add balance blocks (Spent Today + Balance Change)
+        try {
+            $this->addBalanceBlocks($event, $integration, $account, $date, $balance, $spendToday);
+        } catch (Throwable $e) {
+            // Non-fatal if blocks fail
+        }
+    }
+
+    protected function processRecentTransactions(Integration $integration, array $account): void
+    {
+        $sinceIso = now()->subDays(7)->toIso8601String();
+        // Log the API request
+        $this->logApiRequest('GET', '/transactions', [
+            'Authorization' => '[REDACTED]',
+        ], [
+            'account_id' => $account['id'],
+            'expand[]' => 'merchant',
+            'since' => $sinceIso,
+            'limit' => 100,
+        ], $integration->id);
+
+        $resp = Http::withHeaders($this->authHeaders($integration))
+            ->get($this->apiBase . '/transactions', [
+                'account_id' => $account['id'],
+                'expand[]' => 'merchant',
+                'since' => $sinceIso,
+                'limit' => 100,
+            ]);
+
+        // Log the API response
+        $this->logApiResponse('GET', '/transactions', $resp->status(), $resp->body(), $resp->headers(), $integration->id);
+
+        if (! $resp->successful()) {
+            return;
+        }
+        $txs = $resp->json('transactions') ?? [];
+        foreach ($txs as $tx) {
+            $this->processTransactionItem($integration, $tx, $account['id']);
+        }
+    }
+
+    /**
+     * Set location for transaction event
+     */
+    protected function setLocationFromTransaction(Event $event, EventObject $target, array $tx): void
+    {
+        // Skip if online transaction
+        if (isset($tx['merchant']['online']) && $tx['merchant']['online'] === true) {
+            return;
+        }
+
+        // Check if target EventObject already has a location (manually assigned)
+        if ($target->location) {
+            $event->location = $target->location;
+            $event->location_address = $target->location_address;
+            $event->location_geocoded_at = now();
+            $event->location_source = 'inherited';
+            $event->save();
+
+            $this->detectAndLinkPlace($event);
+
+            return;
+        }
+
+        // Check if merchant has coordinates
+        if (isset($tx['merchant']['latitude'], $tx['merchant']['longitude'])) {
+            $latitude = (float) $tx['merchant']['latitude'];
+            $longitude = (float) $tx['merchant']['longitude'];
+
+            // Build formatted address from merchant data
+            $addressParts = array_filter([
+                $tx['merchant']['name'] ?? null, // Include merchant name first for place categorization
+                $tx['merchant']['address']['address'] ?? null,
+                $tx['merchant']['address']['city'] ?? null,
+                $tx['merchant']['address']['postcode'] ?? null,
+                $tx['merchant']['address']['country'] ?? null,
+            ]);
+            $formattedAddress = implode(', ', $addressParts);
+
+            $event->setLocation(
+                $latitude,
+                $longitude,
+                $formattedAddress ?: ($tx['merchant']['name'] ?? null),
+                'monzo_api'
+            );
+
+            $this->detectAndLinkPlace($event);
+
+            return;
+        }
+
+        // Fallback: Geocode merchant address if available
+        if (isset($tx['merchant']['address']['address'])) {
+            $addressParts = array_filter([
+                $tx['merchant']['address']['address'] ?? null,
+                $tx['merchant']['address']['city'] ?? null,
+                $tx['merchant']['address']['postcode'] ?? null,
+                $tx['merchant']['address']['country'] ?? null,
+            ]);
+
+            if (! empty($addressParts)) {
+                $address = implode(', ', $addressParts);
+
+                $geocodingService = app(GeocodingService::class);
+                $result = $geocodingService->geocode($address);
+
+                if ($result) {
+                    $event->setLocation(
+                        $result['latitude'],
+                        $result['longitude'],
+                        $result['formatted_address'] ?? $address,
+                        $result['source'] // 'cache' or 'geoapify'
+                    );
+                }
+            }
+        }
+
+        // After setting location, detect and link to place
+        $this->detectAndLinkPlace($event);
+    }
+
+    /**
+     * Detect or create a place for this event and link them
+     */
+    protected function detectAndLinkPlace(Event $event): void
+    {
+        if (! $event->hasLocation()) {
+            return;
+        }
+
+        try {
+            $placeService = app(PlaceDetectionService::class);
+            $placeService->detectAndLinkPlaceForEvent($event);
+        } catch (Exception $e) {
+            // Log error but don't fail the transaction processing
+            Log::error('Failed to detect place for Monzo transaction', [
+                'event_id' => $event->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function setAction(array $tx, bool $detectSalary = true): string
+    {
+        $amount = (int) ($tx['amount'] ?? 0);
+        $scheme = $tx['scheme'] ?? null;
+        $declined = ! empty($tx['decline_reason']);
+
+        if ($declined) {
+            return 'declined_payment_to';
+        }
+
+        // Salary detection (BACS, amount > £1500 and merchant name matches configured salary name)
+        if ($detectSalary && $scheme === 'bacs' && $amount > 150000) {
+            $salaryName = (string) (config('services.monzo.salary_name') ?? '');
+            if ($salaryName !== '' && isset($tx['merchant']['name']) && $tx['merchant']['name'] === $salaryName) {
+                return 'salary_received_from';
+            }
+        }
+
+        if ($scheme === 'mastercard') {
+            return $amount < 0 ? 'card_payment_to' : 'card_refund_from';
+        }
+        if ($scheme === 'uk_retail_pot') {
+            return $amount < 0 ? 'pot_transfer_to' : 'pot_withdrawal_to';
+        }
+        if ($scheme === 'account_interest') {
+            return $amount < 0 ? 'interest_repaid' : 'interest_earned';
+        }
+        if ($scheme === 'monzo_flex') {
+            return $amount < 0 ? 'monzo_flex_payment' : 'monzo_flex_loan';
+        }
+        if ($scheme === 'bacs') {
+            return $amount < 0 ? 'direct_debit_to' : 'direct_credit_from';
+        }
+        if ($scheme === 'p2p_payment') {
+            return $amount < 0 ? 'monzo_me_to' : 'monzo_me_from';
+        }
+        if ($scheme === 'payport_faster_payments') {
+            return $amount < 0 ? 'bank_transfer_to' : 'bank_transfer_from';
+        }
+        if ($scheme === 'monzo_paid') {
+            return $amount < 0 ? 'fee_paid_for' : 'fee_refunded_for';
+        }
+
+        // Default fallback
+        return $amount < 0 ? 'other_debit_to' : 'other_credit_from';
+    }
+
+    /**
+     * @param  array<string, string>  $categoryNames  Monzo custom category id => display name
+     */
+    private function tagTransactionEvent(Event $event, array $tx, array $categoryNames = []): void
+    {
+        // Category tag, using the display name for Monzo custom categories once it is known
+        if (! empty($tx['category'])) {
+            $category = (string) $tx['category'];
+            $event->attachTag($categoryNames[$category] ?? $category, 'transaction_category');
+        }
+        // Debit/Credit tag
+        $amount = (int) ($tx['amount'] ?? 0);
+        $event->attachTag($amount < 0 ? 'debit' : 'credit', 'transaction_type');
+        // Scheme tag
+        if (! empty($tx['scheme'])) {
+            $event->attachTag((string) $tx['scheme'], 'transaction_scheme');
+        }
+        // Currency tag
+        if (! empty($tx['local_currency'])) {
+            $event->attachTag((string) $tx['local_currency'], 'transaction_currency');
+        }
+        // Merchant emoji/country/category
+        if (! empty($tx['merchant']['emoji'])) {
+            $event->attachTag((string) $tx['merchant']['emoji'], 'merchant_emoji');
+        }
+        if (! empty($tx['merchant']['address']['country'])) {
+            $event->attachTag((string) $tx['merchant']['address']['country'], 'merchant_country');
+        }
+        if (! empty($tx['merchant']['category'])) {
+            $event->attachTag((string) $tx['merchant']['category'], 'merchant_category');
+        }
+        $declined = ! empty($tx['decline_reason']);
+        $pending = ! empty($tx['amount_is_pending'])
+            || (array_key_exists('settled', $tx) && empty($tx['settled']));
+        $event->syncTagsWithType([$declined ? 'declined' : ($pending ? 'pending' : 'settled')], 'transaction_status');
+        $event->syncTagsWithType($declined ? [(string) $tx['decline_reason']] : [], 'decline_reason');
+    }
+
+    private function maybeAddTransactionBlocks(Event $event, array $tx): void
+    {
+        // Merchant details
+        if (! empty($tx['merchant'])) {
+            $m = (array) $tx['merchant'];
+            $parts = [];
+            if (! empty($m['name'])) {
+                $parts['merchant'] = (string) $m['name'];
+            }
+            if (! empty($m['category'])) {
+                $parts['category'] = (string) $m['category'];
+            }
+            if (! empty($m['address'])) {
+                $addr = (array) $m['address'];
+                $addrLine = implode(', ', array_values(array_filter([
+                    $addr['address'] ?? null,
+                    $addr['city'] ?? null,
+                    $addr['postcode'] ?? null,
+                    $addr['country'] ?? null,
+                ])));
+                if ($addrLine !== '') {
+                    $parts['address'] = $addrLine;
+                }
+            }
+            $event->createBlock([
+                'time' => $event->time,
+                'block_type' => 'merchant',
+                'title' => 'Merchant',
+                'metadata' => $parts,
+                'media_url' => $m['logo'] ?? null,
+                'value' => null,
+                'value_multiplier' => 1,
+                'value_unit' => null,
+            ]);
+        }
+
+        // FX breakdown (local currency vs transaction currency)
+        $localAmount = $tx['local_amount'] ?? null;
+        $localCurrency = $tx['local_currency'] ?? null;
+        $txCurrency = $tx['currency'] ?? 'GBP';
+        if ($localAmount !== null && $localCurrency && strtoupper((string) $localCurrency) !== strtoupper((string) $txCurrency)) {
+            $gbp = abs(((int) ($tx['amount'] ?? 0)) / 100);
+            $loc = abs(((int) $localAmount) / 100);
+            $rate = $loc > 0 ? round($gbp / $loc, 6) : null;
+            $metadata = [
+                strtoupper((string) $localCurrency) => $loc,
+                strtoupper((string) $txCurrency) => $gbp,
+            ];
+            if ($rate !== null) {
+                $metadata['rate'] = $rate;
+            }
+            $event->createBlock([
+                'time' => $event->time,
+                'block_type' => 'foreign_exchange',
+                'title' => 'FX',
+                'metadata' => $metadata,
+                'media_url' => null,
+                'value' => null,
+                'value_multiplier' => 1,
+                'value_unit' => null,
+            ]);
+        }
+
+        // Example block for virtual cards
+        if (! empty($tx['virtual_card'])) {
+            $vc = (array) $tx['virtual_card'];
+            $event->createBlock([
+                'time' => $event->time,
+                'block_type' => 'virtual_card',
+                'title' => 'Virtual Card',
+                'metadata' => $vc,
+                'media_url' => null,
+                'value' => null,
+                'value_multiplier' => 1,
+                'value_unit' => null,
+            ]);
+        }
+
+        $scheme = $tx['scheme'] ?? null;
+        $amount = (int) ($tx['amount'] ?? 0);
+
+        // Pot Transfers
+        if ($scheme === 'uk_retail_pot') {
+            $direction = $amount < 0 ? 'To' : 'From';
+            $potName = null;
+            // Try to resolve pot name from target
+            try {
+                $target = $event->target()->first();
+                if ($target && $target->type === 'monzo_pot') {
+                    $potName = $target->title;
+                }
+            } catch (Throwable $e) {
+                // ignore
+            }
+            $event->createBlock([
+                'time' => $event->time,
+                'block_type' => 'pot_transfer',
+                'title' => 'Pot Transfer',
+                'metadata' => ['direction' => $direction, 'pot_name' => $potName ?? 'Pot'],
+                'media_url' => null,
+                'value' => abs($amount),
+                'value_multiplier' => 100,
+                'value_unit' => 'GBP',
+            ]);
+        }
+
+        // External Account Transfers (Faster Payments / bank transfers)
+        if ($scheme === 'payport_faster_payments') {
+            $cp = (array) ($tx['counterparty'] ?? []);
+            $details = [];
+            if (! empty($cp['name'])) {
+                $details['counterparty'] = (string) $cp['name'];
+            }
+            if (! empty($cp['sort_code']) && ! empty($cp['account_number'])) {
+                $details['sort_code'] = $cp['sort_code'];
+                $details['account_number'] = $cp['account_number'];
+            }
+            $event->createBlock([
+                'block_type' => 'bank_transfer',
+                'time' => $event->time,
+                'title' => 'Bank Transfer',
+                'metadata' => $details,
+                'media_url' => null,
+                'value' => abs($amount),
+                'value_multiplier' => 100,
+                'value_unit' => 'GBP',
+            ]);
+        }
+    }
+}

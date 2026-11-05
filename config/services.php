@@ -40,6 +40,299 @@ return [
         'client_secret' => env('AUTHELIA_CLIENT_SECRET'),
         'redirect' => env('AUTHELIA_REDIRECT_URI'),
         'base_url' => env('AUTHELIA_BASE_URL'),
+        'token_endpoint_auth_method' => 'client_secret_basic',
+    ],
+
+    'github' => [
+        'client_id' => env('GITHUB_CLIENT_ID'),
+        'client_secret' => env('GITHUB_CLIENT_SECRET'),
+        'redirect' => env('GITHUB_REDIRECT_URI'),
+    ],
+
+    'spotify' => [
+        'client_id' => env('SPOTIFY_CLIENT_ID'),
+        'client_secret' => env('SPOTIFY_CLIENT_SECRET'),
+        'redirect' => env('SPOTIFY_REDIRECT_URI'),
+    ],
+
+    'reddit' => [
+        'client_id' => env('REDDIT_CLIENT_ID'),
+        'client_secret' => env('REDDIT_CLIENT_SECRET'),
+        'redirect' => env('REDDIT_REDIRECT_URI'),
+        'useragent' => env('REDDIT_USERAGENT', 'SparkApp/1.0 by u/example'),
+    ],
+
+    'monzo' => [
+        'client_id' => env('MONZO_CLIENT_ID'),
+        'client_secret' => env('MONZO_CLIENT_SECRET'),
+        'redirect' => env('MONZO_REDIRECT_URI'),
+        'salary_name' => env('MONZO_SALARY_NAME'),
+    ],
+
+    'gocardless' => [
+        // GoCardless Bank Account Data API credentials
+        'secret_id' => env('GOCARDLESS_SECRET_ID'),
+        'secret_key' => env('GOCARDLESS_SECRET_KEY'),
+        // API base URL
+        'api_base' => env('GOCARDLESS_API_BASE', 'https://bankaccountdata.gocardless.com/api/v2'),
+        // Optional: limit to a country or pre-select an institution
+        'country' => env('GOCARDLESS_COUNTRY', 'GB'),
+        'institution_id' => env('GOCARDLESS_INSTITUTION_ID'),
+        // Redirect URI for requisition flow
+        'redirect' => env('GOCARDLESS_REDIRECT_URI', env('APP_URL') . '/integrations/gocardless/callback'),
+    ],
+
+    'oura' => [
+        'client_id' => env('OURA_CLIENT_ID'),
+        'client_secret' => env('OURA_CLIENT_SECRET'),
+        'redirect' => env('OURA_REDIRECT_URI'),
+    ],
+
+    'hevy' => [
+        'api_key' => env('HEVY_API_KEY'),
+    ],
+
+    'outline' => [
+        'url' => env('OUTLINE_URL'),
+        'access_token' => env('OUTLINE_ACCESS_TOKEN'),
+        'daynotes_collection_id' => env('OUTLINE_DAYNOTES_COLLECTION_ID', '5622670a-e725-437d-b747-a17905038df8'),
+        'poll_interval_minutes' => env('OUTLINE_POLL_INTERVAL_MINUTES', 15),
+    ],
+
+    'karakeep' => [
+        'url' => env('KARAKEEP_URL'),
+        'access_token' => env('KARAKEEP_ACCESS_TOKEN'),
+    ],
+
+    'google-calendar' => [
+        'client_id' => env('GOOGLE_CALENDAR_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CALENDAR_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_CALENDAR_REDIRECT_URI'),
+    ],
+
+    'bluesky' => [
+        'oauth_private_key' => env('BLUESKY_OAUTH_PRIVATE_KEY'),
+        'redirect' => env('BLUESKY_REDIRECT', '/bluesky/oauth/callback'),
+    ],
+
+    'playwright' => [
+        'enabled' => env('PLAYWRIGHT_ENABLED', false),
+        'worker_url' => env('PLAYWRIGHT_WORKER_URL', 'http://playwright-worker:3000'),
+        'chrome_vnc_url' => env('CHROME_VNC_URL', 'vnc://localhost:5900'),
+        'chrome_vnc_password' => env('CHROME_VNC_PASSWORD', 'spark-dev-vnc'),
+        'timeout' => env('PLAYWRIGHT_TIMEOUT', 30000), // 30 seconds
+        'screenshot_enabled' => env('PLAYWRIGHT_SCREENSHOT_ENABLED', true),
+        'mcp_max_html_bytes' => env('MCP_PLAYWRIGHT_MAX_HTML_BYTES', 1048576),
+        'auto_escalate' => env('PLAYWRIGHT_AUTO_ESCALATE', true), // Auto-use Playwright on HTTP failures
+        'js_required_domains' => env('PLAYWRIGHT_JS_DOMAINS', 'twitter.com,x.com,instagram.com,facebook.com'),
+
+        // Stealth mode (anti-bot detection)
+        'stealth_enabled' => env('PLAYWRIGHT_STEALTH_ENABLED', true),
+
+        // Cookie auto-refresh
+        'auto_update_cookies' => env('PLAYWRIGHT_AUTO_UPDATE_COOKIES', true),
+
+        // Browser context persistence
+        'context_persistence_enabled' => env('PLAYWRIGHT_CONTEXT_PERSISTENCE', true),
+        'context_ttl' => env('PLAYWRIGHT_CONTEXT_TTL', 1800), // 30 minutes in seconds
+        'context_ttl_minutes' => env('PLAYWRIGHT_CONTEXT_TTL', 1800) / 60, // For display
+
+        // Use default browser context (includes extensions like cookie popup blocker)
+        'use_default_context' => env('PLAYWRIGHT_USE_DEFAULT_CONTEXT', true),
+
+        // Scheduled cookie refresh
+        'cookie_refresh_enabled' => env('PLAYWRIGHT_COOKIE_REFRESH_ENABLED', true),
+        'cookie_refresh_threshold_days' => env('PLAYWRIGHT_COOKIE_REFRESH_THRESHOLD', 7),
+    ],
+
+    'fetch' => [
+        // Archive.is bypass for paywalled content
+        'archive_bypass_enabled' => env('FETCH_ARCHIVE_BYPASS_ENABLED', true),
+        'archive_bypass_timeout' => env('FETCH_ARCHIVE_BYPASS_TIMEOUT', 30), // seconds
+
+        // Domains to exclude from archive bypass (comma-separated)
+        // Some sites may not work well with archive.is or have their own bypass mechanisms
+        'archive_bypass_excluded_domains' => env('FETCH_ARCHIVE_BYPASS_EXCLUDED_DOMAINS', ''),
+    ],
+
+    'jev' => [
+        // TypeSafe's Jev (System One) classifier, used for narrow typed
+        // judgments such as "is this page a list of articles?". Pin an exact
+        // model version: the thresholds in config/fetch.php are tuned per
+        // version and must be re-checked when this changes.
+        'enabled' => env('JEV_ENABLED', false),
+        'api_key' => env('TYPESAFE_API_KEY'),
+        'base_url' => env('JEV_BASE_URL', 'https://api.typesafe.ai'),
+        'model' => env('JEV_MODEL', 'jev-1.13.0'),
+        'timeout' => (float) env('JEV_TIMEOUT', 10),
+    ],
+
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'organization' => env('OPENAI_ORGANIZATION'),
+        'daily_token_cap' => (int) env('OPENAI_DAILY_TOKEN_CAP', 0),
+
+        // One model per role, resolved through App\Services\Ai\AiModel. Nothing
+        // in the application names a model inline, so switching one is an env
+        // change rather than a code change. Keep this list short.
+        'models' => [
+            'embedding' => env('OPENAI_EMBEDDING_MODEL', 'text-embedding-3-small'),
+            'extraction' => env('OPENAI_EXTRACTION_MODEL', 'gpt-5-nano'),
+            'reasoning' => env('OPENAI_REASONING_MODEL', 'gpt-4o-mini'),
+        ],
+    ],
+
+    'tmdb' => [
+        'api_key' => env('TMDB_API_KEY'),
+        'base_url' => env('TMDB_BASE_URL', 'https://api.themoviedb.org/3'),
+        'image_base_url' => env('TMDB_IMAGE_BASE_URL', 'https://image.tmdb.org/t/p/w500'),
+    ],
+
+    'boardgamegeek' => [
+        'base_url' => env('BOARDGAMEGEEK_BASE_URL', 'https://boardgamegeek.com/xmlapi2'),
+    ],
+
+    'vivino' => [
+        'search_url' => env('VIVINO_SEARCH_URL', 'https://www.vivino.com/search/wines'),
+    ],
+
+    'untappd' => [
+        'search_url' => env('UNTAPPD_SEARCH_URL', 'https://untappd.com/search'),
+    ],
+
+    'tvdb' => [
+        'base_url' => env('TVDB_BASE_URL', 'https://api4.thetvdb.com/v4'),
+        'api_key' => env('TVDB_API_KEY'),
+    ],
+
+    'receipt' => [
+        'domain' => env('RECEIPT_DOMAIN', 'spark.cronx.co'),
+        'email_address' => env('RECEIPT_EMAIL_ADDRESS', 'receipts@spark.cronx.co'),
+        's3_bucket' => env('AWS_BUCKET_RECEIPTS', 'spark-receipts-emails'),
+        'sns_topic_arn' => env('AWS_SNS_RECEIPT_TOPIC_ARN'),
+        'auto_match_threshold' => 0.8,
+        'review_threshold' => 0.5,
+        'currency_tolerance_percent' => (float) env('RECEIPT_CURRENCY_TOLERANCE', 2.0),
+    ],
+
+    'newsletter' => [
+        'domain' => env('NEWSLETTER_DOMAIN', 'spark.cronx.co'),
+        'email_address' => env('NEWSLETTER_EMAIL_ADDRESS', 'news@spark.cronx.co'),
+        's3_bucket' => env('AWS_BUCKET_NEWSLETTERS', 'spark-newsletters-emails'),
+        'sns_topic_arn' => env('AWS_SNS_NEWSLETTER_TOPIC_ARN'),
+        'retention_days' => 90,
+    ],
+
+    'currency' => [
+        'api_provider' => env('CURRENCY_API_PROVIDER', 'exchangerate'),
+        'api_key' => env('CURRENCY_API_KEY'),
+        'api_url' => env('CURRENCY_API_URL', 'https://v6.exchangerate-api.com/v6'),
+        'base_currency' => env('CURRENCY_BASE', 'GBP'),
+        'cache_ttl_hours' => (int) env('CURRENCY_CACHE_TTL', 24),
+        'fallback_enabled' => env('CURRENCY_FALLBACK_ENABLED', true),
+        'supported_currencies' => ['GBP', 'USD', 'EUR', 'AUD', 'CAD', 'CHF', 'JPY', 'CNY'],
+    ],
+
+    'geoapify' => [
+        'api_key' => env('GEOAPIFY_API_KEY'),
+        'base_url' => env('GEOAPIFY_BASE_URL', 'https://api.geoapify.com/v1'),
+        'daily_limit' => (int) env('GEOAPIFY_DAILY_LIMIT', 3000),
+    ],
+
+    'metoffice' => [
+        'api_key' => env('METOFFICE_API_KEY'),
+        'base_url' => env('METOFFICE_BASE_URL', 'https://data.hub.api.metoffice.gov.uk/sitespecific/v0'),
+        'cache_ttl_hours' => (int) env('METOFFICE_CACHE_TTL', 1),
+    ],
+
+    // Claude Code Routine webhook that generates Flint morning/evening digests.
+    // Spark owns the timing (in the user's effective timezone) and POSTs to the
+    // routine, which calls back via the create-flint-digest MCP tool.
+    'flint_routine' => [
+        // Minutes after which a routine run that never reported back stops blocking the next one.
+        'running_stale_minutes' => (int) env('FLINT_ROUTINE_RUNNING_STALE_MINUTES', 45),
+
+        // The CronxTools MCP endpoint OpenAI connects to when running a Flint
+        // skill. The bearer token is embedded in the URL, so this value is a
+        // credential: it must never reach a log, a span or a stored payload.
+        // See redact_sensitive_urls() in app/Support/helpers.php.
+        'cronxtools_url' => env('FLINT_CRONXTOOLS_URL'),
+
+        // The You.com MCP endpoint a skill may search through when its
+        // manifest allows a `you__` tool. The free profile needs no key; a
+        // keyed URL would be a credential, so it is redacted like the above.
+        'you_mcp_url' => env('FLINT_YOU_MCP_URL', 'https://api.you.com/mcp?profile=free'),
+
+        // Optional You.com API key, sent as the MCP bearer token rather than
+        // in the URL. Leave unset for the free profile.
+        'you_mcp_key' => env('FLINT_YOU_MCP_KEY'),
+
+        // How a routine is run: 'webhook' hands it to a Claude Code Routine,
+        // 'openai' runs the vendored skill in-process. Individual routines may
+        // override this, so the two can be compared on the same input. Only a
+        // fallback: a driver chosen on the Flint settings tab wins.
+        'driver' => env('FLINT_ROUTINE_DRIVER', 'webhook'),
+
+        // Shared fallback bearer secret. Per-routine secrets below take
+        // precedence; this exists so they can be rolled out one routine at a
+        // time rather than on a flag day.
+        'secret' => env('FLINT_ROUTINE_WEBHOOK_SECRET'),
+
+        // Each routine owns its endpoint and its own secret, so one leaked
+        // secret does not authenticate against the other three and rotation is
+        // per-routine. Resolved by App\Services\Flint\RoutineConfig.
+        'routines' => [
+            'digest' => [
+                'url' => env('FLINT_ROUTINE_WEBHOOK_URL'),
+                'secret' => env('FLINT_DIGEST_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_DIGEST_DRIVER'),
+            ],
+            'topics' => [
+                'url' => env('FLINT_TOPICS_WEBHOOK_URL'),
+                'secret' => env('FLINT_TOPICS_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_TOPICS_DRIVER'),
+            ],
+            'reading_list' => [
+                'url' => env('FLINT_READING_LIST_WEBHOOK_URL'),
+                'secret' => env('FLINT_READING_LIST_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_READING_LIST_DRIVER'),
+            ],
+            'news_roundup' => [
+                'url' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_URL'),
+                'secret' => env('FLINT_NEWS_ROUNDUP_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_NEWS_ROUNDUP_DRIVER'),
+            ],
+            'money_weekly' => [
+                'url' => env('FLINT_MONEY_WEEKLY_WEBHOOK_URL'),
+                'secret' => env('FLINT_MONEY_WEEKLY_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_MONEY_WEEKLY_DRIVER'),
+            ],
+            'money_close' => [
+                'url' => env('FLINT_MONEY_CLOSE_WEBHOOK_URL'),
+                'secret' => env('FLINT_MONEY_CLOSE_WEBHOOK_SECRET'),
+                'driver' => env('FLINT_MONEY_CLOSE_DRIVER'),
+            ],
+        ],
+
+        'morning_time_weekday' => env('FLINT_MORNING_WEEKDAY', '07:30'),
+        'morning_time_weekend' => env('FLINT_MORNING_WEEKEND', '09:30'),
+        'evening_time' => env('FLINT_EVENING_TIME', '19:30'),
+        'morning_fallback' => env('FLINT_MORNING_FALLBACK', '11:00'),
+
+        // Slot times for the once-daily routines beyond the digest. These are
+        // defaults; each is user-overridable from the Flint settings tab.
+        'topics_time' => env('FLINT_TOPICS_TIME', '21:00'),
+        'reading_list_time' => env('FLINT_READING_LIST_TIME', '20:00'),
+        'news_roundup_time' => env('FLINT_NEWS_ROUNDUP_TIME', '07:00'),
+        'money_weekly_time' => env('FLINT_MONEY_WEEKLY_TIME', '09:00'),
+        'money_close_time' => env('FLINT_MONEY_CLOSE_TIME', '09:00'),
+
+        // How often each routine runs, for routines that are not daily. A user's
+        // settings.flint.schedules.{routine} replaces the whole entry.
+        'cadence' => [
+            'money_weekly' => ['frequency' => 'weekly', 'days' => ['sun']],
+            'money_close' => ['frequency' => 'monthly', 'day_of_month' => 2],
+        ],
     ],
 
 ];

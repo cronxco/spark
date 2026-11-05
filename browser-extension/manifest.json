@@ -1,0 +1,13 @@
+{
+    "manifest_version": 3,
+    "name": "Save to Spark",
+    "description": "Capture the current authenticated webpage and save it as a Spark bookmark.",
+    "version": "0.1.0",
+    "permissions": ["activeTab", "scripting", "storage"],
+    "optional_host_permissions": ["https://*/*", "http://*/*"],
+    "action": {
+        "default_title": "Save to Spark",
+        "default_popup": "popup.html"
+    },
+    "options_page": "options.html"
+}

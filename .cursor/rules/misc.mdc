@@ -1,0 +1,84 @@
+---
+description: Others
+globs:
+alwaysApply: true
+---
+## Strings & Formatting
+
+- **String interpolation** over concatenation:
+
+## Enums
+
+- Use PascalCase for enum values:
+
+## Comments
+
+- **Avoid comments** - write expressive code instead
+- When needed, use proper formatting:
+  ```php
+  // Single line with space after //
+  
+  /*
+   * Multi-line blocks start with single *
+   */
+  ```
+- Refactor comments into descriptive function names
+
+## Whitespace
+
+- Add blank lines between statements for readability
+- Exception: sequences of equivalent single-line operations
+- No extra empty lines between `{}` brackets
+- Let code "breathe" - avoid cramped formatting
+
+## Validation
+
+- Use array notation for multiple rules (easier for custom rule classes):
+  ```php
+  public function rules() {
+      return [
+          'email' => ['required', 'email'],
+      ];
+  }
+  ```
+- Custom validation rules use snake_case:
+  ```php
+  Validator::extend('organisation_type', function ($attribute, $value) {
+      return OrganisationType::isValid($value);
+  });
+  ```
+
+## Blade Templates
+
+- Indent with 4 spaces
+- No spaces after control structures:
+  ```blade
+  @if($condition)
+      Something
+  @endif
+  ```
+
+## Authorization
+
+- Policies use camelCase: `Gate::define('editPost', ...)`
+- Use CRUD words, but `view` instead of `show`
+
+## Translations
+
+- Use `__()` function over `@lang`:
+
+## API Routing
+
+- Use plural resource names: `/errors`
+- Use kebab-case: `/error-occurrences`
+- Limit deep nesting for simplicity:
+  ```
+  /error-occurrences/1
+  /errors/1/occurrences
+  ```
+
+## Testing
+
+- Keep test classes in same file when possible
+- Use descriptive test method names
+- Follow the arrange-act-assert pattern

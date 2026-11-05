@@ -1,41 +1,318 @@
 <?php
 
+use App\Http\Controllers\AasaController;
+use App\Http\Controllers\Admin\GoCardlessAdminController;
+use App\Http\Controllers\Api\PushSubscriptionController;
+use App\Http\Controllers\Auth\OAuthController;
+use App\Http\Controllers\GoCardlessRenewalController;
+use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\WebhookController;
+use App\Integrations\GoCardless\GoCardlessBankPlugin;
+use App\Integrations\PluginRegistry;
+use App\Jobs\DeleteBinItemsBatch;
+use App\Livewire\Day;
+use App\Livewire\FinancialAccounts;
+use App\Livewire\FinancialAccountShow;
+use App\Livewire\IntegrationDetails;
+use App\Livewire\KnowledgeTasks;
+use App\Livewire\Media\Index;
+use App\Livewire\Media\Show;
+use App\Livewire\MetricDetail;
+use App\Livewire\MetricsOverview;
+use App\Livewire\ReceiptDetail;
+use App\Livewire\Receipts;
+use App\Models\IntegrationGroup;
 use App\Models\User;
-use Illuminate\Support\Facades\Route;
-use Livewire\Volt\Volt;
-use Laravel\Socialite\Facades\Socialite;
+use App\Support\AdminTenant;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
+use Laravel\Socialite\Facades\Socialite;
+use Livewire\Volt\Volt;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('today.main');
 })->name('home');
 
 Route::view('dashboard', 'dashboard')
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+// Apple App Site Association for Universal Links
+Route::get('.well-known/apple-app-site-association', [AasaController::class, 'show'])
+    ->name('aasa');
+
+// Push notification routes (public)
+Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey'])
+    ->name('push.vapid-public-key');
+
+// Push notification routes (authenticated)
+Route::middleware(['auth'])->prefix('push')->group(function () {
+    Route::post('subscribe', [PushSubscriptionController::class, 'subscribe'])->name('push.subscribe');
+    Route::post('unsubscribe', [PushSubscriptionController::class, 'unsubscribe'])->name('push.unsubscribe');
+    Route::get('status', [PushSubscriptionController::class, 'status'])->name('push.status');
+    Route::get('subscriptions', [PushSubscriptionController::class, 'list'])->name('push.subscriptions');
+    Route::delete('subscriptions/{id}', [PushSubscriptionController::class, 'destroy'])->name('push.subscriptions.destroy');
+    Route::post('test', [PushSubscriptionController::class, 'test'])->name('push.test');
+});
+
+// OAuth PKCE authorization (iOS companion app)
 Route::middleware(['auth'])->group(function () {
+    Route::get('oauth/authorize', [OAuthController::class, 'authorize'])->name('oauth.authorize');
+    Route::post('oauth/authorize', [OAuthController::class, 'approve'])->name('oauth.approve');
+    Route::post('oauth/deny', [OAuthController::class, 'deny'])->name('oauth.deny');
+});
+
+Route::middleware(['auth'])->group(function () {
+    // Day-based timeline routes
+    Route::get('knowledge/tasks', KnowledgeTasks::class)->name('knowledge.tasks');
+    Route::get('tasks/{id}', KnowledgeTasks::class)->whereUuid('id')->name('knowledge.task');
+    Route::get('projects/{projectId}', KnowledgeTasks::class)->whereUuid('projectId')->name('knowledge.project');
+    Route::get('day/today', Day::class)->name('today.day');
+    Route::get('today', Day::class)->name('today.main');
+    Route::get('day/tomorrow', Day::class)->name('tomorrow');
+    Route::get('day/yesterday', Day::class)->name('day.yesterday');
+    Route::get('day/{date}', Day::class)->name('day.show');
     Route::redirect('settings', 'settings/profile');
 
     Volt::route('settings/profile', 'settings.profile')->name('settings.profile');
     Volt::route('settings/password', 'settings.password')->name('settings.password');
-    Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
+    Volt::route('settings/sessions', 'settings.sessions')->name('settings.sessions');
+    Volt::route('settings/notifications', 'settings.notifications')->name('settings.notifications');
+    Volt::route('flint', 'flint.index')->name('flint.index');
+    // Removed settings/appearance route
     Volt::route('settings/api-tokens', 'settings.api-tokens')->name('settings.api-tokens');
+    Volt::route('settings/integrations', 'integrations.index')->name('integrations.index');
+    Volt::route('/updates', 'updates.index')->name('updates.index');
+    Volt::route('/events/{event}', 'events.show')->name('events.show');
+    Volt::route('/objects/{object}', 'objects.show')->name('objects.show');
+    Volt::route('/people/{person}', 'people.show')->name('people.show');
+    Volt::route('/blocks/{block}', 'blocks.show')->name('blocks.show');
+    Volt::route('/tags', 'tags.index')->name('tags.index');
+    Volt::route('/tags/{type}/{slug}/{id}', 'tags.show')->name('tags.show');
+    Volt::route('notifications', 'notifications.index')->name('notifications.index');
+    Volt::route('log', 'manual-log')->name('manual-log.index');
+
+    // Media routes
+    Route::get('media', Index::class)->name('media.index');
+    Route::get('media/{media:uuid}', Show::class)->name('media.show');
+
+    // Metrics routes
+    Route::get('metrics', MetricsOverview::class)->name('metrics.index');
+    Route::get('metrics/{metric}', MetricDetail::class)->whereUuid('metric')->name('metrics.show');
+
+    Route::get('integrations/{service}/oauth', [IntegrationController::class, 'oauth'])->name('integrations.oauth');
+    Route::get('integrations/{service}/callback', [IntegrationController::class, 'oauthCallback'])->name('integrations.oauth.callback');
+    Route::post('integrations/{service}/initialize', [IntegrationController::class, 'initialize'])->name('integrations.initialize');
+    Route::get('integrations/gocardless/renewal/{group}', [GoCardlessRenewalController::class, 'show'])
+        ->whereUuid('group')->name('integrations.gocardless.renewal.show');
+    Route::post('integrations/gocardless/renewal/{group}', [GoCardlessRenewalController::class, 'store'])
+        ->whereUuid('group')->name('integrations.gocardless.renewal.store');
+
+    Route::get('integrations/{service}/reconnect/{group}', [IntegrationController::class, 'reconnect'])
+        ->whereUuid('group')
+        ->name('integrations.reconnect');
+    Route::get('integrations/groups/{group}/onboarding', [IntegrationController::class, 'onboarding'])
+        ->whereUuid('group')
+        ->name('integrations.onboarding');
+    Route::post('integrations/groups/{group}/instances', [IntegrationController::class, 'storeInstances'])
+        ->whereUuid('group')
+        ->name('integrations.storeInstances');
+    Volt::route('/integrations/{integration}/configure', 'integrations.configure')->name('integrations.configure');
+
+    // Plugin and integration instance detail routes
+    Route::get('plugins/{service}', function (string $service) {
+        $pluginClass = PluginRegistry::getPlugin($service);
+        if (! $pluginClass || ! PluginRegistry::isAvailableTo($pluginClass, Auth::user())) {
+            abort(404);
+        }
+
+        // Every credential group the user has for this service: a second
+        // Monzo or GitHub account is its own group, and loading only the
+        // first() hid the other accounts' instances.
+        $groups = IntegrationGroup::where('service', $service)
+            ->where('user_id', Auth::id())
+            ->with('integrations')
+            ->oldest()
+            ->get();
+
+        return view('plugins.show', [
+            'service' => $service,
+            'pluginClass' => $pluginClass,
+            'groups' => $groups,
+        ]);
+    })->name('plugins.show');
+
+    Route::get('integrations/{integration}/details', IntegrationDetails::class)
+        ->whereUuid('integration')
+        ->name('integrations.details');
+
+    // Money routes
+    Route::get('money', FinancialAccounts::class)->name('money');
+    Route::get('money/{account}', FinancialAccountShow::class)->whereUuid('account')->name('money.show');
+
+    // Receipts routes
+    Route::get('money/receipts', Receipts::class)->name('receipts.index');
+    Route::get('money/receipts/{id}', ReceiptDetail::class)->whereUuid('id')->name('receipts.show');
+
+    // Bookmarks routes
+    Volt::route('bookmarks', 'bookmarks.index')->name('bookmarks');
+    Route::redirect('bookmarks/fetch', '/bookmarks?tab=urls')->name('bookmarks.fetch');
+
+    // Map route
+    Route::get('map', App\Livewire\Map\Index::class)->name('map.index');
+
+    // Place detail route
+    Route::get('places/{place}', App\Livewire\Places\Show::class)->whereUuid('place')->name('places.show');
+    // GoCardless bank selection page
+    Route::get('integrations/groups/{group}/gocardless/bank-selection', function (IntegrationGroup $group) {
+        if ((string) $group->user_id !== (string) Auth::id()) {
+            abort(403);
+        }
+
+        // Load institutions if not already in session
+        if (empty(session('gocardless_institutions_' . $group->id, []))) {
+            try {
+                $plugin = new GoCardlessBankPlugin;
+                $institutions = $plugin->getInstitutions();
+
+                $logData = [
+                    'count' => count($institutions),
+                    'country' => config('services.gocardless.country', 'GB'),
+                ];
+
+                // Only include institution details in local/debug environments
+                if (app()->isLocal() || config('app.debug')) {
+                    $logData['first_few'] = array_slice($institutions, 0, 3);
+                }
+
+                Log::info('GoCardless institutions loaded', $logData);
+
+                if (! empty($institutions)) {
+                    session(['gocardless_institutions_' . $group->id => $institutions]);
+                    Log::info('Institutions saved to session', [
+                        'session_key' => 'gocardless_institutions_' . $group->id,
+                        'count' => count($institutions),
+                    ]);
+                } else {
+                    Log::warning('GoCardless API returned empty institutions');
+                    session(['gocardless_institutions_' . $group->id => []]);
+                }
+            } catch (Throwable $e) {
+                $logData = [
+                    'error' => $e->getMessage(),
+                    'country' => config('services.gocardless.country', 'GB'),
+                ];
+
+                // Only include full trace in local/debug environments
+                if (app()->isLocal() || config('app.debug')) {
+                    $logData['trace'] = $e->getTraceAsString();
+                }
+
+                Log::error('GoCardless API call failed', $logData);
+                session(['gocardless_institutions_' . $group->id => []]);
+            }
+        }
+
+        return view('livewire.integrations.bank-selection', ['group' => $group]);
+    })->whereUuid('group')->name('integrations.gocardless.bankSelection');
+
+    // GoCardless institution selection helper
+    Route::post('integrations/groups/{group}/gocardless/institution', function (IntegrationGroup $group) {
+        if ((string) $group->user_id !== (string) Auth::id()) {
+            abort(403);
+        }
+
+        $institutionId = request('institution_id');
+
+        // Validate required institution_id
+        if (empty($institutionId)) {
+            Log::warning('No institution ID provided in request', [
+                'group_id' => $group->id,
+                'user_id' => Auth::id(),
+            ]);
+
+            return redirect()->back()->withErrors(['institution_id' => 'Please select a bank to continue.']);
+        }
+
+        // Get the whitelisted institutions from session
+        $institutions = session('gocardless_institutions_' . $group->id, []);
+
+        // Validate institution_id exists in the whitelisted institutions
+        $validInstitution = collect($institutions)->firstWhere('id', $institutionId);
+        if (! $validInstitution) {
+            $logData = [
+                'group_id' => $group->id,
+                'user_id' => Auth::id(),
+                'institution_id' => $institutionId,
+            ];
+
+            // Only include available institutions list in local/debug environments
+            if (app()->isLocal() || config('app.debug')) {
+                $logData['available_institutions'] = array_column($institutions, 'id');
+            }
+
+            Log::warning('Invalid institution ID provided', $logData);
+
+            return redirect()->back()->withErrors(['institution_id' => 'Invalid bank selection. Please try again.']);
+        }
+
+        // Store the validated institution ID and OAuth group ID to avoid ambiguity
+        session([
+            'gocardless_institution_id_' . $group->id => (string) $institutionId,
+            'gocardless_oauth_group_id' => $group->id,
+        ]);
+
+        // Persist institution id and human-readable name on the group for later provider derivation
+        $authMeta = $group->auth_metadata ?? [];
+        $authMeta['gocardless_institution_id'] = (string) $institutionId;
+        if (! empty($validInstitution['name'])) {
+            $authMeta['gocardless_institution_name'] = (string) $validInstitution['name'];
+        }
+        $group->update([
+            'auth_metadata' => $authMeta,
+        ]);
+
+        $logData = [
+            'group_id' => $group->id,
+            'user_id' => Auth::id(),
+            'institution_id' => $institutionId,
+            'session_keys' => [
+                'institution_key' => 'gocardless_institution_id_' . $group->id,
+                'oauth_group_key' => 'gocardless_oauth_group_id',
+            ],
+        ];
+
+        // Only include institution name in local/debug environments
+        if (app()->isLocal() || config('app.debug')) {
+            $logData['institution_name'] = $validInstitution['name'] ?? 'Unknown';
+        }
+
+        Log::info('GoCardless institution ID validated and stored in session', $logData);
+
+        // Redirect to OAuth flow
+        return redirect()->route('integrations.oauth', ['service' => 'gocardless'])
+            ->with('success', __('Bank selection saved.'));
+    })->whereUuid('group')->name('integrations.gocardless.setInstitution');
 });
 
-require __DIR__.'/auth.php';
+// Webhook routes (no auth required)
+Route::post('webhook/{service}/{secret}', [WebhookController::class, 'handle'])->name('webhook.handle');
+
+require __DIR__ . '/auth.php';
 
 // Authelia Socialite authentication routes
-Route::get('/auth/authelia/redirect', function () {
+Route::get('auth/authelia/redirect', function () {
     return Socialite::driver('authelia')->redirect();
 })->name('authelia.redirect');
 
-Route::get('/auth/authelia/callback', function () {
+Route::get('auth/authelia/callback', function () {
     $user = Socialite::driver('authelia')->user();
     $email = $user->getEmail();
-    if (!$email) {
+    if (! $email) {
         return redirect('/')->withErrors(['authelia' => 'No email address returned from Authelia.']);
     }
     $authUser = User::updateOrCreate(
@@ -46,5 +323,64 @@ Route::get('/auth/authelia/callback', function () {
         ]
     );
     Auth::login($authUser);
-    return redirect('/dashboard');
+
+    if (AdminTenant::pullReauthenticationRequest($authUser) && AdminTenant::isGlobalOperator($authUser)) {
+        AdminTenant::start($authUser);
+
+        return redirect()->route('admin.god-mode.index');
+    }
+
+    return redirect('/today');
+});
+
+// Admin routes
+Route::middleware(['auth', 'verified', 'admin', 'admin.god-mode.audit'])->prefix('admin')->name('admin.')->group(function () {
+    Volt::route('god-mode', 'admin.god-mode')->name('god-mode.index');
+    Route::post('god-mode/enable', function () {
+        abort_unless(AdminTenant::isGlobalOperator(Auth::user()), 403);
+        AdminTenant::requestReauthentication(Auth::user());
+
+        // prompt=login alone: max_age=0 made Authelia keep asking for re-auth after a good password.
+        return Socialite::driver('authelia')->with(['prompt' => 'login'])->redirect();
+    })->name('god-mode.enable');
+    Route::post('god-mode/disable', function () {
+        AdminTenant::end();
+
+        return redirect()->route('admin.god-mode.index');
+    })->name('god-mode.disable');
+
+    Route::middleware('admin.god-mode.required')->group(function () {
+        Route::get('gocardless', [GoCardlessAdminController::class, 'index'])->name('gocardless.index');
+        Route::delete('gocardless/agreements/{agreementId}', [GoCardlessAdminController::class, 'deleteAgreement'])->name('gocardless.deleteAgreement');
+        Route::delete('gocardless/requisitions/{requisitionId}', [GoCardlessAdminController::class, 'deleteRequisition'])->name('gocardless.deleteRequisition');
+    });
+
+    Route::redirect('migrations', '/admin/pulse?section=data_fixes')->name('migrations.index');
+
+    Volt::route('daynotes', 'admin.daynotes')->name('daynotes.index');
+    Volt::route('events', 'admin.events')->name('events.index');
+    Volt::route('objects', 'admin.objects')->name('objects.index');
+    Volt::route('blocks', 'admin.blocks')->name('blocks.index');
+    Volt::route('relationships', 'admin.relationships')->name('relationships.index');
+    Route::redirect('pending-links', '/flint')->name('pending-links.index');
+    Volt::route('bin', 'admin.bin')->name('bin.index');
+    Volt::route('pulse', 'admin.sense-check')->name('pulse.index');
+    Route::get('sense-check', fn (Request $request) => redirect()->route('admin.pulse.index', $request->query()))->name('sense-check.index');
+    Volt::route('search', 'admin.search')->name('search.index');
+    Volt::route('duplicates', 'admin.duplicates.index')->name('duplicates.index');
+    Volt::route('logs', 'pages.admin.logs')->name('logs.index');
+    Route::redirect('block-view', '/admin/blocks?view=gallery')->name('block-view.index');
+    Route::post('bin/delete', function () {
+        $userId = AdminTenant::id();
+        AdminTenant::recordAction('bin_purge', [], $userId === null);
+        DeleteBinItemsBatch::dispatch($userId === null ? null : (string) $userId);
+
+        return response()->json([
+            'message' => 'Deletion process started. All items will be permanently deleted.',
+        ]);
+    })->name('bin.delete');
+    Volt::route('activity', 'admin.activity')->name('activity.index');
+    Volt::route('push-notifications', 'admin.push-notifications')->name('push-notifications.index');
+    Volt::route('pipeline', 'admin.task-pipeline-overview')->name('pipeline.index');
+    Route::redirect('task-pipeline', '/admin/pipeline')->name('task-pipeline.index');
 });

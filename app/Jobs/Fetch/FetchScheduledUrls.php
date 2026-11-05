@@ -1,0 +1,104 @@
+<?php
+
+namespace App\Jobs\Fetch;
+
+use App\Jobs\Base\BaseFetchJob;
+use App\Models\EventObject;
+use Illuminate\Support\Facades\Log;
+
+class FetchScheduledUrls extends BaseFetchJob
+{
+    protected function getServiceName(): string
+    {
+        return 'fetch';
+    }
+
+    protected function getJobType(): string
+    {
+        return 'scheduled_urls';
+    }
+
+    protected function fetchData(): array
+    {
+        Log::info('Fetch: Starting scheduled URL fetch', [
+            'integration_id' => $this->integration->id,
+            'user_id' => $this->integration->user_id,
+        ]);
+
+        // Query enabled fetch_webpage EventObjects for this integration. EventObjects
+        // don't have an integration_id column, so filter by fetch_integration_id in
+        // metadata. All filtering is pushed into the database (JSON operators) so we
+        // never load the user's entire webpage set into memory.
+        // - belongs to this integration
+        // - enabled (missing => true)
+        // - fetch_mode 'once' only when never fetched (fetch_count = 0); any other
+        //   mode (including missing) is treated as recurring => always eligible
+        $enabledWebpages = EventObject::where('user_id', $this->integration->user_id)
+            ->where('concept', 'bookmark')
+            ->where('type', 'fetch_webpage')
+            ->whereNotNull('url')
+            ->whereRaw("metadata->>'fetch_integration_id' = ?", [$this->integration->id])
+            ->whereRaw("(metadata->>'enabled' IS NULL OR metadata->>'enabled' = 'true')")
+            ->whereRaw("(
+                metadata->>'fetch_mode' IS NULL
+                OR metadata->>'fetch_mode' <> 'once'
+                OR COALESCE((metadata->>'fetch_count')::int, 0) = 0
+            )")
+            // A one-time bookmark whose fetch was just dispatched elsewhere (e.g. a
+            // staggered list expansion) is left alone until that fetch has had time to run.
+            ->whereRaw("(
+                metadata->>'fetch_mode' IS DISTINCT FROM 'once'
+                OR metadata->>'fetch_dispatched_at' IS NULL
+                OR (metadata->>'fetch_dispatched_at')::timestamptz < ?
+            )", [now()->subMinutes((int) config('fetch.list_expansion.dispatch_guard_minutes', 30))->toIso8601String()])
+            ->get();
+
+        Log::info('Fetch: Found URLs to fetch', [
+            'integration_id' => $this->integration->id,
+            'enabled_urls' => $enabledWebpages->count(),
+        ]);
+
+        // Return data for processing
+        return [
+            'webpages' => $enabledWebpages->map(function ($webpage) {
+                return [
+                    'id' => $webpage->id,
+                    'url' => $webpage->url,
+                    'title' => $webpage->title,
+                    'metadata' => $webpage->metadata,
+                ];
+            })->toArray(),
+            'total_count' => $enabledWebpages->count(),
+        ];
+    }
+
+    protected function dispatchProcessingJobs($data): void
+    {
+        $webpages = $data['webpages'] ?? [];
+
+        Log::info('Fetch: Dispatching URL fetch jobs', [
+            'integration_id' => $this->integration->id,
+            'job_count' => count($webpages),
+        ]);
+
+        // Dispatch URL discovery job if monitoring is configured
+        $monitoredIntegrations = $this->integration->configuration['monitor_integrations'] ?? [];
+        if (! empty($monitoredIntegrations)) {
+            DiscoverUrlsFromIntegrations::dispatch($this->integration);
+
+            Log::info('Fetch: Dispatched URL discovery job', [
+                'integration_id' => $this->integration->id,
+                'monitored_count' => count($monitoredIntegrations),
+            ]);
+        }
+
+        // Dispatch FetchSingleUrl job for each webpage
+        foreach ($webpages as $webpage) {
+            FetchSingleUrl::dispatch(
+                $this->integration,
+                $webpage['id'],
+                $webpage['url']
+            );
+        }
+    }
+}
