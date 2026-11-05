@@ -1,0 +1,325 @@
+<?php
+
+namespace Tests\Feature\Integrations\Spotify;
+
+use App\Integrations\Spotify\SpotifyPlugin;
+use App\Models\Integration;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
+use Tests\TestCase;
+
+class SpotifyPluginTest extends TestCase
+{
+    use RefreshDatabase;
+
+    #[Test]
+    public function plugin_has_correct_metadata(): void
+    {
+        $this->assertEquals('spotify', SpotifyPlugin::getIdentifier());
+        $this->assertEquals('Spotify', SpotifyPlugin::getDisplayName());
+        $this->assertEquals('oauth', SpotifyPlugin::getServiceType());
+        $this->assertEquals('media', SpotifyPlugin::getDomain());
+
+        $description = SpotifyPlugin::getDescription();
+        $this->assertStringContainsString('Spotify', $description);
+    }
+
+    #[Test]
+    public function plugin_has_configuration_schema(): void
+    {
+        $schema = SpotifyPlugin::getConfigurationSchema();
+
+        $this->assertIsArray($schema);
+        $this->assertArrayHasKey('update_frequency_minutes', $schema);
+        $this->assertArrayHasKey('auto_tag_genres', $schema);
+        $this->assertArrayHasKey('auto_tag_artists', $schema);
+        $this->assertArrayHasKey('include_album_art', $schema);
+        $this->assertArrayHasKey('track_podcasts', $schema);
+        $this->assertArrayHasKey('podcast_min_listen_minutes', $schema);
+        $this->assertArrayHasKey('podcast_session_timeout_hours', $schema);
+
+        // Check update frequency has proper config
+        $this->assertEquals('integer', $schema['update_frequency_minutes']['type']);
+        $this->assertEquals(15, $schema['update_frequency_minutes']['default']);
+        $this->assertEquals(5, $schema['update_frequency_minutes']['min']);
+    }
+
+    #[Test]
+    public function plugin_has_action_types(): void
+    {
+        $actionTypes = SpotifyPlugin::getActionTypes();
+
+        $this->assertArrayHasKey('listened_to', $actionTypes);
+        $this->assertEquals('Listened to Track', $actionTypes['listened_to']['display_name']);
+        $this->assertEquals('fas.play', $actionTypes['listened_to']['icon']);
+    }
+
+    #[Test]
+    public function plugin_has_block_types(): void
+    {
+        $blockTypes = SpotifyPlugin::getBlockTypes();
+
+        $this->assertArrayHasKey('album_art', $blockTypes);
+        $this->assertArrayHasKey('track_details', $blockTypes);
+        $this->assertArrayHasKey('artist', $blockTypes);
+        $this->assertArrayHasKey('track_info', $blockTypes);
+        $this->assertArrayHasKey('episode_art', $blockTypes);
+        $this->assertArrayHasKey('episode_details', $blockTypes);
+
+        $this->assertEquals('Album Artwork', $blockTypes['album_art']['display_name']);
+        $this->assertEquals('Track Details', $blockTypes['track_details']['display_name']);
+        $this->assertEquals('Artist', $blockTypes['artist']['display_name']);
+    }
+
+    #[Test]
+    public function plugin_has_object_types(): void
+    {
+        $objectTypes = SpotifyPlugin::getObjectTypes();
+
+        $this->assertArrayHasKey('spotify_user', $objectTypes);
+        $this->assertArrayHasKey('spotify_track', $objectTypes);
+        $this->assertArrayHasKey('spotify_podcast_episode', $objectTypes);
+
+        $this->assertEquals('Spotify User', $objectTypes['spotify_user']['display_name']);
+        $this->assertEquals('Spotify Track', $objectTypes['spotify_track']['display_name']);
+        $this->assertEquals('Podcast Episode', $objectTypes['spotify_podcast_episode']['display_name']);
+    }
+
+    #[Test]
+    public function plugin_supports_migration(): void
+    {
+        $this->assertTrue(SpotifyPlugin::supportsMigration());
+    }
+
+    #[Test]
+    public function plugin_has_instance_types(): void
+    {
+        $instanceTypes = SpotifyPlugin::getInstanceTypes();
+
+        $this->assertArrayHasKey('listening', $instanceTypes);
+        $this->assertEquals('Listening Activity', $instanceTypes['listening']['label']);
+    }
+
+    #[Test]
+    public function plugin_has_icon(): void
+    {
+        $icon = SpotifyPlugin::getIcon();
+
+        $this->assertEquals('fab.spotify', $icon);
+    }
+
+    #[Test]
+    public function plugin_has_accent_color(): void
+    {
+        $accentColor = SpotifyPlugin::getAccentColor();
+
+        $this->assertEquals('success', $accentColor);
+    }
+
+    #[Test]
+    public function plugin_has_spotlight_commands(): void
+    {
+        $commands = SpotifyPlugin::getSpotlightCommands();
+
+        $this->assertIsArray($commands);
+        $this->assertArrayHasKey('spotify-sync-recent', $commands);
+        $this->assertArrayHasKey('spotify-view-stats', $commands);
+
+        $syncCommand = $commands['spotify-sync-recent'];
+        $this->assertArrayHasKey('title', $syncCommand);
+        $this->assertArrayHasKey('subtitle', $syncCommand);
+        $this->assertArrayHasKey('icon', $syncCommand);
+        $this->assertArrayHasKey('action', $syncCommand);
+    }
+
+    #[Test]
+    public function plugin_encodes_integer_value_correctly(): void
+    {
+        $plugin = new SpotifyPlugin;
+
+        [$value, $multiplier] = $plugin->encodeNumericValue(100);
+
+        $this->assertEquals(100, $value);
+        $this->assertEquals(1, $multiplier);
+    }
+
+    #[Test]
+    public function plugin_encodes_float_value_with_multiplier(): void
+    {
+        $plugin = new SpotifyPlugin;
+
+        [$value, $multiplier] = $plugin->encodeNumericValue(3.14159);
+
+        $this->assertEquals(3142, $value);
+        $this->assertEquals(1000, $multiplier);
+    }
+
+    #[Test]
+    public function plugin_encodes_null_value(): void
+    {
+        $plugin = new SpotifyPlugin;
+
+        [$value, $multiplier] = $plugin->encodeNumericValue(null);
+
+        $this->assertNull($value);
+        $this->assertNull($multiplier);
+    }
+
+    #[Test]
+    public function plugin_encodes_empty_string_value(): void
+    {
+        $plugin = new SpotifyPlugin;
+
+        [$value, $multiplier] = $plugin->encodeNumericValue('');
+
+        $this->assertNull($value);
+        $this->assertNull($multiplier);
+    }
+
+    #[Test]
+    public function plugin_podcast_configuration_has_defaults(): void
+    {
+        $schema = SpotifyPlugin::getConfigurationSchema();
+
+        $this->assertTrue($schema['track_podcasts']['default']);
+        $this->assertEquals(5, $schema['podcast_min_listen_minutes']['default']);
+        $this->assertEquals(4, $schema['podcast_session_timeout_hours']['default']);
+    }
+
+    #[Test]
+    public function plugin_podcast_configuration_has_min_max(): void
+    {
+        $schema = SpotifyPlugin::getConfigurationSchema();
+
+        // podcast_min_listen_minutes
+        $this->assertEquals(1, $schema['podcast_min_listen_minutes']['min']);
+        $this->assertEquals(60, $schema['podcast_min_listen_minutes']['max']);
+
+        // podcast_session_timeout_hours
+        $this->assertEquals(1, $schema['podcast_session_timeout_hours']['min']);
+        $this->assertEquals(24, $schema['podcast_session_timeout_hours']['max']);
+    }
+
+    #[Test]
+    public function recently_played_uses_saved_cursor_and_preserves_it_on_empty_response(): void
+    {
+        Http::fake(['*' => Http::response(['items' => []], 200)]);
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'instance_type' => 'listening',
+            'configuration' => ['spotify_after_ms' => 1750000000000, 'track_podcasts' => false],
+        ]);
+
+        $data = (new SpotifyPlugin)->pullListeningData($integration);
+
+        $this->assertSame([], $data['recently_played']);
+        $this->assertSame(1750000000000, $integration->fresh()->configuration['spotify_after_ms']);
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/me/player/recently-played')
+            && (int) $request['after'] === 1750000000000 && (int) $request['limit'] === 50);
+    }
+
+    #[Test]
+    public function initial_recently_played_request_has_no_after_cursor(): void
+    {
+        Http::fake(['*' => Http::response(['items' => []], 200)]);
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'instance_type' => 'listening',
+            'configuration' => ['track_podcasts' => false],
+        ]);
+
+        (new SpotifyPlugin)->pullListeningData($integration);
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), '/me/player/recently-played')
+            && ! isset($request['after']) && (int) $request['limit'] === 50);
+    }
+
+    #[Test]
+    public function fetched_cursor_is_acknowledged_only_after_successful_processing(): void
+    {
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'configuration' => ['spotify_after_ms' => 1000, 'unrelated' => 'preserved'],
+        ]);
+        $plugin = new class extends SpotifyPlugin
+        {
+            public bool $failProcessing = true;
+
+            public function checkForDuplicateProcessing(Integration $integration, array $listeningData): void {}
+
+            protected function processTrackPlay(Integration $integration, array $playData, string $source): void
+            {
+                if ($this->failProcessing) {
+                    throw new RuntimeException('Processing failed');
+                }
+            }
+        };
+        $data = ['recently_played' => [['track' => ['id' => 'track']]], 'after_ms' => 2000];
+
+        try {
+            $plugin->processListeningData($integration, $data);
+            $this->fail('Failed track processing must be retried.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Processing failed', $exception->getMessage());
+        }
+        $this->assertSame(1000, $integration->fresh()->configuration['spotify_after_ms']);
+
+        $plugin->failProcessing = false;
+        $plugin->processListeningData($integration, $data);
+        $this->assertSame(2000, $integration->fresh()->configuration['spotify_after_ms']);
+        $this->assertSame('preserved', $integration->fresh()->configuration['unrelated']);
+
+        $plugin->processListeningData($integration, array_replace($data, ['after_ms' => 1500]));
+        $this->assertSame(2000, $integration->fresh()->configuration['spotify_after_ms']);
+    }
+
+    #[Test]
+    public function fetching_new_tracks_does_not_commit_unprocessed_cursor(): void
+    {
+        Http::fake(['*' => Http::response(['items' => [
+            ['played_at' => '2026-10-10T10:00:00.000Z', 'track' => ['id' => 'track']],
+        ]], 200)]);
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'instance_type' => 'listening',
+            'configuration' => ['spotify_after_ms' => 1000, 'track_podcasts' => false],
+        ]);
+
+        $data = (new SpotifyPlugin)->pullListeningData($integration);
+
+        $this->assertGreaterThan(1000, $data['after_ms']);
+        $this->assertCount(1, $data['recently_played']);
+        $this->assertSame(1000, $integration->fresh()->configuration['spotify_after_ms']);
+    }
+
+    #[Test]
+    public function final_attempt_skips_a_track_that_keeps_failing_and_advances_the_cursor(): void
+    {
+        $integration = Integration::factory()->create([
+            'service' => 'spotify',
+            'configuration' => ['spotify_after_ms' => 1000],
+        ]);
+        $plugin = new class extends SpotifyPlugin
+        {
+            public array $processed = [];
+
+            public function checkForDuplicateProcessing(Integration $integration, array $listeningData): void {}
+
+            protected function processTrackPlay(Integration $integration, array $playData, string $source): void
+            {
+                if ($playData['track']['id'] === 'poison') {
+                    throw new RuntimeException('Always fails');
+                }
+                $this->processed[] = $playData['track']['id'];
+            }
+        };
+        $data = ['recently_played' => [['track' => ['id' => 'poison']], ['track' => ['id' => 'good']]], 'after_ms' => 3000];
+
+        $plugin->processListeningData($integration, $data, skipFailedTracks: true);
+
+        $this->assertSame(['good'], $plugin->processed);
+        $this->assertSame(3000, $integration->fresh()->configuration['spotify_after_ms']);
+    }
+}

@@ -1,0 +1,428 @@
+<?php
+
+namespace App\Integrations\Outline;
+
+use App\Models\Integration;
+use Exception;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use LogicException;
+use Throwable;
+
+class OutlineApi
+{
+    public function __construct(private readonly Integration $integration) {}
+
+    public function listCollections(int $limit = 100): array
+    {
+        $endpoint = '/api/collections.list?limit=' . $limit;
+        $data = $this->post($endpoint);
+        $collections = $data['data'] ?? [];
+
+        // Follow pagination with a sensible upper bound to avoid long-running jobs
+        $pageCount = 0;
+        while ($this->hasNextPage($data)) {
+            if ($pageCount++ >= 10) { // hard cap to prevent unbounded runtime
+                Log::warning('Outline collections pagination capped at 10 pages');
+                break;
+            }
+
+            $data = $this->post($data['pagination']['nextPath']);
+            $collections = array_merge($collections, $data['data'] ?? []);
+        }
+
+        return $collections;
+    }
+
+    public function listDocuments(array $params = []): array
+    {
+        $query = array_merge([
+            'limit' => 100,
+        ], $params);
+
+        $endpoint = '/api/documents.list?limit=' . (int) $query['limit'];
+        unset($query['limit']);
+
+        $data = $this->post($endpoint, $query);
+        $documents = $data['data'] ?? [];
+
+        // Follow pagination with a sensible upper bound to avoid long-running jobs
+        $pageCount = 0;
+        while ($this->hasNextPage($data)) {
+            if ($pageCount++ >= 10) { // hard cap to prevent unbounded runtime
+                Log::warning('Outline documents pagination capped at 10 pages');
+                break;
+            }
+
+            $data = $this->post($data['pagination']['nextPath'], $query);
+            $documents = array_merge($documents, $data['data'] ?? []);
+        }
+
+        return $documents;
+    }
+
+    /**
+     * List documents with external pagination control (for migration)
+     * Unlike listDocuments(), this respects offset/limit without internal pagination
+     */
+    public function listDocumentsPaginated(array $params = []): array
+    {
+        $query = array_merge([
+            'limit' => 50,
+        ], $params);
+
+        // Build endpoint with limit parameter
+        $endpoint = '/api/documents.list?limit=' . (int) $query['limit'];
+
+        // Add offset parameter if provided
+        if (isset($query['offset'])) {
+            $endpoint .= '&offset=' . (int) $query['offset'];
+        }
+
+        // Remove limit and offset from query body since they're in the endpoint
+        unset($query['limit'], $query['offset']);
+
+        $data = $this->post($endpoint, $query);
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Search for a single document using Outline's dedicated search endpoint
+     * This is optimized for finding one specific document and stops after the first result
+     */
+    public function searchSingleDocument(array $params = []): ?array
+    {
+        $query = array_merge([
+            'limit' => 100,
+        ], $params);
+
+        $endpoint = '/api/documents.search?limit=' . (int) $query['limit'];
+        unset($query['limit']);
+
+        $data = $this->post($endpoint, $query);
+        $documents = $data['data'] ?? [];
+
+        // Return the first document if found
+        if (! empty($documents)) {
+            return $documents[0];
+        }
+
+        return null;
+    }
+
+    /**
+     * Search for documents with early termination when we have enough results
+     * This is optimized for cases where we know we don't need all results
+     */
+    public function searchDocumentsLimited(array $params = [], int $maxResults = 50): array
+    {
+        $query = array_merge([
+            'limit' => 100,
+        ], $params);
+
+        $endpoint = '/api/documents.search?limit=' . (int) $query['limit'];
+        unset($query['limit']);
+
+        $data = $this->post($endpoint, $query);
+        $documents = $data['data'] ?? [];
+
+        // Stop if we already have enough results
+        if (count($documents) >= $maxResults) {
+            return array_slice($documents, 0, $maxResults);
+        }
+
+        // Follow pagination with early termination
+        $pageCount = 0;
+        while ($this->hasNextPage($data)) {
+            if ($pageCount++ >= 5) { // Reduced cap for efficiency
+                Log::warning('Outline documents search pagination capped at 5 pages');
+                break;
+            }
+
+            $data = $this->post($data['pagination']['nextPath'], $query);
+            $newDocuments = $data['data'] ?? [];
+            $documents = array_merge($documents, $newDocuments);
+
+            // Stop if we have enough results
+            if (count($documents) >= $maxResults) {
+                return array_slice($documents, 0, $maxResults);
+            }
+        }
+
+        return $documents;
+    }
+
+    /**
+     * Search for documents using Outline's dedicated search endpoint
+     * This uses /documents.search which is designed for keyword searching
+     */
+    public function searchDocuments(array $params = []): array
+    {
+        $query = array_merge([
+            'limit' => 100,
+        ], $params);
+
+        $endpoint = '/api/documents.search?limit=' . (int) $query['limit'];
+        unset($query['limit']);
+
+        $data = $this->post($endpoint, $query);
+        $documents = $data['data'] ?? [];
+
+        // Follow pagination with a sensible upper bound
+        $pageCount = 0;
+        while ($this->hasNextPage($data)) {
+            if ($pageCount++ >= 10) { // Reasonable cap for search results
+                Log::warning('Outline documents search pagination capped at 10 pages');
+                break;
+            }
+
+            $data = $this->post($data['pagination']['nextPath'], $query);
+            $documents = array_merge($documents, $data['data'] ?? []);
+        }
+
+        return $documents;
+    }
+
+    public function getDocument(string $documentId): array
+    {
+        $endpoint = '/api/documents.info';
+
+        return $this->post($endpoint, [
+            'id' => $documentId,
+        ]);
+    }
+
+    public function createDocument(string $title, string $collectionId, ?string $parentId = null, bool $publish = true): array
+    {
+        $endpoint = '/api/documents.create';
+        $payload = [
+            'title' => $title,
+            'collectionId' => $collectionId,
+            'publish' => $publish,
+        ];
+        if (! empty($parentId)) {
+            $payload['parentDocumentId'] = $parentId;
+        }
+
+        return $this->post($endpoint, $payload);
+    }
+
+    public function listPins(int $limit = 100): array
+    {
+        $endpoint = '/api/pins.list?limit=' . $limit;
+        $data = $this->post($endpoint);
+
+        // Pins API returns top-level keys like 'pins' and included 'documents'
+        return $data;
+    }
+
+    public function createPin(string $documentId): array
+    {
+        $endpoint = '/api/pins.create';
+
+        return $this->post($endpoint, [
+            'documentId' => $documentId,
+        ]);
+    }
+
+    public function deletePin(string $pinId): array
+    {
+        $endpoint = '/api/pins.delete';
+
+        return $this->post($endpoint, [
+            'id' => $pinId,
+        ]);
+    }
+
+    public function updateDocumentContent(string $documentId, string $text, ?string $title = null, bool $publish = true): array
+    {
+        $endpoint = '/api/documents.update';
+        $payload = [
+            'id' => $documentId,
+            'text' => $text,
+            'publish' => $publish,
+        ];
+        if (! empty($title)) {
+            $payload['title'] = $title;
+        }
+
+        return $this->post($endpoint, $payload);
+    }
+
+    public function updateDocumentAtRevision(string $documentId, string $text, int $revision): array
+    {
+        if (! config('knowledge.outline_revision_writes_verified')) {
+            throw new LogicException('Outline conditional writes have not been verified.');
+        }
+
+        return $this->post('/api/documents.update', ['id' => $documentId, 'text' => $text, 'lastRevision' => $revision]);
+    }
+
+    public function patchDocumentAtRevision(string $documentId, string $findText, string $text, int $revision): array
+    {
+        if (! config('knowledge.outline_revision_writes_verified')) {
+            throw new LogicException('Outline conditional patches have not been verified.');
+        }
+
+        return $this->post('/api/documents.update', ['id' => $documentId, 'editMode' => 'patch', 'findText' => $findText, 'text' => $text, 'lastRevision' => $revision]);
+    }
+
+    public function baseUrl(): string
+    {
+        // First try to get from IntegrationGroup (preferred)
+        if ($this->integration->group && $this->integration->group->auth_metadata && isset($this->integration->group->auth_metadata['api_url'])) {
+            $raw = (string) $this->integration->group->auth_metadata['api_url'];
+        } else {
+            // Fallback to individual integration configuration
+            $config = $this->integration->configuration ?? [];
+            $raw = (string) ($config['api_url'] ?? config('services.outline.url'));
+        }
+
+        $url = trim($raw);
+
+        if ($url === '') {
+            throw new Exception('Outline API URL is not configured');
+        }
+
+        // Ensure scheme is present; default to https
+        if (! preg_match('/^https?:\/\//i', $url)) {
+            $url = 'https://' . $url;
+        }
+
+        return $url;
+    }
+
+    public function daynotesCollectionId(): string
+    {
+        // First try to get from IntegrationGroup (preferred)
+        if ($this->integration->group && $this->integration->group->auth_metadata && isset($this->integration->group->auth_metadata['daynotes_collection_id'])) {
+            return (string) $this->integration->group->auth_metadata['daynotes_collection_id'];
+        }
+
+        // Fallback to individual integration configuration
+        $config = $this->integration->configuration ?? [];
+
+        return (string) ($config['daynotes_collection_id'] ?? config('services.outline.daynotes_collection_id'));
+    }
+
+    public function token(): string
+    {
+        // First try to get from IntegrationGroup (preferred)
+        if ($this->integration->group && $this->integration->group->access_token) {
+            $raw = (string) $this->integration->group->access_token;
+        } else {
+            // Fallback to individual integration configuration
+            $config = $this->integration->configuration ?? [];
+            $raw = (string) ($config['access_token'] ?? config('services.outline.access_token') ?? '');
+        }
+
+        $token = trim($raw);
+
+        if (str_starts_with($token, 'Bearer ')) {
+            $token = substr($token, 7);
+        }
+
+        return $token;
+    }
+
+    protected function post(string $endpoint, array $json = []): array
+    {
+        $url = rtrim($this->baseUrl(), '/') . $endpoint;
+
+        $payload = empty($json) ? (object) [] : $json;
+
+        try {
+            // API logging (request)
+            $integrationId = (string) $this->integration->id;
+            log_integration_api_request(
+                'outline',
+                'POST',
+                $endpoint,
+                [
+                    'Authorization' => '[REDACTED]',
+                    'Content-Type' => 'application/json',
+                ],
+                in_array($endpoint, ['/api/documents.update', '/api/documents.info']) ? ['id' => $json['id'] ?? null, 'content' => '[REDACTED]'] : (is_array($payload) ? $payload : (array) $payload),
+                $integrationId,
+                true
+            );
+
+            $startedAt = microtime(true);
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->token(),
+                'Content-Type' => 'application/json',
+            ])
+                ->acceptJson()
+                ->connectTimeout(10)
+                ->timeout(25)
+                ->retry($endpoint === '/api/documents.update' && isset($payload['lastRevision']) ? 1 : 2, 500, fn (Exception $error) => $error instanceof ConnectionException
+                    || ($error instanceof RequestException && ($error->response->status() === 429 || $error->response->serverError())), throw: false)
+                ->post($url, $payload);
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+
+            // API logging (response)
+            log_integration_api_response(
+                'outline',
+                'POST',
+                $endpoint,
+                $response->status(),
+                in_array($endpoint, ['/api/documents.update', '/api/documents.info']) ? '[REDACTED DOCUMENT CONTENT]' : $response->body(),
+                $response->headers(),
+                $integrationId,
+                true
+            );
+
+            if ($response->status() === 409 || $response->json('error') === 'edit_conflict') {
+                throw new OutlineRevisionConflict('Outline changed before the edit could be saved.');
+            }
+            if (! $response->successful()) {
+                Log::warning('Outline API request failed', [
+                    'url' => $url,
+                    'endpoint' => $endpoint,
+                    'status' => $response->status(),
+                    'body' => in_array($endpoint, ['/api/documents.update', '/api/documents.info']) ? '[REDACTED DOCUMENT CONTENT]' : $response->body(),
+                    'duration_ms' => $durationMs,
+                ]);
+                throw new Exception('Outline API error: ' . $response->status());
+            }
+
+            $jsonResponse = $response->json();
+
+            // Lightweight timing log in application log
+            Log::debug('Outline API call completed', [
+                'endpoint' => $endpoint,
+                'status' => $response->status(),
+                'duration_ms' => $durationMs,
+            ]);
+
+            return $jsonResponse;
+
+        } catch (OutlineRevisionConflict $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('Outline API request exception', [
+                'url' => $url,
+                'endpoint' => $endpoint,
+                'error' => $e->getMessage(),
+            ]);
+            throw new Exception('Outline API request failed: ' . $e->getMessage(), previous: $e);
+        }
+    }
+
+    private function hasNextPage(array $data): bool
+    {
+        if (empty($data['data']) || empty($data['pagination']['nextPath'])) {
+            return false;
+        }
+
+        $pagination = $data['pagination'];
+        if (isset($pagination['total'], $pagination['offset'], $pagination['limit'])) {
+            return (int) $pagination['offset'] + (int) $pagination['limit'] < (int) $pagination['total'];
+        }
+
+        return true;
+    }
+}

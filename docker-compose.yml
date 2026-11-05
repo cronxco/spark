@@ -1,9 +1,9 @@
 services:
     nginx:
-        image: 'nginx:latest@sha256:33e0bbc7ca9ecf108140af6288c7c9d1ecc77548cbfd3952fd8466a75edefe57'
+        image: "nginx:latest@sha256:0d4374c710a9649200e84f8ef8dbdd4fa76c0c107839cd50f1e42a63916b0f2e"
         ports:
-            - '${HTTP_PORT:-8000}:80'
-            - '${SSL_PORT:-443}:443'
+            - "${HTTP_PORT:-8000}:80"
+            - "${SSL_PORT:-443}:443"
         environment:
             - SSL_PORT=${SSL_PORT:-443}
             - APP_SERVICE=${APP_SERVICE:-laravel.test}
@@ -11,9 +11,9 @@ services:
             - SSL_DOMAIN=${SSL_DOMAIN:-localhost}
             - SSL_ALT_NAME=${SSL_ALT_NAME:-DNS:localhost}
         volumes:
-            - 'sail-nginx:/etc/nginx/certs'
-            - './vendor/ryoluo/sail-ssl/nginx/templates:/etc/nginx/templates'
-            - './vendor/ryoluo/sail-ssl/nginx/generate-ssl-cert.sh:/docker-entrypoint.d/99-generate-ssl-cert.sh'
+            - "sail-nginx:/etc/nginx/certs"
+            - "./vendor/ryoluo/sail-ssl/nginx/templates:/etc/nginx/templates"
+            - "./vendor/ryoluo/sail-ssl/nginx/generate-ssl-cert.sh:/docker-entrypoint.d/99-generate-ssl-cert.sh"
         depends_on:
             - ${APP_SERVICE:-laravel.test}
         networks:
@@ -44,7 +44,7 @@ services:
             - pgsql
             - redis
     pgsql:
-        image: "pgvector/pgvector:0.8.0-pg17@sha256:40b404964359299eefdd5f8518facf1886c562848cf4de13b6eaf91cb70c2b87"
+        image: "bsamasi/postgis-pgvector:pg17@sha256:f3133925f641c093fae3f83607cfe21eb6e401b6961ae1cac84f70ff6f767f59"
         ports:
             - "${FORWARD_DB_PORT:-5432}:5432"
         environment:
@@ -69,7 +69,7 @@ services:
             retries: 3
             timeout: 5s
     redis:
-        image: "redis:alpine@sha256:987c376c727652f99625c7d205a1cba3cb2c53b92b0b62aade2bd48ee1593232"
+        image: "redis:alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576"
         ports:
             - "${FORWARD_REDIS_PORT:-6379}:6379"
         volumes:
@@ -83,13 +83,107 @@ services:
                 - ping
             retries: 3
             timeout: 5s
+    reverb:
+        build:
+            context: ./vendor/laravel/sail/runtimes/8.4
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: "${WWWGROUP}"
+        image: sail-8.4/app
+        command:
+            ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+        ports:
+            - "${REVERB_FORWARD_PORT:-8080}:8080"
+        environment:
+            WWWUSER: "${WWWUSER}"
+            LARAVEL_SAIL: 1
+            REVERB_APP_ID: "${REVERB_APP_ID:-spark}"
+            REVERB_APP_KEY: "${REVERB_APP_KEY}"
+            REVERB_APP_SECRET: "${REVERB_APP_SECRET}"
+            REVERB_HOST: "${REVERB_HOST:-localhost}"
+            REVERB_PORT: "${REVERB_PORT:-8080}"
+            REVERB_SERVER_HOST: "${REVERB_SERVER_HOST:-0.0.0.0}"
+            REVERB_SERVER_PORT: "${REVERB_SERVER_PORT:-8080}"
+        volumes:
+            - ".:/var/www/html"
+        networks:
+            - sail
+        depends_on:
+            - redis
+            - pgsql
+        restart: unless-stopped
+    chrome:
+        image: "maelp/docker-vnc-chromium:latest@sha256:0fb0477d22a1bad5141084661bcd479c5a37543fb7c01f4570d1d3dcf6d1ece4"
+        ports:
+            - "${CHROME_VNC_PORT:-5900}:5900"
+            - "${CHROME_CDP_PORT:-9222}:9222"
+        environment:
+            - VNC_PASSWORD=${CHROME_VNC_PASSWORD:-spark-dev-vnc}
+            - DISPLAY_WIDTH=1920
+            - DISPLAY_HEIGHT=1080
+            - CHROME_EXTRA_ARGS=--remote-debugging-address=0.0.0.0
+        volumes:
+            - "chrome-userdata:/config/userdata"
+        networks:
+            sail:
+                ipv4_address: 172.20.0.10
+        healthcheck:
+            test:
+                - CMD
+                - curl
+                - "-f"
+                - "http://localhost:9222/json/version"
+            interval: 10s
+            timeout: 5s
+            retries: 3
+        profiles:
+            - playwright
+    playwright-worker:
+        build:
+            context: ./docker/playwright
+            dockerfile: Dockerfile
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        environment:
+            - CHROME_CDP_URL=http://172.20.0.10:9222
+            - NODE_ENV=production
+            - STEALTH_ENABLED=${PLAYWRIGHT_STEALTH_ENABLED:-true}
+            - CONTEXT_TTL=${PLAYWRIGHT_CONTEXT_TTL:-1800000}
+            - FETCH_URL_SAFETY_ALLOWED_HOSTS=${FETCH_URL_SAFETY_ALLOWED_HOSTS:-}
+        ports:
+            - "${PLAYWRIGHT_WORKER_PORT:-3000}:3000"
+        volumes:
+            - "./storage/app/playwright:/app/storage:rw"
+        networks:
+            - sail
+        depends_on:
+            chrome:
+                condition: service_healthy
+        healthcheck:
+            test:
+                - CMD
+                - wget
+                - "--quiet"
+                - "--tries=1"
+                - "--spider"
+                - "http://localhost:3000/health"
+            interval: 10s
+            timeout: 5s
+            retries: 3
+        profiles:
+            - playwright
 networks:
     sail:
         driver: bridge
+        ipam:
+            config:
+                - subnet: 172.20.0.0/16
 volumes:
     sail-nginx:
         driver: local
     sail-pgsql:
         driver: local
     sail-redis:
+        driver: local
+    chrome-userdata:
         driver: local

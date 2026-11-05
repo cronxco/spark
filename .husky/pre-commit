@@ -1,0 +1,2 @@
+npx lint-staged
+php ./vendor/bin/duster fix --dirty

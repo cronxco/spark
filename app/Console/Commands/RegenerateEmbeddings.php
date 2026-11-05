@@ -1,0 +1,255 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Jobs\GenerateBlockEmbeddingJob;
+use App\Jobs\GenerateEventEmbeddingJob;
+use App\Jobs\GenerateObjectEmbeddingJob;
+use App\Models\ActionProgress;
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\User;
+use App\Services\Ai\AiModel;
+use App\Services\Ai\EmbeddingClient;
+use Illuminate\Console\Command;
+
+class RegenerateEmbeddings extends Command
+{
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'embeddings:regenerate
+                            {--model= : Model to regenerate (Event, Block, EventObject). If not specified, regenerates all}
+                            {--force : Regenerate all embeddings, even if they already exist}
+                            {--stale-model : Only regenerate rows whose stored embedding model differs from the configured one}
+                            {--filter= : Filter by service or domain (e.g., service:fetch or domain:health)}
+                            {--sync : Run synchronously instead of queueing jobs}
+                            {--limit= : Limit the number of records to process (for testing)}';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Regenerate embeddings for events, blocks, and objects';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle(): int
+    {
+        $modelOption = $this->option('model');
+        $force = $this->option('force');
+        $staleModel = $this->option('stale-model');
+        $filter = $this->option('filter');
+        $sync = $this->option('sync');
+        $limit = $this->option('limit');
+
+        // Parse filter
+        $filterType = null;
+        $filterValue = null;
+        if ($filter) {
+            $parts = explode(':', $filter);
+            if (count($parts) !== 2 || ! in_array($parts[0], ['service', 'domain'])) {
+                $this->error('Invalid filter format. Use service:value or domain:value');
+
+                return Command::FAILURE;
+            }
+            $filterType = $parts[0];
+            $filterValue = $parts[1];
+        }
+
+        // Determine which models to process
+        $models = [];
+        if ($modelOption) {
+            if (! in_array($modelOption, ['Event', 'Block', 'EventObject'])) {
+                $this->error('Invalid model. Choose Event, Block, or EventObject');
+
+                return Command::FAILURE;
+            }
+            $models = [$modelOption];
+        } else {
+            $models = ['Event', 'Block', 'EventObject'];
+        }
+
+        $this->info('🔄 Regenerating embeddings...');
+        $this->newLine();
+
+        $totalProcessed = 0;
+
+        foreach ($models as $modelName) {
+            $count = $this->processModel($modelName, $force, $filterType, $filterValue, $sync, $limit, $staleModel);
+            $totalProcessed += $count;
+        }
+
+        $this->newLine();
+        $this->info("✅ Processed {$totalProcessed} records total");
+        $this->info('Jobs queued successfully. Check Horizon to monitor progress.');
+
+        return Command::SUCCESS;
+    }
+
+    private function processModel(string $modelName, bool $force, ?string $filterType, ?string $filterValue, bool $sync, ?int $limit, bool $staleModel = false): int
+    {
+        $modelClass = match ($modelName) {
+            'Event' => Event::class,
+            'Block' => Block::class,
+            'EventObject' => EventObject::class,
+        };
+
+        $jobClass = match ($modelName) {
+            'Event' => GenerateEventEmbeddingJob::class,
+            'Block' => GenerateBlockEmbeddingJob::class,
+            'EventObject' => GenerateObjectEmbeddingJob::class,
+        };
+
+        $this->info("Processing {$modelName} records...");
+
+        // Build query
+        $query = $modelClass::query();
+
+        if ($modelName === 'Event') {
+            $query->withoutInternal();
+        } elseif ($modelName === 'Block') {
+            $query->whereHas('event', fn ($eventQuery) => $eventQuery->withoutInternal());
+        }
+
+        // Apply filter
+        if ($filterType === 'service') {
+            if ($modelName === 'EventObject') {
+                $this->warn('Service filter not applicable to EventObject, skipping');
+
+                return 0;
+            }
+
+            if ($modelName === 'Event') {
+                $query->where('service', $filterValue);
+            } elseif ($modelName === 'Block') {
+                $query->whereHas('event', function ($q) use ($filterValue) {
+                    $q->where('service', $filterValue);
+                });
+            }
+        } elseif ($filterType === 'domain') {
+            if ($modelName === 'EventObject') {
+                $this->warn('Domain filter not applicable to EventObject, skipping');
+
+                return 0;
+            }
+
+            if ($modelName === 'Event') {
+                $query->where('domain', $filterValue);
+            } elseif ($modelName === 'Block') {
+                $query->whereHas('event', function ($q) use ($filterValue) {
+                    $q->where('domain', $filterValue);
+                });
+            }
+        }
+
+        // Changing the embedding model invalidates every vector generated by the
+        // previous one. Rows stamp the model they were built with, so --stale-model
+        // re-embeds exactly those left behind rather than the whole corpus.
+        if ($staleModel) {
+            $metadataColumn = $modelName === 'Event' ? 'event_metadata' : 'metadata';
+            $configuredModel = AiModel::Embedding->model();
+
+            $query->whereNotNull('embeddings')
+                ->where(function ($q) use ($metadataColumn, $configuredModel) {
+                    $q->whereNull($metadataColumn . '->embedding_model')
+                        ->orWhere($metadataColumn . '->embedding_model', '!=', $configuredModel);
+                });
+        } elseif (! $force) {
+            $query->whereNull('embeddings');
+        }
+
+        // Apply limit
+        if ($limit) {
+            $query->limit($limit);
+        }
+
+        $total = $query->count();
+
+        if ($total === 0) {
+            $this->warn("No {$modelName} records to process");
+
+            return 0;
+        }
+
+        $this->line("Found {$total} {$modelName} records to process");
+
+        // Progress tracking is a convenience, not the job. action_progress.user_id
+        // is a UUID foreign key, so there is no "system user" to attribute a
+        // backfill to; when no user exists the run proceeds untracked rather
+        // than failing on the foreign key.
+        $progress = $this->createProgressRecord($modelName, $total, [
+            'force' => $force,
+            'filter_type' => $filterType,
+            'filter_value' => $filterValue,
+            'stale_model' => $staleModel,
+        ]);
+
+        // Process in chunks
+        $bar = $this->output->createProgressBar($total);
+        $bar->start();
+
+        $processed = 0;
+        $query->chunkById(100, function ($records) use ($jobClass, $sync, $bar, &$processed, $progress, $staleModel) {
+            foreach ($records as $record) {
+                if ($sync) {
+                    // Run synchronously
+                    $job = new $jobClass($record, $staleModel);
+                    $job->handle(app(EmbeddingClient::class));
+                } else {
+                    // Queue job
+                    $jobClass::dispatch($record, $staleModel)->onQueue('embeddings');
+                }
+
+                $processed++;
+                $bar->advance();
+
+                // Update progress every 10 records
+                if ($processed % 10 === 0) {
+                    $progress?->update(['progress' => $processed]);
+                }
+            }
+        });
+
+        $bar->finish();
+        $this->newLine();
+
+        // Mark progress as complete
+        $progress?->update([
+            'progress' => $total,
+            'step' => 'completed',
+        ]);
+
+        $this->info("✅ Queued {$processed} {$modelName} embedding jobs");
+
+        return $processed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $metadata
+     */
+    private function createProgressRecord(string $modelName, int $total, array $metadata): ?ActionProgress
+    {
+        $user = User::query()->where('is_admin', true)->first() ?? User::query()->first();
+
+        if (! $user) {
+            return null;
+        }
+
+        return ActionProgress::createProgress(
+            userId: $user->id,
+            actionType: 'embeddings',
+            actionId: 'regenerate-embeddings-' . strtolower($modelName) . '-' . now()->timestamp,
+            step: 'processing',
+            message: "Regenerating {$total} {$modelName} embeddings",
+            progress: 0,
+            total: $total,
+            details: array_merge(['model' => $modelName], $metadata),
+        );
+    }
+}

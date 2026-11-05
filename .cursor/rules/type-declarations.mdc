@@ -1,0 +1,42 @@
+---
+description: Type Declarations & Docblocks
+globs:
+alwaysApply: true
+---
+- Use typed properties over docblocks
+- Specify return types including `void`
+- Use short nullable syntax: `?Type` not `Type|null`
+- Document iterables with generics:
+  ```php
+  /** @return Collection<int, User> */
+  public function getUsers(): Collection
+  ```
+
+### Docblock Rules
+- Don't use docblocks for fully type-hinted methods (unless description needed)
+- **Always import classnames in docblocks** - never use fully qualified names:
+  ```php
+  use \Spatie\Url\Url;
+  /** @return Url */
+  ```
+- Use one-line docblocks when possible: `/** @var string */`
+- Most common type should be first in multi-type docblocks:
+  ```php
+  /** @var Collection|SomeWeirdVendor\Collection */
+  ```
+- If one parameter needs docblock, add docblocks for all parameters
+- For iterables, always specify key and value types:
+  ```php
+  /**
+   * @param array<int, MyObject> $myArray
+   * @param int $typedArgument 
+   */
+  function someFunction(array $myArray, int $typedArgument) {}
+  ```
+- Use array shape notation for fixed keys, put each key on it's own line:
+  ```php
+  /** @return array{
+     first: SomeClass, 
+     second: SomeClass
+  } */
+  ```
