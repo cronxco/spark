@@ -184,6 +184,24 @@ class BaselineServiceTest extends TestCase
         $this->assertSame('mean_sd', $described['method']);
     }
 
+    #[Test]
+    public function excluding_a_day_removes_it_from_the_basis_without_saving(): void
+    {
+        $this->days('oura', 'had_readiness_score', 'percent', 60, fn (int $back) => $back === 1 ? 20 : 80 + ($back % 5));
+
+        $statistic = $this->statistic('oura', 'had_readiness_score', 'percent');
+        $service = app(BaselineService::class);
+        $service->recompute($statistic);
+        $statistic = $statistic->fresh();
+
+        $basis = $service->excluding($statistic, now()->utc()->subDay()->startOfDay(), 'UTC');
+
+        $this->assertSame(59, $basis->event_count);
+        $this->assertGreaterThan((float) $statistic->mean_value, (float) $basis->mean_value);
+        $this->assertLessThan((float) $statistic->stddev_value, (float) $basis->stddev_value);
+        $this->assertSame(60, $statistic->fresh()->event_count);
+    }
+
     /**
      * One event per day, ending yesterday.
      *
@@ -216,23 +234,5 @@ class BaselineServiceTest extends TestCase
             'action' => $action,
             'value_unit' => $unit,
         ]);
-    }
-
-    #[Test]
-    public function excluding_a_day_removes_it_from_the_basis_without_saving(): void
-    {
-        $this->days('oura', 'had_readiness_score', 'percent', 60, fn (int $back) => $back === 1 ? 20 : 80 + ($back % 5));
-
-        $statistic = $this->statistic('oura', 'had_readiness_score', 'percent');
-        $service = app(BaselineService::class);
-        $service->recompute($statistic);
-        $statistic = $statistic->fresh();
-
-        $basis = $service->excluding($statistic, now()->utc()->subDay()->startOfDay(), 'UTC');
-
-        $this->assertSame(59, $basis->event_count);
-        $this->assertGreaterThan((float) $statistic->mean_value, (float) $basis->mean_value);
-        $this->assertLessThan((float) $statistic->stddev_value, (float) $basis->stddev_value);
-        $this->assertSame(60, $statistic->fresh()->event_count);
     }
 }
