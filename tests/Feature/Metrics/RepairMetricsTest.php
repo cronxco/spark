@@ -49,7 +49,7 @@ class RepairMetricsTest extends TestCase
 
         $this->artisan('metrics:repair', ['--user' => $this->user->id, '--apply' => true])->assertSuccessful();
 
-        $this->assertSame([$kept->id], MetricTrend::pluck('id')->all());
+        $this->assertSame([(string) $kept->id], MetricTrend::pluck('id')->map(fn ($id) => (string) $id)->all());
         $this->assertNull($readiness->fresh()->baseline_reset_suggested_at);
     }
 

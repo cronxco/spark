@@ -33,8 +33,9 @@ class CalculateMetricStatisticsJob implements ShouldBeUnique, ShouldQueue
     /**
      * @param  string|null  $userId  Limit the run to one user. A user-triggered
      *                               run must pass this; null is the all-tenant run.
+     * @param  bool  $judgedOnly  Only relearn the metrics that are judged (the nightly run)
      */
-    public function __construct(public ?string $userId = null) {}
+    public function __construct(public ?string $userId = null, public bool $judgedOnly = false) {}
 
     /**
      * One pending run per user (or one all-tenant run) at a time, so repeated
@@ -117,7 +118,7 @@ class CalculateMetricStatisticsJob implements ShouldBeUnique, ShouldQueue
             ->filter(function ($metricData) {
                 // The all-tenant nightly run relearns the metrics that are judged;
                 // the rest are refreshed as their events arrive, or on request.
-                if ($this->userId === null && ! app(MetricCatalogue::class)->isJudgeable($metricData->service, $metricData->action)) {
+                if ($this->judgedOnly && ! app(MetricCatalogue::class)->isJudgeable($metricData->service, $metricData->action)) {
                     return false;
                 }
 

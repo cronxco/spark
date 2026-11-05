@@ -38,7 +38,7 @@ Schedule::job(new CheckIntegrationUpdates)
     ->sentryMonitor();
 
 // Relearn what is usual for every metric each night (baselines, day types)
-Schedule::job(new CalculateMetricStatisticsJob)
+Schedule::job(new CalculateMetricStatisticsJob(judgedOnly: true))
     ->dailyAt('03:30')
     ->withoutOverlapping()
     ->onOneServer()

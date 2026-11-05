@@ -48,17 +48,21 @@ class BaselineService
         $timezone = $user?->getTimezone() ?? 'UTC';
         $detectionDays = (int) config('metrics.detection_window_days', 90);
 
-        $series = $this->series->daily($statistic, $timezone, $detectionDays, $now);
+        // Days with no reading still show how long the metric has been
+        // recorded; only the values that mean something are learned from.
+        $raw = $this->series->daily($statistic, $timezone, $detectionDays, $now, dropZeros: false);
+        $series = $this->series->keepsZeros($statistic) ? $raw : array_filter($raw, fn (float $v) => $v != 0.0);
 
-        $dates = array_keys($series);
+        $dates = array_keys($raw);
         $span = $dates === [] ? 0 : Carbon::parse($dates[0])->diffInDays(Carbon::parse(end($dates)));
 
-        if (count($series) < 10 || $span < 30) {
+        if (count($raw) < 10 || $span < 30 || count($series) < 3) {
             $this->clear($statistic, $now);
 
             return false;
         }
 
+        $dates = array_keys($series);
         $method = $this->catalogue->method($statistic->service, $statistic->action);
         $values = array_values($series);
         $summary = $this->summarise($values, $method);

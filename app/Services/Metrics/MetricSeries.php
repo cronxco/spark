@@ -29,12 +29,12 @@ class MetricSeries
      *
      * @return array<string, float>
      */
-    public function daily(MetricStatistic $statistic, string $timezone, int $days, ?CarbonInterface $now = null, bool $finalOnly = true): array
+    public function daily(MetricStatistic $statistic, string $timezone, int $days, ?CarbonInterface $now = null, bool $finalOnly = true, bool $dropZeros = true): array
     {
         $now = $now ? Carbon::instance($now) : now();
         $service = $statistic->service;
         $action = $statistic->action;
-        $includeZeros = $this->keepsZeros($statistic);
+        $includeZeros = ! $dropZeros || $this->keepsZeros($statistic);
 
         if (SpendSeries::isSpend($statistic)) {
             return $this->finalDays($statistic, $this->spend->daily($statistic->user_id, $days, $now), $timezone, $now, $finalOnly);

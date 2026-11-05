@@ -154,7 +154,7 @@ class ContextualActionsTest extends TestCase
         $this->actingAs($this->alice);
 
         $this->assertCount(2, ContextualActionsQuery::commands('metrics.index', [], ''));
-        $this->assertCount(1, ContextualActionsQuery::commands('metrics.index', [], 'detect'));
+        $this->assertCount(1, ContextualActionsQuery::commands('metrics.index', [], 'insights'));
         $this->assertCount(0, ContextualActionsQuery::commands('metrics.index', [], 'nothing like this'));
     }
 
