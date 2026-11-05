@@ -208,7 +208,7 @@ Nested corners are concentric: an inner radius equals the outer radius minus the
 Three layers, top to bottom:
 
 1. **Controls**: tab bar, toolbars, floating buttons, the Up to Speed header. Liquid Glass on iOS. Never put glass on glass.
-2. **Content**: cards and grouped rows. An opaque surface (`sparkElevated`) with no shadow on iOS. `bg-base-200` with no shadow on the web. Simple timeline rows can sit straight on the page with no container.
+2. **Content**: cards and grouped rows. An opaque surface (`sparkElevated`) with no shadow on iOS. `bg-base-200` with no shadow on the web. Simple timeline rows can sit straight on the page with no container. Event cards in a Flint briefing mix their domain tint into this surface at 9% (7.3); the result is still opaque.
 3. **Ground**: the page, with the time-of-day wash on iOS. The web stays flat.
 
 This follows Apple's guidance that Liquid Glass belongs to the navigation layer above content, and finding 8 of the 6 September iOS review. It reverses part of the 3 October iOS change that moved Flint cards onto glass. iOS adds one modifier, `.sparkContentSurface(radius:tint:)`, and `GlassCard` switches to it. Reduce Transparency and Increase Contrast keep today's fallback: opaque fill and a visible edge.
@@ -318,7 +318,7 @@ Unless a card has its own controls (`linked: false`, below), the whole card is o
 | Size | Where | Shows | Layout |
 |---|---|---|---|
 | `ref` | Inline in prose, event and object detail, relationship lists, the actor and target of an event | Glyph and title, plus a service label only when the context asks for it | The smallest view of any integration, object, block or event. See 7.5 |
-| `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value (with an against-the-mean bar for durations and counts) or a 64pt ring for scores, one context line | Minimum height, 2 or 3 across. At accessibility text sizes, one column with variable height so nothing clips. No body. |
+| `compact` | Up to Speed, widgets, a row of signals on Day | Eyebrow (glyph + short label), hero value (with an against-the-mean bar for durations and counts) or a 64pt ring for scores, one context line | Minimum height, 2 or 3 across, or the full row when alone. At accessibility text sizes, one column with variable height so nothing clips. No body. Briefing cards add their own layouts (7.3). |
 | `row` | Event detail, Knowledge item, timelines, lists inside a section | Glyph chip, label, value or title, trailing time | One line, 44pt minimum height |
 | `card` | Web grids, iOS block lists that need a body | All four slots | Full width on phone, grid on the web (`grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3`) |
 | `full` | Block or event detail screen | Hero at display size (4), body large, context and source below | Whole screen; see 12.2 |
@@ -327,7 +327,17 @@ One component renders every size: `BlockCard(block, size:)` and `EventCard(event
 
 ### 7.3 Event cards in Up to Speed
 
-When Flint prose mentions a metric that has an event behind it (sleep duration, sleep score, readiness, activity score), show those events as `compact` cards under the paragraph. Put up to three in a row, ordered as the prose mentions them. Highlighted phrases in the prose use the `highlight` token (3.3), and each card's glyph carries its domain tint. Scores (sleep score, readiness, activity score) show as a ring. Durations and counts (sleep, steps) show as the value over a thin against-the-mean bar (section 8, Bar) with its Avg marker. Tapping a card opens the event. With more than three, the third card reads "+N more" and opens a list.
+When Flint prose links an event, show it as a card under the paragraph, in the order the prose mentions it. Highlighted phrases in the prose use the `highlight` token (3.3). The backend names each card's `layout`, and the card says what the event is (Will, 2026-11-05):
+
+- **Metric** (sleep, sleep score, readiness, activity score, steps, other daily metrics): the `compact` card. Scores show as a ring. Durations and counts show as the value over a thin against-the-mean bar (section 8, Bar) with its Avg marker. Up to three in a row; with more than three, the third card reads "+N more" and opens a list. A lone metric card spans the row, with its ring or bar trailing.
+- **Journey** (a flight a flight tracker wrote into the calendar): the airport codes are the hero, with each end's local time under it, joined by a route line. While the flight is in the air the plane glyph sits along the line at the share of the flight time gone. The context names the flight time and the cities.
+- **Calendar** (any other calendar entry): the entry's title, then its time span and length.
+- **Payment** (a card or bank payment): the amount as the hero, the merchant in display case, the account and a Pending chip while the line is pending. Trailing, a strip of the week's payments up to that day, with this one in the domain fill and a caption when it stands out ("Largest this week").
+- **Reading** (an article or newsletter issue): the publication's monogram and name in the eyebrow, the article's own headline in the serif face, the read time, then up to four key takeaways, each a bullet held to two lines.
+
+Every layout but Metric spans the row. Only Metric cards carry a comparison line (3.4): a one-off event has no usual, so the others show a fact instead. When the reader has answered a Flint question that links the event, the card ends with "You answered" and the answer (its note when there is one) under a hairline.
+
+Each card sits on its **domain-tinted fill**: the domain tint at 9% mixed into the content surface, so the card stays opaque (5.3). The glyph sits in a rounded-square chip of the domain tint, and the hero takes the domain ink (3.6). On iOS the cards rise into place 70ms apart after the prose, and rings and route lines draw once; under Reduce Motion they are simply there. A tap gives a light haptic and opens the event.
 
 ### 7.4 Adding a card type
 

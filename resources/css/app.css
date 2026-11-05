@@ -152,6 +152,15 @@
     display: none;
 }
 
+/*
+ * Linked event cards in Flint briefings (design language §7.3): the card's
+ * domain tint at 9% mixed into base-100, so the fill stays opaque content,
+ * not glass. The card sets --card-tint to its domain's fill token.
+ */
+.surface-domain-tint {
+    background: color-mix(in oklab, var(--card-tint, transparent) 9%, var(--color-base-100));
+}
+
 pretty-json {
     --key-color: #b02411;
     --arrow-color: #011627;
