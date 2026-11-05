@@ -456,7 +456,7 @@ Centralise semantic feedback in `SparkHaptics`, using SwiftUI `.sensoryFeedback`
 | Explicit start/stop of a timed activity | Start / stop | At the actual transition |
 | Navigation, scrolling, background refresh, passive reading outside the Up to Speed interactions in 10.7 | None | No added automatic haptics |
 
-- Prefer built-in system control feedback and never duplicate it. Do not add a haptic to every tap, or use vibration as the only feedback channel. Preserve the named Up to Speed reading and card-tap haptics in 10.7; they are deliberate product behaviour, not violations of the general quiet-navigation rule.
+- Prefer built-in system control feedback and never duplicate it. Do not add a haptic to every tap, or use vibration as the only feedback channel. Preserve the named Up to Speed reading haptics in 10.7; they are deliberate product behaviour, not violations of the general quiet-navigation rule.
 - Support a setting to disable Spark-specific haptics. Respect OS behaviour and accessibility settings.
 
 ### 10.5 Loading and completion
@@ -480,7 +480,7 @@ Check touch, keyboard and VoiceOver/screen reader behaviour; light/dark themes; 
 | Arrive at Wrap | Success | Marks completion of the reading journey; it does not claim that a write or all read markers have persisted |
 | Explicitly toggle an article read/unread | Selection | At the explicit interaction, retaining immediate feedback while persistence proceeds |
 | Acknowledge an anomaly | Light impact | Retain the existing cue after the acknowledgement succeeds |
-| Tap a linked event card | Light impact | At the tap that opens the event, as specified in 7.3 |
+| Tap a linked event card | Navigation only | Opens the event; no additional tap haptic is currently implemented |
 
 Use the existing pager hierarchy: a chapter-boundary cue replaces the within-chapter tick, and arriving at Wrap uses the completion cue rather than stacking it with a chapter impact. Check-in, answer and Mark all as read persistence feedback remains distinct and follows the confirmed-write rule in 10.4. A reading-completion success at Wrap is not evidence that those operations succeeded.
 
