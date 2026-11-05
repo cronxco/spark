@@ -4,16 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ApiTokenUITest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_access_api_tokens_page()
+    #[Test]
+    public function user_can_access_api_tokens_page()
     {
         $user = User::factory()->create();
-        
+
         $response = $this->actingAs($user)
             ->get('/settings/api-tokens');
 
@@ -22,24 +24,26 @@ class ApiTokenUITest extends TestCase
         $response->assertSee('Create New Token');
     }
 
-    public function test_user_can_see_api_tokens_ui_elements()
+    #[Test]
+    public function user_can_see_api_tokens_ui_elements()
     {
         $user = User::factory()->create();
-        
+
         $response = $this->actingAs($user)
             ->get('/settings/api-tokens');
 
         $response->assertStatus(200);
         $response->assertSee('Create New Token');
-        $response->assertSee('Your API Tokens');
-        $response->assertSee('Token Name');
+        $response->assertSee('Your Tokens');
+        $response->assertSee('Name');
         $response->assertSee('Create Token');
     }
 
-    public function test_guest_cannot_access_api_tokens_page()
+    #[Test]
+    public function guest_cannot_access_api_tokens_page()
     {
         $response = $this->get('/settings/api-tokens');
 
         $response->assertRedirect('/login');
     }
-} 
+}

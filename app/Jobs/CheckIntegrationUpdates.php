@@ -1,0 +1,144 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Integrations\PluginRegistry;
+use App\Integrations\Task\TaskPlugin;
+use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
+use App\Models\Integration;
+use Exception;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+use Sentry\EventHint;
+use Sentry\SentrySdk;
+use Sentry\Severity;
+use Sentry\Tracing\SpanStatus;
+use Sentry\Tracing\TransactionContext;
+use Throwable;
+
+class CheckIntegrationUpdates implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $timeout = 60; // 1 minute
+
+    public $tries = 1; // Don't retry this job
+
+    /**
+     * Create a new job instance.
+     */
+    public function __construct()
+    {
+        //
+    }
+
+    /**
+     * Execute the job.
+     */
+    public function handle(): void
+    {
+        $hub = SentrySdk::getCurrentHub();
+        $txContext = new TransactionContext;
+        $txContext->setName('job.check_integration_updates');
+        $txContext->setOp('job');
+        $transaction = $hub->startTransaction($txContext);
+        $hub->setSpan($transaction);
+
+        try {
+            Log::info('Starting integration update check');
+
+            // Get integrations that need updating
+            // - OAuth: require a valid group token
+            // - API key: no token requirement
+            // - Task: admin-owned instances with use_schedule switched on
+            $oauthServices = PluginRegistry::getOAuthPlugins()->keys();
+            $apiKeyServices = PluginRegistry::getApiKeyPlugins()->keys();
+
+            // Get all integrations that could potentially need updating
+            $allIntegrations = Integration::external()->with(['user', 'group'])
+                ->whereHas('user')
+                ->where(function ($query) use ($oauthServices, $apiKeyServices) {
+                    $query->where(function ($q) use ($oauthServices) {
+                        // OAuth integrations with a token
+                        $q->whereIn('service', $oauthServices)
+                            ->whereHas('group', function ($groupQuery) {
+                                $groupQuery->whereNotNull('access_token');
+                            });
+                    })->orWhere(function ($q) use ($apiKeyServices) {
+                        // API key integrations (no token required)
+                        $q->whereIn('service', $apiKeyServices);
+                    })->orWhere(function ($q) {
+                        $q->where('service', TaskPlugin::getIdentifier())
+                            ->whereHas('user', function ($userQuery) {
+                                $userQuery->where('is_admin', true);
+                            });
+                    });
+                })
+                ->get();
+
+            // Filter to only those that actually need updating using the individual/schedule-aware method
+            $integrations = $allIntegrations->filter(function ($integration) {
+                if ($integration->service === TaskPlugin::getIdentifier() && ! $integration->runsTaskOnSchedule()) {
+                    return false;
+                }
+
+                return $integration->isDue();
+            });
+
+            if ($integrations->isEmpty()) {
+                Log::info('No integrations found that need updating');
+
+                return;
+            }
+
+            Log::info("Found {$integrations->count()} integration(s) that need updating");
+
+            foreach ($integrations as $integration) {
+                ProcessTaskPipelineJob::dispatch(
+                    model: $integration,
+                    trigger: 'scheduled',
+                    taskFilter: ['run_integration_update'],
+                    force: true,
+                )->onQueue('tasks');
+
+                Log::info("Dispatched integration update task for integration {$integration->id} ({$integration->service}) - User: {$integration->user->name}");
+            }
+
+            \Sentry\captureMessage('CheckIntegrationUpdates summary', Severity::info(), EventHint::fromArray(['extra' => [
+                'dispatched' => $integrations->count(),
+            ]]));
+
+            Log::info("Integration update check completed: {$integrations->count()} dispatched");
+            $transaction->setStatus(SpanStatus::ok());
+
+        } catch (Exception $e) {
+            Log::error('Failed to check integration updates', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            \Sentry\captureException($e);
+            $transaction->setStatus(SpanStatus::internalError());
+
+            throw $e;
+        } finally {
+            $transaction->finish();
+            $hub->setSpan(null);
+        }
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(Throwable $exception): void
+    {
+        Log::error('Integration update check job failed permanently', [
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
+        ]);
+        \Sentry\captureException($exception);
+    }
+}

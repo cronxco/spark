@@ -1,0 +1,408 @@
+<div>
+    {{-- GoCardless EUA Reconfirmation Banner --}}
+    @if ($integration->group && $integration->group->service === 'gocardless' &&
+        data_get($integration->group, 'auth_metadata.requires_reconfirmation', false))
+        <livewire:go-cardless-reconfirm-banner :group="$integration->group" />
+    @endif
+
+    <!-- Two-column layout: main content + drawer -->
+    <div class="flex flex-col lg:flex-row gap-4 lg:gap-6">
+        <!-- Main Content Area -->
+        <div class="flex-1 space-y-4 lg:space-y-6">
+            <!-- Header -->
+            <x-header title="{{ $integration->name ?: $integration->service }}" subtitle="{{ $integration->service }} integration" separator>
+                <x-slot:actions>
+                    @php $isOAuth = $pluginClass && is_a($pluginClass, \App\Integrations\Contracts\OAuthIntegrationPlugin::class, true); @endphp
+
+                    <!-- Desktop: Full buttons -->
+                    <div class="hidden sm:flex gap-2">
+                        @if (!$integration->isPaused())
+                            <x-button
+                                label="Update Now"
+                                icon="fas.rotate"
+                                wire:click="triggerIntegrationUpdate"
+                                class="btn-outline"
+                            />
+                        @endif
+                        @if ($isOAuth)
+                            <x-button
+                                label="Reconnect"
+                                icon="fas.rotate-right"
+                                wire:click="reconnectIntegration"
+                                class="btn-outline"
+                            />
+                        @endif
+                        <x-button
+                            label="Configure"
+                            link="{{ route('integrations.configure', $integration->id) }}"
+                            class="btn-outline"
+                            icon="fas.gear"
+                        />
+                        <x-button
+                            wire:click="toggleSidebar"
+                            class="btn-ghost btn-sm">
+                            <x-icon name="fas.sliders" class="w-5 h-5" />
+                        </x-button>
+                    </div>
+
+                    <!-- Mobile: Dropdown -->
+                    <div class="sm:hidden">
+                        <x-dropdown>
+                            <x-slot:trigger>
+                                <x-button class="btn-ghost btn-sm">
+                                    <x-icon name="fas.ellipsis-vertical" class="w-5 h-5" />
+                                </x-button>
+                            </x-slot:trigger>
+                            @if (!$integration->isPaused())
+                                <x-menu-item title="Update Now" icon="fas.rotate" wire:click="triggerIntegrationUpdate" />
+                            @endif
+                            @if ($isOAuth)
+                                <x-menu-item title="Reconnect" icon="fas.rotate-right" wire:click="reconnectIntegration" />
+                            @endif
+                            <x-menu-item title="Configure" icon="fas.gear" link="{{ route('integrations.configure', $integration->id) }}" />
+                            <x-menu-item title="{{ $showSidebar ? 'Hide Details' : 'Show Details' }}" icon="fas.sliders" wire:click="toggleSidebar" />
+                        </x-dropdown>
+                    </div>
+                </x-slot:actions>
+            </x-header>
+
+            <!-- Primary Hero Card -->
+            <x-card>
+                <div class="flex flex-col sm:flex-row items-start gap-4 lg:gap-6">
+                    <!-- Large integration icon -->
+                    <div class="flex-shrink-0 self-center sm:self-start">
+                        @php
+                            $icon = $pluginClass ? $pluginClass::getIcon() : 'fas.link';
+                        @endphp
+                        <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                            <x-icon name="{{ $icon }}" class="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+                        </div>
+                    </div>
+
+                    <!-- Main content -->
+                    <div class="flex-1">
+                        <div class="mb-4 text-center sm:text-left">
+                            <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-base-content mb-2">
+                                {{ $integration->name ?: $integration->service }}
+                            </h2>
+                            <div class="text-sm text-base-content/70">
+                                {{ $integration->instance_type }}
+                            </div>
+                        </div>
+
+                        <!-- Key metadata -->
+                        <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-sm">
+                            @if ($integration->last_successful_update_at)
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="fas.clock" class="w-4 h-4 text-base-content/60" />
+                                    <span class="text-base-content/70">Last update: {{ $integration->last_successful_update_at->diffForHumans() }}</span>
+                                </div>
+                            @else
+                                <div class="flex items-center gap-2">
+                                    <x-icon name="fas.triangle-exclamation" class="w-4 h-4 text-warning" />
+                                    <span class="text-warning">Never updated</span>
+                                </div>
+                            @endif
+
+                            @if ($integration->needsUpdate())
+                                <x-badge value="Needs update" class="badge-warning" />
+                            @endif
+
+                            @if ($integration->isPaused())
+                                <x-badge value="Paused" class="badge-neutral" />
+                            @endif
+                        </div>
+
+                        <!-- Update schedule info -->
+                        @if ($integration->getNextUpdateTime())
+                            <div class="mt-4 p-3 lg:p-4 rounded-lg bg-base-300/50 border border-base-300">
+                                <div class="flex items-center gap-2 text-sm">
+                                    <x-icon name="fas.rotate" class="w-4 h-4 text-base-content/60" />
+                                    <span class="text-base-content/70">Next update: {{ $integration->getNextUpdateTime()->diffForHumans() }}</span>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </x-card>
+
+            @if ($this->getPluginClass())
+                <!-- Action Types Overview -->
+                <div wire:init="loadActionTypes">
+                    @if ($actionTypesLoaded && $this->getActionTypes()->isNotEmpty())
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.bolt" class="w-5 h-5 text-primary" />
+                            Action Types
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            @foreach ($this->getActionTypes() as $actionType)
+                            <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                                <div class="flex items-start gap-3 mb-2">
+                                    <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                        <x-icon name="{{ $actionType['action']['icon'] }}" class="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-base truncate">{{ $actionType['action']['display_name'] }}</div>
+                                        <div class="text-sm text-base-content/70 flex items-center gap-2">
+                                            <span class="text-lg font-bold text-primary">{{ $actionType['count'] }}</span>
+                                            @if ($actionType['newest'])
+                                            <span class="text-xs">{{ $actionType['newest']->created_at->diffForHumans() }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
+                        </div>
+                    </x-card>
+                    @elseif (! $actionTypesLoaded)
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.bolt" class="w-5 h-5 text-primary" />
+                            Action Types
+                        </h3>
+                        <x-skeleton-loader type="block-grid" />
+                    </x-card>
+                    @endif
+                </div>
+
+                <!-- Object Types Overview -->
+                <div wire:init="loadObjectTypes">
+                    @if ($objectTypesLoaded && $this->getObjectTypes()->isNotEmpty())
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.grip" class="w-5 h-5 text-info" />
+                            Object Types
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            @foreach ($this->getObjectTypes() as $objectType)
+                            <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                                <div class="flex items-start gap-3 mb-2">
+                                    <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center flex-shrink-0">
+                                        <x-icon name="{{ $objectType['object']['icon'] }}" class="w-4 h-4 text-info" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-base truncate">{{ $objectType['object']['display_name'] }}</div>
+                                        <div class="text-sm text-base-content/70 flex items-center gap-2">
+                                            <span class="text-lg font-bold text-info">{{ $objectType['count'] }}</span>
+                                            @if ($objectType['newest'])
+                                            <span class="text-xs">{{ $objectType['newest']->created_at->diffForHumans() }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
+                        </div>
+                    </x-card>
+                    @elseif (! $objectTypesLoaded)
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="fas.grip" class="w-5 h-5 text-info" />
+                            Object Types
+                        </h3>
+                        <x-skeleton-loader type="block-grid" />
+                    </x-card>
+                    @endif
+                </div>
+
+                <!-- Block Types Overview -->
+                <div wire:init="loadBlockTypes">
+                    @if ($blockTypesLoaded && $this->getBlockTypes()->isNotEmpty())
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-cube" class="w-5 h-5 text-success" />
+                            Block Types
+                        </h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            @foreach ($this->getBlockTypes() as $blockType)
+                            <div class="border border-base-200 bg-base-100 rounded-lg p-3 hover:bg-base-50 transition-colors">
+                                <div class="flex items-start gap-3 mb-2">
+                                    <div class="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
+                                        <x-icon name="{{ $blockType['block']['icon'] }}" class="w-4 h-4 text-success" />
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-base truncate">{{ $blockType['block']['display_name'] }}</div>
+                                        <div class="text-sm text-base-content/70 flex items-center gap-2">
+                                            <span class="text-lg font-bold text-success">{{ $blockType['count'] }}</span>
+                                            @if ($blockType['newest'])
+                                            <span class="text-xs">{{ $blockType['newest']->created_at->diffForHumans() }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @endforeach
+                        </div>
+                    </x-card>
+                    @elseif (! $blockTypesLoaded)
+                    <x-card class="bg-base-200 shadow">
+                        <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                            <x-icon name="o-cube" class="w-5 h-5 text-success" />
+                            Block Types
+                        </h3>
+                        <x-skeleton-loader type="block-grid" />
+                    </x-card>
+                    @endif
+                </div>
+            @else
+                <!-- No plugin configuration -->
+                <x-card class="bg-base-200 shadow">
+                    <div class="text-center py-8">
+                        <x-icon name="fas.triangle-exclamation" class="w-16 h-16 mx-auto text-base-content/70 mb-4" />
+                        <h3 class="text-lg font-medium text-base-content mb-2">Plugin Configuration Not Found</h3>
+                        <p class="text-base-content/70">Plugin configuration not found for this integration.</p>
+                    </div>
+                </x-card>
+            @endif
+
+            <!-- Logs -->
+            <x-card class="bg-base-200 shadow">
+                <h3 class="text-lg font-semibold text-base-content mb-4 flex items-center gap-2">
+                    <x-icon name="fas.file-lines" class="w-5 h-5 text-base-content/60" />
+                    Logs
+                </h3>
+                <livewire:log-viewer type="integration" :entity-id="$integration->id" />
+            </x-card>
+        </div>
+
+        <!-- Drawer for Technical Details -->
+        <x-drawer wire:model="showSidebar" right title="Integration Details" separator with-close-button class="w-11/12 lg:w-1/3">
+            <div class="space-y-4">
+                <!-- Primary Information (Always Visible) -->
+                <div class="pb-4 border-b border-base-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80">Information</h3>
+                        <button
+                            wire:click="exportAsJson"
+                            class="btn btn-ghost btn-xs gap-1"
+                            title="Export complete integration with configuration and recent events">
+                            <x-icon name="fas.download" class="w-3 h-3" />
+                            <span class="hidden sm:inline">Export</span>
+                        </button>
+                    </div>
+                    <dl>
+                        <x-metadata-row label="Integration ID" :value="$integration->id" copyable />
+                        <x-metadata-row label="Service" :value="$integration->service" />
+                        <x-metadata-row label="Instance Type" :value="$integration->instance_type" />
+                        <x-metadata-row label="Status" :copy-value="$integration->isPaused() ? 'Paused' : 'Active'">
+                            <span class="badge {{ $integration->isPaused() ? 'badge-neutral' : 'badge-success' }} badge-sm">
+                                {{ $integration->isPaused() ? 'Paused' : 'Active' }}
+                            </span>
+                        </x-metadata-row>
+                        <x-metadata-row label="Created" :copy-value="$integration->created_at?->toIso8601String()">
+                            <x-uk-date :date="$integration->created_at" />
+                        </x-metadata-row>
+                        @if ($integration->last_triggered_at)
+                            <x-metadata-row label="Last Triggered" :copy-value="$integration->last_triggered_at?->toIso8601String()">
+                                <x-uk-date :date="$integration->last_triggered_at" />
+                            </x-metadata-row>
+                        @endif
+                        @if ($integration->last_successful_update_at)
+                            <x-metadata-row label="Last Successful Update" :copy-value="$integration->last_successful_update_at?->toIso8601String()">
+                                <x-uk-date :date="$integration->last_successful_update_at" />
+                            </x-metadata-row>
+                        @endif
+                    </dl>
+                </div>
+
+                <!-- Configuration (Collapsible, Default Open) -->
+                <x-collapse wire:model="configOpen">
+                    <x-slot:heading>
+                        <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80">
+                            Configuration
+                        </div>
+                    </x-slot:heading>
+                    <x-slot:content>
+                        <dl>
+                            @if ($integration->getUpdateFrequencyMinutes())
+                                <x-metadata-row
+                                    label="Update Frequency"
+                                    :value="$integration->getUpdateFrequencyMinutes() . ' minutes'"
+                                />
+                            @endif
+
+                            @if ($integration->useSchedule())
+                                <x-metadata-row
+                                    label="Schedule Times"
+                                    :value="implode(', ', $integration->getScheduleTimes())"
+                                />
+                                <x-metadata-row
+                                    label="Schedule Timezone"
+                                    :value="$integration->getScheduleTimezone()"
+                                />
+                            @endif
+
+                            @if ($integration->account_id)
+                                <x-metadata-row
+                                    label="Account ID"
+                                    :value="$integration->account_id"
+                                    copyable
+                                />
+                            @endif
+
+                            @if ($integration->getNextUpdateTime())
+                                <x-metadata-row label="Next Update" :copy-value="$integration->getNextUpdateTime()?->toIso8601String()">
+                                    <x-uk-date :date="$integration->getNextUpdateTime()" />
+                                </x-metadata-row>
+                            @endif
+                        </dl>
+
+                        <div class="mt-4 pt-4 border-t border-base-200">
+                            <x-button
+                                label="Edit Configuration"
+                                link="{{ route('integrations.configure', $integration->id) }}"
+                                class="btn-outline btn-sm w-full"
+                                icon="fas.pen"
+                            />
+                        </div>
+                    </x-slot:content>
+                </x-collapse>
+
+                <!-- Tasks -->
+                <div class="pb-4 border-b border-base-200" wire:init="loadTasks">
+                    @if ($tasksLoaded)
+                        @php
+                            $executions = app(\App\Services\TaskPipeline\TaskExecutionStore::class)->getTaskExecutions($integration);
+                            $failedCount = collect($executions)->filter(fn($e) => ($e['last_attempt']['status'] ?? null) === 'failed')->count();
+                            $pendingCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['pending', 'running']))->count();
+                            $executedCount = collect($executions)->filter(fn($e) => in_array($e['last_attempt']['status'] ?? null, ['success', 'failed', 'running', 'pending']))->count();
+                        @endphp
+                        <x-collapse wire:model="tasksOpen">
+                            <x-slot:heading>
+                                <div class="text-sm font-semibold uppercase tracking-wider text-base-content/80 flex items-center justify-between w-full">
+                                    <div class="flex items-center gap-2">
+                                        <span>Tasks</span>
+                                        @if ($failedCount > 0)
+                                            <x-badge class="badge-xs badge-error">{{ $failedCount }} failed</x-badge>
+                                        @endif
+                                        @if ($pendingCount > 0)
+                                            <x-badge class="badge-xs badge-warning">{{ $pendingCount }} pending</x-badge>
+                                        @endif
+                                        @if ($executedCount > 0 && $failedCount === 0 && $pendingCount === 0)
+                                            <x-badge class="badge-xs badge-ghost">{{ $executedCount }} executed</x-badge>
+                                        @endif
+                                    </div>
+                                    <button
+                                        type="button"
+                                        wire:click.stop="$dispatch('tasks-rerun-initiated')"
+                                        class="btn btn-xs btn-ghost"
+                                        title="Re-run all tasks">
+                                        <x-icon name="fas.rotate" class="w-3 h-3" />
+                                    </button>
+                                </div>
+                            </x-slot:heading>
+                            <x-slot:content>
+                                <livewire:task-execution-section :model="$integration" :key="'tasks-integration-' . $integration->id" />
+                            </x-slot:content>
+                        </x-collapse>
+                    @else
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-base-content/80 mb-3">Tasks</h3>
+                        <x-skeleton-loader type="list-item" :count="2" />
+                    @endif
+                </div>
+            </div>
+        </x-drawer>
+    </div>
+</div>

@@ -2,20 +2,17 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('objects', function (Blueprint $table) {
             $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
             $table->timestampTz('time')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
-            $table->uuid('integration_id');
+            $table->uuid('user_id');
             $table->text('concept');
             $table->text('type');
             $table->text('title');
@@ -26,13 +23,11 @@ return new class extends Migration
             $table->vector('embeddings', 3)->nullable();
             $table->timestampTz('created_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
             $table->timestampTz('updated_at')->default(DB::raw("(now() AT TIME ZONE 'utc')"));
-            $table->foreign('integration_id')->references('id')->on('integrations');
+            $table->timestampTz('deleted_at')->nullable();
+            $table->foreign('user_id', Schema::getConnection()->getTablePrefix() . 'objects_user_id_foreign')->references('id')->on('users');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('objects');

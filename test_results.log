@@ -1,0 +1,868 @@
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\BaseFetchJobTest::unique_id_generation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\BaseFetchJobTest::job_timeout_and_retries(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GitHubActivityPullTest::job_creation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GitHubActivityPullTest::unique_id_generation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GitHubActivityPullTest::job_handles_integration_correctly(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GitHubActivityPullTest::configuration_inheritance(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GitHubActivityPullTest::normalize_repositories(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GitHubActivityPullTest::normalize_events(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GitHubActivityPullTest::job_with_different_configurations(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GoCardlessTransactionPullTest::job_creation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GoCardlessTransactionPullTest::unique_id_generation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GoCardlessTransactionPullTest::missing_account_id_in_configuration(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GoCardlessTransactionPullTest::rate_limit_cache_key_format(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GoCardlessTransactionPullTest::job_handles_integration_correctly(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GoCardlessTransactionPullTest::configuration_inheritance(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\GoCardlessTransactionPullTest::uses_account_id_from_integration_configuration(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutDataTest::job_creation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutDataTest::process_workout_data(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutDataTest::duplicate_workout_handling(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutDataTest::exercise_blocks_creation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutDataTest::weight_unit_inference(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutDataTest::encode_numeric_value(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutPullTest::job_creation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutPullTest::unique_id_generation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutPullTest::fetch_data_success(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutPullTest::dispatch_processing_jobs(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutPullTest::api_error_handling(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\HevyWorkoutPullTest::empty_workout_data(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\MonzoAccountPullTest::fetch_accounts_success(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\MonzoAccountPullTest::dispatch_processing_jobs(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\MonzoAccountPullTest::job_metadata(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\OuraActivityPullTest::fetch_activity_success(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\OuraActivityPullTest::dispatch_processing_jobs(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\OuraActivityPullTest::job_metadata(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SlackEventsHookTest::job_creation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SlackEventsHookTest::url_verification_handling(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SlackEventsHookTest::missing_event_data(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SlackEventsHookTest::event_type_filtering(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SlackEventsHookTest::signature_verification(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SlackEventsHookTest::event_data_conversion(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SlackEventsHookTest::configuration_handling(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SlackEventsHookTest::job_metadata(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SpotifyListeningPullTest::job_creation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SpotifyListeningPullTest::unique_id_generation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SpotifyListeningPullTest::job_handles_integration_correctly(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SpotifyListeningPullTest::configuration_inheritance(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SpotifyListeningPullTest::job_with_minimal_configuration(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SpotifyListeningPullTest::job_with_different_account_ids(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SpotifyListeningPullTest::job_handles_null_account_id(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\Jobs\SpotifyListeningPullTest::job_with_various_config_options(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\OuraValueMappingTest::stress_level_mapping_for_storage(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\OuraValueMappingTest::stress_level_mapping_for_display(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\OuraValueMappingTest::unknown_mapping_key_returns_null_for_storage(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\OuraValueMappingTest::unknown_mapping_key_returns_no_data_for_display(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\OuraValueMappingTest::unknown_numeric_value_returns_unknown_for_display(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\OuraValueMappingTest::resilience_level_mapping_for_storage(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Unit\OuraValueMappingTest::resilience_level_mapping_for_display(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\ApiWebhookLoggingSimpleTest::it_creates_per_instance_log_files_automatically(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\ApiWebhookLoggingSimpleTest::it_creates_per_service_log_files_automatically(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\ApiWebhookLoggingSimpleTest::it_handles_empty_integration_ids_gracefully(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\ApiWebhookLoggingSimpleTest::it_sanitizes_sensitive_data_automatically(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\ApiWebhookLoggingSimpleTest::it_logs_different_message_types_correctly(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\ApiWebhookLoggingSimpleTest::it_handles_helper_functions_exist(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\ApiWebhookLoggingSimpleTest::it_creates_multiple_unique_log_files(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\BinAdminTest::admin_bin_page_loads_for_authenticated_user(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\BinAdminTest::admin_bin_page_requires_authentication(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\BinAdminTest::admin_bin_delete_endpoint_works(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\GoCardlessSweepTest::sweep_logic_runs_when_no_previous_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\GoCardlessSweepTest::sweep_logic_skips_when_recent_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\GoCardlessSweepTest::sweep_logic_runs_when_old_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\GoCardlessSweepTest::sweep_works_for_different_instance_types(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\GoCardlessSweepTest::sweep_handles_missing_account_id(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\GoCardlessSweepTest::sweep_uses_correct_timing(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\GoCardlessSweepTest::sweep_timestamp_format(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::perform_sweep_if_needed_runs_when_no_previous_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::perform_sweep_if_needed_skips_when_recent_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::perform_sweep_if_needed_runs_when_old_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::perform_data_sweep_processes_workout_data(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::perform_data_sweep_handles_different_response_formats(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::perform_data_sweep_handles_api_errors_gracefully(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::sweep_works_for_different_instance_types(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::sweep_timestamp_format_is_correct(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::sweep_uses_correct_date_range(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::sweep_handles_non_array_workout_items(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\HevySweepTest::sweep_includes_limit_parameter(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\Integrations\Reddit\RedditPluginTest::oauth_flow_saves_tokens_and_account_id(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\Integrations\Reddit\RedditPluginTest::pull_dispatches_processing_and_stores_cursor(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\Integrations\Reddit\RedditSavedDataTest::creates_event_objects_and_blocks_with_tags(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationOptionsVisibilityTest::migration_options_shown_for_supported_plugins(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationOptionsVisibilityTest::migration_options_hidden_for_unsupported_plugins(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationOptionsVisibilityTest::plugin_migration_support_methods(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationOptionsVisibilityTest::all_migration_supported_plugins_have_migration_implementation(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationProgressTrackingTest::start_integration_migration_creates_progress_record(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationProgressTrackingTest::migration_progress_updates_during_processing(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationProgressTrackingTest::migration_progress_can_be_marked_completed(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationProgressTrackingTest::migration_progress_can_be_marked_failed(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationProgressUITest::updates_page_shows_migration_progress(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationProgressUITest::updates_page_shows_failed_migration(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationProgressUITest::updates_page_shows_completed_migration(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MigrationProgressUITest::updates_page_shows_different_progress_steps(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::perform_sweep_if_needed_runs_when_no_previous_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::perform_sweep_if_needed_skips_when_recent_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::perform_sweep_if_needed_runs_when_old_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::perform_data_sweep_processes_all_data_types(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::perform_data_sweep_handles_no_accounts(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::perform_data_sweep_handles_api_errors_gracefully(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::sweep_works_for_different_instance_types(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::sweep_timestamp_format_is_correct(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::sweep_uses_correct_date_range(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoSweepTest::sweep_skips_accounts_instance_type(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoTokenRefreshTest::it_refreshes_token_when_expired_during_api_call(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoTokenRefreshTest::it_handles_401_response_by_refreshing_token(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoTokenRefreshTest::it_handles_refresh_token_failure_gracefully(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\MonzoTokenRefreshTest::it_skips_refresh_when_missing_credentials(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OuraSweepTest::perform_sweep_if_needed_runs_when_no_previous_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OuraSweepTest::perform_sweep_if_needed_skips_when_recent_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OuraSweepTest::perform_sweep_if_needed_runs_when_old_sweep(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OuraSweepTest::perform_data_sweep_creates_events_for_all_data_types(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OuraSweepTest::perform_data_sweep_handles_api_errors_gracefully(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OuraSweepTest::sweep_works_for_different_instance_types(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OuraSweepTest::sweep_timestamp_format_is_correct(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OutlineIntegrationTest::creates_task_blocks_from_document_text(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OutlineIntegrationTest::deleted_task_is_soft_deleted_on_reprocess(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OutlineMigrationTest::outline_migration_creates_progress_record(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OutlineMigrationTest::outline_migration_dispatches_outline_migration_pull(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   WARN  Metadata found in doc-comment for method Tests\Feature\OutlineMigrationTest::outline_plugin_supports_migration(). Metadata in doc-comments is deprecated and will no longer be supported in PHPUnit 12. Update your test code to use attributes instead.
+
+   PASS  Tests\Unit\ApiWebhookLoggingHelpersTest
+  ✓ get integration log channel creates per instance channels            0.85s  
+  ✓ get integration log channel creates per service channels             0.08s  
+  ✓ get integration log channel falls back when per instance has no id   0.07s  
+  ✓ log integration api request creates log file                         0.08s  
+  ✓ log integration api response handles json parsing                    0.08s  
+  ✓ log integration webhook creates log file                             0.08s  
+  ✓ log functions handle empty parameters gracefully                     0.10s  
+  ✓ log functions sanitize various sensitive keys                        0.08s  
+  ✓ log functions handle non array parameters                            0.07s  
+  ✓ log functions include timestamps                                     0.09s  
+  ✓ log functions create unique files per integration                    0.18s  
+
+   PASS  Tests\Unit\ExampleTest
+  ✓ that true is true
+
+   PASS  Tests\Unit\GoCardlessAccountNameTest
+  ✓ it generates name from details field                                 0.08s  
+  ✓ it generates name from owner name when details empty                 0.08s  
+  ✓ it generates name from owner name when details missing               0.08s  
+  ✓ it generates name from resource id when no details or owner          0.08s  
+  ✓ it generates name from id when no resource id                        0.08s  
+  ✓ it handles empty account array                                       0.07s  
+  ✓ it prefers details over owner name                                   0.08s  
+  ✓ it ignores whitespace only details                                   0.08s  
+  ✓ it can instantiate plugin and access token method                    0.08s  
+
+   PASS  Tests\Unit\Integrations\Oura\HasOuraBlocksTest
+  ✓ it creates contributor blocks correctly                              0.14s  
+  ✓ it creates activity metric blocks correctly                          0.09s  
+  ✓ it creates sleep stage blocks correctly                              0.09s  
+  ✓ it creates heart rate blocks correctly                               0.10s  
+  ✓ it creates sleep timing blocks correctly                             0.09s  
+  ✓ it skips missing values in block creation                            0.09s  
+  ✓ it provides correct standard metric configurations                   0.11s  
+
+   PASS  Tests\Unit\Jobs\BaseFetchJobTest
+  ✓ unique id generation                                                 0.09s  
+  ✓ job timeout and retries                                              0.07s  
+
+   PASS  Tests\Unit\Jobs\GitHubActivityPullTest
+  ✓ job creation                                                         0.08s  
+  ✓ unique id generation                                                 0.09s  
+  ✓ job handles integration correctly                                    0.08s  
+  ✓ configuration inheritance                                            0.08s  
+  ✓ normalize repositories                                               0.07s  
+  ✓ normalize events                                                     0.07s  
+  ✓ job with different configurations                                    0.09s  
+
+   PASS  Tests\Unit\Jobs\GoCardlessTransactionPullTest
+  ✓ job creation                                                         0.12s  
+  ✓ unique id generation                                                 0.11s  
+  ✓ missing account id in configuration                                  0.11s  
+  ✓ rate limit cache key format                                          0.14s  
+  ✓ job handles integration correctly                                    0.11s  
+  ✓ configuration inheritance                                            0.08s  
+  ✓ uses account id from integration configuration                       0.07s  
+
+   PASS  Tests\Unit\Jobs\HevyWorkoutDataTest
+  ✓ job creation                                                         0.08s  
+  ✓ process workout data                                                 0.11s  
+  ✓ duplicate workout handling                                           0.09s  
+  ✓ exercise blocks creation                                             0.12s  
+  ✓ weight unit inference                                                0.08s  
+  ✓ encode numeric value                                                 0.08s  
+
+   PASS  Tests\Unit\Jobs\HevyWorkoutPullTest
+  ✓ job creation                                                         0.08s  
+  ✓ unique id generation                                                 0.07s  
+  ✓ fetch data success                                                   0.08s  
+  ✓ dispatch processing jobs                                             0.09s  
+  ✓ api error handling                                                   0.08s  
+  ✓ empty workout data                                                   0.09s  
+
+   PASS  Tests\Unit\Jobs\MonzoAccountPullTest
+  ✓ fetch accounts success                                               0.09s  
+  ✓ dispatch processing jobs                                             0.07s  
+  ✓ job metadata                                                         0.07s  
+
+   PASS  Tests\Unit\Jobs\OuraActivityPullTest
+  ✓ fetch activity success                                               0.10s  
+  ✓ dispatch processing jobs                                             0.08s  
+  ✓ job metadata                                                         0.08s  
+
+   PASS  Tests\Unit\Jobs\OutlineMigrationPullTest
+  ✓ job can be instantiated                                              0.08s  
+  ✓ generates unique id correctly                                        0.08s  
+  ✓ returns correct service name and job type                            0.08s  
+
+   PASS  Tests\Unit\Jobs\OutlinePullRecentDayNotesTest
+  ✓ job can be instantiated                                              0.08s  
+  ✓ returns correct service name and job type                            0.07s  
+
+   PASS  Tests\Unit\Jobs\OutlinePullRecentDocumentsTest
+  ✓ job can be instantiated                                              0.08s  
+  ✓ returns correct service name and job type                            0.07s  
+
+   PASS  Tests\Unit\Jobs\SlackEventsHookTest
+  ✓ job creation                                                         0.08s  
+  ✓ url verification handling                                            0.08s  
+  ✓ missing event data                                                   0.08s  
+  ✓ event type filtering                                                 0.08s  
+  ✓ signature verification                                               0.07s  
+  ✓ event data conversion                                                0.07s  
+  ✓ configuration handling                                               0.07s  
+  ✓ job metadata                                                         0.07s  
+
+   PASS  Tests\Unit\Jobs\SpotifyListeningPullTest
+  ✓ job creation                                                         0.08s  
+  ✓ unique id generation                                                 0.07s  
+  ✓ job handles integration correctly                                    0.08s  
+  ✓ configuration inheritance                                            0.07s  
+  ✓ job with minimal configuration                                       0.09s  
+  ✓ job with different account ids                                       0.08s  
+  ✓ job handles null account id                                          0.07s  
+  ✓ job with various config options                                      0.07s  
+
+   PASS  Tests\Unit\Models\UniqueBlockCreationTest
+  ✓ it prevents duplicate blocks with same title and block type          0.11s  
+  ✓ it allows different blocks with different titles                     0.10s  
+  ✓ it allows same title with different block types                      0.09s  
+  ✓ update or create for event creates new block when none exists        0.08s  
+
+   PASS  Tests\Unit\OuraValueMappingTest
+  ✓ stress level mapping for storage                                     0.08s  
+  ✓ stress level mapping for display                                     0.07s  
+  ✓ unknown mapping key returns null for storage                         0.09s  
+  ✓ unknown mapping key returns no data for display                      0.07s  
+  ✓ unknown numeric value returns unknown for display                    0.08s  
+  ✓ resilience level mapping for storage                                 0.07s  
+  ✓ resilience level mapping for display                                 0.09s  
+
+   PASS  Tests\Feature\AddBalanceUpdateTest
+  ✓ can mount component without account parameter                        0.24s  
+  ✓ can mount component with account parameter                           0.21s  
+  ✓ can add balance update for manual account                            0.24s  
+  ✓ cannot add balance update for non manual account                     0.14s  
+  ✓ cannot add balance update for other users account                    0.12s  
+  ✓ validation requires all required fields                              0.11s  
+  ✓ can change preselected account                                       0.09s  
+  ✓ only manual accounts are available in dropdown                       0.09s  
+
+   PASS  Tests\Feature\ApiTokenTest
+  ✓ user can create api token                                            0.11s  
+  ✓ user can list their tokens                                           0.08s  
+  ✓ user can revoke token                                                0.07s  
+  ✓ user cannot revoke nonexistent token                                 0.08s  
+  ✓ unauthenticated user cannot access token endpoints                   0.08s  
+
+   PASS  Tests\Feature\ApiTokenUITest
+  ✓ user can access api tokens page                                      0.22s  
+  ✓ user can see api tokens ui elements                                  0.16s  
+  ✓ guest cannot access api tokens page                                  0.08s  
+
+   PASS  Tests\Feature\ApiWebhookLoggingSimpleTest
+  ✓ it creates per instance log files automatically                      0.08s  
+  ✓ it creates per service log files automatically                       0.08s  
+  ✓ it handles empty integration ids gracefully                          0.08s  
+  ✓ it sanitizes sensitive data automatically                            0.09s  
+  ✓ it logs different message types correctly                            0.10s  
+  ✓ it handles helper functions exist                                    0.08s  
+  ✓ it creates multiple unique log files                                 0.09s  
+
+   PASS  Tests\Feature\ApiWebhookLoggingTest
+  ✓ it logs api requests with sanitized headers                          0.09s  
+  ✓ it logs api responses with sanitized data                            0.08s  
+  ✓ it logs webhook payloads with sanitized data                         0.08s  
+  ✓ it creates per instance log files                                    0.08s  
+  ✓ it creates per service log files                                     0.08s  
+  ✓ it truncates large response bodies                                   0.09s  
+  ✓ it sanitizes sensitive data in requests                              0.09s  
+  ✓ it sanitizes sensitive headers                                       0.08s  
+  ✓ it handles plugin specific logging                                   0.09s  
+  ✓ it logs webhook verification attempts                                0.09s  
+  ✓ it handles empty integration ids                                     0.08s  
+  ✓ it handles nested sensitive data                                     0.08s  
+
+   PASS  Tests\Feature\AppleHealthIntegrationTest
+  ✓ webhook ingests workouts creating event and blocks                   0.09s  
+  ✓ webhook ingests metrics creating events                              0.08s  
+
+   PASS  Tests\Feature\Auth\AuthenticationTest
+  ✓ login screen can be rendered                                         0.10s  
+  ✓ users can authenticate using the login screen                        5.39s  
+  ✓ users can not authenticate with invalid password                     1.41s  
+  ✓ users can logout                                                     0.09s  
+
+   PASS  Tests\Feature\Auth\EmailVerificationTest
+  ✓ email verification screen can be rendered                            0.13s  
+  ✓ email can be verified                                                0.09s  
+  ✓ email is not verified with invalid hash                              0.09s  
+
+   PASS  Tests\Feature\Auth\PasswordConfirmationTest
+  ✓ confirm password screen can be rendered                              0.10s  
+  ✓ password can be confirmed                                            0.09s  
+  ✓ password is not confirmed with invalid password                      0.30s  
+
+   PASS  Tests\Feature\Auth\PasswordResetTest
+  ✓ reset password link screen can be rendered                           0.15s  
+  ✓ reset password link can be requested                                 0.32s  
+  ✓ reset password screen can be rendered                                0.34s  
+  ✓ password can be reset with valid token                               0.32s  
+
+   PASS  Tests\Feature\Auth\RegistrationTest
+  ✓ registration screen can be rendered                                  0.10s  
+  ✓ new users can register                                               0.10s  
+
+   PASS  Tests\Feature\AutheliaAuthTest
+  ✓ user can authenticate via authelia and is created if new             0.09s  
+  ✓ user authentication fails without email                              0.10s  
+
+   PASS  Tests\Feature\BinAdminTest
+  ✓ admin bin page loads for authenticated user                          0.80s  
+  ✓ admin bin page requires authentication                               0.09s  
+  ✓ admin bin delete endpoint works                                      0.11s  
+
+   PASS  Tests\Feature\CheckIntegrationUpdatesJobTest
+  ✓ job dispatches processing jobs for integrations that need updating   0.11s  
+  ✓ job skips integrations that are currently processing                 0.13s  
+  ✓ job skips integrations that were recently triggered                  0.15s  
+  ✓ job handles integrations without access token                        0.15s  
+  ✓ job handles empty result set                                         0.09s  
+
+   PASS  Tests\Feature\DashboardTest
+  ✓ guests are redirected to the login page                              0.09s  
+  ✓ authenticated users can visit the dashboard                          0.32s  
+
+   PASS  Tests\Feature\DeleteIntegrationGroupTest
+  ✓ user can confirm delete group modal                                  0.48s  
+  ✓ delete confirmation requires correct service name                    0.24s  
+  ✓ delete group dispatches job                                          0.26s  
+  ✓ user cannot delete other users group                                 0.12s  
+  ✓ delete job removes all related data                                  0.23s  
+  ✓ delete job preserves objects used by other events                    0.15s  
+  ✓ main job dispatches analyze data job                                 0.11s  
+  ✓ integration group model returns correct deletion summary             0.12s  
+  ✓ job handles errors gracefully                                        0.09s  
+  ✓ job respects user ownership                                          0.08s  
+  ✓ job updates progress correctly                                       0.11s  
+
+   PASS  Tests\Feature\EventApiExtendedTest
+  ✓ user can list events                                                 0.13s  
+  ✓ user can filter events by service                                    0.11s  
+  ✓ user can filter events by domain                                     0.10s  
+  ✓ user can get specific event                                          0.10s  
+  ✓ user cannot access other users event                                 0.09s  
+  ✓ user can update event                                                0.10s  
+  ✓ user cannot update other users event                                 0.12s  
+  ✓ user can delete event                                                0.12s  
+  ✓ user cannot delete other users event                                 0.10s  
+  ✓ unauthenticated user cannot access events                            0.10s  
+  ✓ events are paginated                                                 0.19s  
+  ✓ user can specify per page                                            0.14s  
+
+   PASS  Tests\Feature\EventApiTest
+  ✓ unauthenticated users cannot create events                           0.09s  
+  ✓ authenticated user can create event with objects and blocks          0.11s  
+
+   PASS  Tests\Feature\EventTaggingUiTest
+  ✓ user can add and remove tags via event component methods             0.59s  
+  ✓ it ignores marker values used for whitelist or initial               0.43s  
+
+   PASS  Tests\Feature\EventsPageTest
+  ✓ events page loads for authenticated user                             0.59s  
+  ✓ events page requires authentication                                  0.13s  
+  ✓ events page shows events from today                                  0.36s  
+  ✓ events page shows no events message when empty                       0.21s  
+
+   PASS  Tests\Feature\ExampleTest
+  ✓ returns a successful response                                        0.09s  
+
+   PASS  Tests\Feature\FetchCommandTest
+  ✓ fetch command only updates integrations that need updating           0.10s  
+  ✓ fetch command with force updates all integrations                    0.11s  
+  ✓ fetch command returns no integrations message when none need updati… 0.09s  
+
+   PASS  Tests\Feature\FinancialIntegrationEventTest
+  ✓ can create manual account object                                     0.09s  
+  ✓ can create balance event                                             0.09s  
+  ✓ can get manual accounts for user                                     0.11s  
+  ✓ can get balance events for account                                   0.10s  
+  ✓ can get latest balance for account                                   0.09s  
+  ✓ manual plugin does not support oauth                                 0.09s  
+  ✓ manual plugin does not support webhooks                              0.09s  
+  ✓ account metadata includes integration id                             0.08s  
+  ✓ can get manual accounts only for balance updates                     0.09s  
+  ✓ can get all financial accounts including integrated ones             0.09s  
+  ✓ balance events use manual account service                            0.09s  
+  ✓ can find integration by metadata or name fallback                    0.09s  
+
+   PASS  Tests\Feature\GoCardlessIntegrationTest
+  ✓ plugin metadata and service type                                     0.13s  
+  ✓ onboarding institution selection route exists and sets session       0.10s  
+  ✓ bank selection page loads                                            0.20s  
+  ✓ bank selection page shows error when no banks available              0.33s  
+  ✓ oauth flow uses selected institution and redirects                   0.19s  
+  ✓ initialization redirects to bank selection                           0.09s  
+  ✓ plugin constructor validates credentials                             0.08s  
+  ✓ plugin constructor allows empty credentials in testing               0.10s  
+
+   PASS  Tests\Feature\GoCardlessOnboardingInstanceNamesTest
+  ✓ it generates account names using static helper with different scena… 0.11s  
+  ✓ it handles whitespace and empty details                              0.10s  
+  ✓ it uses integration controller import correctly                      0.13s  
+
+   PASS  Tests\Feature\GoCardlessSweepTest
+  ✓ sweep logic runs when no previous sweep                              0.13s  
+  ✓ sweep logic skips when recent sweep                                  0.10s  
+  ✓ sweep logic runs when old sweep                                      0.09s  
+  ✓ sweep works for different instance types                             0.12s  
+  ✓ sweep handles missing account id                                     0.10s  
+  ✓ sweep uses correct timing                                            0.09s  
+  ✓ sweep timestamp format                                               0.08s  
+
+   PASS  Tests\Feature\HevyIntegrationTest
+  ✓ hevy plugin has correct metadata and service type                    0.16s  
+  ✓ hevy plugin can initialize group and instance                        0.12s  
+  ✓ hevy fetch workouts creates event and set blocks                     0.17s  
+
+   PASS  Tests\Feature\HevySweepTest
+  ✓ perform sweep if needed runs when no previous sweep                  0.80s  
+  ✓ perform sweep if needed skips when recent sweep                      0.09s  
+  ✓ perform sweep if needed runs when old sweep                          0.09s  
+  ✓ perform data sweep processes workout data                            0.37s  
+  ✓ perform data sweep handles different response formats                0.93s  
+  ✓ perform data sweep handles api errors gracefully                     0.11s  
+  ✓ sweep works for different instance types                             0.10s  
+  ✓ sweep timestamp format is correct                                    0.09s  
+  ✓ sweep uses correct date range                                        0.09s  
+  ✓ sweep handles non array workout items                                0.36s  
+  ✓ sweep includes limit parameter                                       0.10s  
+
+   PASS  Tests\Feature\IconValidationTest
+  ✓ all icon references are valid                                        0.18s  
+  ✓ heroicons package is available                                       0.10s  
+  ✓ fontawesome package is available                                     0.10s  
+  ✓ common icon patterns are detected                                    0.09s  
+  ✓ invalid icon patterns are not detected                               0.09s  
+  ✓ can find icons in plugin files                                       0.09s  
+
+   PASS  Tests\Feature\IntegrationConfigurationTest
+  ✓ all plugins have required configuration methods                      0.10s  
+  ✓ all plugins return valid icon strings                                0.08s  
+  ✓ all plugins return valid accent colors                               0.08s  
+  ✓ all plugins return valid domain                                      0.09s  
+  ✓ all plugins return valid action types                                0.08s  
+  ✓ all plugins return valid block types                                 0.08s  
+  ✓ all plugins return valid object types                                0.09s  
+  ✓ plugin registry get plugins with config                              0.08s  
+  ✓ plugin registry get plugin config                                    0.08s  
+  ✓ block types are consistent across plugins                            0.14s  
+  ✓ action types are consistent across plugins                           0.12s  
+  ✓ object types are consistent across plugins                           0.12s  
+
+   PASS  Tests\Feature\IntegrationDeleteTest
+  ✓ user can delete their integration                                    0.53s  
+  ✓ user cannot delete other users integration                           0.42s  
+  ✓ user cannot delete nonexistent integration                           0.27s  
+  ✓ delete integration shows success message                             0.30s  
+  ✓ delete integration refreshes data                                    0.24s  
+  ✓ deleting last integration soft deletes group                         0.09s  
+  ✓ deleting non last integration does not delete group                  0.09s  
+
+   PASS  Tests\Feature\IntegrationNameUpdateTest
+  ✓ user can update integration name from index page                     0.22s  
+  ✓ user can update integration name from configure page                 0.20s  
+  ✓ user cannot update other users integration name from index page      0.18s  
+  ✓ user cannot update other users integration name from configure page  0.10s  
+  ✓ user cannot set empty integration name from index page               0.25s  
+  ✓ user cannot set empty integration name from configure page           0.16s  
+  ✓ configure page loads with correct initial name                       0.11s  
+  ✓ configure page uses service name when no custom name                 0.11s  
+  ✓ name update trims whitespace                                         0.19s  
+  ✓ configure page name update trims whitespace                          0.13s  
+
+   PASS  Tests\Feature\IntegrationPageTest
+  ✓ integrations page requires authentication                            0.10s  
+  ✓ plugin registry has github plugin                                    0.08s  
+  ✓ plugin registry has slack plugin                                     0.08s  
+  ✓ initialize route exists                                              0.08s  
+  ✓ plugin registry supports multiple instances                          0.09s  
+
+   PASS  Tests\Feature\IntegrationPluginTest
+  ✓ plugin registry can register and retrieve plugins                    0.12s  
+  ✓ plugin registry can filter by service type                           0.09s  
+  ✓ plugin registry can get plugin instance                              0.09s  
+  ✓ plugin registry returns null for invalid plugin                      0.09s  
+  ✓ github plugin has correct metadata                                   0.10s  
+  ✓ github plugin has configuration schema                               0.08s  
+  ✓ github plugin has required scopes                                    0.14s  
+
+   PASS  Tests\Feature\IntegrationScheduleTest
+  ✓ schedule override marks due when never updated                       0.14s  
+  ✓ schedule override due after next run reached                         0.13s  
+  ✓ paused instances are not due                                         0.12s  
+
+   PASS  Tests\Feature\IntegrationTest
+  ✓ plugin can initialize group and instance                             0.14s  
+  ✓ integrations index page loads                                        0.32s  
+  ✓ oauth flow redirects to provider                                     0.10s  
+  ✓ oauth callback handles success                                       0.09s  
+  ✓ oauth callback handles invalid state                                 0.09s  
+  ✓ configure page loads                                                 0.20s  
+  ✓ configure page requires ownership                                    0.10s  
+  ✓ can update integration configuration                                 0.13s  
+  ✓ webhook handles valid request                                        0.09s  
+  ✓ webhook handles invalid service                                      0.09s  
+  ✓ webhook handles invalid secret                                       0.10s  
+
+   PASS  Tests\Feature\IntegrationUpdateFrequencyTest
+  ✓ integration needs update when never updated                          0.10s  
+  ✓ integration needs update when frequency elapsed                      0.09s  
+  ✓ integration does not need update when frequency not elapsed          0.08s  
+  ✓ get next update time returns correct time                            0.09s  
+  ✓ get next update time returns null when never updated                 0.09s  
+  ✓ mark as triggered updates last triggered at                          0.11s  
+  ✓ mark as successfully updated updates both timestamps                 0.10s  
+  ✓ mark as failed clears triggered state                                0.09s  
+  ✓ is processing with time window                                       0.11s  
+  ✓ scope needs update returns correct integrations                      0.09s  
+  ✓ scope oauth needs update returns only oauth integrations             0.09s  
+  ✓ can configure update frequency                                       0.13s  
+  ✓ update frequency validation requires minimum one minute              0.14s  
+  ✓ integration index shows update frequency info                        0.24s  
+  ✓ integration index shows up to date status                            0.24s  
+
+   PASS  Tests\Feature\Integrations\Reddit\RedditPluginTest
+  ✓ oauth flow saves tokens and account id                               0.13s  
+  ✓ pull dispatches processing and stores cursor                         0.11s  
+
+   PASS  Tests\Feature\Integrations\Reddit\RedditSavedDataTest
+  ✓ creates event objects and blocks with tags                           0.10s  
+
+   PASS  Tests\Feature\LoginViewTest
+  ✓ login page shows cronxid button                                      0.11s  
+
+   PASS  Tests\Feature\MigrationJobsTest
+  ✓ onboarding can trigger migration with optional timebox               0.09s  
+  ✓ fetch integration page respects timebox and stops                    0.09s  
+  ✓ spotify fetch handles 429 and redispatches                           0.09s  
+  ✓ github fetch paginates and chains processing                         0.12s  
+  ✓ oura fetch handles 429 and empty window                              0.11s  
+
+   PASS  Tests\Feature\MigrationOptionsVisibilityTest
+  ✓ migration options shown for supported plugins                        0.29s  
+  ✓ migration options hidden for unsupported plugins                     0.34s  
+  ✓ plugin migration support methods                                     0.16s  
+  ✓ all migration supported plugins have migration implementation        0.26s  
+
+   PASS  Tests\Feature\MigrationProgressTrackingTest
+  ✓ start integration migration creates progress record                  0.16s  
+  ✓ migration progress updates during processing                         0.10s  
+  ✓ migration progress can be marked completed                           0.10s  
+  ✓ migration progress can be marked failed                              0.09s  
+
+   PASS  Tests\Feature\MigrationProgressUITest
+  ✓ updates page shows migration progress                                0.23s  
+  ✓ updates page shows failed migration                                  0.25s  
+  ✓ updates page shows completed migration                               0.25s  
+  ✓ updates page shows different progress steps                          0.47s  
+
+   PASS  Tests\Feature\MoneyIndexTest
+  ✓ money index displays service column                                  0.31s  
+  ✓ money index shows manual accounts with correct service               0.14s  
+  ✓ money index shows monzo accounts with correct service                0.12s  
+  ✓ money index shows gocardless accounts with correct service           0.11s  
+  ✓ money index shows all account types                                  0.16s  
+  ✓ money index requires authentication                                  0.10s  
+  ✓ money show view displays account details correctly                   0.13s  
+  ✓ money show view displays monzo pot with title                        0.10s  
+  ✓ money show view displays manual account with metadata name           0.12s  
+  ✓ money show view requires authentication                              0.09s  
+  ✓ money show view prevents access to other users accounts              0.10s  
+
+   PASS  Tests\Feature\MonzoMigrationTest
+  ✓ migration processes transactions window creates events               0.13s  
+  ✓ migration pots snapshot creates pot objects                          0.14s  
+  ✓ migration balance snapshot creates daily event                       0.10s  
+
+   PASS  Tests\Feature\MonzoSweepTest
+  ✓ perform sweep if needed runs when no previous sweep                  0.26s  
+  ✓ perform sweep if needed skips when recent sweep                      0.11s  
+  ✓ perform sweep if needed runs when old sweep                          0.13s  
+  ✓ perform data sweep processes all data types                          0.36s  
+  ✓ perform data sweep handles no accounts                               0.17s  
+  ✓ perform data sweep handles api errors gracefully                     0.25s  
+  ✓ sweep works for different instance types                             0.35s  
+  ✓ sweep timestamp format is correct                                    0.17s  
+  ✓ sweep uses correct date range                                        0.15s  
+  ✓ sweep skips accounts instance type                                   0.11s  
+
+   PASS  Tests\Feature\MonzoTokenRefreshTest
+  ✓ it refreshes token when expired during api call                      0.15s  
+  ✓ it handles 401 response by refreshing token                          0.11s  
+  ✓ it handles refresh token failure gracefully                          0.49s  
+  ✓ it skips refresh when missing credentials                            0.35s  
+
+   PASS  Tests\Feature\ObjectTaggingUiTest
+  ✓ user can add and remove tags via object component methods            0.27s  
+  ✓ it ignores marker values used for whitelist or initial               0.26s  
+
+   PASS  Tests\Feature\OuraIntegrationTest
+  ✓ oura plugin has correct metadata and scopes                          0.11s  
+  ✓ oura plugin can initialize group and instance                        0.13s  
+  ✓ oura fetch daily activity creates event and blocks                   0.50s  
+  ✓ oura fetch sleep records creates event with stages and avg hr        0.77s  
+  ✓ oura fetch heartrate series creates daily event with min max blocks  0.93s  
+  ✓ oura fetch workouts creates event seconds and blocks                 0.49s  
+  ✓ oura fetch sessions creates event seconds and mindfulness concept    0.48s  
+  ✓ oura fetch tags creates event and tag block                          0.48s  
+  ✓ oura daily readiness resilience stress spo2 actions                  0.26s  
+  ✓ oura stress data processes new format with day summary and blocks    0.12s  
+  ✓ oura stress data maps stressful day summary correctly                0.13s  
+  ✓ oura stress data maps normal day summary correctly                   0.10s  
+  ✓ oura stress data maps restored day summary correctly                 0.10s  
+
+   PASS  Tests\Feature\OuraSweepTest
+  ✓ perform sweep if needed runs when no previous sweep                  1.19s  
+  ✓ perform sweep if needed skips when recent sweep                      0.22s  
+  ✓ perform sweep if needed runs when old sweep                          0.20s  
+  ✓ perform data sweep creates events for all data types                 0.61s  
+  ✓ perform data sweep handles api errors gracefully                     0.24s  
+  ✓ sweep works for different instance types                             1.19s  
+  ✓ sweep timestamp format is correct                                    0.22s  
+
+   PASS  Tests\Feature\OutlineIntegrationTest
+  ✓ creates task blocks from document text                               0.10s  
+  ✓ deleted task is soft deleted on reprocess                            0.11s  
+
+   PASS  Tests\Feature\OutlineMigrationTest
+  ✓ outline migration creates progress record                            0.09s  
+  ✓ outline migration dispatches outline migration pull                  0.08s  
+  ✓ outline plugin supports migration                                    0.08s  
+
+   PASS  Tests\Feature\PluginAndIntegrationViewsTest
+  ✓ plugin show page loads for valid service                             0.28s  
+  ✓ plugin show page returns 404 for invalid service                     0.12s  
+  ✓ integration details page loads for owned integration                 0.27s  
+  ✓ integration details page returns 403 for other users integration     0.13s  
+  ✓ plugin show page displays action types                               0.21s  
+  ✓ plugin show page displays object types                               0.24s  
+  ✓ plugin show page displays block types                                0.18s  
+  ✓ integration details page displays action types                       0.19s  
+  ✓ integration details page displays object types                       0.19s  
+  ✓ integration details page displays block types                        0.19s  
+
+   FAIL  Tests\Feature\PluginTypeValidationTest
+  ⨯ all plugin types are properly configured                             0.11s  
+  ✓ all configured types are actually used                               0.08s  
+
+   PASS  Tests\Feature\RunIntegrationTaskTest
+  ✓ runs artisan command mode                                            0.09s  
+
+   PASS  Tests\Feature\Settings\PasswordUpdateTest
+  ✓ password can be updated                                              0.12s  
+  ✓ correct password must be provided to update password                 0.11s  
+
+   PASS  Tests\Feature\Settings\ProfileUpdateTest
+  ✓ profile page is displayed                                            0.21s  
+  ✓ profile information can be updated                                   0.12s  
+  ✓ email verification status is unchanged when email address is unchan… 0.12s  
+  ✓ user can delete their account                                        0.10s  
+  ✓ correct password must be provided to delete account                  0.16s  
+
+   PASS  Tests\Feature\SoftDeleteTest
+  ✓ integration soft delete                                              0.12s  
+  ✓ event object soft delete                                             0.12s  
+  ✓ event soft delete                                                    0.13s  
+  ✓ block soft delete                                                    0.10s  
+  ✓ relationships with soft deleted models                               0.09s  
+  ✓ restore functionality                                                0.08s  
+  ✓ force delete functionality                                           0.08s  
+  ✓ only trashed scope                                                   0.08s  
+  ✓ with trashed scope                                                   0.08s  
+  ✓ trashed helper method                                                0.07s  
+
+   PASS  Tests\Feature\SpotifyIntegrationTest
+  ✓ spotify plugin can be initialized                                    0.09s  
+  ✓ spotify plugin has correct metadata                                  0.07s  
+  ✓ spotify plugin has configuration schema                              0.07s  
+  ✓ spotify plugin requires correct scopes                               0.07s  
+  ✓ spotify plugin can process track play                                0.09s  
+  ✓ spotify plugin prevents duplicate events                             0.09s  
+
+   PASS  Tests\Feature\TagManagerComponentTest
+  ✓ it adds a plain tag defaulting to spark type                         0.10s  
+  ✓ it adds a tag with explicit type prefix and strips prefix for value  0.11s  
+  ✓ it adds a tag with type argument and handles prefixed input          0.12s  
+  ✓ it infers emoji type for emoji only values                           0.10s  
+  ✓ it removes a tag with or without type                                0.10s  
+  ✓ it ignores empty values when adding or removing                      0.09s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\PluginTypeValidationTest > al…  AssertionFailedError   
+  Found undefined types in plugins:
+
+Plugin: apple_health
+  object_types: location, data_source
+
+  at tests/Feature/PluginTypeValidationTest.php:38
+     34▕                 foreach ($pluginErrors as $type => $undefinedTypes) {
+     35▕                     $errorMessage .= "  {$type}: " . implode(', ', $undefinedTypes) . "\n";
+     36▕                 }
+     37▕             }
+  ➜  38▕             $this->fail($errorMessage);
+     39▕         }
+     40▕ 
+     41▕         $this->assertTrue(true, 'All plugin types are properly configured');
+     42▕     }
+
+  1   tests/Feature/PluginTypeValidationTest.php:38
+
+
+  Tests:    1 failed, 433 passed (4729 assertions)
+  Duration: 71.23s
+

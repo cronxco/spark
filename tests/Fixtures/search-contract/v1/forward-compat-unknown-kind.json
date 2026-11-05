@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "query": "sync",
+  "mode": "default",
+  "execution": { "status": "complete", "fallback_reason": null },
+  "results": [
+    { "kind": "object", "id": "1c7d1a71-6e4f-4f9f-8e6c-2d3b4a5f6e7b", "title": "Sync notes", "subtitle": "note", "concept": "note" },
+    { "kind": "hologram", "id": "future-1", "title": "A kind no build knows yet", "subtitle": null },
+    { "kind": "event", "id": "0b6c0f60-5d3e-4e8e-9d5b-1c2a3f4e5d6a", "title": "Monzo sync", "subtitle": "money", "domain": "money" }
+  ],
+  "meta": { "count": 3, "limit": 20 }
+}

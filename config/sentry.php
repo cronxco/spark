@@ -1,0 +1,40 @@
+<?php
+
+return [
+    'dsn' => env('SENTRY_LARAVEL_DSN'),
+
+    'environment' => env('APP_ENV', 'production'),
+
+    'release' => file_exists(base_path('VERSION'))
+        ? trim(file_get_contents(base_path('VERSION')))
+        : (env('SENTRY_RELEASE') ?: null),
+
+    'js' => [
+        'dsn' => env('VITE_SENTRY_DSN'),
+    ],
+
+    'traces_sample_rate' => (float) env('SENTRY_TRACES_SAMPLE_RATE', 0.2),
+
+    'profiles_sample_rate' => (float) env('SENTRY_PROFILES_SAMPLE_RATE', 0.0),
+
+    'send_default_pii' => false,
+
+    // Named callables keep this configuration serialisable by `config:cache`.
+    'before_send' => 'redact_sentry_event',
+    'before_send_transaction' => 'redact_sentry_event',
+    'before_send_log' => 'redact_sentry_log',
+    'before_breadcrumb' => 'redact_sentry_breadcrumb',
+
+    'breadcrumbs' => [
+        'sql_queries' => true,
+        'sql_bindings' => false,
+        'queue_info' => true,
+        'command_info' => true,
+    ],
+
+    // Continue incoming distributed traces from the browser (sentry-trace + baggage)
+    'tracing' => [
+        'queue_job_transactions' => true,
+        'queue_job_transactions_trim_uuids' => true,
+    ],
+];

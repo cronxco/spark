@@ -1,0 +1,251 @@
+<?php
+
+namespace Tests\Feature\Api\V1\Mobile;
+
+use App\Models\PushSubscription;
+use App\Models\User;
+use App\Notifications\TestPushNotification;
+use App\Support\SparkAbility;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
+use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
+
+class DevicesControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected User $user;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['ios.mobile_api_enabled' => true]);
+        $this->user = User::factory()->create();
+    }
+
+    #[Test]
+    public function index_requires_authentication(): void
+    {
+        $this->getJson('/api/v1/mobile/devices')->assertStatus(401);
+    }
+
+    #[Test]
+    public function index_returns_ios_devices_for_authenticated_user(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('a', 64),
+            'device_type' => PushSubscription::DEVICE_TYPE_IOS,
+            'app_environment' => 'sandbox',
+            'bundle_id' => 'co.cronx.spark',
+            'app_version' => '1.0.0',
+            'os_version' => '18.1',
+            'device_name' => 'Will’s iPhone',
+        ]);
+
+        $this->getJson('/api/v1/mobile/devices')
+            ->assertOk()
+            ->assertJsonCount(1, 'devices')
+            // iOS RegisteredDevice contract: name + platform are required by the
+            // client decoder, last_seen_at and is_current_device are optional.
+            ->assertJsonPath('devices.0.name', 'Will’s iPhone')
+            ->assertJsonPath('devices.0.platform', 'ios')
+            ->assertJsonPath('devices.0.is_current_device', false)
+            ->assertJsonStructure(['devices' => [['id', 'name', 'platform', 'last_seen_at', 'is_current_device']]])
+            ->assertJsonPath('devices.0.device_type', 'ios')
+            ->assertJsonPath('devices.0.app_environment', 'sandbox')
+            ->assertJsonPath('devices.0.app_version', '1.0.0')
+            ->assertJsonPath('devices.0.os_version', '18.1');
+    }
+
+    #[Test]
+    public function index_falls_back_to_a_default_name_when_device_name_is_missing(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        // device_name is nullable, but the iOS decoder requires a non-null name.
+        $this->user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('a', 64),
+            'device_type' => PushSubscription::DEVICE_TYPE_IOS,
+        ]);
+
+        $this->getJson('/api/v1/mobile/devices')
+            ->assertOk()
+            ->assertJsonPath('devices.0.name', 'iPhone');
+    }
+
+    #[Test]
+    public function index_excludes_another_users_devices(): void
+    {
+        $other = User::factory()->create();
+        $other->pushSubscriptions()->create([
+            'endpoint' => str_repeat('f', 64),
+            'device_type' => PushSubscription::DEVICE_TYPE_IOS,
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->getJson('/api/v1/mobile/devices')
+            ->assertOk()
+            ->assertJsonCount(0, 'devices');
+    }
+
+    #[Test]
+    public function register_requires_authentication(): void
+    {
+        $this->postJson('/api/v1/mobile/devices', $this->payload())->assertStatus(401);
+    }
+
+    #[Test]
+    public function register_requires_write_ability(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->postJson('/api/v1/mobile/devices', $this->payload())
+            ->assertStatus(403);
+    }
+
+    #[Test]
+    public function register_creates_ios_push_subscription(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $token = str_repeat('b', 64);
+
+        $this->postJson('/api/v1/mobile/devices', $this->payload($token))
+            ->assertStatus(201)
+            ->assertJsonPath('device_type', PushSubscription::DEVICE_TYPE_IOS)
+            ->assertJsonPath('endpoint', $token)
+            ->assertJsonPath('app_environment', 'sandbox');
+
+        $this->assertDatabaseHas('push_subscriptions', [
+            'endpoint' => $token,
+            'device_type' => 'ios',
+            'subscribable_id' => $this->user->id,
+            'device_name' => 'iPhone 15 Pro',
+        ]);
+    }
+
+    #[Test]
+    public function register_upserts_on_duplicate_token(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $token = str_repeat('c', 64);
+
+        $this->postJson('/api/v1/mobile/devices', $this->payload($token))->assertStatus(201);
+        $this->postJson('/api/v1/mobile/devices', array_merge($this->payload($token), ['app_version' => '1.0.1']))
+            ->assertStatus(201)
+            ->assertJsonPath('endpoint', $token);
+
+        $this->assertEquals(1, PushSubscription::where('endpoint', $token)->count());
+        $this->assertEquals('1.0.1', PushSubscription::where('endpoint', $token)->first()->app_version);
+    }
+
+    #[Test]
+    public function register_rejects_invalid_environment(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/devices', array_merge($this->payload(), ['app_environment' => 'staging']))
+            ->assertStatus(422);
+    }
+
+    #[Test]
+    public function destroy_removes_subscription(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $subscription = $this->user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('d', 64),
+            'device_type' => 'ios',
+        ]);
+
+        $this->deleteJson("/api/v1/mobile/devices/{$subscription->id}")
+            ->assertStatus(204);
+
+        $this->assertDatabaseMissing('push_subscriptions', ['id' => $subscription->id]);
+    }
+
+    #[Test]
+    public function register_transfers_existing_token_to_current_user(): void
+    {
+        $other = User::factory()->create();
+        $token = str_repeat('f', 64);
+
+        $other->pushSubscriptions()->create([
+            'endpoint' => $token,
+            'device_type' => 'ios',
+            'app_environment' => 'sandbox',
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/devices', $this->payload($token))
+            ->assertStatus(201);
+
+        $this->assertEquals(1, PushSubscription::where('endpoint', $token)->count());
+        $this->assertDatabaseHas('push_subscriptions', [
+            'endpoint' => $token,
+            'subscribable_id' => $this->user->id,
+        ]);
+    }
+
+    #[Test]
+    public function destroy_denies_another_users_device(): void
+    {
+        $other = User::factory()->create();
+        $subscription = $other->pushSubscriptions()->create([
+            'endpoint' => str_repeat('e', 64),
+            'device_type' => 'ios',
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->deleteJson("/api/v1/mobile/devices/{$subscription->id}")
+            ->assertStatus(404);
+    }
+
+    #[Test]
+    public function push_requires_ios_subscription(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/devices/test')
+            ->assertStatus(400);
+    }
+
+    #[Test]
+    public function push_sends_ios_notification(): void
+    {
+        Notification::fake();
+
+        $this->user->pushSubscriptions()->create([
+            'endpoint' => str_repeat('1', 64),
+            'device_type' => 'ios',
+            'app_environment' => 'sandbox',
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->postJson('/api/v1/mobile/devices/test')
+            ->assertStatus(204);
+
+        Notification::assertSentTo($this->user, TestPushNotification::class);
+    }
+
+    protected function payload(?string $token = null): array
+    {
+        return [
+            'apns_token' => $token ?? str_repeat('a', 64),
+            'app_environment' => 'sandbox',
+            'bundle_id' => 'co.cronx.sparkapp',
+            'app_version' => '1.0.0',
+            'os_version' => '18.1',
+            'device_name' => 'iPhone 15 Pro',
+        ];
+    }
+}

@@ -1,0 +1,6 @@
+{
+    "scripts": {
+        "setup": "cp .env.sail .env && composer install && sail down && sail up -d && sail artisan key:generate && sail artisan migrate && sail npm install && sail npm run build",
+        "run": ""
+    }
+}
