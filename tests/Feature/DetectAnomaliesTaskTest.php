@@ -169,10 +169,10 @@ class DetectAnomaliesTaskTest extends TestCase
         (new DispatchRetrospectiveAnomalyTasksJob)->handle();
 
         $swept = Queue::pushed(ProcessTaskPipelineJob::class, fn ($job) => $job->trigger === 'scheduled')
-            ->map(fn ($job) => [$job->model->getKey(), $job->force])
+            ->map(fn ($job) => [(string) $job->model->getKey(), $job->force])
             ->values()
             ->all();
-        $this->assertSame([[$deferred->getKey(), true]], $swept);
+        $this->assertSame([[(string) $deferred->getKey(), true]], $swept);
     }
 
     #[Test]
