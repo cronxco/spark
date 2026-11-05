@@ -292,6 +292,8 @@ class UpToSpeedController extends Controller
                         'baseline_display' => $presentation->formatValue($stat, $baselineValue),
                         'deviation' => round($trend->deviation, 2),
                         'streak_days' => $streakCount,
+                        // The window the baseline is drawn from, for "21bpm below 90d trend".
+                        'baseline_window_days' => $stat->baseline_window_days ?? MetricStatistic::DEFAULT_WINDOW_DAYS,
                         'detected_at' => $trend->detected_at->toIso8601String(),
                         'acknowledged_at' => $trend->acknowledged_at?->toIso8601String(),
                     ],

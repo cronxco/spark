@@ -277,6 +277,50 @@ class OuraIntegrationTest extends TestCase
     }
 
     #[Test]
+    public function a_later_heartrate_fetch_refreshes_the_days_average(): void
+    {
+        $user = User::factory()->create();
+        $group = IntegrationGroup::create([
+            'user_id' => $user->id,
+            'service' => 'oura',
+            'account_id' => 'user_abc',
+            'access_token' => 'test_access_token',
+            'expiry' => now()->addHour(),
+        ]);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'oura',
+            'instance_type' => 'heartrate',
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
+        ]);
+
+        $day = now()->toDateString();
+        $overnight = [
+            ['timestamp' => $day . 'T01:00:00Z', 'bpm' => 50],
+            ['timestamp' => $day . 'T02:00:00Z', 'bpm' => 60],
+        ];
+        $wholeDay = array_merge($overnight, [
+            ['timestamp' => $day . 'T12:00:00Z', 'bpm' => 100],
+            ['timestamp' => $day . 'T13:00:00Z', 'bpm' => 110],
+        ]);
+        Http::fake([
+            'https://api.ouraring.com/v2/usercollection/personal_info*' => Http::response(['data' => [['user_id' => 'user_abc']]], 200),
+            'https://api.ouraring.com/v2/usercollection/heartrate*' => Http::sequence()
+                ->push(['data' => $overnight], 200)
+                ->push(['data' => $wholeDay], 200),
+        ]);
+
+        (new OuraPlugin)->fetchData($integration);
+        (new OuraPlugin)->fetchData($integration->fresh());
+
+        $events = Event::where('integration_id', $integration->id)->where('action', 'had_heart_rate')->get();
+        $this->assertCount(1, $events);
+        $this->assertEqualsWithDelta(80, $events->first()->event_metadata['avg_bpm'], 0.01);
+        $this->assertEqualsWithDelta(80, (float) $events->first()->getFormattedValueAttribute(), 0.01);
+    }
+
+    #[Test]
     public function oura_fetch_workouts_creates_event_seconds_and_blocks(): void
     {
         $user = User::factory()->create();
