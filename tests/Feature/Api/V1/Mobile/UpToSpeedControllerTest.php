@@ -1390,6 +1390,34 @@ class UpToSpeedControllerTest extends TestCase
     }
 
     #[Test]
+    public function linked_payment_outside_the_weeks_ten_largest_is_still_the_highlighted_bar(): void
+    {
+        $monzo = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'monzo',
+        ]);
+        $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account', 'type' => 'monzo_account', 'title' => 'Monzo Current']);
+        $shop = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'monzo_counterparty', 'title' => 'Shop']);
+
+        foreach (range(1, 11) as $hour) {
+            $this->monzoPayment($monzo, $account, $shop, 1000 + $hour * 100, now()->subHours($hour + 2));
+        }
+        $coffee = $this->monzoPayment($monzo, $account, $shop, 250, now()->subHour());
+
+        $this->digestLinking("a [£2.50 coffee](https://spark.cronx.co/events/{$coffee->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $week = $this->digestPayload()['linked_events'][0]['details']['week'];
+
+        $this->assertCount(10, $week['amounts']);
+        $this->assertSame(9, $week['index']);
+        $this->assertSame(250, $week['amounts'][$week['index']]);
+        $this->assertNull($week['caption']);
+    }
+
+    #[Test]
     public function linked_article_gets_a_reading_card_with_its_takeaways(): void
     {
         $publication = EventObject::factory()->create([

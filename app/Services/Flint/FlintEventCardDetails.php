@@ -119,8 +119,9 @@ class FlintEventCardDetails
 
     /**
      * This payment among the week's spending up to and including its day:
-     * each payment's amount in time order (the largest ten when there are
-     * more), which one this is, and a caption when it stands out.
+     * each payment's amount in time order (when there are more than ten,
+     * this one and the nine largest others), which one this is, and a
+     * caption when it stands out.
      *
      * @return array{amounts: array<int, int>, index: int, caption: string|null}|null
      */
@@ -140,16 +141,18 @@ class FlintEventCardDetails
             return null;
         }
 
-        $rank = $entries->sortByDesc('amount')->values()
-            ->search(fn (array $entry): bool => $entry['id'] === (string) $event->id);
+        $isThis = fn (array $entry): bool => $entry['id'] === (string) $event->id;
+        $ranked = $entries->sortByDesc('amount')->values();
+        $rank = $ranked->search($isThis);
 
-        $shown = $entries->sortByDesc('amount')->take(self::WEEK_BARS)
+        $shown = $ranked->reject($isThis)->take(self::WEEK_BARS - 1)
+            ->push($ranked->first($isThis))
             ->sortBy(fn (array $entry): int => $entry['time']->getTimestamp())
             ->values();
 
         return [
             'amounts' => $shown->pluck('amount')->map(fn (mixed $amount): int => (int) $amount)->all(),
-            'index' => (int) $shown->search(fn (array $entry): bool => $entry['id'] === (string) $event->id),
+            'index' => (int) $shown->search($isThis),
             'caption' => match ($rank) {
                 0 => $entries->count() > 1 ? 'Largest this week' : null,
                 1 => '2nd largest this week',
