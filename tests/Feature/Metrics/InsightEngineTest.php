@@ -45,7 +45,7 @@ class InsightEngineTest extends TestCase
      *
      * @param  callable(int, Carbon): float  $value  given days back and the date
      */
-    private function seed(string $service, string $action, string $unit, callable $value, int $days = 90): MetricStatistic
+    private function seedMetric(string $service, string $action, string $unit, callable $value, int $days = 90): MetricStatistic
     {
         for ($back = 1; $back <= $days; $back++) {
             $date = now()->utc()->subDays($back)->startOfDay();
@@ -78,7 +78,7 @@ class InsightEngineTest extends TestCase
     public function a_week_well_above_the_four_week_trend_is_an_insight(): void
     {
         // Steady 8,000 a day with a little noise, then a busy last week of 11,000.
-        $this->seed('apple_health', 'had_step_count', 'count', fn (int $back) => ($back <= 7 ? 11000 : 8000) + (($back * 37) % 11 - 5) * 60);
+        $this->seedMetric('apple_health', 'had_step_count', 'count', fn (int $back) => ($back <= 7 ? 11000 : 8000) + (($back * 37) % 11 - 5) * 60);
 
         app(InsightEngine::class)->generateForUser($this->user);
 
@@ -95,7 +95,7 @@ class InsightEngineTest extends TestCase
     #[Test]
     public function an_ordinary_week_is_not_an_insight(): void
     {
-        $this->seed('apple_health', 'had_step_count', 'count', fn (int $back) => 8000 + (($back * 37) % 11 - 5) * 60);
+        $this->seedMetric('apple_health', 'had_step_count', 'count', fn (int $back) => 8000 + (($back * 37) % 11 - 5) * 60);
 
         app(InsightEngine::class)->generateForUser($this->user);
 
@@ -106,7 +106,7 @@ class InsightEngineTest extends TestCase
     public function a_low_day_is_worded_for_the_weekday_only_when_days_really_differ(): void
     {
         // Weekdays ~9,000, weekends ~5,000, and yesterday (Thursday) only 7,300.
-        $this->seed('apple_health', 'had_step_count', 'count', function (int $back, Carbon $date) {
+        $this->seedMetric('apple_health', 'had_step_count', 'count', function (int $back, Carbon $date) {
             if ($back === 1) {
                 return 7300;
             }
@@ -127,7 +127,7 @@ class InsightEngineTest extends TestCase
     #[Test]
     public function a_low_day_has_no_day_wording_when_days_do_not_differ(): void
     {
-        $this->seed('oura', 'had_readiness_score', 'percent', function (int $back) {
+        $this->seedMetric('oura', 'had_readiness_score', 'percent', function (int $back) {
             // Yesterday is clearly lower than usual, but inside the anomaly range.
             return $back === 1 ? 73 : 80 + (($back * 7) % 13 - 6);
         });
@@ -144,7 +144,7 @@ class InsightEngineTest extends TestCase
     #[Test]
     public function a_move_big_enough_to_be_an_anomaly_is_not_also_an_insight(): void
     {
-        $this->seed('oura', 'had_readiness_score', 'percent', fn (int $back) => $back === 1 ? 20 : 80 + (($back * 7) % 13 - 6));
+        $this->seedMetric('oura', 'had_readiness_score', 'percent', fn (int $back) => $back === 1 ? 20 : 80 + (($back * 7) % 13 - 6));
 
         app(InsightEngine::class)->generateForUser($this->user);
 
@@ -154,7 +154,7 @@ class InsightEngineTest extends TestCase
     #[Test]
     public function generating_again_changes_nothing(): void
     {
-        $this->seed('apple_health', 'had_step_count', 'count', fn (int $back) => ($back <= 7 ? 11000 : 8000) + (($back * 37) % 11 - 5) * 60);
+        $this->seedMetric('apple_health', 'had_step_count', 'count', fn (int $back) => ($back <= 7 ? 11000 : 8000) + (($back * 37) % 11 - 5) * 60);
 
         app(InsightEngine::class)->generateForUser($this->user);
         $first = MetricTrend::insights()->pluck('id')->sort()->values()->all();
@@ -169,8 +169,8 @@ class InsightEngineTest extends TestCase
     {
         config(['metrics.max_insights_per_day' => 1]);
 
-        $this->seed('apple_health', 'had_step_count', 'count', fn (int $back) => ($back <= 7 ? 11000 : 8000) + (($back * 37) % 11 - 5) * 60);
-        $this->seed('apple_health', 'had_apple_exercise_time', 'min', fn (int $back) => ($back <= 7 ? 60 : 30) + (($back * 37) % 11 - 5));
+        $this->seedMetric('apple_health', 'had_step_count', 'count', fn (int $back) => ($back <= 7 ? 11000 : 8000) + (($back * 37) % 11 - 5) * 60);
+        $this->seedMetric('apple_health', 'had_apple_exercise_time', 'min', fn (int $back) => ($back <= 7 ? 60 : 30) + (($back * 37) % 11 - 5));
 
         $stored = app(InsightEngine::class)->generateForUser($this->user);
 
@@ -181,7 +181,7 @@ class InsightEngineTest extends TestCase
     #[Test]
     public function a_metric_that_is_not_listed_for_insights_produces_none(): void
     {
-        $this->seed('apple_health', 'had_basal_energy_burned', 'kcal', fn (int $back) => ($back <= 7 ? 3000 : 1600) + (($back * 37) % 11 - 5) * 10);
+        $this->seedMetric('apple_health', 'had_basal_energy_burned', 'kcal', fn (int $back) => ($back <= 7 ? 3000 : 1600) + (($back * 37) % 11 - 5) * 10);
 
         app(InsightEngine::class)->generateForUser($this->user);
 
@@ -191,7 +191,7 @@ class InsightEngineTest extends TestCase
     #[Test]
     public function insights_are_not_broadcast_as_anomalies(): void
     {
-        $this->seed('apple_health', 'had_step_count', 'count', fn (int $back) => ($back <= 7 ? 11000 : 8000) + (($back * 37) % 11 - 5) * 60);
+        $this->seedMetric('apple_health', 'had_step_count', 'count', fn (int $back) => ($back <= 7 ? 11000 : 8000) + (($back * 37) % 11 - 5) * 60);
 
         app(InsightEngine::class)->generateForUser($this->user);
 
