@@ -115,11 +115,12 @@ class DeleteIntegrationGroupTest extends TestCase
             'service' => 'github',
         ]);
 
-        $this->expectException(ModelNotFoundException::class);
-
         Livewire::actingAs($user)
             ->test('actions.delete-integration-group')
-            ->call('confirmDeleteGroup', $group->id);
+            ->call('confirmDeleteGroup', $group->id)
+            ->assertNotFound();
+
+        $this->assertNotSoftDeleted($group);
     }
 
     #[Test]

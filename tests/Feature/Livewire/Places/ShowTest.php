@@ -11,7 +11,6 @@ use App\Models\Place;
 use App\Models\Relationship;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -111,8 +110,6 @@ class ShowTest extends TestCase
     #[Test]
     public function cannot_link_another_users_event_to_place(): void
     {
-        $this->expectException(ModelNotFoundException::class);
-
         // Create another user with their own integration and event
         $otherUser = User::factory()->create();
         $otherGroup = IntegrationGroup::factory()->create([
@@ -131,11 +128,10 @@ class ShowTest extends TestCase
 
         $component = Livewire::test(Show::class, ['place' => $this->place]);
 
-        // Should throw ModelNotFoundException because event won't be found due to forUser() scope
-        $component->call('linkNearbyEvent', $otherEvent->id);
+        $component->call('linkNearbyEvent', $otherEvent->id)
+            ->assertNotFound();
 
-        // This won't execute due to exception, but demonstrates intent
-        // No relationship should be created
+        // The rejected request must not create a relationship.
         $this->assertDatabaseMissing('relationships', [
             'from_id' => $otherEvent->id,
             'to_id' => $this->place->id,
