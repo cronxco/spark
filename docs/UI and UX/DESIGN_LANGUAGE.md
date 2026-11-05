@@ -17,7 +17,7 @@ Written 28 October 2026 from a read of iOS `main` @ `539f651` and web `dev` @ `f
 7. [Cards](#7-cards)
 8. [Visual patterns for blocks and events](#8-visual-patterns-for-blocks-and-events)
 9. [Writing data](#9-writing-data)
-10. [Interaction and motion](#10-interaction-and-motion)
+10. [Interaction, motion, depth and haptics](#10-interaction-motion-depth-and-haptics)
 11. [Accessibility checks](#11-accessibility-checks)
 12. [Page patterns](#12-page-patterns)
 13. [What to remove](#13-what-to-remove)
@@ -419,7 +419,7 @@ These extend the Design System's content rules.
 
 ### 10.2 Motion
 
-Motion has four jobs: **response** (press/selection), **continuity** (disclosure/navigation), **confirmation** (completion), and **focus** (foreground sheets and menus).
+Motion has four general jobs: **response** (press/selection), **continuity** (disclosure/navigation), **confirmation** (completion), and **focus** (foreground sheets and menus). Up to Speed also has the deliberate reading rhythm and bounded card presentation described in [10.7](#107-up-to-speed-reading-rhythm-and-linked-cards).
 
 | Motion token | Starting range | Use |
 |---|---|---|
@@ -427,8 +427,8 @@ Motion has four jobs: **response** (press/selection), **continuity** (disclosure
 | `motion.state` | 180–240ms | Disclosure, selection and status changes |
 | `motion.spatial` | 250–350ms | Custom card expansion and meaningful layout changes |
 
-- These are proposed testing ranges, not overrides of native system timing. Prefer iOS system navigation and spring behaviour for gesture-driven transitions; gesture motion follows the finger and remains interruptible.
-- Animate only the relevant properties. Avoid `transition-all`, unrelated layout movement, repeated entrance effects, loops, pulses, confetti and decorative parallax.
+- These are proposed testing ranges, not overrides of native system timing or limits on the deliberately choreographed Up to Speed cards in 10.7. Prefer iOS system navigation and spring behaviour for gesture-driven transitions; gesture motion follows the finger and remains interruptible.
+- Animate only the relevant properties. Avoid `transition-all`, unrelated layout movement, repeated entrance effects, loops, pulses, confetti and decorative parallax. The bounded Up to Speed card entrance and draw-once effects in 10.7 are intentional; retain them rather than applying this general rule to remove them.
 - Motion never delays the next action. Under Reduce Motion / `prefers-reduced-motion`, replace spatial travel with a restrained cross-fade or immediate change as appropriate; avoid making opacity changes mandatory.
 
 ### 10.3 Depth and surfaces
@@ -454,9 +454,9 @@ Centralise semantic feedback in `SparkHaptics`, using SwiftUI `.sensoryFeedback`
 | Completed task, saved check-in or reflection | Success | Only after confirmed persistence |
 | Significant recoverable failure | Error / warning | With visible explanatory feedback |
 | Explicit start/stop of a timed activity | Start / stop | At the actual transition |
-| Navigation, scrolling, background refresh, passive reading | None | Never automatically vibrate |
+| Navigation, scrolling, background refresh, passive reading outside the Up to Speed interactions in 10.7 | None | No added automatic haptics |
 
-- Prefer built-in system control feedback and never duplicate it. Do not add a haptic to every tap, or use vibration as the only feedback channel.
+- Prefer built-in system control feedback and never duplicate it. Do not add a haptic to every tap, or use vibration as the only feedback channel. Preserve the named Up to Speed reading and card-tap haptics in 10.7; they are deliberate product behaviour, not violations of the general quiet-navigation rule.
 - Support a setting to disable Spark-specific haptics. Respect OS behaviour and accessibility settings.
 
 ### 10.5 Loading and completion
@@ -468,6 +468,25 @@ Centralise semantic feedback in `SparkHaptics`, using SwiftUI `.sensoryFeedback`
 ### 10.6 Verification
 
 Check touch, keyboard and VoiceOver/screen reader behaviour; light/dark themes; Dynamic Type; Increase Contrast; Reduce Transparency; Reduce Motion; rapid repeated input; failed requests; cancellation; animation interruption; and absence of duplicated haptics. Icon semantics and accessible labels must match across platforms.
+
+### 10.7 Up to Speed reading rhythm and linked cards
+
+**Deliberate product behaviour (Will, 2026-11-05).** Up to Speed is a guided reading experience with a tactile rhythm. Its existing reading haptics and the linked-card presentation specified in 7.3 / spark-ios PR92 are intentional. Preserve them when applying the general motion and haptic rules above.
+
+| Up to Speed interaction | Feedback | Meaning and timing |
+|---|---|---|
+| Move between pages in the same chapter | Selection | At the foreground page transition, including accessible Next/Previous actions |
+| Cross into another chapter | Medium impact | At the chapter transition, including the existing Skip/jump behaviour |
+| Arrive at Wrap | Success | Marks completion of the reading journey; it does not claim that a write or all read markers have persisted |
+| Explicitly toggle an article read/unread | Selection | At the explicit interaction, retaining immediate feedback while persistence proceeds |
+| Acknowledge an anomaly | Light impact | Retain the existing cue after the acknowledgement succeeds |
+| Tap a linked event card | Light impact | At the tap that opens the event, as specified in 7.3 |
+
+Use the existing pager hierarchy: a chapter-boundary cue replaces the within-chapter tick, and arriving at Wrap uses the completion cue rather than stacking it with a chapter impact. Check-in, answer and Mark all as read persistence feedback remains distinct and follows the confirmed-write rule in 10.4. A reading-completion success at Wrap is not evidence that those operations succeeded.
+
+**Linked-card motion.** Retain PR92's cards rising into place 70ms apart after the prose, and its one-time ring, against-the-mean bar, route and week-bar drawing effects. Keep the implemented choreography as the baseline, including its longer presentation springs; the micro/state/spatial ranges are not grounds for removing or shortening these approved effects. Retain the flight-progress glyph's meaningful position along the route. This permission is specific to these Up to Speed cards, not a default entrance treatment for every list or chart.
+
+**Accessibility and lifecycle.** Under Reduce Motion, show the linked cards and final chart/route states without their spatial entrance or drawing animation. Reduce Motion does not itself disable the reading haptics; the Spark-specific haptic setting and OS behaviour govern those. Preserve foreground reading interactions when centralising feedback in `SparkHaptics`, without adding a second cue. Background data refresh, passive value changes and read-marker queue flushing do not acquire haptics from this exception. Animation never delays a tap or a save, and completion cues for actual writes must still reflect their real outcome.
 
 ## 11. Accessibility checks
 
