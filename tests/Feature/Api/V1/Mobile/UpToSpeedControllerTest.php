@@ -1269,6 +1269,231 @@ class UpToSpeedControllerTest extends TestCase
         $this->assertSame([], $this->digestPayload()['linked_events']);
     }
 
+    #[Test]
+    public function linked_metric_cards_use_the_metric_layout(): void
+    {
+        $oura = $this->ouraIntegration();
+        $score = $this->ouraEvent($oura, 'had_sleep_score', 81, 'percent');
+
+        $this->digestLinking("a [sleep score of 81](https://spark.cronx.co/events/{$score->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('metric', $card['layout']);
+        $this->assertNull($card['details']);
+        $this->assertNull($card['answer']);
+    }
+
+    #[Test]
+    public function linked_flight_gets_a_journey_card_without_a_baseline(): void
+    {
+        $calendar = $this->calendarIntegration();
+        $flight = $this->calendarEvent(
+            $calendar,
+            "\u{2708} LGW\u{200B}\u{2192}\u{200B}ACE \u{2022} BA\u{00A0}2704",
+            "British Airways\u{00A0}2704\nLondon to Lanzarote\n\u{2197} 8:10 GMT\n\u{2198} 12:25 WET\nFlight time 4 hrs, 15 min",
+            255,
+        );
+        MetricStatistic::factory()->create([
+            'user_id' => $this->user->id,
+            'service' => 'google-calendar',
+            'action' => 'had_event',
+            'value_unit' => 'minutes',
+            'event_count' => 90,
+            'mean_value' => 60,
+            'stddev_value' => 20,
+            'normal_lower_bound' => 30,
+            'normal_upper_bound' => 90,
+            'baseline_window_days' => 90,
+        ]);
+
+        $this->digestLinking("The [flight is due into Arrecife at 12:25](https://spark.cronx.co/events/{$flight->id}).");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('journey', $card['layout']);
+        $this->assertNull($card['context']);
+        $this->assertSame('BA2704', $card['details']['flight']);
+        $this->assertSame('LGW', $card['details']['from']);
+        $this->assertSame('ACE', $card['details']['to']);
+        $this->assertSame('London to Lanzarote', $card['details']['route']);
+        $this->assertSame('08:10', $card['details']['departs_local']);
+        $this->assertSame('GMT', $card['details']['departs_zone']);
+        $this->assertSame('12:25', $card['details']['arrives_local']);
+        $this->assertSame('WET', $card['details']['arrives_zone']);
+        $this->assertSame(255, $card['details']['duration_minutes']);
+    }
+
+    #[Test]
+    public function linked_calendar_entry_that_is_not_a_flight_gets_a_calendar_card(): void
+    {
+        $calendar = $this->calendarIntegration();
+        $meeting = $this->calendarEvent($calendar, 'Design review', null, 45);
+
+        $this->digestLinking("[Design review](https://spark.cronx.co/events/{$meeting->id}) at ten.");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('calendar', $card['layout']);
+        $this->assertSame('Design review', $card['details']['title']);
+        $this->assertSame(45, $card['details']['duration_minutes']);
+        $this->assertNotNull($card['details']['ends_at']);
+    }
+
+    #[Test]
+    public function linked_payment_gets_a_merchant_card_with_its_place_in_the_week_and_the_readers_answer(): void
+    {
+        $monzo = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'monzo',
+        ]);
+        $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account', 'type' => 'monzo_account', 'title' => 'Monzo Current']);
+        $theatre = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'monzo_counterparty', 'title' => 'CRITERION THEATRE TRUST - BOX OFFICE']);
+        $coffee = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'monzo_counterparty', 'title' => 'Coffee']);
+
+        $payment = $this->monzoPayment($monzo, $account, $theatre, 15900, now()->subHours(2));
+        $this->monzoPayment($monzo, $account, $coffee, 350, now()->subDays(2));
+        $this->monzoPayment($monzo, $account, $coffee, 420, now()->subDays(3));
+
+        $digest = $this->digestLinking("a [£159 Criterion Theatre Trust payment](https://spark.cronx.co/events/{$payment->id})");
+        Block::factory()->create([
+            'event_id' => $digest->id,
+            'block_type' => 'flint_user_question',
+            'metadata' => [
+                'question' => "That [£159 payment](https://spark.cronx.co/events/{$payment->id}) — what was it for?",
+                'answer' => 'Theatre tickets or booking',
+                'answer_note' => 'Redcliffe, Sat 30 January with Dan',
+            ],
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('payment', $card['layout']);
+        $this->assertNull($card['context']);
+        $this->assertSame('Criterion Theatre Trust - Box Office', $card['details']['merchant']);
+        $this->assertSame('Monzo Current', $card['details']['account']);
+        $this->assertFalse($card['details']['pending']);
+        $this->assertSame([420, 350, 15900], $card['details']['week']['amounts']);
+        $this->assertSame(2, $card['details']['week']['index']);
+        $this->assertSame('Largest this week', $card['details']['week']['caption']);
+        $this->assertSame('Theatre tickets or booking', $card['answer']['answer']);
+        $this->assertSame('Redcliffe, Sat 30 January with Dan', $card['answer']['note']);
+    }
+
+    #[Test]
+    public function linked_article_gets_a_reading_card_with_its_takeaways(): void
+    {
+        $publication = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'title' => 'Klement on Investing',
+            'content' => '# China is decoupling from the West' . "\n\n" . str_repeat('word ', 460),
+        ]);
+        $article = Event::factory()->create([
+            'integration_id' => $this->knowledgeIntegration->id,
+            'domain' => 'knowledge',
+            'service' => 'newsletter',
+            'action' => 'received_post',
+            'target_id' => $publication->id,
+            'value' => null,
+            'event_metadata' => ['email_subject' => 'China is decoupling from the West'],
+            'time' => now()->subHour(),
+        ]);
+        Block::factory()->create([
+            'event_id' => $article->id,
+            'block_type' => 'newsletter_key_takeaways',
+            'metadata' => ['content' => json_encode([
+                '- **China\'s trade is shifting:** imports come from China-aligned countries.',
+                '- **The pivot sped up** after the pandemic.',
+                '- **Brazil and Russia gained.**',
+                '- **Germany, South Korea and Japan** lost the most.',
+                '- A fifth that the card leaves out.',
+            ])],
+        ]);
+
+        $this->digestLinking("**Klement on Investing:** [China's import sources shifted](https://spark.cronx.co/events/{$article->id}).");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('reading', $card['layout']);
+        $this->assertSame('Klement on Investing', $card['details']['publication']);
+        $this->assertSame('China is decoupling from the West', $card['details']['headline']);
+        $this->assertSame(2, $card['details']['read_minutes']);
+        $this->assertCount(4, $card['details']['takeaways']);
+        $this->assertSame('**China\'s trade is shifting:** imports come from China-aligned countries.', $card['details']['takeaways'][0]);
+    }
+
+    #[Test]
+    public function linked_events_without_a_value_that_are_not_articles_still_get_no_card(): void
+    {
+        $oura = $this->ouraIntegration();
+        $empty = $this->ouraEvent($oura, 'had_sleep_score', null, null);
+
+        $this->digestLinking("[no score yet](https://spark.cronx.co/events/{$empty->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $this->assertSame([], $this->digestPayload()['linked_events']);
+    }
+
+    private function calendarIntegration(): Integration
+    {
+        return Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'google-calendar',
+        ]);
+    }
+
+    private function calendarEvent(Integration $integration, string $title, ?string $content, int $minutes): Event
+    {
+        $entry = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'event',
+            'type' => 'calendar_event',
+            'title' => $title,
+            'content' => $content,
+        ]);
+
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'google-calendar',
+            'domain' => 'knowledge',
+            'action' => 'had_event',
+            'target_id' => $entry->id,
+            'value' => $minutes,
+            'value_multiplier' => 1,
+            'value_unit' => 'minutes',
+            'time' => now()->addHour(),
+        ]);
+    }
+
+    private function monzoPayment(Integration $integration, EventObject $account, EventObject $merchant, int $pence, Carbon $time): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => 'monzo',
+            'domain' => 'money',
+            'action' => 'card_payment_to',
+            'actor_id' => $account->id,
+            'target_id' => $merchant->id,
+            'value' => $pence,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => $time,
+        ]);
+    }
+
     private function ouraIntegration(): Integration
     {
         return Integration::factory()->create([
