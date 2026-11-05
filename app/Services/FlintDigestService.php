@@ -164,38 +164,6 @@ class FlintDigestService
     }
 
     /**
-     * The input with every Spark event link that leads nowhere reduced to its
-     * words, in the summary and in every block's prose.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array{0: array<string, mixed>, 1: array<int, string>}
-     */
-    private function stripDeadLinks(User $user, array $data): array
-    {
-        $links = new FlintDeadLinks($user);
-        $removed = [];
-        $strip = function (?string $text) use ($links, &$removed): ?string {
-            $result = $links->strip($text);
-            array_push($removed, ...$result['removed']);
-
-            return $result['text'];
-        };
-
-        if (isset($data['summary'])) {
-            $data['summary'] = $strip($data['summary']);
-        }
-        foreach ($data['blocks'] ?? [] as $index => $block) {
-            foreach (['content', 'question'] as $field) {
-                if (isset($block[$field])) {
-                    $data['blocks'][$index][$field] = $strip($block[$field]);
-                }
-            }
-        }
-
-        return [$data, array_values(array_unique($removed))];
-    }
-
-    /**
      * The user's one Flint integration (decision D-F4): the plugin's
      * `assistant` instance, oldest first, created on first use.
      */
@@ -250,6 +218,38 @@ class FlintDigestService
                 'generated_at' => now()->toIso8601String(),
             ], fn (mixed $value) => $value !== null)],
         );
+    }
+
+    /**
+     * The input with every Spark event link that leads nowhere reduced to its
+     * words, in the summary and in every block's prose.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array{0: array<string, mixed>, 1: array<int, string>}
+     */
+    private function stripDeadLinks(User $user, array $data): array
+    {
+        $links = new FlintDeadLinks($user);
+        $removed = [];
+        $strip = function (?string $text) use ($links, &$removed): ?string {
+            $result = $links->strip($text);
+            array_push($removed, ...$result['removed']);
+
+            return $result['text'];
+        };
+
+        if (isset($data['summary'])) {
+            $data['summary'] = $strip($data['summary']);
+        }
+        foreach ($data['blocks'] ?? [] as $index => $block) {
+            foreach (['content', 'question'] as $field) {
+                if (isset($block[$field])) {
+                    $data['blocks'][$index][$field] = $strip($block[$field]);
+                }
+            }
+        }
+
+        return [$data, array_values(array_unique($removed))];
     }
 
     /**

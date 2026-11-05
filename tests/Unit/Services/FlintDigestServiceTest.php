@@ -67,7 +67,7 @@ class FlintDigestServiceTest extends TestCase
             'title' => 'Evening Digest — Mon',
             'period' => 'evening',
             'summary' => "Your [train leaves at 13:00](https://spark.cronx.co/events/{$real}). "
-                . "The [return is booked](https://spark.cronx.co/events/EM41PV) and the "
+                . 'The [return is booked](https://spark.cronx.co/events/EM41PV) and the '
                 . "[hotel is paid](https://spark.cronx.co/events/{$missing}). [Their note](https://spark.cronx.co/events/{$someoneElses}).",
             'blocks' => [
                 ['block_type' => 'flint_insight', 'title' => 'Insight', 'content' => "A [walk](https://spark.cronx.co/events/{$missing}) today."],
