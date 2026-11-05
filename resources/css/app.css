@@ -38,6 +38,8 @@
     --color-warning-content: #0c0407;
     --color-error: #e26969;
     --color-error-content: #120404;
+    /* Highlighted facts in Flint and summary prose (design language §3.3) */
+    --highlight: #244f83;
     /* Domain tints (docs/UI and UX/DESIGN_LANGUAGE.md §3.2): fill for chips,
        rings and tinted grounds; ink for tinted text. */
     --domain-health: #7abaa1;
@@ -95,6 +97,7 @@
     --color-warning-content: #01111e;
     --color-error: #e26969;
     --color-error-content: #01111e;
+    --highlight: #ffbf00;
     --domain-health: #7abaa1;
     --domain-health-ink: #b3d8c9;
     --domain-activity: #f79129;
@@ -148,6 +151,7 @@
 /* Domain tint utilities (`text-domain-money`, `bg-domain-media/10`, …).
    The values come from the daisyUI themes above, so they follow the theme. */
 @theme inline {
+    --color-highlight: var(--highlight);
     --color-domain-health: var(--domain-health);
     --color-domain-health-ink: var(--domain-health-ink);
     --color-domain-activity: var(--domain-activity);

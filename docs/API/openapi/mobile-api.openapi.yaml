@@ -2636,6 +2636,26 @@ components:
         tldr: { type: string }
         note: { type: string }
         blocks_count: { type: integer }
+        integration:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string, nullable: true }
+            service: { type: string }
+        block_refs:
+          type: array
+          description: Feed only. Up to 3 blocks as timeline pills; notes and deleted blocks are left out.
+          items:
+            type: object
+            required: [id, block_type, title]
+            properties:
+              id: { type: string }
+              block_type: { type: string }
+              title: { type: string }
+              display_value: { type: string }
+        block_refs_total:
+          type: integer
+          description: Feed only. How many blocks block_refs was taken from.
         blocks:
           { type: array, items: { $ref: "#/components/schemas/CompactBlock" } }
         display_name: { type: string }

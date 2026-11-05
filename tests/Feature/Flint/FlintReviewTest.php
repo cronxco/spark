@@ -224,7 +224,7 @@ class FlintReviewTest extends TestCase
     public function shared_merchant_flags_do_not_change_each_receipts_link_state(): void
     {
         $first = $this->receipt('Coffee House');
-        $second = $this->receipt('Coffee House');
+        $second = $this->receipt('Coffee House second');
         $second->update(['target_id' => $first->target_id]);
         $first->target->update(['metadata' => ['is_matched' => true, 'needs_review' => true]]);
         $this->receiptLink($first, $this->transaction('Coffee House'));
