@@ -129,6 +129,7 @@ class MoneyIndexTest extends TestCase
             'title' => 'GoCardless Account',
             'metadata' => [
                 'name' => 'GoCardless Account',
+                'account_id' => 'gocardless-account',
                 'provider' => 'GoCardless',
                 'account_type' => 'current_account',
                 'details' => 'Bank Account',
@@ -188,6 +189,7 @@ class MoneyIndexTest extends TestCase
             'title' => 'GoCardless Account',
             'metadata' => [
                 'name' => 'GoCardless Account',
+                'account_id' => 'gocardless-account',
                 'provider' => 'GoCardless',
                 'account_type' => 'current_account',
                 'details' => 'Bank Account',

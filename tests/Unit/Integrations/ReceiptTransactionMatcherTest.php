@@ -11,6 +11,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionMethod;
 use Tests\TestCase;
 
 class ReceiptTransactionMatcherTest extends TestCase
@@ -169,11 +170,9 @@ class ReceiptTransactionMatcherTest extends TestCase
         // Empty candidates collection
         $this->matcher->flagForReview($receipt, collect());
 
-        $merchant->refresh();
-
-        $this->assertFalse($merchant->metadata['is_matched']);
-        $this->assertTrue($merchant->metadata['needs_review']);
-        $this->assertEmpty($merchant->metadata['candidate_matches']);
+        $this->assertSame('suggestions', $receipt->fresh()->event_metadata['receipt_matching']['status']);
+        $this->assertSame([], $receipt->fresh()->event_metadata['receipt_matching']['candidates']);
+        $this->assertFalse($merchant->fresh()->metadata['needs_review']);
     }
 
     #[Test]
@@ -414,10 +413,9 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertEquals(0.85, $relationship->metadata['match_confidence']);
         $this->assertEquals('automatic', $relationship->metadata['match_method']);
 
-        // Verify merchant metadata was updated
-        $receiptMerchant->refresh();
-        $this->assertTrue($receiptMerchant->metadata['is_matched']);
-        $this->assertEquals($transaction->id, $receiptMerchant->metadata['matched_transaction_id']);
+        // Matching state is receipt-specific, never written to the shared merchant.
+        $this->assertSame('matched', $receipt->fresh()->event_metadata['receipt_matching']['status']);
+        $this->assertFalse($receiptMerchant->fresh()->metadata['is_matched']);
     }
 
     #[Test]
@@ -480,5 +478,40 @@ class ReceiptTransactionMatcherTest extends TestCase
         $this->assertEquals(100, $relationship->value_multiplier);
         $this->assertEquals('USD', $relationship->value_unit);
         $this->assertEquals('manual', $relationship->metadata['match_method']);
+    }
+
+    #[Test]
+    public function merchant_aliases_improve_both_match_directions(): void
+    {
+        $receipt = new Event([
+            'value' => 1943,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'event_metadata' => ['matching_hints' => ['suggested_merchant_names' => ['Wingstop', 'Deliveroo']]],
+        ]);
+        $receipt->setRelation('target', new EventObject(['title' => 'Wingstop']));
+        $transaction = new Event(['value' => 1943, 'value_unit' => 'GBP', 'time' => $receipt->time]);
+        $transaction->setRelation('target', new EventObject(['title' => 'DELIVEROO']));
+
+        $this->assertEqualsWithDelta(1.0, $this->matcher->calculateReverseMatchConfidence($receipt, $transaction), 0.001);
+        $this->assertEqualsWithDelta(0.9, (new ReflectionMethod($this->matcher, 'calculateMatchConfidence'))->invoke($this->matcher, $receipt, $transaction), 0.001);
+    }
+
+    #[Test]
+    public function malformed_merchant_aliases_preserve_title_matching(): void
+    {
+        $receipt = new Event([
+            'value' => 585,
+            'value_unit' => 'GBP',
+            'time' => now(),
+            'event_metadata' => ['matching_hints' => ['suggested_merchant_names' => [null, [], 123, '']]],
+        ]);
+        $receipt->setRelation('target', new EventObject(['title' => 'Marks & Spencer']));
+        $transaction = new Event(['value' => 585, 'value_unit' => 'GBP', 'time' => $receipt->time]);
+        $transaction->setRelation('target', new EventObject(['title' => 'MARKS & SPENCER']));
+
+        $this->assertEqualsWithDelta(1.0, $this->matcher->calculateReverseMatchConfidence($receipt, $transaction), 0.001);
+        $receipt->event_metadata = ['matching_hints' => ['suggested_merchant_names' => 'not an array']];
+        $this->assertEqualsWithDelta(0.9, (new ReflectionMethod($this->matcher, 'calculateMatchConfidence'))->invoke($this->matcher, $receipt, $transaction), 0.001);
     }
 }

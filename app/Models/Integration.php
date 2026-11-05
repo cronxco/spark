@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -18,6 +19,11 @@ use Spatie\Activitylog\Traits\LogsActivity;
 class Integration extends Model
 {
     use HasFactory, LogsActivity, RedactsLoggedProperties, SoftDeletes;
+
+    /** The longest a failing integration waits between attempts. */
+    public const MAX_FAILURE_BACKOFF_MINUTES = 1440;
+
+    private const CONFIGURATION_SQL = "(CASE WHEN jsonb_typeof(configuration) = 'object' THEN configuration ELSE '{}'::jsonb END)";
 
     public $incrementing = false;
 
@@ -308,6 +314,10 @@ class Integration extends Model
             return null;
         }
 
+        if ($retryAt = $this->failureRetryAt()) {
+            return $retryAt;
+        }
+
         if ($this->useSchedule()) {
             return $this->getNextScheduledRun();
         }
@@ -433,6 +443,11 @@ class Integration extends Model
 
         $nowUtc = $now ? (clone $now)->setTimezone('UTC') : Carbon::now('UTC');
 
+        $retryAt = $this->failureRetryAt();
+        if ($retryAt && $nowUtc->lessThan($retryAt)) {
+            return false;
+        }
+
         if ($this->useSchedule()) {
             if (! $this->last_successful_update_at) {
                 return true;
@@ -486,6 +501,10 @@ class Integration extends Model
             'last_successful_update_at' => now(),
             'last_triggered_at' => now(),
         ]);
+
+        if (isset(($this->configuration ?? [])['failure_backoff'])) {
+            $this->writeFailureBackoff(new Expression(self::CONFIGURATION_SQL . " - 'failure_backoff'"));
+        }
     }
 
     /**
@@ -493,9 +512,43 @@ class Integration extends Model
      */
     public function markAsFailed(): void
     {
-        // Clear the triggered state so it can be retried
-        // Don't update last_successful_update_at since the update failed
+        // Clear the triggered state so it can be retried once its backoff
+        // passes. Don't update last_successful_update_at since the update failed.
         $this->update(['last_triggered_at' => null]);
+
+        $configuration = self::CONFIGURATION_SQL;
+        $count = "COALESCE(({$configuration}->'failure_backoff'->>'count')::int, 0) + 1";
+        $failedAt = $this->getConnection()->escape(now()->toIso8601String());
+        $this->writeFailureBackoff(new Expression(
+            "jsonb_set({$configuration}, '{failure_backoff}', jsonb_build_object('count', {$count}, 'failed_at', {$failedAt}::text), true)"
+        ));
+    }
+
+    /**
+     * When a failing integration may next be attempted, or null when it has
+     * not failed since its last success. Without this, a permanent failure
+     * (a revoked bank consent, a deleted account) made the integration due
+     * again on the next scheduler tick, so it was retried and re-reported
+     * every few minutes indefinitely. The wait doubles from the update
+     * interval with each consecutive failure, up to a day. The count lives
+     * in `configuration.failure_backoff` and is cleared on success.
+     */
+    public function failureRetryAt(): ?Carbon
+    {
+        $backoff = ($this->configuration ?? [])['failure_backoff'] ?? null;
+        $failures = (int) ($backoff['count'] ?? 0);
+        if ($failures < 1 || empty($backoff['failed_at'])) {
+            return null;
+        }
+        $failedAt = Carbon::parse($backoff['failed_at'])->setTimezone('UTC');
+        if ($this->last_successful_update_at && $this->last_successful_update_at->gte($failedAt)) {
+            return null;
+        }
+
+        $base = max(15, $this->getUpdateFrequencyMinutes());
+        $minutes = min($base * (2 ** min($failures - 1, 10)), self::MAX_FAILURE_BACKOFF_MINUTES);
+
+        return $failedAt->addMinutes($minutes);
     }
 
     /**
@@ -606,6 +659,11 @@ class Integration extends Model
                 : 'up_to_date';
         }
 
+        // Backing off after a failure is not "up to date".
+        if ($this->failureRetryAt() !== null) {
+            return 'needs_update';
+        }
+
         if (! $this->isDue()) {
             return 'up_to_date';
         }
@@ -654,5 +712,16 @@ class Integration extends Model
     public function getUuidBlock(): string
     {
         return explode('-', $this->id)[0] ?? $this->id;
+    }
+
+    /**
+     * Writes `configuration.failure_backoff` in SQL, so it cannot clobber
+     * keys other writers change concurrently (see IntegrationRunService).
+     */
+    private function writeFailureBackoff(Expression $configuration): void
+    {
+        static::withTrashed()->whereKey($this->getKey())->update(['configuration' => $configuration]);
+        $this->setAttribute('configuration', static::withTrashed()->whereKey($this->getKey())->first()?->configuration);
+        $this->syncOriginalAttribute('configuration');
     }
 }

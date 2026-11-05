@@ -18,6 +18,13 @@ class OuraIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::preventStrayRequests();
+    }
+
     #[Test]
     public function oura_plugin_has_correct_metadata_and_scopes(): void
     {
@@ -81,7 +88,7 @@ class OuraIntegrationTest extends TestCase
             'service' => 'oura',
             'name' => 'Oura Test',
             'instance_type' => 'activity',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         // Mock Oura API responses used by the plugin
@@ -155,7 +162,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'sleep_records',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -245,7 +252,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'heartrate',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         $day = now()->toDateString();
@@ -270,6 +277,50 @@ class OuraIntegrationTest extends TestCase
     }
 
     #[Test]
+    public function a_later_heartrate_fetch_refreshes_the_days_average(): void
+    {
+        $user = User::factory()->create();
+        $group = IntegrationGroup::create([
+            'user_id' => $user->id,
+            'service' => 'oura',
+            'account_id' => 'user_abc',
+            'access_token' => 'test_access_token',
+            'expiry' => now()->addHour(),
+        ]);
+        $integration = Integration::factory()->create([
+            'user_id' => $user->id,
+            'integration_group_id' => $group->id,
+            'service' => 'oura',
+            'instance_type' => 'heartrate',
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
+        ]);
+
+        $day = now()->toDateString();
+        $overnight = [
+            ['timestamp' => $day . 'T01:00:00Z', 'bpm' => 50],
+            ['timestamp' => $day . 'T02:00:00Z', 'bpm' => 60],
+        ];
+        $wholeDay = array_merge($overnight, [
+            ['timestamp' => $day . 'T12:00:00Z', 'bpm' => 100],
+            ['timestamp' => $day . 'T13:00:00Z', 'bpm' => 110],
+        ]);
+        Http::fake([
+            'https://api.ouraring.com/v2/usercollection/personal_info*' => Http::response(['data' => [['user_id' => 'user_abc']]], 200),
+            'https://api.ouraring.com/v2/usercollection/heartrate*' => Http::sequence()
+                ->push(['data' => $overnight], 200)
+                ->push(['data' => $wholeDay], 200),
+        ]);
+
+        (new OuraPlugin)->fetchData($integration);
+        (new OuraPlugin)->fetchData($integration->fresh());
+
+        $events = Event::where('integration_id', $integration->id)->where('action', 'had_heart_rate')->get();
+        $this->assertCount(1, $events);
+        $this->assertEqualsWithDelta(80, $events->first()->event_metadata['avg_bpm'], 0.01);
+        $this->assertEqualsWithDelta(80, (float) $events->first()->getFormattedValueAttribute(), 0.01);
+    }
+
+    #[Test]
     public function oura_fetch_workouts_creates_event_seconds_and_blocks(): void
     {
         $user = User::factory()->create();
@@ -285,7 +336,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'workouts',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -328,7 +379,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'sessions',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -368,7 +419,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'tags',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -417,7 +468,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'readiness',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
         (new OuraPlugin)->fetchData($readiness);
         $this->assertEquals('had_readiness_score', Event::where('integration_id', $readiness->id)->first()->action);
@@ -428,7 +479,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'resilience',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
         (new OuraPlugin)->fetchData($resilience);
         $this->assertEquals('had_resilience_score', Event::where('integration_id', $resilience->id)->first()->action);
@@ -439,7 +490,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
         $plugin = new OuraPlugin;
         $stressData = $plugin->pullStressData($stress);
@@ -452,7 +503,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'spo2',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
         (new OuraPlugin)->fetchData($spo2);
         $this->assertEquals('had_spo2', Event::where('integration_id', $spo2->id)->first()->action);
@@ -474,7 +525,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         // Mock the new stress data format
@@ -566,7 +617,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -621,7 +672,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -676,7 +727,7 @@ class OuraIntegrationTest extends TestCase
             'integration_group_id' => $group->id,
             'service' => 'oura',
             'instance_type' => 'stress',
-            'configuration' => ['days_back' => 1],
+            'configuration' => ['days_back' => 1, 'oura_last_sweep_at' => now()->toIso8601String()],
         ]);
 
         Http::fake([
@@ -712,5 +763,14 @@ class OuraIntegrationTest extends TestCase
         $this->assertEquals($encodedValue, $event->value, 'Event should have correct mapped value for restored');
         $this->assertEquals($multiplier, $event->value_multiplier);
         $this->assertEquals('restored', $event->event_metadata['original_day_summary']);
+    }
+
+    #[Test]
+    public function workout_activity_names_are_normalised_to_snake_case(): void
+    {
+        $this->assertSame('strength_training', OuraPlugin::normaliseActivityType('strengthTraining'));
+        $this->assertSame('horseback_riding', OuraPlugin::normaliseActivityType('horsebackRiding'));
+        $this->assertSame('hiit', OuraPlugin::normaliseActivityType('HIIT'));
+        $this->assertSame('walking', OuraPlugin::normaliseActivityType('walking'));
     }
 }

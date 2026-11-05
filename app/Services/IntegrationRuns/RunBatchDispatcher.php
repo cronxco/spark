@@ -57,6 +57,16 @@ class RunBatchDispatcher implements QueueingDispatcher
         return $this->dispatcher->dispatchNow($command, $handler);
     }
 
+    public function dispatchAfterResponse($command, $handler = null): mixed
+    {
+        return $this->dispatcher->dispatchAfterResponse($command, $handler);
+    }
+
+    public function chain($jobs = null): mixed
+    {
+        return $this->dispatcher->chain($jobs);
+    }
+
     public function dispatchToQueue($command): mixed
     {
         return $this->dispatcher->dispatchToQueue($command);

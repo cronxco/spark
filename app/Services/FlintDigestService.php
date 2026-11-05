@@ -11,6 +11,9 @@ use App\Models\User;
 use App\Services\Flint\FlintRunCompletionService;
 use App\Services\Flint\FlintRunToken;
 use App\Services\Flint\RoutineConfig;
+use App\Services\Flint\RoutineModel;
+use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Support\FlintDigestDay;
 use App\Support\FlintDigestOpener;
 use App\Support\FlintQuestion;
 use Carbon\Carbon;
@@ -209,6 +212,25 @@ class FlintDigestService
         );
     }
 
+    /**
+     * The driver of the tracked run that wrote this digest, or null when the
+     * digest has no run token or its attempt was not recorded.
+     *
+     * @param  array<string, mixed>|null  $run
+     */
+    private function runDriver(Integration $integration, ?array $run): ?string
+    {
+        if (! is_string($run['routine'] ?? null) || ! is_string($run['run_uuid'] ?? null)) {
+            return null;
+        }
+
+        $attempt = app(TaskExecutionStore::class)
+            ->trackedRunAttempt($integration, "flint_routine_{$run['routine']}", $run['run_uuid']);
+        $driver = $attempt['driver'] ?? null;
+
+        return is_string($driver) ? $driver : null;
+    }
+
     /** @param array<string, mixed> $data @param array<string, mixed>|null $run */
     private function createTransactionally(
         User $user,
@@ -229,12 +251,22 @@ class FlintDigestService
             return $this->result($existing, $period, true);
         }
 
+        // A second scheduled run for a slot that already has its digest (a
+        // retried fire, a re-run session) carries a new run uuid, so the source
+        // id above cannot see it. The first digest stands; manual runs are
+        // deliberate regenerations and are left alone.
+        $slotDigest = $this->scheduledSlotDigest($integration, $date, $period, $run);
+        if ($slotDigest) {
+            return $this->result($slotDigest, $period, true);
+        }
+
         $digest = $this->resolveDigestObject($user, $period, $date, $run['routine'] ?? null);
         $actor = EventObject::firstOrCreate(
             ['user_id' => $user->id, 'concept' => 'user', 'type' => 'user_profile', 'title' => $user->name],
             ['time' => now()],
         );
         $blocks = $data['blocks'] ?? [];
+        $driver = $this->runDriver($integration, $run);
         $metadata = array_filter([
             'period' => $period,
             'digest_object_id' => $digest->id,
@@ -249,6 +281,10 @@ class FlintDigestService
             'kind' => RoutineConfig::digestKind($run['routine'] ?? null),
             'skill' => $run['skill'] ?? null,
             'trigger_source' => $run['trigger_source'] ?? null,
+            // What wrote this digest, so outputs can be compared by driver and
+            // model. Null for a conversational digest with no tracked run.
+            'driver' => $driver,
+            'model' => RoutineModel::for($driver),
             'local_date' => $date->toDateString(),
             'note_ids_used' => $data['note_ids_used'] ?? null,
             'question_omission' => $data['question_omission'] ?? null,
@@ -316,6 +352,29 @@ class FlintDigestService
         return $this->result($event->load('blocks'), $period, false);
     }
 
+    /**
+     * The digest already written for this routine's slot, if the run asking to
+     * write another is itself a scheduled one. Runs with an occurrence claim
+     * belong to a multi-slot schedule, where several digests a day are intended.
+     *
+     * @param  array<string, mixed>|null  $run
+     */
+    private function scheduledSlotDigest(Integration $integration, Carbon $date, string $period, ?array $run): ?Event
+    {
+        $routine = $run['routine'] ?? null;
+        if (! is_string($routine) || ($run['trigger_source'] ?? null) !== 'scheduled' || isset($run['occurrence'])) {
+            return null;
+        }
+
+        return Event::query()
+            ->where('integration_id', $integration->id)
+            ->tap(fn ($query) => FlintDigestDay::forScheduledSlot($query, $routine, $period, $date->toDateString()))
+            ->oldest('created_at')
+            ->lockForUpdate()
+            ->with('blocks')
+            ->first();
+    }
+
     /** @return array<string, mixed> */
     private function result(Event $event, string $period, bool $deduplicated): array
     {
@@ -379,7 +438,15 @@ class FlintDigestService
             }
         }
 
-        if (in_array($routine, ['digest', 'news_roundup'], true)) {
+        if (in_array($routine, ['money_weekly', 'money_close'], true)) {
+            if ($types->filter(fn (string $type) => $type === 'flint_user_question')->count() > 3) {
+                throw ValidationException::withMessages([
+                    'blocks' => 'A money digest may ask at most three questions.',
+                ]);
+            }
+        }
+
+        if (in_array($routine, ['digest', 'news_roundup', 'money_weekly', 'money_close'], true)) {
             if ($types->filter(fn (string $type) => $type === 'flint_editorial_note')->count() !== 1
                 || $blocks->last()['block_type'] !== 'flint_editorial_note') {
                 throw ValidationException::withMessages([

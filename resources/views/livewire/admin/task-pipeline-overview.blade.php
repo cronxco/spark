@@ -1,7 +1,10 @@
 <?php
 
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
+use App\Models\Block;
 use App\Models\Event;
+use App\Models\EventObject;
+use App\Models\Integration;
 use App\Models\TaskExecution;
 use App\Services\TaskPipeline\TaskRegistry;
 use App\Support\AdminTenant;
@@ -59,6 +62,18 @@ new class extends Component
 
     public function updatedWindow(): void
     {
+        $this->resetPage('executionsPage');
+        $this->resetPage('failuresPage');
+    }
+
+    public function updatedExecSearch(): void
+    {
+        $this->resetPage('executionsPage');
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = in_array($this->perPage, [10, 25, 50, 100], true) ? $this->perPage : 25;
         $this->resetPage('executionsPage');
         $this->resetPage('failuresPage');
     }
@@ -181,7 +196,7 @@ new class extends Component
     {
         $fromRegistry = $this->allTasks->map(fn ($task) => ['key' => $task->key, 'name' => $task->name]);
 
-        $fromExecutions = TaskExecution::forUser(AdminTenant::id())
+        $fromExecutions = AdminTenant::scopeForUser(TaskExecution::query())
             ->select('task_key', 'task_name')
             ->distinct()
             ->get()
@@ -196,7 +211,7 @@ new class extends Component
      */
     public function getEntityTypeFilterOptionsProperty(): Collection
     {
-        $fromExecutions = TaskExecution::forUser(AdminTenant::id())->distinct()->pluck('entity_type');
+        $fromExecutions = AdminTenant::scopeForUser(TaskExecution::query())->distinct()->pluck('entity_type');
 
         return collect($this->uniqueAppliesTo)->concat($fromExecutions)->unique()->sort()->values();
     }
@@ -207,19 +222,24 @@ new class extends Component
             && $execution->updated_at->lt($this->stuckThreshold());
     }
 
+    /** @var array<string, Event|EventObject|Block> */
+    protected array $entityCache = [];
+
     public function getActiveExecutionsProperty(): Collection
     {
-        return TaskExecution::forUser(AdminTenant::id())
+        $rows = AdminTenant::scopeForUser(TaskExecution::query())
             ->whereIn('status', ['pending', 'running', 'waiting', 'blocked'])
             ->when($this->activeStatusFilter, fn ($q) => $q->where('status', $this->activeStatusFilter))
             ->latest('updated_at')
             ->limit(100)
             ->get();
+
+        return $this->preloadEntities($rows);
     }
 
     public function getRecentExecutionsProperty(): LengthAwarePaginator
     {
-        return TaskExecution::forUser(AdminTenant::id())
+        $page = AdminTenant::scopeForUser(TaskExecution::query())
             ->where('updated_at', '>=', $this->windowStart())
             ->when($this->execStatusFilter, fn ($q) => $q->where('status', $this->execStatusFilter))
             ->when($this->execTaskFilter, fn ($q) => $q->where('task_key', $this->execTaskFilter))
@@ -233,20 +253,62 @@ new class extends Component
             })
             ->latest('updated_at')
             ->paginate($this->perPage, ['*'], 'executionsPage');
+
+        $this->preloadEntities($page->getCollection());
+
+        return $page;
     }
 
     public function getRecentFailuresProperty(): LengthAwarePaginator
     {
-        return TaskExecution::forUser(AdminTenant::id())
+        $page = AdminTenant::scopeForUser(TaskExecution::query())
             ->where('status', 'failed')
             ->where('updated_at', '>=', $this->windowStart())
             ->latest('updated_at')
             ->paginate($this->perPage, ['*'], 'failuresPage');
+
+        $this->preloadEntities($page->getCollection());
+
+        return $page;
+    }
+
+    /**
+     * Load the events, objects, blocks and integrations the given executions point at in one
+     * query per type, scoped to the viewed tenant, so the ref cards do not query per row.
+     *
+     * @param  Collection<int, TaskExecution>  $executions
+     * @return Collection<int, TaskExecution>
+     */
+    protected function preloadEntities(Collection $executions): Collection
+    {
+        $idsFor = fn (string $type) => $executions->where('entity_type', $type)->pluck('entity_id')->unique()->values();
+
+        $loaded = [
+            'event' => AdminTenant::scopeForUser(Event::query())->with(['actor', 'target', 'integration'])->withCount('blocks')->whereKey($idsFor('event'))->get()->keyBy('id'),
+            'object' => AdminTenant::scope(EventObject::query())->whereKey($idsFor('object'))->get()->keyBy('id'),
+            'block' => Block::query()->with('event.integration')
+                ->whereHas('event.integration', fn ($q) => AdminTenant::scope($q))
+                ->whereKey($idsFor('block'))->get()->keyBy('id'),
+            'integration' => AdminTenant::scope(Integration::query())->whereKey($idsFor('integration'))->get()->keyBy('id'),
+        ];
+
+        foreach ($loaded as $type => $models) {
+            foreach ($models as $id => $model) {
+                $this->entityCache["{$type}:{$id}"] = $model;
+            }
+        }
+
+        return $executions;
+    }
+
+    public function entityFor(TaskExecution $execution): Event|EventObject|Block|Integration|null
+    {
+        return $this->entityCache["{$execution->entity_type}:{$execution->entity_id}"] ?? null;
     }
 
     public function getStatsProperty(): array
     {
-        $liveCounts = TaskExecution::forUser(AdminTenant::id())
+        $liveCounts = AdminTenant::scopeForUser(TaskExecution::query())
             ->whereIn('status', ['pending', 'running', 'waiting', 'blocked'])
             ->selectRaw('status, count(*) as aggregate')
             ->groupBy('status')
@@ -257,12 +319,12 @@ new class extends Component
         $waiting = (int) ($liveCounts['waiting'] ?? 0);
         $blocked = (int) ($liveCounts['blocked'] ?? 0);
 
-        $stuck = TaskExecution::forUser(AdminTenant::id())
+        $stuck = AdminTenant::scopeForUser(TaskExecution::query())
             ->whereIn('status', ['pending', 'running'])
             ->where('updated_at', '<', $this->stuckThreshold())
             ->count();
 
-        $windowCounts = TaskExecution::forUser(AdminTenant::id())
+        $windowCounts = AdminTenant::scopeForUser(TaskExecution::query())
             ->whereIn('status', ['success', 'failed'])
             ->where('updated_at', '>=', $this->windowStart())
             ->selectRaw('status, count(*) as aggregate')
@@ -343,13 +405,13 @@ new class extends Component
     public function getSelectedExecutionProperty(): ?TaskExecution
     {
         return $this->selectedExecutionId
-            ? TaskExecution::forUser(AdminTenant::id())->whereKey($this->selectedExecutionId)->first()
+            ? AdminTenant::scopeForUser(TaskExecution::query())->whereKey($this->selectedExecutionId)->first()
             : null;
     }
 
     public function retryFailure(string $failureId): void
     {
-        $execution = TaskExecution::forUser(AdminTenant::id())->whereKey($failureId)->first();
+        $execution = AdminTenant::scopeForUser(TaskExecution::query())->whereKey($failureId)->first();
 
         if (! $execution) {
             $this->error('That task execution could not be found.');
@@ -357,22 +419,29 @@ new class extends Component
             return;
         }
 
-        if ($execution->entity_type !== 'event') {
-            $this->error('Only event-backed tasks can be retried from here.');
+        if ($execution->status !== 'failed') {
+            $this->error('Only failed task executions can be retried.');
 
             return;
         }
 
-        $event = Event::forUser(AdminTenant::id())->whereKey($execution->entity_id)->first();
+        if (! TaskRegistry::getTask($execution->task_key)) {
+            $this->error('That task is no longer registered, so it cannot be retried.');
 
-        if (! $event) {
-            $this->error('The underlying event no longer exists.');
+            return;
+        }
+
+        $this->preloadEntities(collect([$execution]));
+        $model = $this->entityFor($execution);
+
+        if (! $model) {
+            $this->error('The underlying record no longer exists.');
 
             return;
         }
 
         ProcessTaskPipelineJob::dispatch(
-            model: $event,
+            model: $model,
             trigger: 'manual',
             taskFilter: [$execution->task_key],
             force: true,
@@ -397,7 +466,7 @@ new class extends Component
 }; ?>
 
 <div @if ($this->stats['activeCount'] > 0) wire:poll.5s @endif>
-    <x-header title="Task Pipeline" subtitle="Registered tasks, live status, and execution history" separator>
+    <x-header title="Pipeline" separator>
         <x-slot:actions>
             <button class="btn btn-ghost btn-sm gap-2" wire:click="$refresh">
                 <x-icon name="fas.rotate" class="w-4 h-4" />
@@ -574,13 +643,7 @@ new class extends Component
                             @endscope
 
                             @scope('cell_model', $execution)
-                                @if ($url = $this->executionModelUrl($execution))
-                                    <a href="{{ $url }}" class="link link-primary text-sm">
-                                        {{ ucfirst($execution->entity_type) }} #{{ Str::limit($execution->entity_id, 8, '') }}
-                                    </a>
-                                @else
-                                    <span class="text-sm">{{ ucfirst($execution->entity_type) }} #{{ Str::limit($execution->entity_id, 8, '') }}</span>
-                                @endif
+                                <x-admin.execution-ref :execution="$execution" :entity="$this->entityFor($execution)" />
                             @endscope
 
                             @scope('cell_status', $execution)
@@ -619,38 +682,38 @@ new class extends Component
             <x-tab name="executions" label="Recent Executions" icon="fas.clock-rotate-left">
                 <div class="card bg-base-200 shadow">
                     <div class="card-body">
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                            <h3 class="card-title">Recent Executions</h3>
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+                            <h3 class="card-title shrink-0">Recent Executions</h3>
 
                             <div class="flex flex-wrap items-center gap-2">
                                 <input
                                     type="text"
-                                    class="input input-bordered input-sm"
+                                    class="input input-bordered input-sm w-44"
                                     placeholder="Search task..."
                                     wire:model.live.debounce.300ms="execSearch" />
 
-                                <select class="select select-bordered select-sm" wire:model.live="execStatusFilter">
+                                <select class="select select-bordered select-sm w-auto" wire:model.live="execStatusFilter">
                                     <option value="">All Statuses</option>
                                     @foreach ($this->statusOptions() as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
 
-                                <select class="select select-bordered select-sm" wire:model.live="execTaskFilter">
+                                <select class="select select-bordered select-sm w-auto" wire:model.live="execTaskFilter">
                                     <option value="">All Tasks</option>
                                     @foreach ($this->taskFilterOptions as $task)
                                         <option value="{{ $task['key'] }}">{{ $task['name'] }}</option>
                                     @endforeach
                                 </select>
 
-                                <select class="select select-bordered select-sm" wire:model.live="execEntityTypeFilter">
+                                <select class="select select-bordered select-sm w-auto" wire:model.live="execEntityTypeFilter">
                                     <option value="">All Types</option>
                                     @foreach ($this->entityTypeFilterOptions as $type)
                                         <option value="{{ $type }}">{{ ucfirst($type) }}</option>
                                     @endforeach
                                 </select>
 
-                                <select class="select select-bordered select-sm" wire:model.live="window">
+                                <select class="select select-bordered select-sm w-auto" wire:model.live="window">
                                     <option value="24h">Last 24 hours</option>
                                     <option value="7d">Last 7 days</option>
                                     <option value="30d">Last 30 days</option>
@@ -692,13 +755,7 @@ new class extends Component
                             @endscope
 
                             @scope('cell_model', $execution)
-                                @if ($url = $this->executionModelUrl($execution))
-                                    <a href="{{ $url }}" class="link link-primary text-sm">
-                                        {{ ucfirst($execution->entity_type) }} #{{ Str::limit($execution->entity_id, 8, '') }}
-                                    </a>
-                                @else
-                                    <span class="text-sm">{{ ucfirst($execution->entity_type) }} #{{ Str::limit($execution->entity_id, 8, '') }}</span>
-                                @endif
+                                <x-admin.execution-ref :execution="$execution" :entity="$this->entityFor($execution)" />
                             @endscope
 
                             @scope('cell_status', $execution)
@@ -732,7 +789,7 @@ new class extends Component
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                             <h3 class="card-title">Recent Failures</h3>
 
-                            <select class="select select-bordered select-sm" wire:model.live="window">
+                            <select class="select select-bordered select-sm w-auto" wire:model.live="window">
                                 <option value="24h">Last 24 hours</option>
                                 <option value="7d">Last 7 days</option>
                                 <option value="30d">Last 30 days</option>
@@ -760,13 +817,7 @@ new class extends Component
                             @endscope
 
                             @scope('cell_model', $failure)
-                                @if ($url = $this->executionModelUrl($failure))
-                                    <a href="{{ $url }}" class="link link-primary text-sm">
-                                        {{ ucfirst($failure->entity_type) }} #{{ Str::limit($failure->entity_id, 8, '') }}
-                                    </a>
-                                @else
-                                    <span class="text-sm">{{ ucfirst($failure->entity_type) }} #{{ Str::limit($failure->entity_id, 8, '') }}</span>
-                                @endif
+                                <x-admin.execution-ref :execution="$failure" :entity="$this->entityFor($failure)" />
                             @endscope
 
                             @scope('cell_error', $failure)
@@ -828,7 +879,7 @@ new class extends Component
                                 <div class="space-y-2 mt-2 text-sm">
                                     <div class="flex justify-between gap-2">
                                         <span class="font-medium">Entity:</span>
-                                        <span class="font-mono">{{ ucfirst($execution->entity_type) }} #{{ Str::limit($execution->entity_id, 8, '') }}</span>
+                                        <x-admin.execution-ref :execution="$execution" :entity="$this->entityFor($execution)" />
                                     </div>
                                     <div class="flex justify-between gap-2">
                                         <span class="font-medium">Attempts:</span>
@@ -950,7 +1001,7 @@ new class extends Component
                 </div>
 
                 <div class="modal-action">
-                    @if ($execution->status === 'failed' && $execution->entity_type === 'event')
+                    @if ($execution->status === 'failed')
                         <button class="btn btn-ghost" wire:click="retryFailure('{{ $execution->id }}')">
                             Retry
                         </button>

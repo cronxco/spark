@@ -172,6 +172,22 @@ A client assembling one screen from several of these endpoints can rely on them 
 
 Day-scoped payloads also **render** in that zone: every timestamp inside `GET /briefing/today` (transaction `time`, `observed_at`, `sync_status.*`, `anomalies[].detected_at`) carries the day's UTC offset, e.g. `2026-09-25T01:06:53+01:00` — the same instant as `00:06:53Z`, but with the local clock time. For a **past** date the zone is the one acknowledged on that date (so a London day stays London after flying to Vancouver); today and future dates use the live effective zone. `GET /widgets/today` and `GET /widgets/spend` resolve "today" the same way. Parse these as offset-bearing ISO 8601; never assume `Z`.
 
+### Looking ahead (`ahead`)
+
+`GET /briefing/today?date=` for a date **after today** adds an `ahead` object alongside the usual (empty) sections. Everything is read at query time; nothing new is stored.
+
+| Field              | Description                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `headline`         | Plain factual line: how much is on and when it starts, open tasks, birthdays, weather                                                                                                                                                                                                                                                                                  |
+| `digest_event_id`  | The digest whose `flint_day_context` block is dated to this day (usually the evening digest), or `null`                                                                                                                                                                                                                                                                |
+| `weather`          | `{location, condition, temp_high_c, rain_probability_pct}` from that block, or `null`                                                                                                                                                                                                                                                                                  |
+| `first_commitment` | `{title, start}` of the first timed entry, or `null`                                                                                                                                                                                                                                                                                                                   |
+| `calendar[]`       | `{title, start, end, all_day, location, person, event_id}`. With a digest its list is authoritative (`person` is `will`, `dan` or `both`; a shared "Will · X"/"Dan · X" pair merges to `both`) and synced Google Calendar events only add `end`, `location` and `event_id`. Without one, synced events form the list and `person` is `null`. All-day items sort first. |
+| `birthdays[]`      | `{title}`, from the digest, else all-day synced events whose title contains "birthday"                                                                                                                                                                                                                                                                                 |
+| `plan[]`           | `{id, title, kind, done, topic_id, topic_title, url}`; `kind` is `day_note` (task blocks on that day's Outline day note, in note order), `topic_task` (Flint topic tasks with `due_on`/`review_on` that day) or `topic_review` (active topics whose `next_review_at` is that day)                                                                                      |
+| `day_note_url`     | The day note in Outline, or `null`                                                                                                                                                                                                                                                                                                                                     |
+| `sleep_target`     | `{wake_by, bed_by, sleep_need_minutes, typical_wake, early_start, readiness_low_nights}`, only when the first commitment needs an earlier wake than the fortnight's median, or readiness has sat below its 30-day average for 3+ nights. `wake_by` is an hour before the first commitment when that is earlier than the usual wake time, and the usual wake time otherwise; `bed_by` subtracts the median night's sleep plus 20 minutes.                |
+
 ### Response Headers
 
 | Header          | Endpoints  | Description                        |
@@ -583,7 +599,7 @@ Cursor-paginated reverse-chronological feed of the user's events.
 
 **Response `422`** — Invalid domain value or malformed `date` parameter.
 
-See [CompactEvent](#compactevent) for the item schema. Feed items include `tags`, `blocks_count`, and `tldr` (when a `*_tldr` block exists), but do **not** embed the full `blocks` array — tap through to `GET /events/{id}` to retrieve that.
+See [CompactEvent](#compactevent) for the item schema. Feed items include `integration`, `tags`, `blocks_count`, `block_refs`, `block_refs_total` and `tldr` (when a `*_tldr` block exists), but do **not** embed the full `blocks` array — tap through to `GET /events/{id}` to retrieve that.
 
 ---
 
@@ -649,7 +665,10 @@ evenly, keeping the first and last point. Accepts `ios:read` or `data:read`.
 
 ```json
 {
-    "points": [{ "lat": 51.5, "lng": -0.12 }, { "lat": 51.51, "lng": -0.13 }],
+    "points": [
+        { "lat": 51.5, "lng": -0.12 },
+        { "lat": 51.51, "lng": -0.13 }
+    ],
     "total_points": 2,
     "distance": 5.02,
     "distance_unit": "km",
@@ -892,6 +911,103 @@ Searches across events, objects, integrations, and metrics using one of five mod
 ```
 
 Empty collections are included as `[]`. An unknown `mode` returns `422`.
+
+#### Search contract v1
+
+Send `contract_version=1` to get the versioned contract. Without it you get the
+pre-v1 grouped response above, kept for shipped builds.
+
+| Parameter          | Type    | Default   | Description                                                                                                      |
+| ------------------ | ------- | --------- | ---------------------------------------------------------------------------------------------------------------- |
+| `contract_version` | integer | —         | Must be `1`. Any other value returns `422` with `supported_versions`                                             |
+| `query`            | string  | required  | Search text (max 500). May be empty. `q` is not accepted                                                         |
+| `mode`             | string  | `default` | Singular modes only: `default`, `semantic`, `tag`, `metric`, `integration`, `command`. Plural names return `422` |
+| `limit`            | integer | 20        | 1–50                                                                                                             |
+
+```json
+{
+    "schema_version": 1,
+    "query": "coffee",
+    "mode": "default",
+    "execution": { "status": "complete", "fallback_reason": null },
+    "results": [
+        {
+            "kind": "event",
+            "id": "…",
+            "title": "…",
+            "subtitle": "money",
+            "domain": "money"
+        }
+    ],
+    "meta": { "count": 1, "limit": 20 }
+}
+```
+
+- `results` is one flat list, ordered by family: `event`, `object`, `block`,
+  `metric`, `integration`, `place`, `tag`, `command`. `default` mode returns all
+  eight (at most five commands); `semantic` returns events and objects.
+- Every hit has `kind` (singular), `id`, `title` and `subtitle`, plus the keys
+  for its kind (`domain`, `concept`, `block_type`, `identifier`, `service`,
+  `name`/`type`/`count`, and for `command`: `icon`, `action_kind`, `confirm`).
+  Keys are always present, null when empty. A metric's
+  `id` is its `identifier`.
+- `execution.status` is `complete` or `degraded`. A semantic search that cannot
+  embed the query falls back to keyword matching and returns `degraded` with
+  `fallback_reason` `embedding_failed` (or `embeddings_unavailable`). Clients
+  should label degraded results "keyword matches".
+- A `command` hit is an action from the ActionRegistry that this token can run
+  (`id` is the action id for `POST /actions/{id}/run`); `mode=command` returns
+  commands only.
+- Clients must drop a `kind` they do not know and render the rest.
+- Fixtures for every shape live in `tests/Fixtures/search-contract/v1` and are
+  decoded by spark-ios. Change both together; bump `schema_version` for a
+  breaking change.
+
+The pre-v1 spellings (`q`, plural modes, `"true"`/`"false"`) are counted per day
+by `App\Services\Search\LegacyAliasUsage` (counts only, no query text) so they
+can be removed once no shipped build uses them.
+
+---
+
+### Actions
+
+Commands come from the ActionRegistry. `GET /actions?q=` lists the native
+actions this token can run; each carries `id`, `title`, `kind`
+(`navigation`, `safe` or `data`), `confirm` (`none`, `undo` or `confirm`) and
+the `target` fields it needs. A `navigation` action is run by the client:
+`destination.native` names the screen (`day`, `flint`, `knowledge`,
+`explore.health`, `explore.money`, `explore.metrics`, `explore.tags`,
+`explore.map`). A client skips a screen id it does not know.
+
+`POST /actions/{id}/run` takes `target` and `confirmed`; see the receipt and
+undo routes beside it.
+
+#### `GET /actions/resolve?q=sync monzo`
+
+Names a targeted action from a typed line, so the app never needs an id. The
+first word picks the action (`sync`, `refresh`, `pause`, `resume`, `delete`,
+`reprocess`, `tag`) and the rest names an integration or an event title from the
+last 90 days. `tag` also needs a `#tag`: `tag parkrun #fitness`.
+
+```json
+{
+    "contract_version": 1,
+    "data": {
+        "status": "matched",
+        "label": "Monzo",
+        "action": { "id": "integrations.sync", "...": "..." },
+        "target": { "integration_id": "…" }
+    }
+}
+```
+
+- `matched`: one match; send `action.id` and `target` to run. An exact name beats
+  longer ones (`monzo` over `Monzo Pot`).
+- `ambiguous`: `candidates` is a list of `{label, target}`; nothing is chosen.
+- `incomplete`: the verb is known but a name or `#tag` is missing; `message` says which.
+- `none`: no action, nothing matched, or the token cannot run the action.
+
+Matching is limited to the caller's own integrations and events.
 
 ---
 
@@ -1183,8 +1299,13 @@ semantic mode.
 Cursor-paginated list of the user's tags with usage counts, ordered by
 total usage then ID.
 
-**Query Parameters**: `q` (string, optional filter, max 255), `cursor`,
-`limit` (default 30, max 100).
+**Query Parameters**: `q` (string, optional filter, max 255), `type`
+(optional, one tag type such as `music_artist`; `untyped` lists tags with no
+type), `cursor`, `limit` (default 30, max 100).
+
+The first page (no `cursor`) also carries `types`: one entry per tag type among
+the tags matching `q`, ignoring `type`, with how many tags it has and their
+combined usage, ordered by usage. Tags with no type are listed as `untyped`.
 
 **Response `200`**
 
@@ -1201,7 +1322,10 @@ total usage then ID.
         }
     ],
     "next_cursor": "MjA=",
-    "has_more": false
+    "has_more": false,
+    "types": [
+        { "type": "spark", "tags_count": 8, "total_count": 120 }
+    ]
 }
 ```
 
@@ -1922,7 +2046,9 @@ otherwise it defaults to `spark`.
 **`Idempotency-Key` (optional):** send a UUID and a retried `POST` with
 the same key replays the first response instead of attaching (or
 find-or-creating) the tag a second time. Keys are scoped per user and per
-endpoint, and stay live for 24 hours.
+endpoint, and stay live for 24 hours. The replay is checked before `If-Match`,
+so a retry may resend the original `If-Match` even though the first write moved
+the entity's ETag on; the replay carries the first response's `ETag`.
 
 **Response `201`**: `{"tag": Tag, "tags": [Tag, ...]}` (the entity's full tag
 list), with a fresh `ETag`.
@@ -2870,7 +2996,12 @@ shapes.
         { "name": "running", "type": null }
     ],
     "tldr": "Optional single-sentence summary from any *_tldr block.",
+    "integration": { "id": "uuid", "name": "Current Account", "service": "monzo" },
     "blocks_count": 3,
+    "block_refs": [
+        { "id": "uuid", "block_type": "tax_summary", "title": "Tax Summary", "display_value": "£1.20" }
+    ],
+    "block_refs_total": 3,
     "blocks": [ CompactBlock, ... ]
 }
 ```
@@ -2894,6 +3025,9 @@ shapes.
 | `tags`                | Yes            | Always an array (empty when no tags); each item has `name` and `type`                                                                                                                                                                                                       |
 | `blocks_count`        | Feed only      | Integer count of attached blocks; present in `/feed`, absent in `/events/id`                                                                                                                                                                                                |
 | `blocks`              | Detail only    | Full block array; present in `GET /events/{id}`, absent in `/feed`                                                                                                                                                                                                          |
+| `integration`         | No             | The integration instance the event came from (`id`, `name`, `service`); the first pill on a timeline row |
+| `block_refs`          | Feed only      | Up to 3 blocks as light pills: `id`, `block_type`, `title` (the block type's display name when untitled) and `display_value` when the block has a value. Notes and deleted blocks are left out |
+| `block_refs_total`    | Feed only      | How many blocks `block_refs` was taken from, so the client can show "+N" |
 
 ### CompactObject
 
