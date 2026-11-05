@@ -8,13 +8,13 @@ use function Livewire\Volt\{state};
     @php
         $merchant = $receipt->target;
         $metadata = $merchant?->metadata ?? [];
-        $isMatched = $metadata['is_matched'] ?? false;
-        $needsReview = $metadata['needs_review'] ?? false;
-        $extractedData = $metadata['extracted_data'] ?? [];
+        $isMatched = $matchingStatus === 'matched';
+        $needsReview = $matchingStatus === 'suggestions';
+        $extractedData = $receipt->event_metadata['raw_extraction'] ?? [];
         $lineItems = $extractedData['line_items'] ?? [];
         $taxBreakdown = $extractedData['tax_breakdown'] ?? [];
         $paymentInfo = $extractedData['payment_info'] ?? [];
-        $matchingHints = $extractedData['matching_hints'] ?? [];
+        $matchingHints = $receipt->event_metadata['matching_hints'] ?? [];
     @endphp
 
     <x-header :title="$merchant?->title ?? 'Receipt'" separator>
@@ -29,6 +29,7 @@ use function Livewire\Volt\{state};
                     wire:confirm="Are you sure you want to remove this match?" />
             @else
                 <x-button label="Match Transaction" icon="fas.link" wire:click="openMatchModal" class="btn-primary" />
+                <x-button label="Find match again" icon="fas.rotate" wire:click="retryMatch" class="btn-ghost" />
             @endif
 
             <div class="dropdown dropdown-end">
@@ -74,7 +75,7 @@ use function Livewire\Volt\{state};
                         @else
                             <div class="badge badge-info gap-1">
                                 <x-icon name="fas.clock" class="w-3 h-3" />
-                                Unmatched
+                                {{ match ($matchingStatus) { 'searching' => 'Searching', 'no_candidate' => 'No match found', 'needs_details' => 'Needs details', 'no_match' => 'Marked unmatched', default => 'Unmatched' } }}
                             </div>
                         @endif
                     </h2>
@@ -238,21 +239,21 @@ use function Livewire\Volt\{state};
                                 <div class="badge badge-sm">{{ ucfirst($matchedTransaction->service) }}</div>
                             </div>
 
-                            @if (!empty($metadata['match_confidence']))
+                            @if (!empty($matchedRelationship?->metadata['match_confidence']))
                                 <div>
                                     <div class="text-sm text-base-content/60">Confidence</div>
                                     <div class="flex items-center gap-2">
                                         <progress class="progress progress-success w-full"
-                                            value="{{ $metadata['match_confidence'] * 100 }}" max="100"></progress>
-                                        <span class="text-sm font-semibold">{{ round($metadata['match_confidence'] * 100) }}%</span>
+                                            value="{{ $matchedRelationship->metadata['match_confidence'] * 100 }}" max="100"></progress>
+                                        <span class="text-sm font-semibold">{{ round($matchedRelationship->metadata['match_confidence'] * 100) }}%</span>
                                     </div>
                                 </div>
                             @endif
 
-                            @if (!empty($metadata['match_method']))
+                            @if (!empty($matchedRelationship?->metadata['match_method']))
                                 <div>
                                     <div class="text-sm text-base-content/60">Match Type</div>
-                                    <div class="badge badge-sm badge-success">{{ ucfirst($metadata['match_method']) }}</div>
+                                    <div class="badge badge-sm badge-success">{{ ucfirst($matchedRelationship->metadata['match_method']) }}</div>
                                 </div>
                             @endif
                         </div>
@@ -273,7 +274,7 @@ use function Livewire\Volt\{state};
                         <div class="space-y-2 mt-4">
                             @foreach ($candidateMatches as $candidate)
                                 @php
-                                    $transaction = \App\Models\Event::find($candidate['transaction_id']);
+                                    $transaction = \App\Models\Event::forUser(\Illuminate\Support\Facades\Auth::id())->find($candidate['transaction_id']);
                                     $confidence = $candidate['confidence'] ?? 0;
                                 @endphp
                                 @if ($transaction)
@@ -314,10 +315,16 @@ use function Livewire\Volt\{state};
                         </h3>
 
                         <p class="text-sm text-base-content/60 mt-2">
-                            No matching transaction found. You can manually match this receipt to a transaction.
+                            {{ $matchingStatus === 'needs_details' ? 'This receipt needs an amount or time before automatic matching can work.' : 'No transaction is linked to this receipt. You can search for one or run matching again.' }}
                         </p>
 
+                        @if (!empty($matchingState['attempted_at']))
+                            <p class="text-xs text-base-content/60">Last searched {{ \Carbon\Carbon::parse($matchingState['attempted_at'])->diffForHumans() }}</p>
+                        @endif
+
                         <x-button label="Match Transaction" icon="fas.link" wire:click="openMatchModal" class="btn-primary btn-sm mt-4" />
+                        <x-button label="Find match again" icon="fas.rotate" wire:click="retryMatch" class="btn-ghost btn-sm mt-4" />
+                        <x-button label="No matching transaction" wire:click="markNoMatch" wire:confirm="Mark this receipt as having no matching transaction?" class="btn-ghost btn-sm mt-4" />
                     </div>
                 </div>
             @endif
@@ -403,8 +410,19 @@ use function Livewire\Volt\{state};
                 {{-- Search Transactions --}}
                 <div>
                     <h3 class="font-semibold mb-2">Search Transactions</h3>
-                    <x-input placeholder="Search by merchant, amount, or date..." icon="fas.search" />
-                    <p class="text-xs text-base-content/60 mt-1">Feature coming soon - use the receipts list page for now</p>
+                    <x-input placeholder="Search merchant, amount or YYYY-MM-DD..." icon="fas.search" wire:model.live.debounce.300ms="transactionSearch" />
+                    <div class="max-h-80 overflow-y-auto space-y-2 mt-3">
+                        @forelse ($searchTransactions as $transaction)
+                            <button type="button" class="card bg-base-200 w-full text-left" wire:click="createManualMatch('{{ $transaction->id }}')">
+                                <span class="card-body p-3 flex-row justify-between gap-3">
+                                    <span><strong>{{ $transaction->target?->title ?? 'Transaction' }}</strong><br><small>{{ $transaction->time->format('j M Y H:i') }}</small></span>
+                                    <span>{{ $transaction->value_unit }} {{ number_format($transaction->formatted_value, 2) }}</span>
+                                </span>
+                            </button>
+                        @empty
+                            <p class="text-sm text-base-content/60">No transactions found. Try another merchant or amount.</p>
+                        @endforelse
+                    </div>
                 </div>
             </div>
 

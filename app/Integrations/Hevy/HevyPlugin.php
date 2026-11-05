@@ -207,7 +207,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsSweeps, 
                 'display_name' => 'Completed Workout',
                 'description' => 'A workout session that has been completed in Hevy',
                 'display_with_object' => true,
-                'value_unit' => 'kcal',
+                'value_unit' => 'kg',
                 'hidden' => false,
             ],
             'had_coach_recommendation' => [
@@ -685,7 +685,7 @@ class HevyPlugin implements IntegrationPlugin, SupportsEffects, SupportsSweeps, 
             try {
                 $start = Carbon::parse($startIso);
                 $end = Carbon::parse($endIso);
-                $durationSec = (int) $end->diffInSeconds($start);
+                $durationSec = max(0, (int) $start->diffInSeconds($end));
             } catch (Exception $e) {
                 // Fallback to 0 if parsing fails
                 $durationSec = 0;

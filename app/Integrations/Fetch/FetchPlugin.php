@@ -169,6 +169,14 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
     public static function getBlockTypes(): array
     {
         return [
+            'fetch_content' => [
+                'icon' => 'fas.file-code',
+                'display_name' => 'Raw Content',
+                'description' => 'Extracted page content the summaries are generated from',
+                'display_with_object' => true,
+                'value_unit' => null,
+                'hidden' => false,
+            ],
             'fetch_summary_tweet' => [
                 'icon' => 'fas.comment',
                 'display_name' => 'Tweet Summary',
@@ -400,7 +408,7 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
             $method,
             $endpoint,
             $statusCode,
-            $this->sanitizeResponseBody($body),
+            $body,
             $this->sanitizeHeaders($headers),
             $integrationId ?: '',
             true // Use per-instance logging
@@ -455,27 +463,5 @@ class FetchPlugin extends ManualPlugin implements SupportsSpotlightCommands, Sup
         }
 
         return $sanitized;
-    }
-
-    /**
-     * Sanitize response body for logging (limit size and remove sensitive data)
-     */
-    protected function sanitizeResponseBody(string $body): string
-    {
-        // Limit response body size to prevent huge logs
-        $maxLength = 10000;
-        if (strlen($body) > $maxLength) {
-            return substr($body, 0, $maxLength) . '... [TRUNCATED]';
-        }
-
-        // Try to parse as JSON and sanitize sensitive fields
-        $parsed = json_decode($body, true);
-        if (json_last_error() === JSON_ERROR_NONE && is_array($parsed)) {
-            $sanitized = $this->sanitizeData($parsed);
-
-            return json_encode($sanitized, JSON_PRETTY_PRINT);
-        }
-
-        return $body;
     }
 }

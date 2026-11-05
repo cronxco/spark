@@ -24,8 +24,8 @@ use Spatie\Tags\Tag;
 final class OwnedTagQuery
 {
     /**
-     * Tags the user actually uses, with per-user `events_count` and
-     * `objects_count` selected.
+     * Tags the user actually uses, with per-user `events_count`,
+     * `objects_count` and `blocks_count` selected.
      */
     public static function for(User $user, ?string $search = null): Builder
     {
@@ -54,6 +54,18 @@ final class OwnedTagQuery
                     ->whereColumn('taggables.tag_id', 'tags.id')
                     ->where('objects.user_id', $user->id),
                 'objects_count',
+            )
+            ->selectSub(
+                Block::query()
+                    ->selectRaw('COUNT(*)')
+                    ->join('taggables', function ($join) {
+                        $join->on('taggables.taggable_id', '=', 'blocks.id')
+                            ->where('taggables.taggable_type', Block::class);
+                    })
+                    ->join('events', 'events.id', '=', 'blocks.event_id')
+                    ->whereColumn('taggables.tag_id', 'tags.id')
+                    ->whereIn('events.integration_id', $integrationIds),
+                'blocks_count',
             )
             ->where(function (Builder $query) use ($user, $integrationIds) {
                 $query->whereExists(function ($events) use ($integrationIds) {

@@ -59,10 +59,10 @@ class RunFlintSkillTool extends Tool
     {
         return [
             'skill' => $schema->string()
-                ->description('Canonical skill: spark-day-briefing-async, flint-topics, flint-reading-list, or flint-news-roundup.'),
+                ->description('Canonical skill: spark-day-briefing-async, flint-topics, flint-reading-list, flint-news-roundup, or flint-money (use routine money_weekly or money_close to pick its mode).'),
 
             'routine' => $schema->string()
-                ->description('Deprecated routine alias: digest, topics, reading_list, or news_roundup.'),
+                ->description('Deprecated routine alias: digest, topics, reading_list, news_roundup, money_weekly, or money_close.'),
 
             'date' => $schema->string()
                 ->description('Local date to run for (YYYY-MM-DD). Defaults to today in the user\'s effective timezone.'),

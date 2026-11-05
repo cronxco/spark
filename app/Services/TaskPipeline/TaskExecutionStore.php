@@ -380,6 +380,7 @@ class TaskExecutionStore
             'period' => Arr::get($lastAttempt, 'period'),
             'trigger_source' => Arr::get($lastAttempt, 'trigger_source'),
             'driver' => Arr::get($lastAttempt, 'driver'),
+            'model' => Arr::get($lastAttempt, 'model'),
             'response_id' => Arr::get($lastAttempt, 'response_id'),
             'tools_called' => Arr::get($lastAttempt, 'tools_called'),
             'tool_calls' => Arr::get($lastAttempt, 'tool_calls'),

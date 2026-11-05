@@ -125,15 +125,9 @@ class IntegrationDetails extends Component
         $this->success('Update triggered successfully!');
     }
 
-    public function toggleIntegrationPause(): void
+    public function reloadIntegration(): void
     {
-        // Toggle the paused state
-        $config = $this->integration->configuration ?? [];
-        $config['paused'] = ! ($config['paused'] ?? false);
-        $this->integration->configuration = $config;
-        $this->integration->save();
-
-        $this->dispatch('integration-pause-toggled');
+        $this->integration->refresh();
     }
 
     public function reconnectIntegration(): void
@@ -430,9 +424,8 @@ class IntegrationDetails extends Component
     protected function getListeners(): array
     {
         return [
-            // Spotlight command events
-            'trigger-integration-update' => 'triggerIntegrationUpdate',
-            'toggle-integration-pause' => 'toggleIntegrationPause',
+            // Spotlight runs registry actions outside this component
+            'action-ran' => 'reloadIntegration',
             'open-configure-modal' => 'openConfigureModal',
         ];
     }

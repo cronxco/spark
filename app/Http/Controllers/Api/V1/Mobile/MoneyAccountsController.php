@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1\Mobile;
 
-use App\Http\Controllers\Api\V1\Mobile\Concerns\HandlesIdempotency;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Compact\BalanceEntryResource;
 use App\Http\Resources\Compact\MoneyAccountResource;
@@ -12,6 +11,7 @@ use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Services\Api\ResourceVersion;
+use App\Services\GoCardlessAccounts;
 use App\Support\CollectionCursorPage;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -20,8 +20,6 @@ use Illuminate\Support\Str;
 
 class MoneyAccountsController extends Controller
 {
-    use HandlesIdempotency;
-
     public function __construct(protected FinancialPlugin $financial, protected ResourceVersion $versions) {}
 
     /**
@@ -107,12 +105,17 @@ class MoneyAccountsController extends Controller
             return response()->json(['message' => 'Account not found.'], 404);
         }
 
-        $paginator = Event::where('actor_id', $account->id)
+        $validated = $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'cursor' => ['nullable', 'string'],
+        ]);
+
+        $paginator = Event::whereIn('actor_id', app(GoCardlessAccounts::class)->memberIds($account))
             ->whereIn('service', ['manual_account', 'monzo', 'gocardless'])
             ->where('action', 'had_balance')
             ->orderByDesc('time')
             ->orderByDesc('id')
-            ->cursorPaginate(25, ['*'], 'cursor', $request->query('cursor'));
+            ->cursorPaginate((int) ($validated['limit'] ?? 25), ['*'], 'cursor', $validated['cursor'] ?? null);
 
         return response()->json([
             'data' => BalanceEntryResource::collection($paginator->items()),
@@ -270,35 +273,33 @@ class MoneyAccountsController extends Controller
      */
     public function addBalance(Request $request, string $id): JsonResponse
     {
-        // A phone on a bad connection retries this write; an Idempotency-Key
-        // means a retry replays the first response instead of recording the
-        // same balance twice.
-        return $this->idempotent($request, 'money.balances.store', function () use ($request, $id) {
-            $user = $request->user();
-            $account = $this->resolveAccount($id, $user->id);
+        // A retry with the same Idempotency-Key is replayed by the
+        // `idempotent` route middleware ahead of the If-Match check, so it
+        // never reaches here to record the same balance twice.
+        $user = $request->user();
+        $account = $this->resolveAccount($id, $user->id);
 
-            if (! $account) {
-                return response()->json(['message' => 'Account not found.'], 404);
-            }
+        if (! $account) {
+            return response()->json(['message' => 'Account not found.'], 404);
+        }
 
-            $validated = $request->validate([
-                'balance' => ['required', 'numeric'],
-                'date' => ['required', 'date_format:Y-m-d'],
-                'notes' => ['nullable', 'string', 'max:1000'],
-            ]);
+        $validated = $request->validate([
+            'balance' => ['required', 'numeric'],
+            'date' => ['required', 'date_format:Y-m-d'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
 
-            $integration = $this->resolveManualAccountIntegration($user);
+        $integration = $this->resolveManualAccountIntegration($user);
 
-            $event = $this->financial->createBalanceEvent($integration, $account, $validated);
-            // Balance history is part of the account's mutation surface, so move
-            // the account version forward for clients retrying with If-Match.
-            $account->touch();
+        $event = $this->financial->createBalanceEvent($integration, $account, $validated);
+        // Balance history is part of the account's mutation surface, so move
+        // the account version forward for clients retrying with If-Match.
+        $account->touch();
 
-            return response()->json(
-                ['data' => (new BalanceEntryResource($event))->toArray($request)],
-                201,
-            )->header('ETag', $this->versions->etag($account->fresh()));
-        });
+        return response()->json(
+            ['data' => (new BalanceEntryResource($event))->toArray($request)],
+            201,
+        )->header('ETag', $this->versions->etag($account->fresh()));
     }
 
     /**
@@ -306,10 +307,16 @@ class MoneyAccountsController extends Controller
      */
     private function resolveAccount(string $id, string $userId): ?EventObject
     {
-        return EventObject::where('id', $id)
+        $account = EventObject::withTrashed()->where('id', $id)
             ->where('user_id', $userId)
             ->where('concept', 'account')
             ->first();
+
+        if (! $account || ($account->trashed() && empty($account->metadata['merged_into']))) {
+            return null;
+        }
+
+        return app(GoCardlessAccounts::class)->canonical($account);
     }
 
     /**

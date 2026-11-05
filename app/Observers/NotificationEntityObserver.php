@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\EventObject;
 use App\Models\Integration;
+use App\Services\Knowledge\IntegrationTaskService;
 use App\Services\Notifications\NotificationIncidentResolver;
 
 class NotificationEntityObserver
@@ -29,5 +30,8 @@ class NotificationEntityObserver
         // Capture changes before another save mutates the model's change set.
         $snapshot = clone $entity;
         $entity->getConnection()->afterCommit(fn () => app(NotificationIncidentResolver::class)->reconcileEntity($snapshot));
+        if ($snapshot instanceof Integration) {
+            $entity->getConnection()->afterCommit(fn () => app(IntegrationTaskService::class)->reconcile($snapshot));
+        }
     }
 }

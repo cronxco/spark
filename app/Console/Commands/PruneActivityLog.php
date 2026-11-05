@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
  * Applies the activity log retention policy (decision D-API-6): change rows
  * are kept for 90 days, security-relevant rows for a year.
  *
- * Security-relevant means the `security` log (operator access, for example)
+ * Security-relevant means the `security` log (God Mode, for example)
  * and changes to users, integrations and integration groups, which is where
  * credentials, configuration and account changes are recorded.
  *
