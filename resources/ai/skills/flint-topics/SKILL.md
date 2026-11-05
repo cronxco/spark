@@ -219,6 +219,23 @@ the thread is waiting on. One topic is one story — do not fold an unrelated
 development into an existing topic because it shares a broad theme; it either clears
 the bar for its own topic or stays out.
 
+**Write dates, not relative days.** Topics are read days later, so "today", "tonight",
+"tomorrow" and "yesterday" go stale overnight: write "4 November", "the night of 4
+November". The briefing reads the topic on a different day from the one you wrote it.
+
+**Every `active` topic carries `watching_for` and `next_review_at`.** Pass both on
+every create or update of an active topic:
+
+- `watching_for`: one sentence naming the next thing that would move the thread
+  ("BA2705 home on 11 November, then any trip costs still to settle"). Clients show it
+  verbatim.
+- `next_review_at`: the date that thing is due, or the date you would next look again.
+
+A `resolved` or `expired` topic clears `watching_for`. In Oct 2026, "Getting back to
+running" and "Lanzarote trip with Dan" were active with no `watching_for`, and running
+had no review date at all, so nothing would ever bring them back to the briefing's
+attention.
+
 If a topic was mentioned but nothing changed, link it (`related_event_id`) and
 leave `content` alone. Linking is cheap; rewriting an unchanged summary is
 churn.
@@ -307,6 +324,8 @@ correct run.
 - [ ] every topic today's digest genuinely advanced was updated and linked;
 - [ ] `content` rewritten as current understanding, not appended to as a log;
 - [ ] every `content` written is 150 words or fewer, with no caveat clauses;
+- [ ] no `content` or `watching_for` written says today, tonight, tomorrow or yesterday;
+- [ ] every topic left `active` has a `watching_for` sentence and a `next_review_at`;
 - [ ] every answered question in the window was checked for a thing with a horizon;
 - [ ] any dated commitment in the evidence has a topic with `next_review_at` on that date;
 - [ ] topics due for review lead with what is due, so the briefing can see it;

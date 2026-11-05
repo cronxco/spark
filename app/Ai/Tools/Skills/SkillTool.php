@@ -27,6 +27,19 @@ class SkillTool implements Tool
     /** How many times a required tool's failure goes back to the model before the run ends. */
     public const MAX_RETRIES = 2;
 
+    /**
+     * Tools that tie a write to its run through `run_token`. A model sometimes
+     * leaves the token out (3 November 2026: a news roundup written without it
+     * was filed as a morning briefing and its run never completed), so the
+     * runner, which already holds the token, supplies it. Not
+     * `manage-flint-topic`: it accepts only a topics-routine token, and the
+     * news roundup edits topics under its own run.
+     */
+    public const RUN_TOKEN_TOOLS = [
+        'spark__create-flint-digest',
+        'spark__complete-flint-run',
+    ];
+
     public function __construct(
         private string $name,
         private Tool $tool,
@@ -56,6 +69,7 @@ class SkillTool implements Tool
         }
 
         $this->ledger->called[] = $this->name;
+        $request = $this->withRunToken($request);
         $this->ledger->progress('tool_starting', "Running {$this->name}", 40, ['tool' => $this->name]);
 
         if ($this->ledger->dryRun && $this->isWrite($request->all())) {
@@ -91,6 +105,19 @@ class SkillTool implements Tool
         $this->ledger->progress('tool_completed', "Completed {$this->name}", 70, ['tool' => $this->name]);
 
         return $output;
+    }
+
+    /** The request with the run's token filled in when the model left it out of a run-scoped write. */
+    private function withRunToken(Request $request): Request
+    {
+        $arguments = $request->all();
+        if ($this->ledger->runToken === null
+            || ! in_array($this->name, self::RUN_TOKEN_TOOLS, true)
+            || (is_string($arguments['run_token'] ?? null) && $arguments['run_token'] !== '')) {
+            return $request;
+        }
+
+        return new Request(['run_token' => $this->ledger->runToken] + $arguments);
     }
 
     /** @param array<string, mixed> $arguments */

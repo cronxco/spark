@@ -164,7 +164,8 @@ class SkillRunner
         $result = null;
 
         try {
-            $ledger = new SkillToolLedger($skill->maxToolCalls, $dryRun, $progress);
+            $runToken = $payload['run_token'] ?? null;
+            $ledger = new SkillToolLedger($skill->maxToolCalls, $dryRun, $progress, is_string($runToken) ? $runToken : null);
             $ledger->progress('connecting', 'Connecting to OpenAI', 10);
             $ledger->progress('discovering_tools', 'Discovering approved tools', 20);
             $tools = $this->tools($skill, $serverUrl, $ledger);

@@ -6,6 +6,7 @@ use App\Models\Block;
 use App\Models\Event;
 use App\Models\Integration;
 use App\Models\User;
+use App\Services\Flint\FlintDeadLinks;
 use App\Services\Flint\FlintRunToken;
 use App\Services\FlintDigestService;
 use Carbon\Carbon;
@@ -49,6 +50,59 @@ class FlintDigestServiceTest extends TestCase
                 ['block_type' => 'flint_story', 'title' => 'A story', 'content' => 'Something happened.'],
             ],
         ]);
+    }
+
+    #[Test]
+    public function dead_link_cleanup_preserves_external_event_urls_and_checks_relative_and_configured_spark_links(): void
+    {
+        config(['app.url' => 'https://spark-dev.example.test']);
+        $links = new FlintDeadLinks($this->user);
+        $external = '[Conference](https://conference.example/events/autumn) '
+            . '[Lookalike](https://spark.cronx.co.example/events/tickets) '
+            . '[Userinfo](https://spark.cronx.co@conference.example/events/tickets)';
+
+        $result = $links->strip($external . ' [Relative](/events/MISSING) '
+            . '[Dev](https://spark-dev.example.test/events/MISSING) '
+            . '[Canonical](https://spark.cronx.co/events/MISSING)');
+
+        $this->assertSame($external . ' Relative Dev Canonical', $result['text']);
+        $this->assertSame(['MISSING'], $result['removed']);
+    }
+
+    /**
+     * 28 Oct 2026 linked `/events/EM41PV` and 2 Nov a UUID with one group
+     * retyped; both opened an empty page in the app.
+     */
+    #[Test]
+    public function event_links_that_lead_nowhere_are_reduced_to_their_words(): void
+    {
+        $first = $this->service->create($this->user, ['title' => 'Morning Digest — Mon', 'period' => 'morning']);
+        $real = $first['event_id'];
+        $missing = (string) Str::uuid();
+        $someoneElses = $this->service->create(User::factory()->create(), ['title' => 'Other', 'period' => 'morning'])['event_id'];
+
+        $result = $this->service->create($this->user, [
+            'title' => 'Evening Digest — Mon',
+            'period' => 'evening',
+            'summary' => "Your [train leaves at 13:00](https://spark.cronx.co/events/{$real}). "
+                . 'The [return is booked](https://spark.cronx.co/events/EM41PV) and the '
+                . "[hotel is paid](https://spark.cronx.co/events/{$missing}). [Their note](https://spark.cronx.co/events/{$someoneElses}).",
+            'blocks' => [
+                ['block_type' => 'flint_insight', 'title' => 'Insight', 'content' => "A [walk](https://spark.cronx.co/events/{$missing}) today."],
+                ['block_type' => 'flint_user_question', 'title' => 'Q', 'question' => "Was the [£159 payment](https://spark.cronx.co/events/{$real}) for tickets?"],
+            ],
+        ]);
+
+        $event = Event::findOrFail($result['event_id']);
+        $this->assertSame(
+            "Your [train leaves at 13:00](https://spark.cronx.co/events/{$real}). The return is booked and the hotel is paid. Their note.",
+            $event->event_metadata['summary'],
+        );
+        $this->assertSame('A walk today.', $event->blocks->firstWhere('block_type', 'flint_insight')->metadata['content']);
+        $this->assertStringContainsString("events/{$real}", $event->blocks->firstWhere('block_type', 'flint_user_question')->metadata['question']);
+        $this->assertSame(['EM41PV', $missing, $someoneElses], $result['unlinked_event_ids']);
+        $this->assertStringContainsString('EM41PV', $result['warning']);
+        $this->assertArrayNotHasKey('unlinked_event_ids', $first);
     }
 
     #[Test]
