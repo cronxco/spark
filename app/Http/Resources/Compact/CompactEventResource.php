@@ -142,7 +142,7 @@ class CompactEventResource extends JsonResource
             if (! isset($this->blocks_count)) {
                 $blocks = $this->blocks->reject(
                     fn ($block) => $block->block_type === self::NOTE_BLOCK_TYPE,
-                );
+                )->each(fn ($block) => $block->setRelation('event', $this->resource));
                 $data['blocks'] = CompactBlockResource::collection($blocks)->resolve($request);
             } else {
                 // List mode: a light pill per block for the timeline row, the

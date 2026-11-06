@@ -3,6 +3,8 @@
 namespace App\Http\Resources\Compact;
 
 use App\Models\Block;
+use App\Support\BlockDetails;
+use App\Support\BlockPresentation;
 use App\Support\EntityReferenceResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -23,6 +25,17 @@ class CompactBlockResource extends JsonResource
             'title' => $this->title,
             'time' => $this->time?->toIso8601String(),
         ];
+
+        // How the card presents the block: the plugin's display name and
+        // glyph, its domain (which tints the glyph and hero value), whether a
+        // model wrote it, and whether the plugin hides the type. The same
+        // values drive the web's card shell.
+        $presentation = BlockPresentation::for($this->resource);
+        $data['display_name'] = $presentation->label;
+        $data['icon'] = $presentation->icon;
+        $data['domain'] = $presentation->domain;
+        $data['ai_written'] = $presentation->aiWritten;
+        $data['hidden'] = $presentation->hidden;
 
         // Scope citations to the viewer's own integrations. The ids come from
         // stored block metadata written by a routine that reads inbound mail,
@@ -49,6 +62,11 @@ class CompactBlockResource extends JsonResource
 
         if ($this->media_url) {
             $data['media_url'] = $this->media_url;
+        }
+
+        $details = BlockDetails::for($this->resource);
+        if ($details !== null) {
+            $data['details'] = $details;
         }
 
         return $data;
