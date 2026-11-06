@@ -82,6 +82,8 @@ class BlockPresentation
         public readonly bool $aiWritten,
         /** "Summary" or "Flint" for generated text, which says so in the eyebrow (§3.4). */
         public readonly ?string $generatedBy = null,
+        /** The plugin marks the type as not for display. */
+        public readonly bool $hidden = false,
     ) {}
 
     public static function for(Block $block): self
@@ -115,7 +117,7 @@ class BlockPresentation
             default => null,
         };
 
-        return new self($label, $icon, $domain, $aiWritten, $generatedBy);
+        return new self($label, $icon, $domain, $aiWritten, $generatedBy, (bool) ($typeInfo['hidden'] ?? false));
     }
 
     /**
