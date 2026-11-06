@@ -74,7 +74,7 @@ class DetectAnomaliesTaskTest extends TestCase
     #[Test]
     public function todays_heart_rate_average_is_not_judged_while_the_day_is_still_filling(): void
     {
-        $event = $this->heartRateEvent('2026-11-05 00:00:00', 76);
+        $event = $this->heartRateEvent('2026-11-05 00:00:00', 130);
 
         $this->detect($event);
 
@@ -84,20 +84,20 @@ class DetectAnomaliesTaskTest extends TestCase
     #[Test]
     public function a_finished_day_is_judged(): void
     {
-        $event = $this->heartRateEvent('2026-11-04 00:00:00', 76);
+        $event = $this->heartRateEvent('2026-11-04 00:00:00', 130);
 
         $this->detect($event);
 
         $this->assertDatabaseHas('metric_trends', [
             'metric_statistic_id' => $this->heartRate->id,
-            'type' => 'anomaly_low',
+            'type' => 'anomaly_high',
         ]);
     }
 
     #[Test]
     public function an_anomaly_is_removed_when_the_events_value_comes_back_into_range(): void
     {
-        $event = $this->heartRateEvent('2026-11-04 00:00:00', 76);
+        $event = $this->heartRateEvent('2026-11-04 00:00:00', 130);
         $this->detect($event);
 
         $event->update(['value' => 101]);
@@ -109,7 +109,7 @@ class DetectAnomaliesTaskTest extends TestCase
     #[Test]
     public function an_acknowledged_anomaly_is_kept_when_the_value_comes_back_into_range(): void
     {
-        $event = $this->heartRateEvent('2026-11-04 00:00:00', 76);
+        $event = $this->heartRateEvent('2026-11-04 00:00:00', 130);
         $this->detect($event);
         MetricTrend::where('metric_statistic_id', $this->heartRate->id)->update(['acknowledged_at' => now()]);
 
@@ -122,15 +122,15 @@ class DetectAnomaliesTaskTest extends TestCase
     #[Test]
     public function a_recorded_anomaly_follows_the_events_latest_value(): void
     {
-        $event = $this->heartRateEvent('2026-11-04 00:00:00', 76);
+        $event = $this->heartRateEvent('2026-11-04 00:00:00', 130);
         $this->detect($event);
 
-        $event->update(['value' => 70]);
+        $event->update(['value' => 135]);
         $this->detect($event->fresh());
 
         $trends = MetricTrend::where('metric_statistic_id', $this->heartRate->id)->get();
         $this->assertCount(1, $trends);
-        $this->assertEqualsWithDelta(70, (float) $trends->first()->current_value, 0.01);
+        $this->assertEqualsWithDelta(135, (float) $trends->first()->current_value, 0.01);
     }
 
     #[Test]
@@ -138,7 +138,7 @@ class DetectAnomaliesTaskTest extends TestCase
     {
         $this->user->update(['settings' => ['timezone' => 'America/Los_Angeles']]);
         Carbon::setTestNow(Carbon::parse('2026-11-05 20:00:00', 'America/Los_Angeles'));
-        $event = $this->heartRateEvent('2026-11-05 00:00:00', 76, 'UTC');
+        $event = $this->heartRateEvent('2026-11-05 00:00:00', 130, 'UTC');
 
         $this->detect($event->fresh());
 
@@ -148,7 +148,7 @@ class DetectAnomaliesTaskTest extends TestCase
     #[Test]
     public function a_day_still_filling_is_recorded_as_deferred(): void
     {
-        $event = $this->heartRateEvent('2026-11-05 00:00:00', 76);
+        $event = $this->heartRateEvent('2026-11-05 00:00:00', 130);
 
         $task = $this->detect($event);
 
@@ -159,7 +159,7 @@ class DetectAnomaliesTaskTest extends TestCase
     #[Test]
     public function the_daily_sweep_runs_a_deferred_day_again_once_it_has_ended(): void
     {
-        $deferred = $this->heartRateEvent('2026-11-04 00:00:00', 76);
+        $deferred = $this->heartRateEvent('2026-11-04 00:00:00', 130);
         $judged = $this->heartRateEvent('2026-11-03 00:00:00', 99);
         $store = app(TaskExecutionStore::class);
         $definition = TaskRegistry::getTask('detect_anomalies');
@@ -178,7 +178,7 @@ class DetectAnomaliesTaskTest extends TestCase
     #[Test]
     public function a_zero_reading_clears_an_earlier_anomaly(): void
     {
-        $event = $this->heartRateEvent('2026-11-04 00:00:00', 76);
+        $event = $this->heartRateEvent('2026-11-04 00:00:00', 130);
         $this->detect($event);
 
         $event->update(['value' => 0]);
