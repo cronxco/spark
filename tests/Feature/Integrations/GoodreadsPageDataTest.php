@@ -59,14 +59,14 @@ class GoodreadsPageDataTest extends TestCase
     }
 
     #[Test]
-    public function a_date_only_shelf_entry_for_a_past_day_is_midday_in_the_users_timezone(): void
+    public function a_date_only_shelf_entry_for_a_past_day_is_midday_in_the_users_timezone_bst_aware(): void
     {
         $this->integration->user->update(['settings' => ['timezone' => 'Europe/London']]);
         $item = $this->shelfItem('to-read');
         $item['user_date_added'] = '2026-10-19';
         $this->import('shelf', [$item]);
 
-        $this->assertSame('2026-10-19 12:00:00', Event::firstOrFail()->time->utc()->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-10-19 11:00:00', Event::firstOrFail()->time->utc()->format('Y-m-d H:i:s'));
     }
 
     #[Test]
