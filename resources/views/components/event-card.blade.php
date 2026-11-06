@@ -11,6 +11,8 @@
     - calendar: a calendar entry's title and time span.
     - payment: amount, merchant, account and pending state, with where it sits
       in the week's spending.
+    - transfer: amount, then "Mortgage into Current Account" (or "from" for
+      money going out) on one line, the other party in bold, and pending.
     - reading: publication, the article's own headline, read time and up to
       four takeaways.
 
@@ -45,7 +47,7 @@
     $glyph = match ($layoutName) {
         'journey' => 'fas.plane',
         'calendar' => 'fas.calendar',
-        'payment' => 'fas.sterling-sign',
+        'payment', 'transfer' => 'fas.sterling-sign',
         'reading' => 'fas.newspaper',
         default => $layout['glyph'],
     };
@@ -53,12 +55,13 @@
         'journey' => $details['flight'] ? __('Flight :number', ['number' => $details['flight']]) : __('Flight'),
         'calendar' => __('Calendar'),
         'payment' => ($details['refund'] ?? false) ? __('Refund') : __('Payment'),
+        'transfer' => ($details['direction'] ?? 'in') === 'out' ? __('Transfer out') : __('Transfer in'),
         'reading' => $details['publication'] ?? __('Article'),
         default => $layout['label'],
     };
     $eyebrowTime = match ($layoutName) {
         'journey', 'calendar' => \Carbon\Carbon::parse($event['time'])->timezone($tz)->isToday() ? __('Today') : \Carbon\Carbon::parse($event['time'])->timezone($tz)->format('D j M'),
-        'payment' => \Carbon\Carbon::parse($event['time'])->timezone($tz)->format('D H:i'),
+        'payment', 'transfer' => \Carbon\Carbon::parse($event['time'])->timezone($tz)->format('D H:i'),
         'reading' => \Carbon\Carbon::parse($event['time'])->timezone($tz)->format('H:i'),
         default => null,
     };
@@ -98,11 +101,18 @@
     $week = $details['week'] ?? null;
     $weekMax = $week ? max(1, max($week['amounts'])) : 1;
 
+    $transferAccount = match (true) {
+        $layoutName !== 'transfer' || blank($details['account'] ?? null) => null,
+        ($details['direction'] ?? 'in') === 'out' => __('from :account', ['account' => $details['account']]),
+        default => __('into :account', ['account' => $details['account']]),
+    };
+
     $heroLabel = trim($display.' '.($numeric !== null ? $layout['unit'] : ''));
     $ariaLabel = implode(', ', array_filter(match ($layoutName) {
         'journey' => [$label, __(':from to :to', ['from' => $details['from'], 'to' => $details['to']]), $details['departs_local'] ? __('departs :time', ['time' => $details['departs_local']]) : null, $details['arrives_local'] ? __('arrives :time', ['time' => $details['arrives_local']]) : null],
         'calendar' => [$label, $details['title'] ?? null, $clock($details['starts_at'] ?? null)],
         'payment' => [$label, $display, $details['merchant'] ?? null, ($details['pending'] ?? false) ? __('pending') : null, $week['caption'] ?? null],
+        'transfer' => [$label, $display, trim(($details['counterparty'] ?? '').' '.($transferAccount ?? '')), ($details['pending'] ?? false) ? __('pending') : null],
         'reading' => [$details['publication'] ?? null, $details['headline'] ?? null, ($details['read_minutes'] ?? null) ? __(':count min read', ['count' => $details['read_minutes']]) : null],
         default => [$layout['label'], $heroLabel, $contextText],
     }));
@@ -208,6 +218,27 @@
             </div>
             @break
 
+        @case ('transfer')
+            <div class="min-w-0 space-y-1" aria-hidden="true">
+                <div class="font-display text-2xl font-bold leading-none tabular-nums {{ $domainInk }} dark:text-primary">{{ $display }}</div>
+                <div class="flex flex-wrap items-center gap-2 text-sm">
+                    @if (($details['counterparty'] ?? null) || $transferAccount)
+                        <span class="min-w-0 truncate">
+                            @if ($details['counterparty'] ?? null)
+                                <span class="font-semibold">{{ $details['counterparty'] }}</span>
+                            @endif
+                            @if ($transferAccount)
+                                <span class="text-base-content/70">{{ $transferAccount }}</span>
+                            @endif
+                        </span>
+                    @endif
+                    @if ($details['pending'] ?? false)
+                        <span class="rounded-md bg-base-content/10 px-1.5 py-0.5 text-[11px] font-semibold">{{ __('Pending') }}</span>
+                    @endif
+                </div>
+            </div>
+            @break
+
         @case ('reading')
             <div class="font-serif text-base font-bold leading-snug" aria-hidden="true">{{ $details['headline'] ?? __('Article') }}</div>
             @if ($details['read_minutes'] ?? null)
@@ -218,7 +249,7 @@
                     @foreach ($details['takeaways'] as $takeaway)
                         <li class="grid grid-cols-[6px_1fr] gap-2.5">
                             <span class="mt-[7px] h-1.5 w-1.5 rounded-sm {{ $domainFill }}" aria-hidden="true"></span>
-                            <span class="line-clamp-2">{!! \Illuminate\Support\Str::inlineMarkdown($takeaway, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}</span>
+                            <span>{!! \Illuminate\Support\Str::inlineMarkdown($takeaway, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}</span>
                         </li>
                     @endforeach
                 </ul>
