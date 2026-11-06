@@ -59,6 +59,23 @@ class InsightEngineTest extends TestCase
     }
 
     #[Test]
+    public function one_outlier_day_does_not_hide_a_busy_week_for_a_total(): void
+    {
+        // A total is compared to its median day, so a single huge day in the
+        // prior four weeks does not drag the reference up to this week's level.
+        $this->seedMetric('apple_health', 'had_step_count', 'count', fn (int $back) => $back === 20
+            ? 80000
+            : ($back <= 7 ? 11000 : 8000) + (($back * 37) % 11 - 5) * 60);
+
+        app(InsightEngine::class)->generateForUser($this->user);
+
+        $insight = MetricTrend::insights()->where('type', 'insight_period_up')->first();
+
+        $this->assertNotNull($insight);
+        $this->assertEqualsWithDelta(8000, (float) $insight->baseline_value, 150);
+    }
+
+    #[Test]
     public function an_ordinary_week_is_not_an_insight(): void
     {
         $this->seedMetric('apple_health', 'had_step_count', 'count', fn (int $back) => 8000 + (($back * 37) % 11 - 5) * 60);

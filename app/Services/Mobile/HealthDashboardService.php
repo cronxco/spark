@@ -504,7 +504,7 @@ class HealthDashboardService
             'mean' => $mean,
             'normal_lower' => (float) $statistic->normal_lower_bound,
             'normal_upper' => (float) $statistic->normal_upper_bound,
-            'sample_days' => $statistic->event_count,
+            'sample_days' => $statistic->sampleDays(),
             'is_ordinal' => $isOrdinal,
             'band' => $isOrdinal ? $presentation->formatValue($statistic, $value) : null,
             'vs_baseline_pct' => $presentation->baselineDeltaPct($statistic, $value),

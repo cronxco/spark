@@ -37,6 +37,22 @@ class AnomalyPolicyTest extends TestCase
     }
 
     #[Test]
+    public function a_low_average_oura_heart_rate_is_not_an_anomaly(): void
+    {
+        $statistic = $this->statistic('oura', 'had_heart_rate');
+
+        $this->assertNull(app(AnomalyPolicy::class)->judge($statistic, 50.0));
+        $this->assertSame('anomaly_high', app(AnomalyPolicy::class)->judge($statistic, 150.0)['type']);
+    }
+
+    #[Test]
+    public function bills_paid_by_direct_debit_do_not_count_as_spend(): void
+    {
+        $this->assertNotContains('direct_debit_to', config('metrics.spend.actions'));
+        $this->assertContains('card_payment_to', config('metrics.spend.actions'));
+    }
+
+    #[Test]
     public function a_metric_that_is_not_listed_is_never_judged(): void
     {
         $this->assertNull(app(AnomalyPolicy::class)->judge($this->statistic('untappd', 'drank'), 500.0));

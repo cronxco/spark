@@ -141,4 +141,13 @@ class MetricStatistic extends Model
             ->whereIn('type', ['anomaly_high', 'anomaly_low'])
             ->delete();
     }
+
+    /**
+     * Days of history behind the baseline. Rows written by the old job counted
+     * every event, so the figure is held to the detection window.
+     */
+    public function sampleDays(): int
+    {
+        return min((int) $this->event_count, (int) config('metrics.detection_window_days', 90));
+    }
 }
