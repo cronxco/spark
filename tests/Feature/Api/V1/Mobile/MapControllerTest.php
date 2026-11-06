@@ -259,4 +259,49 @@ class MapControllerTest extends TestCase
             ->assertJsonPath('markers.events', [])
             ->assertJsonPath('markers.places', []);
     }
+
+    #[Test]
+    public function a_world_bbox_returns_events_and_places(): void
+    {
+        // The app asks for the whole world first. As a geography envelope
+        // that box has antipodal edges and PostGIS refused the query.
+        $integration = Integration::factory()->create(['user_id' => $this->user->id]);
+        $event = Event::factory()->create([
+            'integration_id' => $integration->id,
+            'location' => Point::makeGeodetic(40.4, -3.7),
+        ]);
+        EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'place',
+            'title' => 'Madrid',
+            'location' => Point::makeGeodetic(40.4, -3.7),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $response = $this->getJson('/api/v1/mobile/map/data?bbox=-90.0,-180.0,90.0,180.0')
+            ->assertOk();
+
+        $this->assertSame([$event->id], array_column($response->json('markers.events'), 'id'));
+        $this->assertSame(['Madrid'], array_column($response->json('markers.places'), 'title'));
+    }
+
+    #[Test]
+    public function a_wide_bbox_keeps_points_near_its_southern_edge(): void
+    {
+        // A geography envelope's southern edge is a great circle that bows
+        // towards the pole, so it used to drop this point.
+        EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'place',
+            'title' => 'London',
+            'location' => Point::makeGeodetic(51.0, 0.0),
+        ]);
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+
+        $this->getJson('/api/v1/mobile/map/data?bbox=50.0,-80.0,60.0,80.0')
+            ->assertOk()
+            ->assertJsonPath('markers.places.0.title', 'London');
+    }
 }
