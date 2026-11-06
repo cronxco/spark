@@ -161,8 +161,11 @@ class InsightEngine
             return null;
         }
 
-        $current = Stats::mean($recent);
-        $reference = Stats::mean($prior);
+        // A median metric is skewed by design: one large day must not drag
+        // the reference away from what a normal day looks like.
+        $centre = $method === MetricCatalogue::METHOD_MEDIAN_MAD ? Stats::median(...) : Stats::mean(...);
+        $current = $centre($recent);
+        $reference = $centre($prior);
         $z = ($current - $reference) / ($spread * sqrt(1 / count($recent) + 1 / count($prior)));
 
         if (abs($z) < self::PERIOD_SIGNIFICANCE) {

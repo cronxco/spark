@@ -53,7 +53,7 @@ return [
         'oura.had_readiness_score' => $reading(['anomalies' => true, 'insights' => true, 'settle_hours' => 6]),
         'oura.had_sleep_score' => $reading(['anomalies' => true, 'insights' => true, 'settle_hours' => 6]),
         'oura.had_activity_score' => $reading(['anomalies' => true, 'insights' => true, 'settle_hours' => 30]),
-        'oura.had_heart_rate' => $reading(['anomalies' => true, 'insights' => true, 'accumulates' => true, 'settle_hours' => 6]),
+        'oura.had_heart_rate' => $reading(['anomalies' => true, 'insights' => true, 'higher_is_better' => false, 'accumulates' => true, 'settle_hours' => 6]),
         'oura.had_spo2' => $reading(['anomalies' => true, 'higher_is_better' => true, 'settle_hours' => 6]),
         'oura.had_cardiovascular_age' => $reading(['anomalies' => true, 'settle_hours' => 6]),
         'oura.had_vo2_max' => $reading(['insights' => true, 'higher_is_better' => true]),
@@ -128,7 +128,7 @@ return [
     // The actions that count as spending, for the spend insights.
     'spend' => [
         'services' => ['monzo', 'gocardless'],
-        'actions' => ['card_payment_to', 'direct_debit_to', 'payment_to'],
+        'actions' => ['card_payment_to', 'payment_to'],
         'currency' => 'GBP',
     ],
 
