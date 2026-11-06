@@ -168,7 +168,7 @@ class GoodreadsPageData extends BaseProcessingJob
             $sessionDate = $item['shelf'] === 'to-read' ? $item['user_date_added'] : ($item['shelf'] === 'read' ? $session['finished_at'] : $session['started_at']);
             $date = $sessionDate ?? $item['user_date_added'];
             $time = $date !== null
-                ? app(GoodreadsPageParser::class)->timestamp($date, $item['source_timezone'], 'day')
+                ? $this->estimateDayTime($date, $item['source_timezone'])
                 : ['pubDate' => $this->rawData['observed_at'], 'time_precision' => 'observed', 'source_date' => null, 'source_timezone' => $item['source_timezone']];
             $time['time_source'] = $sessionDate !== null ? 'reading_session' : ($date !== null ? 'date_added' : 'observation');
             foreach ($this->rawData['activity'] ?? [] as $activity) {
@@ -286,9 +286,13 @@ class GoodreadsPageData extends BaseProcessingJob
                 $metadata['time_source'] = $old['time_source'] ?? 'rss';
                 $metadata['guid'] = $old['guid'] ?? $guid;
             }
+            $entry['pubDate'] = $this->settleEstimate($entry, $existing);
             $differentDay = CarbonImmutable::instance($existing->time)->timezone($entry['source_timezone'])->toDateString()
                 !== CarbonImmutable::parse($entry['pubDate'])->timezone($entry['source_timezone'])->toDateString();
-            $replaceTime = ! $isLegacy && ($differentDay || $this->precision($entry['time_precision']) >= $this->precision($old['time_precision'] ?? 'observed'));
+            $newRank = $this->precision($entry['time_precision']);
+            $oldRank = $this->precision($old['time_precision'] ?? 'observed');
+            // An estimate is recomputed on every sync, so it must never replace an equal estimate or the time would drift
+            $replaceTime = ! $isLegacy && ($differentDay || $newRank > $oldRank || ($newRank === $oldRank && $entry['time_precision'] !== 'estimated'));
             if (! $isLegacy && ! $replaceTime) {
                 foreach (['time_precision', 'source_date', 'source_timezone', 'time_source'] as $key) {
                     $metadata[$key] = $old[$key] ?? $metadata[$key];
@@ -483,7 +487,40 @@ class GoodreadsPageData extends BaseProcessingJob
     private function precision(string $precision): int
     {
         return match ($precision) {
-            'second' => 3, 'minute' => 2, 'day' => 1, default => 0,
+            'second' => 4, 'minute' => 3, 'estimated' => 2, 'day' => 1, default => 0,
         };
+    }
+
+    /**
+     * Goodreads shelves give a calendar date with no time. Midnight in Goodreads' display timezone (often
+     * America/Los_Angeles) lands at 08:00 UK time, so estimate instead: the moment Spark first saw the book when
+     * the date is today, otherwise midday in the user's own timezone.
+     */
+    private function estimateDayTime(string $date, string $sourceTimezone): array
+    {
+        $userTimezone = $this->integration->user?->getTimezone() ?? 'UTC';
+        $observed = CarbonImmutable::parse($this->rawData['observed_at']);
+        $isToday = $observed->timezone($sourceTimezone)->toDateString() === $date
+            || $observed->timezone($userTimezone)->toDateString() === $date;
+        $moment = $isToday ? $observed : CarbonImmutable::parse($date . ' 12:00:00', $userTimezone);
+
+        return ['pubDate' => $moment->utc()->toIso8601String(), 'time_precision' => 'estimated', 'source_date' => $date, 'source_timezone' => $sourceTimezone];
+    }
+
+    /**
+     * For an event already stored, the best estimate of today's activity is when Spark first created it,
+     * which is earlier and closer to the truth than the current sync.
+     */
+    private function settleEstimate(array $entry, Event $existing): string
+    {
+        if ($entry['time_precision'] !== 'estimated' || ! $existing->created_at) {
+            return $entry['pubDate'];
+        }
+        $userTimezone = $this->integration->user?->getTimezone() ?? 'UTC';
+        $created = CarbonImmutable::instance($existing->created_at);
+        $sameDay = $created->timezone($entry['source_timezone'])->toDateString() === $entry['source_date']
+            || $created->timezone($userTimezone)->toDateString() === $entry['source_date'];
+
+        return $sameDay ? $created->utc()->toIso8601String() : $entry['pubDate'];
     }
 }
