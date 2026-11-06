@@ -2,7 +2,6 @@
 
 namespace App\Jobs\Data\Goodreads;
 
-use App\Integrations\Goodreads\GoodreadsPageParser;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use App\Models\EventObject;
