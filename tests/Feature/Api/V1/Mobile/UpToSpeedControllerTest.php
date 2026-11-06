@@ -1418,6 +1418,90 @@ class UpToSpeedControllerTest extends TestCase
     }
 
     #[Test]
+    public function linked_bank_transfer_gets_a_transfer_card_naming_the_reference_and_account(): void
+    {
+        $monzo = $this->monzoIntegration();
+        $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account', 'type' => 'monzo_account', 'title' => 'Current Account']);
+        $reference = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'monzo_counterparty', 'title' => 'MORTGAGE']);
+        $transfer = $this->moneyEvent($monzo, 'bank_transfer_from', $account, $reference, 150000);
+
+        $this->digestLinking("The [£1,500 transfer](https://spark.cronx.co/events/{$transfer->id}) arrived.");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('transfer', $card['layout']);
+        $this->assertNull($card['context']);
+        $this->assertSame(['direction' => 'in', 'counterparty' => 'Mortgage', 'account' => 'Current Account', 'pending' => false], $card['details']);
+    }
+
+    #[Test]
+    public function linked_pot_withdrawal_names_the_pot_and_the_account_it_went_into(): void
+    {
+        $monzo = $this->monzoIntegration();
+        $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account', 'type' => 'monzo_account', 'title' => 'Current Account']);
+        $pot = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'pot', 'type' => 'monzo_pot', 'title' => 'Holiday']);
+        $withdrawal = $this->moneyEvent($monzo, 'pot_withdrawal_to', $pot, $account, 20000);
+        $deposit = $this->moneyEvent($monzo, 'pot_transfer_to', $account, $pot, 5000);
+
+        $this->digestLinking("[£200 out of Holiday](https://spark.cronx.co/events/{$withdrawal->id}) and [£50 back in](https://spark.cronx.co/events/{$deposit->id}).");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        [$out, $in] = $this->digestPayload()['linked_events'];
+
+        $this->assertSame(['direction' => 'in', 'counterparty' => 'Holiday', 'account' => 'Current Account', 'pending' => false], $out['details']);
+        $this->assertSame(['direction' => 'out', 'counterparty' => 'Holiday', 'account' => 'Current Account', 'pending' => false], $in['details']);
+    }
+
+    #[Test]
+    public function linked_direct_debit_gets_a_payment_card(): void
+    {
+        $monzo = $this->monzoIntegration();
+        $account = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account', 'type' => 'monzo_account', 'title' => 'Current Account']);
+        $payee = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'monzo_counterparty', 'title' => 'THAMES WATER']);
+        $debit = $this->moneyEvent($monzo, 'direct_debit_to', $account, $payee, 4200);
+
+        $this->digestLinking("[£42 to Thames Water](https://spark.cronx.co/events/{$debit->id})");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = $this->digestPayload()['linked_events'][0];
+
+        $this->assertSame('payment', $card['layout']);
+        $this->assertSame('Thames Water', $card['details']['merchant']);
+        $this->assertFalse($card['details']['refund']);
+    }
+
+    #[Test]
+    public function open_banking_money_in_is_a_refund_only_on_a_credit_card(): void
+    {
+        $bank = Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'gocardless',
+        ]);
+        $current = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account', 'type' => 'bank_account', 'title' => 'Joint Account', 'metadata' => ['account_type' => 'current_account']]);
+        $card = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'account', 'type' => 'bank_account', 'title' => 'Amex', 'metadata' => ['account_type' => 'credit_card']]);
+        $employer = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'gocardless_counterparty', 'title' => 'ACME LTD']);
+        $shop = EventObject::factory()->create(['user_id' => $this->user->id, 'concept' => 'counterparty', 'type' => 'gocardless_counterparty', 'title' => 'Shop']);
+        $salary = $this->moneyEvent($bank, 'payment_from', $current, $employer, 300000);
+        $refund = $this->moneyEvent($bank, 'payment_from', $card, $shop, 1200);
+
+        $this->digestLinking("[Salary](https://spark.cronx.co/events/{$salary->id}) and a [refund](https://spark.cronx.co/events/{$refund->id}).");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        [$salaryCard, $refundCard] = $this->digestPayload()['linked_events'];
+
+        $this->assertSame('transfer', $salaryCard['layout']);
+        $this->assertSame(['direction' => 'in', 'counterparty' => 'Acme LTD', 'account' => 'Joint Account', 'pending' => false], $salaryCard['details']);
+        $this->assertSame('payment', $refundCard['layout']);
+        $this->assertTrue($refundCard['details']['refund']);
+    }
+
+    #[Test]
     public function linked_article_gets_a_reading_card_with_its_takeaways(): void
     {
         $publication = EventObject::factory()->create([
@@ -1519,6 +1603,31 @@ class UpToSpeedControllerTest extends TestCase
             'value_multiplier' => 100,
             'value_unit' => 'GBP',
             'time' => $time,
+        ]);
+    }
+
+    private function monzoIntegration(): Integration
+    {
+        return Integration::factory()->create([
+            'user_id' => $this->user->id,
+            'integration_group_id' => IntegrationGroup::factory()->create(['user_id' => $this->user->id])->id,
+            'service' => 'monzo',
+        ]);
+    }
+
+    private function moneyEvent(Integration $integration, string $action, EventObject $actor, EventObject $target, int $pence): Event
+    {
+        return Event::factory()->create([
+            'integration_id' => $integration->id,
+            'service' => $integration->service,
+            'domain' => 'money',
+            'action' => $action,
+            'actor_id' => $actor->id,
+            'target_id' => $target->id,
+            'value' => $pence,
+            'value_multiplier' => 100,
+            'value_unit' => 'GBP',
+            'time' => now()->subHours(2),
         ]);
     }
 

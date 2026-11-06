@@ -10,6 +10,7 @@ use App\Services\Flint\Routines\RoutineDriverManager;
 use App\Services\FlintTopicService;
 use App\Services\FlintTopicTaskService;
 use App\Support\FlintDigestKind;
+use App\Support\FlintDigestOpener;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -198,6 +199,7 @@ new class extends Component
         return collect(preg_split('/\n\s*\n/', trim($summary)))
             ->map(fn (string $paragraph): array => [
                 'markdown' => $paragraph,
+                'heading' => FlintDigestOpener::isSectionHeading($paragraph),
                 'cards' => collect(FlintLinkedEventCards::linkedIds($paragraph))
                     ->map(fn (string $id): ?array => $cards->get($id))
                     ->filter()
@@ -524,9 +526,14 @@ new class extends Component
                                 @if ($paragraphs = $this->summaryParagraphs($digest))
                                     <div class="space-y-4">
                                         @foreach ($paragraphs as $paragraph)
-                                            <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90 prose-a:text-highlight prose-a:font-semibold prose-a:no-underline hover:prose-a:underline">
-                                                {!! render_markdown($paragraph['markdown']) !!}
-                                            </div>
+                                            @if ($paragraph['heading'])
+                                                {{-- Flint's Playbook-style section headings stay in capitals, as a serif headline (Will, 6 Nov 2026) --}}
+                                                <h3 class="pt-2 font-serif text-lg font-bold leading-snug tracking-wide">{{ trim(str_replace(['**', '__'], '', $paragraph['markdown'])) }}</h3>
+                                            @else
+                                                <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90 prose-a:text-highlight prose-a:font-semibold prose-a:no-underline hover:prose-a:underline">
+                                                    {!! render_markdown($paragraph['markdown']) !!}
+                                                </div>
+                                            @endif
                                             @if ($paragraph['cards'])
                                                 {{-- Metric cards go up to three across, as the prose orders them, the rest behind "+N more"; wide cards take a row each (design language §7.3) --}}
                                                 @php
