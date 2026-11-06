@@ -9,6 +9,9 @@ use App\Models\MetricStatistic;
 use App\Models\User;
 use App\Services\MetricPresentation;
 use App\Services\Metrics\MetricCompleteness;
+use App\Services\Metrics\SpendSeries;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 
 class MetricTrendService
 {
@@ -101,6 +104,10 @@ class MetricTrendService
                 return $entry;
             })->values()->all();
 
+        if (SpendSeries::isSpend($statistic)) {
+            $dailyValues = $this->spendDailyValues($statistic, $user, $startDate, $endDate, $timezone, $hasValidStats, $presentation);
+        }
+
         $summary = $this->buildSummary($dailyValues, $hasValidStats);
 
         $result = [
@@ -123,7 +130,7 @@ class MetricTrendService
                 'stddev' => round($statistic->stddev_value, 2),
                 'normal_lower' => round($statistic->normal_lower_bound, 2),
                 'normal_upper' => round($statistic->normal_upper_bound, 2),
-                'sample_days' => $statistic->event_count,
+                'sample_days' => $statistic->sampleDays(),
             ];
 
             if ($isOrdinal) {
@@ -141,6 +148,39 @@ class MetricTrendService
      * @param  array<int, array<string, mixed>>  $dailyValues
      * @return array<string, mixed>
      */
+    /**
+     * Spend is built from payments rather than stored as events, so its days
+     * come from the spend series. Days with no payments count as zero.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function spendDailyValues(MetricStatistic $statistic, User $user, CarbonInterface $start, CarbonInterface $end, string $timezone, bool $hasValidStats, MetricPresentation $presentation): array
+    {
+        $now = Carbon::now();
+        $days = max(1, (int) ceil(abs($start->diffInDays($now))) + 1);
+        $from = $start->toDateString();
+        $to = $end->toDateString();
+
+        $entries = [];
+
+        foreach (app(SpendSeries::class)->daily((string) $user->id, $days, $now, $timezone) as $date => $value) {
+            if ($date < $from || $date > $to) {
+                continue;
+            }
+
+            $entry = ['date' => $date, 'value' => round($value, 2)];
+
+            if ($hasValidStats) {
+                $entry['vs_baseline_pct'] = $presentation->baselineDeltaPct($statistic, $value);
+                $entry['is_anomaly'] = false;
+            }
+
+            $entries[] = $entry;
+        }
+
+        return $entries;
+    }
+
     private function buildSummary(array $dailyValues, bool $hasValidStats): array
     {
         $values = collect($dailyValues)->pluck('value')->filter(fn ($v) => $v !== null);
