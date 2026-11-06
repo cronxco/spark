@@ -3,7 +3,7 @@
 namespace App\Livewire;
 
 use App\Jobs\Metrics\CalculateMetricStatisticsJob;
-use App\Jobs\Metrics\DetectMetricTrendsJob;
+use App\Jobs\Metrics\GenerateMetricInsightsJob;
 use App\Models\MetricStatistic;
 use App\Models\MetricTrend;
 use Illuminate\Support\Facades\Auth;
@@ -36,7 +36,7 @@ class MetricsOverview extends Component
         $this->cachedRecentTrends = MetricTrend::whereHas('metricStatistic', function ($query) use ($user) {
             $query->where('user_id', $user->id);
         })
-            ->trends()
+            ->insights()
             ->unacknowledged()
             ->with('metricStatistic')
             ->orderByDesc('detected_at')
@@ -55,9 +55,9 @@ class MetricsOverview extends Component
 
     public function detectTrends(): void
     {
-        DetectMetricTrendsJob::dispatch(Auth::id());
+        GenerateMetricInsightsJob::dispatch(Auth::id());
 
-        $this->success('Trend detection job dispatched. This may take a few minutes.');
+        $this->success('Insights job dispatched. This may take a few minutes.');
     }
 
     public function render()
@@ -76,7 +76,7 @@ class MetricsOverview extends Component
         // Get metrics with their trend counts using withCount (N+1 optimization)
         // Count only actual trends (not anomalies) that are unacknowledged
         $metrics = $metricsQuery->withCount(['trends as unacknowledged_trends_count' => function ($query) {
-            $query->where('type', 'like', 'trend_%')
+            $query->where('type', 'like', 'insight\_%')
                 ->whereNull('acknowledged_at');
         }])->get();
 

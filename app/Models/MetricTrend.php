@@ -110,11 +110,20 @@ class MetricTrend extends Model
     }
 
     /**
-     * Scope to get trends only (not anomalies)
+     * Scope to get insights: period, typical-day and shift comparisons.
+     */
+    public function scopeInsights($query)
+    {
+        return $query->where('type', 'like', 'insight\_%');
+    }
+
+    /**
+     * Scope to get the older trend rows (not anomalies, not insights)
      */
     public function scopeTrends($query)
     {
-        return $query->whereNotIn('type', ['anomaly_high', 'anomaly_low']);
+        return $query->whereNotIn('type', ['anomaly_high', 'anomaly_low'])
+            ->where('type', 'not like', 'insight\_%');
     }
 
     /**
@@ -151,7 +160,12 @@ class MetricTrend extends Model
      */
     public function isTrend(): bool
     {
-        return ! $this->isAnomaly();
+        return ! $this->isAnomaly() && ! $this->isInsight();
+    }
+
+    public function isInsight(): bool
+    {
+        return str_starts_with((string) $this->type, 'insight_');
     }
 
     /**
@@ -168,6 +182,9 @@ class MetricTrend extends Model
             'trend_down_monthly' => 'Trending Down (Monthly)',
             'trend_up_quarterly' => 'Trending Up (Quarterly)',
             'trend_down_quarterly' => 'Trending Down (Quarterly)',
+            'insight_period_up', 'insight_period_down' => 'Against the 4-week trend',
+            'insight_typical_up', 'insight_typical_down' => 'Against a typical day',
+            'insight_shift_up', 'insight_shift_down' => 'A week on one side of usual',
             default => ucfirst(str_replace('_', ' ', $this->type)),
         };
     }

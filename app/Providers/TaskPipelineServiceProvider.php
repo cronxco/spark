@@ -5,7 +5,6 @@ namespace App\Providers;
 use App\Integrations\Contracts\SupportsTaskPipeline;
 use App\Jobs\TaskPipeline\Tasks\CalculateMetricStatsTask;
 use App\Jobs\TaskPipeline\Tasks\DetectAnomaliesTask;
-use App\Jobs\TaskPipeline\Tasks\DetectTrendsTask;
 use App\Jobs\TaskPipeline\Tasks\DispatchMorningDigestOnSleepScoreTask;
 use App\Jobs\TaskPipeline\Tasks\DownloadImagesToMediaLibraryTask;
 use App\Jobs\TaskPipeline\Tasks\FindReceiptForTransactionTask;
@@ -164,35 +163,16 @@ class TaskPipelineServiceProvider extends ServiceProvider
                     return false;
                 }
 
-                // Only run if integration has real-time anomaly detection enabled
                 $integration = $model->integration;
                 if (! $integration) {
                     return false;
                 }
 
-                // Check integration's anomaly_detection_mode
-                $mode = $integration->getAnomalyDetectionMode();
-
-                // Only run for realtime mode (default if not configured), skip for retrospective and disabled
-                return $mode === 'realtime' || $mode === null;
-            },
-        ));
-
-        // Trend Detection - detects metric trends over time
-        TaskRegistry::register(new TaskDefinition(
-            key: 'detect_trends',
-            name: 'Detect Trends',
-            description: 'Detect weekly, monthly, and quarterly metric trends',
-            jobClass: DetectTrendsTask::class,
-            appliesTo: ['event'],
-            conditions: [],
-            dependencies: ['calculate_metric_stats'],
-            queue: 'tasks',
-            priority: 70,
-            runOnCreate: false, // Only scheduled
-            runOnUpdate: false,
-            shouldRun: function ($model) {
-                return $model->value !== null && $model->value_unit !== null;
+                // Only a disabled integration is skipped. Retrospective ones
+                // are judged too: this check used to exclude them, so Apple
+                // Health (retrospective) was never judged by any run, and
+                // the daily sweep is blocked by the same check.
+                return $integration->getAnomalyDetectionMode() !== 'disabled';
             },
         ));
 

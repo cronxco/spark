@@ -1,5 +1,5 @@
 <div>
-    <x-header title="Metrics" subtitle="Track trends and anomalies across your data" separator>
+    <x-header title="Metrics" subtitle="Anomalies and insights across your data" separator>
         <x-slot:actions>
             <div class="flex flex-wrap gap-2 items-center">
                 <button wire:click="calculateStatistics" class="btn btn-outline btn-sm">
@@ -9,7 +9,7 @@
 
                 <button wire:click="detectTrends" class="btn btn-outline btn-sm">
                     <x-icon name="fas.chart-simple" class="h-4 w-4" />
-                    Detect Trends
+                    Refresh insights
                 </button>
 
                 <div class="divider divider-horizontal mx-0"></div>
@@ -38,9 +38,9 @@
             <div class="alert alert-info">
                 <x-icon name="fas.circle-info" class="h-5 w-5" />
                 <div>
-                    <h3 class="font-bold">{{ $recentTrends->count() }} Unacknowledged {{ Str::plural('Trend', $recentTrends->count()) }}</h3>
+                    <h3 class="font-bold">{{ $recentTrends->count() }} New {{ Str::plural('insight', $recentTrends->count()) }}</h3>
                     <div class="text-sm">
-                        You have {{ $recentTrends->count() }} {{ Str::plural('trend', $recentTrends->count()) }} awaiting review.
+
                     </div>
                 </div>
             </div>
@@ -113,14 +113,14 @@
     @if (! $recentTrendsLoaded)
         <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <h3 class="card-title">Recent Trends</h3>
+                <h3 class="card-title">Insights</h3>
                 <x-skeleton-loader type="list-item" :count="3" />
             </div>
         </div>
     @elseif ($recentTrends->count() > 0)
         <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <h3 class="card-title">Recent Trends</h3>
+                <h3 class="card-title">Insights</h3>
 
                 <div class="divide-y">
                     @foreach ($recentTrends as $trend)

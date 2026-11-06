@@ -5,6 +5,7 @@ namespace App\Jobs\TaskPipeline;
 use App\Jobs\TaskPipeline\Tasks\DetectAnomaliesTask;
 use App\Models\Event;
 use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -31,6 +32,7 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
 
         $count = 0;
         $store = app(TaskExecutionStore::class);
+        $task = TaskRegistry::getTask('detect_anomalies');
 
         // Find all events with metrics from the last two days
         // This allows retrospective detection for:
@@ -38,16 +40,17 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
         // 2. Events that didn't get real-time anomaly detection
         // 3. Daily aggregates left unjudged while their day was still filling
         //    up. Two days back covers a day that ends after this run in the
-        //    user's timezone.
+        //    user's timezone. Today is swept too, for values that were
+        //    deferred while their source was still revising them.
         Event::query()
             ->withoutInternal()
             ->whereNotNull('value')
             ->whereNotNull('value_unit')
             ->whereBetween('time', [
                 now()->subDays(2)->startOfDay(),
-                now()->subDay()->endOfDay(),
+                now()->endOfDay(),
             ])
-            ->chunk(100, function ($events) use (&$count, $store) {
+            ->chunk(100, function ($events) use (&$count, $store, $task) {
                 foreach ($events as $event) {
                     // Check if anomaly detection has already been run successfully
                     $executions = $store->getTaskExecutions($event);
@@ -61,8 +64,16 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
                         continue;
                     }
 
-                    // The day before yesterday is only swept for deferred days
-                    if (! $deferred && $event->time->lt(now()->subDay()->startOfDay())) {
+                    // Only deferred values are swept outside yesterday
+                    $isYesterday = $event->time->between(now()->subDay()->startOfDay(), now()->subDay()->endOfDay());
+                    if (! $deferred && ! $isYesterday) {
+                        continue;
+                    }
+
+                    // A task that does not apply now (a disabled integration)
+                    // records nothing, so it would be dispatched every sweep.
+                    // Checked each run so a re-enabled integration is picked up.
+                    if ($task && ! $task->isApplicableTo($event)) {
                         continue;
                     }
 

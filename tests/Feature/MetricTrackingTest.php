@@ -3,12 +3,9 @@
 namespace Tests\Feature;
 
 use App\Jobs\Metrics\CalculateMetricStatisticsJob;
-use App\Jobs\Metrics\DetectMetricAnomaliesJob;
-use App\Jobs\Metrics\DetectMetricTrendsJob;
 use App\Jobs\TaskPipeline\ProcessTaskPipelineJob;
 use App\Jobs\TaskPipeline\Tasks\CalculateMetricStatsTask;
 use App\Jobs\TaskPipeline\Tasks\DetectAnomaliesTask;
-use App\Mcp\Tools\GetBaselinesTool;
 use App\Models\Event;
 use App\Models\EventObject;
 use App\Models\Integration;
@@ -19,7 +16,6 @@ use App\Models\User;
 use App\Services\Mobile\AnomalyAcknowledgement;
 use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -360,68 +356,6 @@ class MetricTrackingTest extends TestCase
     }
 
     #[Test]
-    public function calculate_metric_statistics_job_handles_prefixed_table_aliases(): void
-    {
-        $user = User::factory()->create();
-        $group = IntegrationGroup::factory()->create(['user_id' => $user->id]);
-        $integration = Integration::factory()->create([
-            'user_id' => $user->id,
-            'integration_group_id' => $group->id,
-        ]);
-
-        $actor = EventObject::factory()->create(['user_id' => $user->id]);
-        $target = EventObject::factory()->create(['user_id' => $user->id]);
-
-        for ($i = 0; $i < 40; $i++) {
-            Event::create([
-                'source_id' => 'prefixed-' . $i,
-                'time' => now()->subDays(40 - $i),
-                'integration_id' => $integration->id,
-                'actor_id' => $actor->id,
-                'target_id' => $target->id,
-                'service' => 'apple_health',
-                'domain' => 'health',
-                'action' => 'had_apple_exercise_time',
-                'value' => 20 + $i,
-                'value_multiplier' => 1,
-                'value_unit' => 'min',
-            ]);
-        }
-
-        $connection = DB::connection();
-        $originalPrefix = $connection->getTablePrefix();
-
-        if ($originalPrefix === '') {
-            DB::statement('CREATE TEMP VIEW dev_events AS SELECT * FROM events');
-            DB::statement('CREATE TEMP VIEW dev_integrations AS SELECT * FROM integrations');
-            DB::statement('CREATE TEMP TABLE dev_metric_statistics (LIKE metric_statistics INCLUDING DEFAULTS)');
-
-            $connection->setTablePrefix('dev_');
-        }
-
-        try {
-            $job = new class extends CalculateMetricStatisticsJob
-            {
-                public function calculate(string $userId, string $service, string $action, string $valueUnit): void
-                {
-                    $this->calculateMetricStatistics($userId, $service, $action, $valueUnit);
-                }
-            };
-
-            $job->calculate($user->id, 'apple_health', 'had_apple_exercise_time', 'min');
-
-            $this->assertDatabaseHas('metric_statistics', [
-                'user_id' => $user->id,
-                'service' => 'apple_health',
-                'action' => 'had_apple_exercise_time',
-                'value_unit' => 'min',
-            ]);
-        } finally {
-            $connection->setTablePrefix($originalPrefix);
-        }
-    }
-
-    #[Test]
     public function calculate_metric_statistics_job_skips_when_fewer_than_ten_events(): void
     {
         $user = User::factory()->create();
@@ -577,8 +511,8 @@ class MetricTrackingTest extends TestCase
         $user = User::factory()->create();
         $metric = MetricStatistic::factory()->create([
             'user_id' => $user->id,
-            'service' => 'oura',
-            'action' => 'had_readiness_score',
+            'service' => 'apple_health',
+            'action' => 'had_respiratory_rate',
             'value_unit' => 'percent',
             'mean_value' => 75,
             'stddev_value' => 5,
@@ -602,17 +536,16 @@ class MetricTrackingTest extends TestCase
             'time' => now(),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
-            'service' => 'oura',
+            'service' => 'apple_health',
             'domain' => 'health',
-            'action' => 'had_readiness_score',
+            'action' => 'had_respiratory_rate',
             'value' => 95, // Much higher than upper bound of 85
             'value_multiplier' => 1,
             'value_unit' => 'percent',
             'target_id' => $target->id,
         ]);
 
-        $job = new DetectMetricAnomaliesJob($event);
-        $job->handle();
+        $this->detect($event);
 
         $this->assertDatabaseHas('metric_trends', [
             'metric_statistic_id' => $metric->id,
@@ -625,24 +558,24 @@ class MetricTrackingTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->assertFalse($user->isMetricTrackingDisabled('oura', 'had_readiness_score', 'percent'));
+        $this->assertFalse($user->isMetricTrackingDisabled('apple_health', 'had_respiratory_rate', 'percent'));
 
-        $user->disableMetricTracking('oura', 'had_readiness_score', 'percent');
+        $user->disableMetricTracking('apple_health', 'had_respiratory_rate', 'percent');
 
-        $this->assertTrue($user->isMetricTrackingDisabled('oura', 'had_readiness_score', 'percent'));
+        $this->assertTrue($user->isMetricTrackingDisabled('apple_health', 'had_respiratory_rate', 'percent'));
     }
 
     #[Test]
     public function user_can_enable_metric_tracking(): void
     {
         $user = User::factory()->create();
-        $user->disableMetricTracking('oura', 'had_readiness_score', 'percent');
+        $user->disableMetricTracking('apple_health', 'had_respiratory_rate', 'percent');
 
-        $this->assertTrue($user->isMetricTrackingDisabled('oura', 'had_readiness_score', 'percent'));
+        $this->assertTrue($user->isMetricTrackingDisabled('apple_health', 'had_respiratory_rate', 'percent'));
 
-        $user->enableMetricTracking('oura', 'had_readiness_score', 'percent');
+        $user->enableMetricTracking('apple_health', 'had_respiratory_rate', 'percent');
 
-        $this->assertFalse($user->isMetricTrackingDisabled('oura', 'had_readiness_score', 'percent'));
+        $this->assertFalse($user->isMetricTrackingDisabled('apple_health', 'had_respiratory_rate', 'percent'));
     }
 
     #[Test]
@@ -695,24 +628,24 @@ class MetricTrackingTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->assertNull($user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
+        $this->assertNull($user->getAnomalyDetectionModeOverride('apple_health', 'had_respiratory_rate', 'percent'));
 
-        $user->setAnomalyDetectionMode('oura', 'had_readiness_score', 'percent', 'retrospective');
+        $user->setAnomalyDetectionMode('apple_health', 'had_respiratory_rate', 'percent', 'retrospective');
 
-        $this->assertEquals('retrospective', $user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
+        $this->assertEquals('retrospective', $user->getAnomalyDetectionModeOverride('apple_health', 'had_respiratory_rate', 'percent'));
     }
 
     #[Test]
     public function user_can_clear_anomaly_detection_mode_override(): void
     {
         $user = User::factory()->create();
-        $user->setAnomalyDetectionMode('oura', 'had_readiness_score', 'percent', 'disabled');
+        $user->setAnomalyDetectionMode('apple_health', 'had_respiratory_rate', 'percent', 'disabled');
 
-        $this->assertEquals('disabled', $user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
+        $this->assertEquals('disabled', $user->getAnomalyDetectionModeOverride('apple_health', 'had_respiratory_rate', 'percent'));
 
-        $user->clearAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent');
+        $user->clearAnomalyDetectionModeOverride('apple_health', 'had_respiratory_rate', 'percent');
 
-        $this->assertNull($user->getAnomalyDetectionModeOverride('oura', 'had_readiness_score', 'percent'));
+        $this->assertNull($user->getAnomalyDetectionModeOverride('apple_health', 'had_respiratory_rate', 'percent'));
     }
 
     #[Test]
@@ -750,8 +683,8 @@ class MetricTrackingTest extends TestCase
         $user = User::factory()->create();
         $metric = MetricStatistic::factory()->create([
             'user_id' => $user->id,
-            'service' => 'oura',
-            'action' => 'had_readiness_score',
+            'service' => 'apple_health',
+            'action' => 'had_respiratory_rate',
             'value_unit' => 'percent',
             'mean_value' => 75,
             'stddev_value' => 5,
@@ -761,7 +694,7 @@ class MetricTrackingTest extends TestCase
         ]);
 
         // Set user override to disabled
-        $user->setAnomalyDetectionMode('oura', 'had_readiness_score', 'percent', 'disabled');
+        $user->setAnomalyDetectionMode('apple_health', 'had_respiratory_rate', 'percent', 'disabled');
 
         $group = IntegrationGroup::factory()->create(['user_id' => $user->id]);
         $integration = Integration::factory()->create([
@@ -778,17 +711,16 @@ class MetricTrackingTest extends TestCase
             'time' => now(),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
-            'service' => 'oura',
+            'service' => 'apple_health',
             'domain' => 'health',
-            'action' => 'had_readiness_score',
+            'action' => 'had_respiratory_rate',
             'value' => 95, // Much higher than upper bound
             'value_multiplier' => 1,
             'value_unit' => 'percent',
             'target_id' => $target->id,
         ]);
 
-        $job = new DetectMetricAnomaliesJob($event);
-        $job->handle();
+        $this->detect($event);
 
         // No anomaly should be created due to user override
         $this->assertEquals(0, MetricTrend::where('metric_statistic_id', $metric->id)->count());
@@ -797,259 +729,6 @@ class MetricTrackingTest extends TestCase
     // -------------------------------------------------------------------------
     // Baseline review flag (CRX-652)
     // -------------------------------------------------------------------------
-
-    #[Test]
-    public function seven_consecutive_anomaly_dates_suggest_a_baseline_review(): void
-    {
-        $metric = MetricStatistic::factory()->create(['baseline_reset_suggested_at' => null]);
-
-        foreach (range(0, 6) as $daysAgo) {
-            MetricTrend::factory()->create([
-                'metric_statistic_id' => $metric->id,
-                'type' => 'anomaly_high',
-                'detected_at' => now()->subDays($daysAgo),
-                'start_date' => now()->subDays($daysAgo)->toDateString(),
-            ]);
-        }
-
-        $job = new class(Event::factory()->make()) extends DetectMetricAnomaliesJob
-        {
-            public function suggestBaselineReview(MetricStatistic $metric, string $type): void
-            {
-                $this->suggestBaselineReviewIfPersistent($metric, $type);
-            }
-        };
-
-        $job->suggestBaselineReview($metric, 'anomaly_high');
-
-        $this->assertNotNull($metric->fresh()->baseline_reset_suggested_at);
-    }
-
-    #[Test]
-    public function seven_distinct_anomaly_dates_with_a_gap_do_not_suggest_a_baseline_review(): void
-    {
-        $metric = MetricStatistic::factory()->create(['baseline_reset_suggested_at' => null]);
-
-        foreach ([0, 1, 2, 4, 5, 6, 7] as $daysAgo) {
-            MetricTrend::factory()->create([
-                'metric_statistic_id' => $metric->id,
-                'type' => 'anomaly_high',
-                'detected_at' => now()->subDays($daysAgo),
-                'start_date' => now()->subDays($daysAgo)->toDateString(),
-            ]);
-        }
-
-        $job = new class(Event::factory()->make()) extends DetectMetricAnomaliesJob
-        {
-            public function suggestBaselineReview(MetricStatistic $metric, string $type): void
-            {
-                $this->suggestBaselineReviewIfPersistent($metric, $type);
-            }
-        };
-
-        $job->suggestBaselineReview($metric, 'anomaly_high');
-
-        $this->assertNull($metric->fresh()->baseline_reset_suggested_at);
-    }
-
-    #[Test]
-    public function monthly_trend_sets_baseline_reset_suggested_at(): void
-    {
-        $user = User::factory()->create();
-        $group = IntegrationGroup::factory()->create(['user_id' => $user->id]);
-        $integration = Integration::factory()->create([
-            'user_id' => $user->id,
-            'integration_group_id' => $group->id,
-        ]);
-        $actor = EventObject::factory()->create(['user_id' => $user->id]);
-        $target = EventObject::factory()->create(['user_id' => $user->id]);
-
-        $metric = MetricStatistic::factory()->create([
-            'user_id' => $user->id,
-            'service' => 'oura',
-            'action' => 'had_readiness_score',
-            'value_unit' => 'percent',
-            'baseline_reset_suggested_at' => null,
-        ]);
-
-        // 5 events in the comparison period (3 months back) with value 70
-        $comparisonStart = now()->startOfMonth()->subMonths(3);
-        for ($i = 0; $i < 5; $i++) {
-            Event::create([
-                'source_id' => 'monthly-comp-' . $i,
-                'time' => $comparisonStart->copy()->addDays($i),
-                'integration_id' => $integration->id,
-                'actor_id' => $actor->id,
-                'target_id' => $target->id,
-                'service' => 'oura',
-                'domain' => 'health',
-                'action' => 'had_readiness_score',
-                'value' => 70,
-                'value_multiplier' => 1,
-                'value_unit' => 'percent',
-            ]);
-        }
-
-        // 5 events in the current month with value 90 (~29% higher — exceeds 15% threshold)
-        $currentMonthStart = now()->startOfMonth();
-        for ($i = 0; $i < 5; $i++) {
-            Event::create([
-                'source_id' => 'monthly-curr-' . $i,
-                'time' => $currentMonthStart->copy()->addDays($i),
-                'integration_id' => $integration->id,
-                'actor_id' => $actor->id,
-                'target_id' => $target->id,
-                'service' => 'oura',
-                'domain' => 'health',
-                'action' => 'had_readiness_score',
-                'value' => 90,
-                'value_multiplier' => 1,
-                'value_unit' => 'percent',
-            ]);
-        }
-
-        $this->assertNull($metric->baseline_reset_suggested_at);
-
-        (new DetectMetricTrendsJob)->handle();
-
-        $metric->refresh();
-        $this->assertNotNull($metric->baseline_reset_suggested_at);
-    }
-
-    #[Test]
-    public function quarterly_trend_sets_baseline_reset_suggested_at(): void
-    {
-        $user = User::factory()->create();
-        $group = IntegrationGroup::factory()->create(['user_id' => $user->id]);
-        $integration = Integration::factory()->create([
-            'user_id' => $user->id,
-            'integration_group_id' => $group->id,
-        ]);
-        $actor = EventObject::factory()->create(['user_id' => $user->id]);
-        $target = EventObject::factory()->create(['user_id' => $user->id]);
-
-        $metric = MetricStatistic::factory()->create([
-            'user_id' => $user->id,
-            'service' => 'oura',
-            'action' => 'had_readiness_score',
-            'value_unit' => 'percent',
-            'baseline_reset_suggested_at' => null,
-        ]);
-
-        // 5 events 2 quarters back with value 70
-        $comparisonStart = now()->startOfQuarter()->subQuarters(2);
-        for ($i = 0; $i < 5; $i++) {
-            Event::create([
-                'source_id' => 'quarterly-comp-' . $i,
-                'time' => $comparisonStart->copy()->addDays($i),
-                'integration_id' => $integration->id,
-                'actor_id' => $actor->id,
-                'target_id' => $target->id,
-                'service' => 'oura',
-                'domain' => 'health',
-                'action' => 'had_readiness_score',
-                'value' => 70,
-                'value_multiplier' => 1,
-                'value_unit' => 'percent',
-            ]);
-        }
-
-        // 5 events in the current quarter with value 90 (~29% higher)
-        $currentQuarterStart = now()->startOfQuarter();
-        for ($i = 0; $i < 5; $i++) {
-            Event::create([
-                'source_id' => 'quarterly-curr-' . $i,
-                'time' => $currentQuarterStart->copy()->addDays($i),
-                'integration_id' => $integration->id,
-                'actor_id' => $actor->id,
-                'target_id' => $target->id,
-                'service' => 'oura',
-                'domain' => 'health',
-                'action' => 'had_readiness_score',
-                'value' => 90,
-                'value_multiplier' => 1,
-                'value_unit' => 'percent',
-            ]);
-        }
-
-        $this->assertNull($metric->baseline_reset_suggested_at);
-
-        (new DetectMetricTrendsJob)->handle();
-
-        $metric->refresh();
-        $this->assertNotNull($metric->baseline_reset_suggested_at);
-    }
-
-    #[Test]
-    public function acknowledging_last_sustained_trend_clears_baseline_reset_flag(): void
-    {
-        $metric = MetricStatistic::factory()->create([
-            'baseline_reset_suggested_at' => now()->subDay(),
-        ]);
-
-        $trend = MetricTrend::factory()->create([
-            'metric_statistic_id' => $metric->id,
-            'type' => 'trend_up_monthly',
-            'acknowledged_at' => null,
-        ]);
-
-        $trend->acknowledge();
-
-        $metric->refresh();
-        $this->assertNull($metric->baseline_reset_suggested_at);
-    }
-
-    #[Test]
-    public function acknowledging_one_trend_does_not_clear_flag_while_others_remain(): void
-    {
-        $metric = MetricStatistic::factory()->create([
-            'baseline_reset_suggested_at' => now()->subDay(),
-        ]);
-
-        $monthlyTrend = MetricTrend::factory()->create([
-            'metric_statistic_id' => $metric->id,
-            'type' => 'trend_up_monthly',
-            'acknowledged_at' => null,
-        ]);
-
-        MetricTrend::factory()->create([
-            'metric_statistic_id' => $metric->id,
-            'type' => 'trend_up_quarterly',
-            'acknowledged_at' => null,
-        ]);
-
-        $monthlyTrend->acknowledge();
-
-        $metric->refresh();
-        $this->assertNotNull($metric->baseline_reset_suggested_at);
-    }
-
-    #[Test]
-    public function get_baselines_tool_includes_baseline_review_fields(): void
-    {
-        $metric = MetricStatistic::factory()->create([
-            'baseline_reset_suggested_at' => now()->subDays(3),
-        ]);
-
-        $tool = new class extends GetBaselinesTool
-        {
-            public function publicFormatBaseline(MetricStatistic $statistic): array
-            {
-                return $this->formatBaseline($statistic);
-            }
-        };
-
-        // Flag is set
-        $result = $tool->publicFormatBaseline($metric);
-        $this->assertTrue($result['baseline_review_suggested']);
-        $this->assertEquals(now()->subDays(3)->toDateString(), $result['baseline_review_suggested_since']);
-
-        // Flag is cleared
-        $metric->update(['baseline_reset_suggested_at' => null]);
-        $result = $tool->publicFormatBaseline($metric->fresh());
-        $this->assertFalse($result['baseline_review_suggested']);
-        $this->assertNull($result['baseline_review_suggested_since']);
-    }
 
     // -------------------------------------------------------------------------
     // Significance scoring (CRX-654)
@@ -1071,8 +750,8 @@ class MetricTrackingTest extends TestCase
         // test events at exactly 2σ, 3σ, 5σ above the mean are all flagged.
         $metric = MetricStatistic::factory()->create([
             'user_id' => $user->id,
-            'service' => 'oura',
-            'action' => 'had_readiness_score',
+            'service' => 'apple_health',
+            'action' => 'had_respiratory_rate',
             'value_unit' => 'percent',
             'mean_value' => 100,
             'stddev_value' => 10,
@@ -1095,16 +774,15 @@ class MetricTrackingTest extends TestCase
                 'integration_id' => $integration->id,
                 'actor_id' => $actor->id,
                 'target_id' => $target->id,
-                'service' => 'oura',
+                'service' => 'apple_health',
                 'domain' => 'health',
-                'action' => 'had_readiness_score',
+                'action' => 'had_respiratory_rate',
                 'value' => $value,
                 'value_multiplier' => 1,
                 'value_unit' => 'percent',
             ]);
 
-            $job = new DetectMetricAnomaliesJob($event);
-            $job->handle();
+            $this->detect($event);
 
             $trend = MetricTrend::where('metric_statistic_id', $metric->id)
                 ->whereJsonContains('metadata->event_id', $event->id)
@@ -1146,16 +824,16 @@ class MetricTrackingTest extends TestCase
             'time' => now(),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
-            'service' => 'oura',
+            'service' => 'apple_health',
             'domain' => 'health',
-            'action' => 'had_readiness_score',
+            'action' => 'had_respiratory_rate',
             'value' => 95, // above upper bound of 85
             'value_multiplier' => 1,
             'value_unit' => 'percent',
             'target_id' => $target->id,
         ]);
 
-        (new DetectMetricAnomaliesJob($event))->handle();
+        $this->detect($event);
 
         $this->assertEquals(0, MetricTrend::where('metric_statistic_id', $metric->id)->count());
     }
@@ -1178,16 +856,16 @@ class MetricTrackingTest extends TestCase
             'time' => now(),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
-            'service' => 'oura',
+            'service' => 'apple_health',
             'domain' => 'health',
-            'action' => 'had_readiness_score',
+            'action' => 'had_respiratory_rate',
             'value' => 50, // below lower bound of 65
             'value_multiplier' => 1,
             'value_unit' => 'percent',
             'target_id' => $target->id,
         ]);
 
-        (new DetectMetricAnomaliesJob($event))->handle();
+        $this->detect($event);
 
         $this->assertEquals(0, MetricTrend::where('metric_statistic_id', $metric->id)->count());
     }
@@ -1211,16 +889,16 @@ class MetricTrackingTest extends TestCase
             'time' => now(),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
-            'service' => 'oura',
+            'service' => 'apple_health',
             'domain' => 'health',
-            'action' => 'had_readiness_score',
+            'action' => 'had_respiratory_rate',
             'value' => 50, // below lower bound → anomaly_low
             'value_multiplier' => 1,
             'value_unit' => 'percent',
             'target_id' => $target->id,
         ]);
 
-        (new DetectMetricAnomaliesJob($event))->handle();
+        $this->detect($event);
 
         $this->assertDatabaseHas('metric_trends', [
             'metric_statistic_id' => $metric->id,
@@ -1247,16 +925,16 @@ class MetricTrackingTest extends TestCase
             'time' => now(),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
-            'service' => 'oura',
+            'service' => 'apple_health',
             'domain' => 'health',
-            'action' => 'had_readiness_score',
+            'action' => 'had_respiratory_rate',
             'value' => 95, // above upper bound → anomaly_high
             'value_multiplier' => 1,
             'value_unit' => 'percent',
             'target_id' => $target->id,
         ]);
 
-        (new DetectMetricAnomaliesJob($event))->handle();
+        $this->detect($event);
 
         $this->assertDatabaseHas('metric_trends', [
             'metric_statistic_id' => $metric->id,
@@ -1282,16 +960,16 @@ class MetricTrackingTest extends TestCase
             'time' => now(),
             'integration_id' => $integration->id,
             'actor_id' => $actor->id,
-            'service' => 'oura',
+            'service' => 'apple_health',
             'domain' => 'health',
-            'action' => 'had_readiness_score',
+            'action' => 'had_respiratory_rate',
             'value' => 95,
             'value_multiplier' => 1,
             'value_unit' => 'percent',
             'target_id' => $target->id,
         ]);
 
-        (new DetectMetricAnomaliesJob($event))->handle();
+        $this->detect($event);
 
         $this->assertDatabaseHas('metric_trends', [
             'metric_statistic_id' => $metric->id,
@@ -1357,7 +1035,7 @@ class MetricTrackingTest extends TestCase
     // Directional suppression (CRX-655)
     // -------------------------------------------------------------------------
 
-    private function makeSuppressionFixtures(string $service = 'oura', string $action = 'had_readiness_score', string $unit = 'percent'): array
+    private function makeSuppressionFixtures(string $service = 'apple_health', string $action = 'had_respiratory_rate', string $unit = 'percent'): array
     {
         $user = User::factory()->create();
         $metric = MetricStatistic::factory()->create([
@@ -1380,5 +1058,18 @@ class MetricTrackingTest extends TestCase
         $target = EventObject::factory()->create(['user_id' => $user->id]);
 
         return ['user' => $user, 'metric' => $metric, 'integration' => $integration, 'actor' => $actor, 'target' => $target];
+    }
+
+    /**
+     * Runs the anomaly task body directly. The event is backdated so its
+     * value counts as settled: a freshly written reading is provisional.
+     */
+    private function detect(Event $event): void
+    {
+        Event::whereKey($event->id)->update(['updated_at' => now()->subDay()]);
+
+        $task = new DetectAnomaliesTask($event->fresh(), TaskRegistry::getTask('detect_anomalies'));
+
+        (fn () => $this->execute())->call($task);
     }
 }

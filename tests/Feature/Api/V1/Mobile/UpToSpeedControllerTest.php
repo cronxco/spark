@@ -244,7 +244,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function includes_todays_unacknowledged_anomalies(): void
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         $anomaly = MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
             'detected_at' => now(),
@@ -266,7 +266,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function excludes_acknowledged_anomalies(): void
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
             'detected_at' => now(),
@@ -282,7 +282,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function excludes_suppressed_anomalies(): void
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
             'detected_at' => now(),
@@ -299,7 +299,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function anomaly_caught_up_at_is_set_when_marked(): void
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         $anomaly = MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
             'detected_at' => now(),
@@ -698,7 +698,7 @@ class UpToSpeedControllerTest extends TestCase
             'time' => now(),
         ]);
 
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
             'detected_at' => now(),
@@ -1001,7 +1001,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function include_acknowledged_bypasses_noise_only_for_acknowledged_anomalies(): void
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         $acknowledged = MetricTrend::factory()->marginal()->create([
             'metric_statistic_id' => $stat->id,
             'detected_at' => now(),
@@ -1063,7 +1063,7 @@ class UpToSpeedControllerTest extends TestCase
     #[Test]
     public function include_acknowledged_returns_suppressed_anomalies(): void
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
         $anomaly = MetricTrend::factory()->significant()->create([
             'metric_statistic_id' => $stat->id,
             'detected_at' => now(),
@@ -1584,7 +1584,7 @@ class UpToSpeedControllerTest extends TestCase
 
     private function acknowledgedAnomaly(): MetricTrend
     {
-        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id]);
+        $stat = MetricStatistic::factory()->create(['user_id' => $this->user->id, 'service' => 'apple_health', 'action' => 'had_respiratory_rate']);
 
         // significant() sets the deviation as well as the type: the factory
         // definition picks its deviation scale from the type it generated, so

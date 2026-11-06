@@ -38,6 +38,7 @@ class PulseCommands
         ];
 
         return [
+            'metrics:repair' => $def('Repair metrics', 'Remove stale anomalies and the retired 15% trends, clear baseline-review flags, then relearn baselines.', ['--dry-run' => true, '--user' => '{user}', '--merge-services' => true], ['--apply' => true, '--user' => '{user}', '--merge-services' => true], 'you'),
             'task-pipeline:migrate-executions' => $def('Migrate task executions', 'Create task execution rows for records that predate the pipeline.', ['--dry-run' => true], []),
             'task-pipeline:populate-initial-state' => $def('Populate initial task state', 'Fill initial task execution state for existing records.', ['--dry-run' => true], []),
             'knowledge:tasks-backfill' => $def('Backfill knowledge tasks', 'Value-only backfill of task fields; changes can be rolled back from the console.', ['--user' => '{user}'], ['--user' => '{user}', '--apply' => true], 'you'),

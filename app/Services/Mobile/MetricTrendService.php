@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\MetricStatistic;
 use App\Models\User;
 use App\Services\MetricPresentation;
+use App\Services\Metrics\MetricCompleteness;
 
 class MetricTrendService
 {
@@ -66,14 +67,15 @@ class MetricTrendService
             )
             ->whereBetween('time', [$startDate, $endDate])
             ->orderBy('time', 'asc')
-            ->get(['id', 'time', 'value', 'value_multiplier']);
+            ->get(['id', 'time', 'value', 'value_multiplier', 'updated_at']);
 
+        $timezone = $user->getTimezone() ?? 'UTC';
         $hasValidStats = $statistic->hasValidStatistics();
         $presentation = app(MetricPresentation::class);
         $isOrdinal = $presentation->isOrdinal($statistic);
 
         $dailyValues = $events->groupBy(fn ($e) => $e->time->toDateString())
-            ->map(function ($dayEvents) use ($statistic, $hasValidStats, $presentation, $isOrdinal) {
+            ->map(function ($dayEvents) use ($statistic, $hasValidStats, $presentation, $isOrdinal, $timezone) {
                 $latest = $dayEvents->sortByDesc('time')->first();
                 $value = $latest->formatted_value;
 
@@ -92,7 +94,8 @@ class MetricTrendService
                         $entry['vs_baseline_pct'] = $presentation->baselineDeltaPct($statistic, $value);
                     }
 
-                    $entry['is_anomaly'] = $presentation->isAnomalous($statistic, $value);
+                    $entry['is_anomaly'] = $presentation->isAnomalous($statistic, $value)
+                        && app(MetricCompleteness::class)->isFinal($statistic->service, $statistic->action, $latest->time, $timezone, null, $latest->updated_at);
                 }
 
                 return $entry;

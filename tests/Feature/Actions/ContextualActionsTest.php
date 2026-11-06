@@ -3,7 +3,7 @@
 namespace Tests\Feature\Actions;
 
 use App\Jobs\Metrics\CalculateMetricStatisticsJob;
-use App\Jobs\Metrics\DetectMetricTrendsJob;
+use App\Jobs\Metrics\GenerateMetricInsightsJob;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
@@ -154,7 +154,7 @@ class ContextualActionsTest extends TestCase
         $this->actingAs($this->alice);
 
         $this->assertCount(2, ContextualActionsQuery::commands('metrics.index', [], ''));
-        $this->assertCount(1, ContextualActionsQuery::commands('metrics.index', [], 'detect'));
+        $this->assertCount(1, ContextualActionsQuery::commands('metrics.index', [], 'insights'));
         $this->assertCount(0, ContextualActionsQuery::commands('metrics.index', [], 'nothing like this'));
     }
 
@@ -174,7 +174,7 @@ class ContextualActionsTest extends TestCase
             ->dispatch('run-action', action: 'metrics.detect_trends');
 
         Queue::assertPushed(CalculateMetricStatisticsJob::class, fn ($job) => $job->userId === $this->alice->id);
-        Queue::assertPushed(DetectMetricTrendsJob::class, fn ($job) => $job->userId === $this->alice->id);
+        Queue::assertPushed(GenerateMetricInsightsJob::class, fn ($job) => $job->userId === $this->alice->id);
     }
 
     #[Test]

@@ -272,7 +272,8 @@ class MetricPresentationTest extends FrameworkTestCase
     public function two_bands_from_usual_is_an_anomaly(): void
     {
         $this->assertTrue($this->presentation->isAnomalous($this->resilience(), 1.0));
-        $this->assertTrue($this->presentation->isAnomalous($this->resilience(), 5.0));
+        // Two bands above the usual is the good direction for resilience, so it is not raised.
+        $this->assertFalse($this->presentation->isAnomalous($this->resilience(), 5.0));
     }
 
     #[Test]

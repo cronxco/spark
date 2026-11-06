@@ -3,7 +3,7 @@
 namespace Tests\Feature\Explore;
 
 use App\Jobs\Metrics\CalculateMetricStatisticsJob;
-use App\Jobs\Metrics\DetectMetricTrendsJob;
+use App\Jobs\Metrics\GenerateMetricInsightsJob;
 use App\Livewire\MetricDetail;
 use App\Livewire\MetricsOverview;
 use App\Models\Event;
@@ -11,6 +11,8 @@ use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\MetricStatistic;
 use App\Models\User;
+use App\Services\Metrics\InsightEngine;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -66,9 +68,9 @@ class MetricTenancyTest extends TestCase
         Livewire::test(MetricDetail::class, ['metric' => $metric])->call('calculateMetricStatistics');
 
         Queue::assertPushed(CalculateMetricStatisticsJob::class, fn ($job) => $job->userId === $this->alice->id);
-        Queue::assertPushed(DetectMetricTrendsJob::class, fn ($job) => $job->userId === $this->alice->id);
+        Queue::assertPushed(GenerateMetricInsightsJob::class, fn ($job) => $job->userId === $this->alice->id);
         Queue::assertNotPushed(CalculateMetricStatisticsJob::class, fn ($job) => $job->userId === null);
-        Queue::assertNotPushed(DetectMetricTrendsJob::class, fn ($job) => $job->userId === null);
+        Queue::assertNotPushed(GenerateMetricInsightsJob::class, fn ($job) => $job->userId === null);
     }
 
     #[Test]
@@ -88,32 +90,36 @@ class MetricTenancyTest extends TestCase
     }
 
     #[Test]
-    public function a_user_scoped_trend_run_only_reads_that_users_metrics(): void
+    public function a_user_scoped_insights_run_only_reads_that_users_metrics(): void
     {
-        $alices = MetricStatistic::factory()->create(['user_id' => $this->alice->id]);
+        MetricStatistic::factory()->create(['user_id' => $this->alice->id]);
         MetricStatistic::factory()->create(['user_id' => $this->bob->id]);
 
-        $job = new class($this->alice->id) extends DetectMetricTrendsJob
+        $engine = new class extends InsightEngine
         {
             /** @var array<int, string> */
             public array $seen = [];
 
-            protected function detectTrendsForMetric(MetricStatistic $metric): void
+            public function __construct() {}
+
+            public function generateForUser(User $user, ?CarbonInterface $now = null): int
             {
-                $this->seen[] = (string) $metric->id;
+                $this->seen[] = (string) $user->id;
+
+                return 0;
             }
         };
 
-        $job->handle();
+        (new GenerateMetricInsightsJob($this->alice->id))->handle($engine);
 
-        $this->assertSame([(string) $alices->id], $job->seen);
+        $this->assertSame([(string) $this->alice->id], $engine->seen);
     }
 
     #[Test]
     public function only_one_run_per_scope_can_be_pending(): void
     {
         $this->assertSame($this->alice->id, (new CalculateMetricStatisticsJob($this->alice->id))->uniqueId());
-        $this->assertSame('all', (new DetectMetricTrendsJob)->uniqueId());
+        $this->assertSame('all', (new GenerateMetricInsightsJob)->uniqueId());
     }
 
     /**

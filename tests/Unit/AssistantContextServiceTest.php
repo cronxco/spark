@@ -539,23 +539,25 @@ class AssistantContextServiceTest extends TestCase
         $user = User::factory()->create();
         $flintIntegration = $this->createFlintIntegration($user);
 
-        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'oura']);
+        $integration = Integration::factory()->create(['user_id' => $user->id, 'service' => 'apple_health']);
 
         MetricStatistic::factory()->create([
             'user_id' => $user->id,
-            'service' => 'oura',
-            'action' => 'logged_hrv',
+            'service' => 'apple_health',
+            'action' => 'had_respiratory_rate',
             'value_unit' => 'ms',
+            'event_count' => 30,
             'mean_value' => 55.0,
+            'stddev_value' => 10.0,
             'normal_lower_bound' => 35.0,
             'normal_upper_bound' => 75.0,
         ]);
 
-        // Create event with HRV value outside normal bounds (anomaly)
+        // Create event outside normal bounds (anomaly) for a metric that is judged
         Event::factory()->create([
             'integration_id' => $integration->id,
-            'service' => 'oura',
-            'action' => 'logged_hrv',
+            'service' => 'apple_health',
+            'action' => 'had_respiratory_rate',
             'time' => now(),
             'value' => 85.0, // Above upper bound
             'value_unit' => 'ms',

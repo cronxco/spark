@@ -11,6 +11,8 @@ use App\Models\MetricTrend;
 use App\Models\User;
 use App\Services\Flint\FlintLinkedEventCards;
 use App\Services\MetricPresentation;
+use App\Services\Metrics\AnomalyPolicy;
+use App\Services\Metrics\MetricCatalogue;
 use App\Support\FlintDigestDay;
 use App\Support\FlintDigestKind;
 use App\Support\FlintQuestion;
@@ -23,18 +25,6 @@ use Spatie\Activitylog\Models\Activity;
 
 class UpToSpeedController extends Controller
 {
-    /**
-     * Consecutive days of the same anomaly after which the baseline — not the
-     * reading — is what has moved, and the metric should stop being raised.
-     */
-    private const REBASELINE_STREAK_DAYS = 7;
-
-    /**
-     * Standard deviations a first-day anomaly must clear to be worth raising.
-     * Below this a single day's movement is noise.
-     */
-    private const SINGLE_DAY_DEVIATION_THRESHOLD = 3.0;
-
     /**
      * Hours of reading material to offer. A rolling window, so unaffected by
      * the reader's timezone.
@@ -330,18 +320,15 @@ class UpToSpeedController extends Controller
         $streak = $this->calculateStreakDays($trend, $stat);
         $deviation = abs((float) $trend->deviation);
 
-        // Seen every day for long enough that the baseline, not the reading, is
-        // what has drifted.
-        if ($streak >= self::REBASELINE_STREAK_DAYS) {
+        // Only listed metrics are judged; an anomaly stored before the list
+        // existed is not shown.
+        if (! app(MetricCatalogue::class)->raisesAnomalies($stat->service, $stat->action)) {
             return true;
         }
 
-        // A one-off move has to be large to be worth interrupting for.
-        if ($streak <= 1 && $deviation < self::SINGLE_DAY_DEVIATION_THRESHOLD) {
-            return true;
-        }
-
-        return false;
+        // A one-off move has to be large to be worth interrupting for, and a
+        // streak long enough means the baseline, not the reading, has drifted.
+        return app(AnomalyPolicy::class)->isNoise($deviation, $streak);
     }
 
     /**

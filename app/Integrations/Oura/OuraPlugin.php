@@ -2718,6 +2718,27 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
         }
     }
 
+    /**
+     * Bring a day's Min, Max and Data Points blocks up to date after its
+     * readings grew.
+     */
+    protected function refreshHeartRateBlocks(Event $event, int $min, int $max, int $count): void
+    {
+        $values = [
+            'Min Heart Rate' => $min,
+            'Max Heart Rate' => $max,
+            'Data Points' => $count,
+        ];
+
+        foreach ($event->blocks()->whereIn('title', array_keys($values))->get() as $block) {
+            [$encoded, $multiplier] = $block->title === 'Data Points'
+                ? [$values[$block->title], 1]
+                : $this->encodeNumericValue($values[$block->title]);
+
+            $block->update(['value' => $encoded, 'value_multiplier' => $multiplier]);
+        }
+    }
+
     protected function fetchHeartRateSeries(Integration $integration, string $startIso, string $endIso): void
     {
         $this->ensureUserProfile($integration);
@@ -2740,6 +2761,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             $sourceId = "oura_heartrate_{$integration->id}_{$day}";
             $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
             if ($exists) {
+                // The first day of a window can start mid-day: its readings
+                // are partial, so they must not replace a complete summary.
+                if ($day === Str::substr($startIso, 0, 10) && ! Str::contains(Str::substr($startIso, 11, 8), '00:00:00')) {
+                    continue;
+                }
+
                 // The day fills in through the day: keep its average current,
                 // as OuraHeartrateData does, so anomaly detection judges the
                 // whole day rather than the first overnight readings.
@@ -2754,6 +2781,9 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
                         'avg_bpm' => $avg,
                     ]),
                 ]);
+
+                // The summary blocks describe the same readings, so they follow.
+                $this->refreshHeartRateBlocks($exists, $min, $max, (int) $points->count());
 
                 continue;
             }
