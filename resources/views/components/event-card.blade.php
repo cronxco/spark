@@ -218,7 +218,7 @@
                     @foreach ($details['takeaways'] as $takeaway)
                         <li class="grid grid-cols-[6px_1fr] gap-2.5">
                             <span class="mt-[7px] h-1.5 w-1.5 rounded-sm {{ $domainFill }}" aria-hidden="true"></span>
-                            <span class="line-clamp-2">{!! \Illuminate\Support\Str::inlineMarkdown($takeaway, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}</span>
+                            <span>{!! \Illuminate\Support\Str::inlineMarkdown($takeaway, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}</span>
                         </li>
                     @endforeach
                 </ul>

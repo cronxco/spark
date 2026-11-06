@@ -333,7 +333,7 @@ When Flint prose links an event, show it as a card under the paragraph, in the o
 - **Journey** (a flight a flight tracker wrote into the calendar): the airport codes are the hero, with each end's local time under it, joined by a route line. While the flight is in the air the plane glyph sits along the line at the share of the flight time gone. The context names the flight time and the cities.
 - **Calendar** (any other calendar entry): the entry's title, then its time span and length.
 - **Payment** (a card or bank payment): the amount as the hero, the merchant in display case, the account and a Pending chip while the line is pending. Trailing, a strip of the week's payments up to that day, with this one in the domain fill and a caption when it stands out ("Largest this week").
-- **Reading** (an article or newsletter issue): the publication's monogram and name in the eyebrow, the article's own headline in the serif face, the read time, then up to four key takeaways, each a bullet held to two lines.
+- **Reading** (an article or newsletter issue): the publication's monogram and name in the eyebrow, the article's own headline in the serif face, the read time, then up to four key takeaways, each a bullet shown in full, never truncated (Will, 2026-11-06).
 
 Every layout but Metric spans the row. Only Metric cards carry a comparison line (3.4): a one-off event has no usual, so the others show a fact instead. When the reader has answered a Flint question that links the event, the card ends with "You answered" and the answer (its note when there is one) under a hairline.
 
