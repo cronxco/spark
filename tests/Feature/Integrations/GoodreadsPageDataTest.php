@@ -51,11 +51,61 @@ class GoodreadsPageDataTest extends TestCase
         foreach (Event::where('service', 'goodreads')->get() as $event) {
             $this->assertEquals(5, $event->value);
             $this->assertSame('/5', $event->value_unit);
-            $this->assertSame('day', $event->event_metadata['time_precision']);
+            $this->assertSame('estimated', $event->event_metadata['time_precision']);
             $this->assertSame(1, $event->blocks()->where('block_type', 'book')->count());
             $this->assertSame(['A. Writer'], $event->tags()->where('type', 'goodreads_author')->pluck('name')->all());
             $this->assertTrue($event->time->eq($event->blocks()->first()->time));
         }
+    }
+
+    #[Test]
+    public function a_date_only_shelf_entry_for_a_past_day_is_midday_in_the_users_timezone_bst_aware(): void
+    {
+        $this->integration->user->update(['settings' => ['timezone' => 'Europe/London']]);
+        $item = $this->shelfItem('to-read');
+        $item['user_date_added'] = '2026-10-19';
+        $this->import('shelf', [$item]);
+
+        $this->assertSame('2026-10-19 11:00:00', Event::firstOrFail()->time->utc()->format('Y-m-d H:i:s'));
+    }
+
+    #[Test]
+    public function a_date_only_shelf_entry_for_today_uses_when_it_was_first_seen_and_does_not_drift(): void
+    {
+        $this->integration->user->update(['settings' => ['timezone' => 'Europe/London']]);
+        $item = $this->shelfItem('to-read');
+        $item['user_date_added'] = '2026-11-06';
+
+        $this->travelTo('2026-11-06 12:57:15');
+        $this->import('shelf', [$item]);
+        $first = Event::firstOrFail()->time->utc()->format('H:i');
+        $this->assertSame('12:57', substr($first, 0, 5));
+
+        $this->travelTo('2026-11-06 15:30:00');
+        $this->import('shelf', [$item]);
+        $this->assertSame('12:57', Event::firstOrFail()->time->utc()->format('H:i'));
+    }
+
+    #[Test]
+    public function an_existing_midnight_day_entry_for_today_is_corrected_to_when_it_was_created(): void
+    {
+        $this->integration->user->update(['settings' => ['timezone' => 'Europe/London']]);
+        $item = $this->shelfItem('to-read');
+        $item['user_date_added'] = '2026-11-06';
+        $this->travelTo('2026-11-06 12:57:15');
+        $this->import('shelf', [$item]);
+        $event = Event::firstOrFail();
+        $event->forceFill([
+            'time' => '2026-11-06 08:00:00',
+            'event_metadata' => [...$event->event_metadata, 'time_precision' => 'day'],
+        ])->save();
+
+        $this->travelTo('2026-11-06 15:30:00');
+        $this->import('shelf', [$item]);
+
+        $event->refresh();
+        $this->assertSame('12:57', $event->time->utc()->format('H:i'));
+        $this->assertSame('estimated', $event->event_metadata['time_precision']);
     }
 
     #[Test]
