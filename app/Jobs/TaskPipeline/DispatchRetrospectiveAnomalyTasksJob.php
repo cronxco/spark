@@ -5,6 +5,7 @@ namespace App\Jobs\TaskPipeline;
 use App\Jobs\TaskPipeline\Tasks\DetectAnomaliesTask;
 use App\Models\Event;
 use App\Services\TaskPipeline\TaskExecutionStore;
+use App\Services\TaskPipeline\TaskRegistry;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -31,6 +32,7 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
 
         $count = 0;
         $store = app(TaskExecutionStore::class);
+        $task = TaskRegistry::getTask('detect_anomalies');
 
         // Find all events with metrics from the last two days
         // This allows retrospective detection for:
@@ -48,7 +50,7 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
                 now()->subDays(2)->startOfDay(),
                 now()->endOfDay(),
             ])
-            ->chunk(100, function ($events) use (&$count, $store) {
+            ->chunk(100, function ($events) use (&$count, $store, $task) {
                 foreach ($events as $event) {
                     // Check if anomaly detection has already been run successfully
                     $executions = $store->getTaskExecutions($event);
@@ -65,6 +67,13 @@ class DispatchRetrospectiveAnomalyTasksJob implements ShouldQueue
                     // Only deferred values are swept outside yesterday
                     $isYesterday = $event->time->between(now()->subDay()->startOfDay(), now()->subDay()->endOfDay());
                     if (! $deferred && ! $isYesterday) {
+                        continue;
+                    }
+
+                    // A task that does not apply now (a disabled integration)
+                    // records nothing, so it would be dispatched every sweep.
+                    // Checked each run so a re-enabled integration is picked up.
+                    if ($task && ! $task->isApplicableTo($event)) {
                         continue;
                     }
 

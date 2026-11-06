@@ -198,9 +198,11 @@
                                         <div>
                                             <div class="font-semibold">{{ $trend->getTypeLabel() }}</div>
                                             <div class="text-sm text-gray-500">
-                                                {{ $trend->detected_at->format('M j, Y') }} •
-                                                {{ number_format(abs(($trend->current_value - $trend->baseline_value) / $trend->baseline_value) * 100, 1) }}%
-                                                change
+                                                {{ $trend->detected_at->format('M j, Y') }}
+                                                @if ((float) $trend->baseline_value !== 0.0)
+                                                    • {{ number_format(abs(($trend->current_value - $trend->baseline_value) / $trend->baseline_value) * 100, 1) }}%
+                                                    change
+                                                @endif
                                             </div>
                                             <div class="text-xs text-gray-500">
                                                 {{ number_format($trend->baseline_value, 1) }} →

@@ -59,7 +59,7 @@ class SpendSeries
      *
      * @return array<string, float>
      */
-    public function daily(string $userId, int $days, CarbonInterface $now): array
+    public function daily(string $userId, int $days, CarbonInterface $now, string $timezone = 'UTC'): array
     {
         $events = Event::query()
             ->withoutInternal()
@@ -68,7 +68,7 @@ class SpendSeries
             ->whereIn('action', config('metrics.spend.actions', []))
             ->where('value_unit', config('metrics.spend.currency', 'GBP'))
             ->whereNotNull('value')
-            ->where('time', '>=', Carbon::instance($now)->subDays($days)->startOfDay())
+            ->where('time', '>=', Carbon::instance($now)->setTimezone($timezone)->subDays($days)->startOfDay()->utc())
             ->get(['id', 'time', 'value', 'value_multiplier']);
 
         if ($events->isEmpty()) {
@@ -78,7 +78,7 @@ class SpendSeries
         $byDay = [];
 
         foreach ($events as $event) {
-            $day = Carbon::instance($event->time)->utc()->toDateString();
+            $day = Carbon::instance($event->time)->setTimezone($timezone)->toDateString();
             $byDay[$day] = ($byDay[$day] ?? 0.0) + abs((float) $event->formatted_value);
         }
 
@@ -86,7 +86,7 @@ class SpendSeries
 
         $series = [];
         $cursor = Carbon::parse(array_key_first($byDay), 'UTC');
-        $last = Carbon::instance($now)->utc()->startOfDay();
+        $last = Carbon::parse(Carbon::instance($now)->setTimezone($timezone)->toDateString(), 'UTC');
 
         while ($cursor->lessThanOrEqualTo($last)) {
             $date = $cursor->toDateString();

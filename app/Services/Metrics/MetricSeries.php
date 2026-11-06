@@ -37,7 +37,7 @@ class MetricSeries
         $includeZeros = ! $dropZeros || $this->keepsZeros($statistic);
 
         if (SpendSeries::isSpend($statistic)) {
-            return $this->finalDays($statistic, $this->spend->daily($statistic->user_id, $days, $now), $timezone, $now, $finalOnly);
+            return $this->finalDays($statistic, $this->spend->daily($statistic->user_id, $days, $now, $timezone), $timezone, $now, $finalOnly);
         }
 
         $services = array_unique(array_merge([$service], $this->catalogue->aliasesOf($this->catalogue->canonicalService($service)), [$this->catalogue->canonicalService($service)]));

@@ -65,6 +65,7 @@ class InsightEngine
             ->where('user_id', $user->id)
             ->with('baselines')
             ->get()
+            ->reject(fn (MetricStatistic $s) => SpendSeries::isSpend($s))
             ->filter(fn (MetricStatistic $s) => $this->catalogue->producesInsights($s->service, $s->action));
 
         if ($this->spend->hasSpend($user->id)) {
@@ -98,8 +99,8 @@ class InsightEngine
             $storedIds[] = $this->store($candidate, $now)->id;
         }
 
-        $dayStart = $now->copy()->setTimezone($timezone)->startOfDay();
-        $dayEnd = $now->copy()->setTimezone($timezone)->endOfDay();
+        $dayStart = $now->copy()->setTimezone($timezone)->startOfDay()->utc();
+        $dayEnd = $now->copy()->setTimezone($timezone)->endOfDay()->utc();
 
         // Anything stored earlier today that has dropped out of the top
         // few, and has not been acted on, goes.

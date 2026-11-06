@@ -2761,6 +2761,12 @@ class OuraPlugin extends OAuthPlugin implements SupportsSweeps, SupportsValueMap
             $sourceId = "oura_heartrate_{$integration->id}_{$day}";
             $exists = Event::where('source_id', $sourceId)->where('integration_id', $integration->id)->first();
             if ($exists) {
+                // The first day of a window can start mid-day: its readings
+                // are partial, so they must not replace a complete summary.
+                if ($day === Str::substr($startIso, 0, 10) && ! Str::contains(Str::substr($startIso, 11, 8), '00:00:00')) {
+                    continue;
+                }
+
                 // The day fills in through the day: keep its average current,
                 // as OuraHeartrateData does, so anomaly detection judges the
                 // whole day rather than the first overnight readings.

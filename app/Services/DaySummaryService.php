@@ -882,7 +882,7 @@ class DaySummaryService
             ->whereHas('metricStatistic', fn ($q) => $q->where('user_id', $user->id))
             ->insights()
             ->unacknowledged()
-            ->whereBetween('detected_at', [$date->copy()->startOfDay(), $date->copy()->endOfDay()])
+            ->whereBetween('detected_at', [$date->copy()->startOfDay()->utc(), $date->copy()->endOfDay()->utc()])
             ->with('metricStatistic')
             ->orderByDesc('significance_score')
             ->limit((int) config('metrics.max_insights_per_day', 5))

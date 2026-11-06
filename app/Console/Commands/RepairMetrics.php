@@ -113,7 +113,7 @@ class RepairMetrics extends Command
             MetricTrend::whereIn('id', $retired)->delete();
             $flagged->update(['baseline_reset_suggested_at' => null]);
 
-            (new CalculateMetricStatisticsJob((string) $user->id))->handle();
+            (new CalculateMetricStatisticsJob((string) $user->id, force: true))->handle();
         }
 
         $this->table(['What', 'Count'], [
@@ -134,8 +134,9 @@ class RepairMetrics extends Command
 
     /**
      * Fold statistics under an alias service into the canonical one. Where
-     * both exist the alias row is dropped (its baseline is recomputed from
-     * both spellings anyway); otherwise it is renamed.
+     * both exist its trends move to the canonical row and the alias row is
+     * dropped (the baseline is recomputed from both spellings anyway);
+     * otherwise it is renamed.
      */
     private function mergeServices(User $user, MetricCatalogue $catalogue, bool $apply): int
     {
@@ -154,14 +155,22 @@ class RepairMetrics extends Command
                 continue;
             }
 
-            $exists = MetricStatistic::where([
+            $target = MetricStatistic::where([
                 'user_id' => $user->id,
                 'service' => $canonical,
                 'action' => $statistic->action,
                 'value_unit' => $statistic->value_unit,
-            ])->exists();
+            ])->first();
 
-            $exists ? $statistic->delete() : $statistic->update(['service' => $canonical]);
+            if ($target === null) {
+                $statistic->update(['service' => $canonical]);
+
+                continue;
+            }
+
+            MetricTrend::where('metric_statistic_id', $statistic->id)
+                ->update(['metric_statistic_id' => $target->id]);
+            $statistic->delete();
         }
 
         return $count;

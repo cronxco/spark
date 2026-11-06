@@ -34,8 +34,9 @@ class CalculateMetricStatisticsJob implements ShouldBeUnique, ShouldQueue
      * @param  string|null  $userId  Limit the run to one user. A user-triggered
      *                               run must pass this; null is the all-tenant run.
      * @param  bool  $judgedOnly  Only relearn the metrics that are judged (the nightly run)
+     * @param  bool  $force  Relearn even metrics calculated within the last hour (the repair)
      */
-    public function __construct(public ?string $userId = null, public bool $judgedOnly = false) {}
+    public function __construct(public ?string $userId = null, public bool $judgedOnly = false, public bool $force = false) {}
 
     /**
      * One pending run per user (or one all-tenant run) at a time, so repeated
@@ -115,6 +116,12 @@ class CalculateMetricStatisticsJob implements ShouldBeUnique, ShouldQueue
             ->groupBy('integrations.user_id', $eventsTable . '.service', $eventsTable . '.action', $eventsTable . '.value_unit', $eventsTable . '.domain')
             ->having(DB::raw('COUNT(*)'), '>=', 10) // At least 10 events
             ->get()
+            ->map(function ($metricData) {
+                $metricData->service = app(MetricCatalogue::class)->canonicalService($metricData->service);
+
+                return $metricData;
+            })
+            ->unique(fn ($m) => "{$m->user_id}.{$m->service}.{$m->action}.{$m->value_unit}")
             ->filter(function ($metricData) {
                 // The all-tenant nightly run relearns the metrics that are judged;
                 // the rest are refreshed as their events arrive, or on request.
@@ -151,7 +158,8 @@ class CalculateMetricStatisticsJob implements ShouldBeUnique, ShouldQueue
                     ->first();
 
                 // Calculate if never calculated or hasn't been updated in an hour
-                return ! $statistic
+                return $this->force
+                    || ! $statistic
                     || $statistic->last_calculated_at === null
                     || $statistic->last_calculated_at < now()->subHour();
             });
