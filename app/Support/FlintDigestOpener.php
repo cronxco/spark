@@ -66,6 +66,19 @@ class FlintDigestOpener
         return $letters !== '' && $letters === mb_strtoupper($letters);
     }
 
+    /**
+     * A section heading as its own headline: Markdown emphasis and a `## `
+     * marker go, and so does the trailing dash that led into the paragraph.
+     * The capitals stay.
+     */
+    public static function headingText(string $paragraph): string
+    {
+        $text = trim(str_replace(['**', '__'], '', $paragraph));
+        $text = preg_replace('/^#{1,6}\s+/u', '', $text) ?? $text;
+
+        return trim(preg_replace('/[\s\x{2014}\x{2013}:-]+$/u', '', $text) ?? $text);
+    }
+
     private static function isAllCapsHeading(string $paragraph): bool
     {
         $letters = preg_replace('/[^A-Za-z]/', '', $paragraph) ?? '';

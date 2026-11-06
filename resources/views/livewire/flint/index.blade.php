@@ -528,7 +528,7 @@ new class extends Component
                                         @foreach ($paragraphs as $paragraph)
                                             @if ($paragraph['heading'])
                                                 {{-- Flint's Playbook-style section headings stay in capitals, as a serif headline (Will, 6 Nov 2026) --}}
-                                                <h3 class="pt-2 font-serif text-lg font-bold leading-snug tracking-wide">{{ trim(str_replace(['**', '__'], '', $paragraph['markdown'])) }}</h3>
+                                                <h3 class="pt-2 font-serif text-lg font-bold leading-snug tracking-wide">{{ FlintDigestOpener::headingText($paragraph['markdown']) }}</h3>
                                             @else
                                                 <div class="prose prose-sm lg:prose-base max-w-none text-base-content/90 prose-a:text-highlight prose-a:font-semibold prose-a:no-underline hover:prose-a:underline">
                                                     {!! render_markdown($paragraph['markdown']) !!}

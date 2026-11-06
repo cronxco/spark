@@ -24,4 +24,12 @@ class FlintDigestOpenerTest extends TestCase
         $this->assertFalse(FlintDigestOpener::isSectionHeading(''));
         $this->assertFalse(FlintDigestOpener::isSectionHeading(str_repeat('LOUD ', 20)));
     }
+
+    #[Test]
+    public function a_heading_keeps_its_capitals_and_loses_its_trailing_dash(): void
+    {
+        $this->assertSame('THE NOVEMBER TRANSFER IS DONE', FlintDigestOpener::headingText("THE NOVEMBER TRANSFER IS DONE \u{2014}"));
+        $this->assertSame('DRIVING THE DAY', FlintDigestOpener::headingText('**DRIVING THE DAY**'));
+        $this->assertSame('COMING UP', FlintDigestOpener::headingText('## COMING UP'));
+    }
 }
