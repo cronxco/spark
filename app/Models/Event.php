@@ -756,8 +756,13 @@ class Event extends Model
      */
     public function scopeWithinBounds($query, float $north, float $south, float $east, float $west)
     {
+        // Compare as planar lat/lng geometry, not geography. A geography
+        // envelope has great-circle edges: a world-sized box fails with
+        // "Antipodal edge detected", and a wide box bows towards the pole and
+        // drops points near its southern edge. The expression index from
+        // 2026_11_06_170000_add_geometry_location_indexes keeps this indexed.
         return $query->whereRaw(
-            'location && ST_MakeEnvelope(?, ?, ?, ?, 4326)',
+            'location::geometry && ST_MakeEnvelope(?, ?, ?, ?, 4326)',
             [$west, $south, $east, $north]
         );
     }
