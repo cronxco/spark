@@ -13,6 +13,9 @@
       in the week's spending.
     - reading: publication, the article's own headline, read time and up to
       four takeaways.
+    - digest: one of Flint's own digests (news roundup, reading list, money
+      review), its counts, then every story or pick, never cut short, with
+      the outlets that covered a story or a pick's read time.
 
     Every layout sits on its domain's tinted fill, and a card the reader has
     answered a Flint question about ends with that answer. The whole card
@@ -47,6 +50,12 @@
         'calendar' => 'fas.calendar',
         'payment' => 'fas.sterling-sign',
         'reading' => 'fas.newspaper',
+        'digest' => match (true) {
+            str_starts_with($details['name'] ?? '', 'News') => 'fas.newspaper',
+            str_starts_with($details['name'] ?? '', 'Reading') => 'fas.book-open',
+            str_starts_with($details['name'] ?? '', 'Money') => 'fas.sterling-sign',
+            default => 'fas.file-lines',
+        },
         default => $layout['glyph'],
     };
     $label = match ($layoutName) {
@@ -54,6 +63,7 @@
         'calendar' => __('Calendar'),
         'payment' => ($details['refund'] ?? false) ? __('Refund') : __('Payment'),
         'reading' => $details['publication'] ?? __('Article'),
+        'digest' => $details['name'] ?? __('Digest'),
         default => $layout['label'],
     };
     $eyebrowTime = match ($layoutName) {
@@ -104,6 +114,7 @@
         'calendar' => [$label, $details['title'] ?? null, $clock($details['starts_at'] ?? null)],
         'payment' => [$label, $display, $details['merchant'] ?? null, ($details['pending'] ?? false) ? __('pending') : null, $week['caption'] ?? null],
         'reading' => [$details['publication'] ?? null, $details['headline'] ?? null, ($details['read_minutes'] ?? null) ? __(':count min read', ['count' => $details['read_minutes']]) : null],
+        'digest' => [$label, ...($details['facts'] ?? []), ...collect($details['items'] ?? [])->pluck('title')->all()],
         default => [$layout['label'], $heroLabel, $contextText],
     }));
     if ($answer) {
@@ -219,6 +230,33 @@
                         <li class="grid grid-cols-[6px_1fr] gap-2.5">
                             <span class="mt-[7px] h-1.5 w-1.5 rounded-sm {{ $domainFill }}" aria-hidden="true"></span>
                             <span class="line-clamp-2">{!! \Illuminate\Support\Str::inlineMarkdown($takeaway, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+            @break
+
+        @case ('digest')
+            @if ($details['facts'] ?? [])
+                <div class="flex flex-wrap gap-x-3 text-xs text-base-content/70" aria-hidden="true">
+                    @foreach ($details['facts'] as $fact)
+                        <span>{{ $fact }}</span>
+                    @endforeach
+                </div>
+            @endif
+            @if ($details['items'] ?? [])
+                <ul class="grid gap-2.5 border-t border-base-content/10 pt-3" aria-hidden="true">
+                    @foreach ($details['items'] as $item)
+                        <li class="grid grid-cols-[6px_1fr] gap-2.5">
+                            <span class="mt-[7px] h-1.5 w-1.5 rounded-sm {{ $domainFill }}"></span>
+                            <span class="grid gap-0.5">
+                                <span class="font-serif text-sm font-semibold leading-snug">{{ $item['title'] }}</span>
+                                @if ($item['sources'] ?? [])
+                                    <span class="text-xs text-base-content/70">{{ implode(', ', $item['sources']) }}</span>
+                                @elseif ($item['read_minutes'] ?? null)
+                                    <span class="text-xs text-base-content/70">{{ __(':count min read', ['count' => $item['read_minutes']]) }}</span>
+                                @endif
+                            </span>
                         </li>
                     @endforeach
                 </ul>

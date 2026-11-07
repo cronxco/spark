@@ -334,6 +334,7 @@ When Flint prose links an event, show it as a card under the paragraph, in the o
 - **Calendar** (any other calendar entry): the entry's title, then its time span and length.
 - **Payment** (a card or bank payment): the amount as the hero, the merchant in display case, the account and a Pending chip while the line is pending. Trailing, a strip of the week's payments up to that day, with this one in the domain fill and a caption when it stands out ("Largest this week").
 - **Reading** (an article or newsletter issue): the publication's monogram and name in the eyebrow, the article's own headline in the serif face, the read time, then up to four key takeaways, each a bullet held to two lines.
+- **Digest** (one of Flint's own digests: the news roundup, the reading list, a money review): the digest's name in the eyebrow with a glyph for its kind, a count line ("3 stories, 8 sources", "4 picks"), then every story or pick in it, never cut short (Will, 2026-11-07). Each item is its headline in the serif face, with the outlets that covered a story, or a pick's read time, under it. Run notes, the day context, questions and dropped reads are left out. The whole card opens the digest.
 
 Every layout but Metric spans the row. Only Metric cards carry a comparison line (3.4): a one-off event has no usual, so the others show a fact instead. When the reader has answered a Flint question that links the event, the card ends with "You answered" and the answer (its note when there is one) under a hairline.
 

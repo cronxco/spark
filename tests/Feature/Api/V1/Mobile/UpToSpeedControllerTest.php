@@ -1462,6 +1462,110 @@ class UpToSpeedControllerTest extends TestCase
     }
 
     #[Test]
+    public function linked_news_roundup_gets_a_digest_card_listing_every_story(): void
+    {
+        $roundupObject = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'digest',
+            'type' => 'news_roundup_digest',
+            'title' => '2026-11-07 NEWS ROUNDUP',
+        ]);
+        $roundup = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'domain' => 'knowledge',
+            'action' => 'had_summary',
+            'value' => 5,
+            'value_multiplier' => 1,
+            'target_id' => $roundupObject->id,
+            'time' => now(),
+            'event_metadata' => ['period' => 'morning', 'routine' => 'news_roundup', 'summary' => 'Roundup'],
+        ]);
+        Block::factory()->create(['event_id' => $roundup->id, 'block_type' => 'flint_editorial_note', 'title' => 'Run notes', 'metadata' => ['content' => 'Coverage']]);
+        $stories = [
+            'Police protection scheme to cover more than 1,100 former MPs' => ['BBC News', 'The Guardian', 'BBC News'],
+            'Scottish data-centre plans face scrutiny over power and water risks' => ['The Ferret'],
+            'Ministers weigh smart-glasses restrictions after covert filming concerns' => ['The Guardian', 'The Verge'],
+            'A fourth story the card still lists' => [],
+        ];
+        foreach ($stories as $title => $publications) {
+            Block::factory()->create([
+                'event_id' => $roundup->id,
+                'block_type' => 'flint_news',
+                'title' => $title,
+                'metadata' => ['content' => 'TL;DR', 'news' => [
+                    'key_points' => ['One', 'Two'],
+                    'sources' => array_map(fn (string $publication): array => ['publication' => $publication, 'position' => 'Reported it'], $publications),
+                    'what_to_watch' => 'Next week',
+                ]],
+            ]);
+        }
+
+        $this->digestLinking("Today's [news roundup](https://spark.cronx.co/events/{$roundup->id}) covers former MPs.");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
+            ->where('type', 'flint_digest')
+            ->pluck('payload.linked_events')
+            ->flatten(1)
+            ->firstWhere('event.id', $roundup->id);
+
+        $this->assertNotNull($card);
+        $this->assertSame('digest', $card['layout']);
+        $this->assertNull($card['context']);
+        $this->assertSame('News roundup', $card['details']['name']);
+        $this->assertSame(['4 stories', '4 sources'], $card['details']['facts']);
+        $this->assertCount(4, $card['details']['items']);
+        $titles = collect($card['details']['items'])->pluck('title');
+        $this->assertNotContains('Run notes', $titles);
+        $police = collect($card['details']['items'])->firstWhere('title', 'Police protection scheme to cover more than 1,100 former MPs');
+        $this->assertSame(['BBC News', 'The Guardian'], $police['sources']);
+        $this->assertNull($police['read_minutes']);
+        $this->assertSame([], collect($card['details']['items'])->firstWhere('title', 'A fourth story the card still lists')['sources']);
+    }
+
+    #[Test]
+    public function linked_reading_list_gets_a_digest_card_with_read_times_and_no_drops(): void
+    {
+        $listObject = EventObject::factory()->create([
+            'user_id' => $this->user->id,
+            'concept' => 'digest',
+            'type' => 'reading_list_digest',
+            'title' => '2026-11-07 READING LIST',
+        ]);
+        $list = Event::factory()->create([
+            'integration_id' => $this->flintIntegration->id,
+            'service' => 'flint',
+            'domain' => 'knowledge',
+            'action' => 'had_summary',
+            'value' => 2,
+            'value_multiplier' => 1,
+            'target_id' => $listObject->id,
+            'time' => now(),
+            'event_metadata' => ['period' => 'evening', 'routine' => 'reading_list', 'summary' => 'List'],
+        ]);
+        Block::factory()->create(['event_id' => $list->id, 'block_type' => 'flint_reading_pick', 'title' => 'The quiet death of the high street', 'value' => 12, 'value_multiplier' => 1, 'value_unit' => 'minutes', 'metadata' => ['content' => 'Why']]);
+        Block::factory()->create(['event_id' => $list->id, 'block_type' => 'flint_reading_drop', 'title' => 'Skip this one', 'metadata' => ['content' => 'Why not']]);
+
+        $this->digestLinking("Tonight's [reading list](https://spark.cronx.co/events/{$list->id}) has one pick.");
+
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
+
+        $card = collect($this->getJson('/api/v1/mobile/up-to-speed')->assertOk()->json('items'))
+            ->where('type', 'flint_digest')
+            ->pluck('payload.linked_events')
+            ->flatten(1)
+            ->firstWhere('event.id', $list->id);
+
+        $this->assertNotNull($card);
+        $this->assertSame('digest', $card['layout']);
+        $this->assertSame('Reading list', $card['details']['name']);
+        $this->assertSame(['1 pick'], $card['details']['facts']);
+        $this->assertSame([['title' => 'The quiet death of the high street', 'sources' => [], 'read_minutes' => 12]], $card['details']['items']);
+    }
+
+    #[Test]
     public function linked_events_without_a_value_that_are_not_articles_still_get_no_card(): void
     {
         $oura = $this->ouraIntegration();
