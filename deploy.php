@@ -53,10 +53,17 @@ task('deploy', [
     'npm:install',
     'npm:run:prod',
     'deploy:publish',      // ← symlink swap happens here
+    'scheduler:restart',   // ← start scheduler in the new release directory
     'octane:reload',       // ← reload Octane workers to pick up new release
     'horizon:restart',     // ← graceful Horizon restart
     'reverb:restart',      // ← restart Reverb WebSocket server
 ]);
+
+// Restart the scheduler shell so its working directory resolves to the new release.
+// Otherwise it keeps running in the old release, which deploy:cleanup may remove.
+task('scheduler:restart', function () {
+    run('sudo docker restart spark-scheduler');
+});
 
 // Reload Octane gracefully after symlink swap
 // octane:reload sends SIGUSR1 to workers — zero-downtime reload
