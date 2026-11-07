@@ -731,7 +731,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-22T15:37:26+00:00"
+            "time": "2026-10-22T15:37:26+00:00",
+            "published-time": "2026-10-22T15:38:04+00:00"
         },
         {
             "name": "dflydev/dot-access-data",
@@ -4666,7 +4667,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-04-11T18:38:28+00:00"
+            "time": "2026-04-11T18:38:28+00:00",
+            "published-time": "2026-04-11T18:40:08+00:00"
         },
         {
             "name": "masterminds/html5",
@@ -8343,7 +8345,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-20T06:00:43+00:00"
+            "time": "2026-10-20T06:00:43+00:00",
+            "published-time": "2026-10-20T06:01:11+00:00"
         },
         {
             "name": "spatie/image-optimizer",
@@ -8398,7 +8401,8 @@
                 "issues": "https://github.com/spatie/image-optimizer/issues",
                 "source": "https://github.com/spatie/image-optimizer/tree/1.10.0"
             },
-            "time": "2026-06-29T08:28:30+00:00"
+            "time": "2026-06-29T08:28:30+00:00",
+            "published-time": "2026-06-29T08:28:43+00:00"
         },
         {
             "name": "spatie/laravel-activitylog",
@@ -8493,16 +8497,16 @@
         },
         {
             "name": "spatie/laravel-medialibrary",
-            "version": "11.23.10",
+            "version": "11.23.12",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/laravel-medialibrary.git",
-                "reference": "e32803a1295c001ad53a1e9c8468f5a39b4df37f"
+                "reference": "eb5bc0bb3532ebe82d180320af4c270cfbb367fc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/laravel-medialibrary/zipball/e32803a1295c001ad53a1e9c8468f5a39b4df37f",
-                "reference": "e32803a1295c001ad53a1e9c8468f5a39b4df37f",
+                "url": "https://api.github.com/repos/spatie/laravel-medialibrary/zipball/eb5bc0bb3532ebe82d180320af4c270cfbb367fc",
+                "reference": "eb5bc0bb3532ebe82d180320af4c270cfbb367fc",
                 "shasum": ""
             },
             "require": {
@@ -8587,7 +8591,7 @@
             ],
             "support": {
                 "issues": "https://github.com/spatie/laravel-medialibrary/issues",
-                "source": "https://github.com/spatie/laravel-medialibrary/tree/11.23.10"
+                "source": "https://github.com/spatie/laravel-medialibrary/tree/11.23.12"
             },
             "funding": [
                 {
@@ -8599,7 +8603,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-19T12:45:53+00:00"
+            "time": "2026-11-06T09:26:36+00:00",
+            "published-time": "2026-11-06T09:30:12+00:00"
         },
         {
             "name": "spatie/laravel-package-tools",
@@ -8660,7 +8665,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-28T07:16:50+00:00"
+            "time": "2026-09-28T07:16:50+00:00",
+            "published-time": "2026-09-28T07:17:01+00:00"
         },
         {
             "name": "spatie/laravel-tags",
@@ -8875,7 +8881,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-06-22T07:55:44+00:00"
+            "time": "2026-06-22T07:55:44+00:00",
+            "published-time": "2026-06-22T07:55:53+00:00"
         },
         {
             "name": "spomky-labs/base64url",
@@ -11417,7 +11424,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-08T16:56:12+00:00"
+            "time": "2026-10-08T16:56:12+00:00",
+            "published-time": "2026-10-14T06:45:44+00:00"
         },
         {
             "name": "symfony/psr-http-message-bridge",
