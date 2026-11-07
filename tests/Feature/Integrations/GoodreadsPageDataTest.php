@@ -87,6 +87,32 @@ class GoodreadsPageDataTest extends TestCase
     }
 
     #[Test]
+    public function a_finished_book_is_dated_when_it_left_the_currently_reading_shelf_not_when_the_read_shelf_was_polled(): void
+    {
+        $this->integration->user->update(['settings' => ['timezone' => 'Europe/London']]);
+        Integration::factory()->create([
+            'user_id' => $this->integration->user_id, 'integration_group_id' => $this->integration->integration_group_id,
+            'service' => 'goodreads', 'instance_type' => 'shelf_currently_reading', 'configuration' => ['update_frequency_minutes' => 60],
+        ]);
+        $current = $this->shelfItem('currently-reading');
+        $current['reading_sessions'] = [['id' => 's1', 'started_at' => '2026-11-06', 'finished_at' => null]];
+        $read = $this->shelfItem('read');
+        $read['reading_sessions'] = [['id' => 's1', 'started_at' => '2026-11-06', 'finished_at' => '2026-11-07']];
+
+        $this->travelTo('2026-11-07 13:28:10');
+        $this->import('shelf', [$current]);
+        $this->travelTo('2026-11-07 15:28:19');
+        $this->import('shelf', [$read]);
+
+        $finished = Event::where('action', 'finished_reading')->firstOrFail();
+        $this->assertSame('14:28', $finished->time->utc()->format('H:i'));
+
+        $this->travelTo('2026-11-07 17:28:00');
+        $this->import('shelf', [$read]);
+        $this->assertSame('14:28', $finished->fresh()->time->utc()->format('H:i'));
+    }
+
+    #[Test]
     public function an_existing_midnight_day_entry_for_today_is_corrected_to_when_it_was_created(): void
     {
         $this->integration->user->update(['settings' => ['timezone' => 'Europe/London']]);
