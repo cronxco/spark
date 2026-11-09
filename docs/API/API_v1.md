@@ -379,6 +379,12 @@ resolve to nothing. Each entry has:
 - `at_digest` — `null`, or `{value, display_value}` when the event's value
   changed after the digest was written (Oura revises scores through the
   morning). Cards show the live value and use this to say "updated from 66".
+- `layout` — which card to draw: `metric`, `journey`, `calendar`, `payment`,
+  `transfer` or `reading`. Clients draw an unknown layout as `metric`.
+- `details` — the facts the layout shows, `null` for `metric`. A `transfer`
+  carries `{direction, counterparty, account, pending}`: `direction` is `in`
+  or `out`, and `counterparty` is the other party in display case (a pot, a
+  person, or the bank reference, such as "Mortgage").
 
 ```json
 "linked_events": [
