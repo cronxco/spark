@@ -5,6 +5,7 @@ namespace App\Jobs\Data\Goodreads;
 use App\Jobs\Base\BaseProcessingJob;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Models\Integration;
 use App\Models\Relationship;
 use App\Services\Media\MediaDownloadHelper;
 use Carbon\CarbonImmutable;
@@ -39,7 +40,7 @@ class GoodreadsPageData extends BaseProcessingJob
                     continue;
                 }
                 if ($this->rawData['kind'] === 'shelf') {
-                    $entries = $this->shelfEntries($item);
+                    $entries = $this->shelfEntries($item, $book);
                     $this->bindLegacyEvents($entries, $item);
                     foreach ($entries as $entry) {
                         $this->importEvent($book, $item, $entry);
@@ -101,6 +102,11 @@ class GoodreadsPageData extends BaseProcessingJob
         $metadata['book_id'] = $bookId;
         $metadata['full_title'] = $fullTitle;
         if ($snapshot && ($metadata['shelf_observed_at'] ?? '') <= $this->rawData['observed_at']) {
+            if ($item['shelf'] === 'currently-reading') {
+                unset($metadata['last_seen_currently_reading_at']);
+            } elseif (($metadata['current_shelf'] ?? null) === 'currently-reading' && isset($metadata['shelf_observed_at'])) {
+                $metadata['last_seen_currently_reading_at'] = $metadata['shelf_observed_at'];
+            }
             $metadata['current_shelf'] = $item['shelf'];
             $metadata['shelf_observed_at'] = $this->rawData['observed_at'];
             $metadata['user_rating'] = $item['user_rating'];
@@ -142,7 +148,7 @@ class GoodreadsPageData extends BaseProcessingJob
         return EventObject::create([...$data, 'user_id' => $this->integration->user_id, 'time' => $item['pubDate'] ?? $this->rawData['observed_at'] ?? now()]);
     }
 
-    private function shelfEntries(array $item): array
+    private function shelfEntries(array $item, EventObject $book): array
     {
         $action = match ($item['shelf']) {
             'read' => 'finished_reading', 'to-read' => 'wants_to_read', default => 'is_reading',
@@ -167,7 +173,7 @@ class GoodreadsPageData extends BaseProcessingJob
             $sessionDate = $item['shelf'] === 'to-read' ? $item['user_date_added'] : ($item['shelf'] === 'read' ? $session['finished_at'] : $session['started_at']);
             $date = $sessionDate ?? $item['user_date_added'];
             $time = $date !== null
-                ? $this->estimateDayTime($date, $item['source_timezone'])
+                ? $this->estimateDayTime($date, $item['source_timezone'], $action === 'finished_reading' ? $this->leftCurrentShelfBy($book) : null)
                 : ['pubDate' => $this->rawData['observed_at'], 'time_precision' => 'observed', 'source_date' => null, 'source_timezone' => $item['source_timezone']];
             $time['time_source'] = $sessionDate !== null ? 'reading_session' : ($date !== null ? 'date_added' : 'observation');
             foreach ($this->rawData['activity'] ?? [] as $activity) {
@@ -290,8 +296,9 @@ class GoodreadsPageData extends BaseProcessingJob
                 !== CarbonImmutable::parse($entry['pubDate'])->timezone($entry['source_timezone'])->toDateString();
             $newRank = $this->precision($entry['time_precision']);
             $oldRank = $this->precision($old['time_precision'] ?? 'observed');
-            // An estimate is recomputed on every sync, so it must never replace an equal estimate or the time would drift
-            $replaceTime = ! $isLegacy && ($differentDay || $newRank > $oldRank || ($newRank === $oldRank && $entry['time_precision'] !== 'estimated'));
+            // An estimate is recomputed on every sync, so it may only move earlier, never replace an equal or later estimate, or the time would drift
+            $earlierEstimate = $entry['time_precision'] === 'estimated' && CarbonImmutable::parse($entry['pubDate'])->lt($existing->time);
+            $replaceTime = ! $isLegacy && ($differentDay || $newRank > $oldRank || ($newRank === $oldRank && ($entry['time_precision'] !== 'estimated' || $earlierEstimate)));
             if (! $isLegacy && ! $replaceTime) {
                 foreach (['time_precision', 'source_date', 'source_timezone', 'time_source'] as $key) {
                     $metadata[$key] = $old[$key] ?? $metadata[$key];
@@ -495,15 +502,39 @@ class GoodreadsPageData extends BaseProcessingJob
      * America/Los_Angeles) lands at 08:00 UK time, so estimate instead: the moment Spark first saw the book when
      * the date is today, otherwise midday in the user's own timezone.
      */
-    private function estimateDayTime(string $date, string $sourceTimezone): array
+    private function estimateDayTime(string $date, string $sourceTimezone, ?CarbonImmutable $notAfter = null): array
     {
         $userTimezone = $this->integration->user?->getTimezone() ?? 'UTC';
         $observed = CarbonImmutable::parse($this->rawData['observed_at']);
         $isToday = $observed->timezone($sourceTimezone)->toDateString() === $date
             || $observed->timezone($userTimezone)->toDateString() === $date;
+        $onDate = fn (CarbonImmutable $moment): bool => $moment->timezone($sourceTimezone)->toDateString() === $date
+            || $moment->timezone($userTimezone)->toDateString() === $date;
+        if ($isToday && $notAfter !== null && $notAfter->lt($observed) && $onDate($notAfter)) {
+            $observed = $notAfter;
+        }
         $moment = $isToday ? $observed : CarbonImmutable::parse($date . ' 12:00:00', $userTimezone);
 
         return ['pubDate' => $moment->utc()->toIso8601String(), 'time_precision' => 'estimated', 'source_date' => $date, 'source_timezone' => $sourceTimezone];
+    }
+
+    /**
+     * A finished book can only leave the currently-reading shelf once, so the next poll of that shelf after Spark
+     * last saw the book on it is the earliest Spark could have known. The read shelf is polled less often, so its
+     * own first-seen time can lag by hours and drift from the start of the next book.
+     */
+    private function leftCurrentShelfBy(EventObject $book): ?CarbonImmutable
+    {
+        $lastSeen = $book->metadata['last_seen_currently_reading_at'] ?? null;
+        if ($lastSeen === null) {
+            return null;
+        }
+        $minutes = Integration::query()
+            ->where('integration_group_id', $this->integration->integration_group_id)
+            ->where('instance_type', 'shelf_currently_reading')
+            ->first()?->getUpdateFrequencyMinutes() ?? 60;
+
+        return CarbonImmutable::parse($lastSeen)->addMinutes($minutes);
     }
 
     /**
@@ -520,6 +551,11 @@ class GoodreadsPageData extends BaseProcessingJob
         $sameDay = $created->timezone($entry['source_timezone'])->toDateString() === $entry['source_date']
             || $created->timezone($userTimezone)->toDateString() === $entry['source_date'];
 
-        return $sameDay ? $created->utc()->toIso8601String() : $entry['pubDate'];
+        if (! $sameDay) {
+            return $entry['pubDate'];
+        }
+        $estimate = CarbonImmutable::parse($entry['pubDate']);
+
+        return ($estimate->lt($created) ? $estimate : $created)->utc()->toIso8601String();
     }
 }

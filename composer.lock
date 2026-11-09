@@ -3133,16 +3133,16 @@
         },
         {
             "name": "laravel/mcp",
-            "version": "v1.1.1",
+            "version": "v1.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/mcp.git",
-                "reference": "e77af70cd009aaa31455626bd463b0e7e39cfcf9"
+                "reference": "ab9238ce6c89095679651dd3d19d67641d73a436"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/mcp/zipball/e77af70cd009aaa31455626bd463b0e7e39cfcf9",
-                "reference": "e77af70cd009aaa31455626bd463b0e7e39cfcf9",
+                "url": "https://api.github.com/repos/laravel/mcp/zipball/ab9238ce6c89095679651dd3d19d67641d73a436",
+                "reference": "ab9238ce6c89095679651dd3d19d67641d73a436",
                 "shasum": ""
             },
             "require": {
@@ -3204,7 +3204,8 @@
                 "issues": "https://github.com/laravel/mcp/issues",
                 "source": "https://github.com/laravel/mcp"
             },
-            "time": "2026-10-21T11:50:42+00:00"
+            "time": "2026-10-26T17:48:48+00:00",
+            "published-time": "2026-10-26T18:03:18+00:00"
         },
         {
             "name": "laravel/octane",
@@ -4670,7 +4671,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-04-11T18:38:28+00:00"
+            "time": "2026-04-11T18:38:28+00:00",
+            "published-time": "2026-04-11T18:40:08+00:00"
         },
         {
             "name": "masterminds/html5",
@@ -6214,16 +6216,16 @@
         },
         {
             "name": "predis/predis",
-            "version": "v3.7.0",
+            "version": "v3.7.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/predis/predis.git",
-                "reference": "4d91f3b08a60c3bacc2afbd8dc41724559b7626a"
+                "reference": "2496e6d91ba4e137b47a6b802dc7e088ebf31df4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/predis/predis/zipball/4d91f3b08a60c3bacc2afbd8dc41724559b7626a",
-                "reference": "4d91f3b08a60c3bacc2afbd8dc41724559b7626a",
+                "url": "https://api.github.com/repos/predis/predis/zipball/2496e6d91ba4e137b47a6b802dc7e088ebf31df4",
+                "reference": "2496e6d91ba4e137b47a6b802dc7e088ebf31df4",
                 "shasum": ""
             },
             "require": {
@@ -6265,7 +6267,7 @@
             ],
             "support": {
                 "issues": "https://github.com/predis/predis/issues",
-                "source": "https://github.com/predis/predis/tree/v3.7.0"
+                "source": "https://github.com/predis/predis/tree/v3.7.1"
             },
             "funding": [
                 {
@@ -6273,7 +6275,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-08T16:46:04+00:00"
+            "time": "2026-11-03T17:55:20+00:00",
+            "published-time": "2026-11-03T17:56:07+00:00"
         },
         {
             "name": "psr/clock",
@@ -8351,7 +8354,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-20T06:00:43+00:00"
+            "time": "2026-10-20T06:00:43+00:00",
+            "published-time": "2026-10-20T06:01:11+00:00"
         },
         {
             "name": "spatie/image-optimizer",
@@ -8406,7 +8410,8 @@
                 "issues": "https://github.com/spatie/image-optimizer/issues",
                 "source": "https://github.com/spatie/image-optimizer/tree/1.10.0"
             },
-            "time": "2026-06-29T08:28:30+00:00"
+            "time": "2026-06-29T08:28:30+00:00",
+            "published-time": "2026-06-29T08:28:43+00:00"
         },
         {
             "name": "spatie/laravel-activitylog",
@@ -8501,16 +8506,16 @@
         },
         {
             "name": "spatie/laravel-medialibrary",
-            "version": "11.23.10",
+            "version": "11.23.12",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/laravel-medialibrary.git",
-                "reference": "e32803a1295c001ad53a1e9c8468f5a39b4df37f"
+                "reference": "eb5bc0bb3532ebe82d180320af4c270cfbb367fc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/laravel-medialibrary/zipball/e32803a1295c001ad53a1e9c8468f5a39b4df37f",
-                "reference": "e32803a1295c001ad53a1e9c8468f5a39b4df37f",
+                "url": "https://api.github.com/repos/spatie/laravel-medialibrary/zipball/eb5bc0bb3532ebe82d180320af4c270cfbb367fc",
+                "reference": "eb5bc0bb3532ebe82d180320af4c270cfbb367fc",
                 "shasum": ""
             },
             "require": {
@@ -8595,7 +8600,7 @@
             ],
             "support": {
                 "issues": "https://github.com/spatie/laravel-medialibrary/issues",
-                "source": "https://github.com/spatie/laravel-medialibrary/tree/11.23.10"
+                "source": "https://github.com/spatie/laravel-medialibrary/tree/11.23.12"
             },
             "funding": [
                 {
@@ -8607,7 +8612,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-19T12:45:53+00:00"
+            "time": "2026-11-06T09:26:36+00:00",
+            "published-time": "2026-11-06T09:30:12+00:00"
         },
         {
             "name": "spatie/laravel-package-tools",
@@ -8668,7 +8674,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-28T07:16:50+00:00"
+            "time": "2026-09-28T07:16:50+00:00",
+            "published-time": "2026-09-28T07:17:01+00:00"
         },
         {
             "name": "spatie/laravel-tags",
@@ -8883,7 +8890,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-06-22T07:55:44+00:00"
+            "time": "2026-06-22T07:55:44+00:00",
+            "published-time": "2026-06-22T07:55:53+00:00"
         },
         {
             "name": "spomky-labs/base64url",
@@ -11425,7 +11433,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-08T16:56:12+00:00"
+            "time": "2026-10-08T16:56:12+00:00",
+            "published-time": "2026-10-14T06:45:44+00:00"
         },
         {
             "name": "symfony/psr-http-message-bridge",
