@@ -111,6 +111,6 @@ class FlintDigestOpener
             return mb_substr($slice, 0, $boundary + 1);
         }
 
-        return rtrim($slice).'…';
+        return rtrim($slice) . '…';
     }
 }

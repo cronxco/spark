@@ -209,7 +209,7 @@ class UpToSpeedControllerTest extends TestCase
             'integration_id' => $integration->id,
             'service' => 'daily_checkin',
             'action' => 'had_morning_checkin',
-            'source_id' => 'daily_checkin_morning_'.$today,
+            'source_id' => 'daily_checkin_morning_' . $today,
             'time' => $checkinTime,
             'event_metadata' => ['date' => $today],
         ]);
@@ -1144,8 +1144,8 @@ class UpToSpeedControllerTest extends TestCase
 
         $this->digestLinking(
             "[7h55 of sleep](https://spark.cronx.co/events/{$sleep->id}), a [sleep score of 66](https://spark.cronx.co/events/{$score->id}), "
-            ."[a note](https://spark.cronx.co/events/{$article->id}), [readiness at 88](https://spark.cronx.co/events/{$foreign->id}) "
-            ."and [the score again](https://spark.cronx.co/event/{$score->id})."
+            . "[a note](https://spark.cronx.co/events/{$article->id}), [readiness at 88](https://spark.cronx.co/events/{$foreign->id}) "
+            . "and [the score again](https://spark.cronx.co/event/{$score->id})."
         );
 
         Sanctum::actingAs($this->user, SparkAbility::MOBILE_READ);
@@ -1507,7 +1507,7 @@ class UpToSpeedControllerTest extends TestCase
         $publication = EventObject::factory()->create([
             'user_id' => $this->user->id,
             'title' => 'Klement on Investing',
-            'content' => '# China is decoupling from the West'."\n\n".str_repeat('word ', 460),
+            'content' => '# China is decoupling from the West' . "\n\n" . str_repeat('word ', 460),
         ]);
         $article = Event::factory()->create([
             'integration_id' => $this->knowledgeIntegration->id,

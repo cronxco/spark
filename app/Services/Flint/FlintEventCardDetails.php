@@ -168,8 +168,8 @@ class FlintEventCardDetails
         return [
             'name' => $this->digestName($event),
             'facts' => array_values(array_filter([
-                $items->isNotEmpty() ? $items->count().' '.Str::plural($noun, $items->count()) : null,
-                $sourceCount > 0 ? $sourceCount.' '.Str::plural('source', $sourceCount) : null,
+                $items->isNotEmpty() ? $items->count() . ' ' . Str::plural($noun, $items->count()) : null,
+                $sourceCount > 0 ? $sourceCount . ' ' . Str::plural('source', $sourceCount) : null,
             ])),
             'items' => $items->all(),
         ];
