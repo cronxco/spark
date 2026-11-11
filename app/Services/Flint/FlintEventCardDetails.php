@@ -22,8 +22,12 @@ use Illuminate\Support\Str;
  * - `journey`: a flight from a flight tracker's calendar entry (route, local
  *   times, flight time).
  * - `calendar`: any other calendar entry (title and time span).
- * - `payment`: a card or bank payment (merchant, account, pending, and where
- *   it sits among the week's spending).
+ * - `payment`: a card or bank payment or a direct debit (merchant, account,
+ *   pending, and where it sits among the week's spending).
+ * - `transfer`: money moving rather than being spent: bank transfers, direct
+ *   credits, Monzo Me, pot moves, salary, and money into an open-banking
+ *   account that isn't a credit card (direction, the other party, the account
+ *   and pending; Will, 6 Nov 2026).
  * - `reading`: an article or newsletter issue (publication, its own headline,
  *   read time and up to four key takeaways).
  * - `digest`: one of Flint's own digests, such as the news roundup (its name,
@@ -46,6 +50,19 @@ class FlintEventCardDetails
         SpendingScope::BANK_OUT,
         SpendingScope::MONZO_REFUND,
         SpendingScope::BANK_IN,
+        'direct_debit_to',
+    ];
+
+    /** Monzo actions that move money rather than spend it, and which way. */
+    private const TRANSFER_DIRECTIONS = [
+        'bank_transfer_from' => 'in',
+        'bank_transfer_to' => 'out',
+        'direct_credit_from' => 'in',
+        'monzo_me_from' => 'in',
+        'monzo_me_to' => 'out',
+        'pot_withdrawal_to' => 'in',
+        'pot_transfer_to' => 'out',
+        'salary_received_from' => 'in',
     ];
 
     /**
@@ -76,6 +93,10 @@ class FlintEventCardDetails
             return $flight !== null
                 ? ['layout' => 'journey', 'details' => $flight]
                 : ['layout' => 'calendar', 'details' => $this->calendar($event)];
+        }
+
+        if ($event->domain === 'money' && $this->isTransfer($event)) {
+            return ['layout' => 'transfer', 'details' => $this->transfer($event)];
         }
 
         if ($event->domain === 'money' && in_array($event->action, self::PAYMENT_ACTIONS, true)) {
@@ -147,8 +168,8 @@ class FlintEventCardDetails
         return [
             'name' => $this->digestName($event),
             'facts' => array_values(array_filter([
-                $items->isNotEmpty() ? $items->count() . ' ' . Str::plural($noun, $items->count()) : null,
-                $sourceCount > 0 ? $sourceCount . ' ' . Str::plural('source', $sourceCount) : null,
+                $items->isNotEmpty() ? $items->count().' '.Str::plural($noun, $items->count()) : null,
+                $sourceCount > 0 ? $sourceCount.' '.Str::plural('source', $sourceCount) : null,
             ])),
             'items' => $items->all(),
         ];
@@ -204,20 +225,64 @@ class FlintEventCardDetails
     }
 
     /**
+     * Money moving between accounts or people. An open-banking line into an
+     * account counts as a refund only on a credit card (as SpendingScope
+     * has it); into any other account it is a transfer, salary included.
+     */
+    private function isTransfer(Event $event): bool
+    {
+        if (array_key_exists($event->action, self::TRANSFER_DIRECTIONS)) {
+            return true;
+        }
+
+        return $event->action === SpendingScope::BANK_IN
+            && ($event->actor?->metadata['account_type'] ?? null) !== 'credit_card';
+    }
+
+    /**
+     * Which way the money went, the other party (a pot, a person, or the
+     * reference the bank gave) and the reader's account. A pot withdrawal
+     * names the pot as its actor and the account as its target, so the two
+     * swap there.
+     *
+     * @return array{direction: string, counterparty: string|null, account: string|null, pending: bool}
+     */
+    private function transfer(Event $event): array
+    {
+        $meta = $event->event_metadata ?? [];
+        $fromPot = $event->action === 'pot_withdrawal_to';
+        $account = $fromPot ? $event->target : $event->actor;
+        $other = $fromPot ? $event->actor : $event->target;
+
+        return [
+            'direction' => self::TRANSFER_DIRECTIONS[$event->action] ?? 'in',
+            'counterparty' => MerchantName::display((string) ($other?->title ?: ($meta['description'] ?? ''))) ?: null,
+            'account' => $account?->title,
+            'pending' => $this->isPending($event),
+        ];
+    }
+
+    private function isPending(Event $event): bool
+    {
+        $meta = $event->event_metadata ?? [];
+
+        return $event->service === 'gocardless'
+            ? ($meta['transaction_status'] ?? null) === 'pending'
+            : (bool) ($meta['amount_is_pending'] ?? false);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function payment(Event $event, string $userId): array
     {
         $meta = $event->event_metadata ?? [];
         $refund = in_array($event->action, [SpendingScope::MONZO_REFUND, SpendingScope::BANK_IN], true);
-        $pending = $event->service === 'gocardless'
-            ? ($meta['transaction_status'] ?? null) === 'pending'
-            : (bool) ($meta['amount_is_pending'] ?? false);
 
         return [
             'merchant' => MerchantName::display((string) ($event->target?->title ?: ($meta['description'] ?? ''))) ?: null,
             'account' => $event->actor?->title,
-            'pending' => $pending,
+            'pending' => $this->isPending($event),
             'refund' => $refund,
             'week' => $refund ? null : $this->week($event, $userId),
         ];

@@ -48,6 +48,37 @@ class FlintDigestOpener
         return self::clean($paragraphs->first());
     }
 
+    /**
+     * A short paragraph in capitals is one of Flint's Playbook-style section
+     * headings ("DRIVING THE DAY", "THE NOVEMBER TRANSFER IS DONE —"). The
+     * Flint page draws it as a serif headline, still in capitals (Will,
+     * 6 Nov 2026). Matches the iOS digest-card rule.
+     */
+    public static function isSectionHeading(string $paragraph): bool
+    {
+        $paragraph = trim($paragraph);
+        if ($paragraph === '' || mb_strlen($paragraph) >= 80) {
+            return false;
+        }
+
+        $letters = preg_replace('/[^\p{L}]/u', '', $paragraph) ?? '';
+
+        return $letters !== '' && $letters === mb_strtoupper($letters);
+    }
+
+    /**
+     * A section heading as its own headline: Markdown emphasis and a `## `
+     * marker go, and so does the trailing dash that led into the paragraph.
+     * The capitals stay.
+     */
+    public static function headingText(string $paragraph): string
+    {
+        $text = trim(str_replace(['**', '__'], '', $paragraph));
+        $text = preg_replace('/^#{1,6}\s+/u', '', $text) ?? $text;
+
+        return trim(preg_replace('/[\s\x{2014}\x{2013}:-]+$/u', '', $text) ?? $text);
+    }
+
     private static function isAllCapsHeading(string $paragraph): bool
     {
         $letters = preg_replace('/[^A-Za-z]/', '', $paragraph) ?? '';
@@ -80,6 +111,6 @@ class FlintDigestOpener
             return mb_substr($slice, 0, $boundary + 1);
         }
 
-        return rtrim($slice) . '…';
+        return rtrim($slice).'…';
     }
 }

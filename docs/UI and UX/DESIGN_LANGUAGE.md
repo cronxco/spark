@@ -155,7 +155,7 @@ The hero value (the big number on a card or detail page) is the one place amber 
 
 - **Numbers in rows and grids use tabular figures** (`.monospacedDigit()`, `tabular-nums`) so columns line up and values don't jitter on refresh.
 - **Units scale with the value**: the unit is about 55% of the value's size, in the same face, `secondary`, baseline-aligned. At the card hero (44pt) that is 24pt; at compact (24pt), 13pt. `7h 55m` is the exception; it is one string at one size.
-- **Sentence case everywhere.** No all-caps eyebrows. Section labels use `captionStrong` (iOS) or `text-xs font-semibold` (web).
+- **Sentence case everywhere.** No all-caps eyebrows. The one exception is Flint's own section headings in a briefing (7.3). Section labels use `captionStrong` (iOS) or `text-xs font-semibold` (web).
 - **Headings never skip a level**: h2 for the page hero, h3 for sections, h4 inside a section.
 - iOS uses text styles so Dynamic Type works. A layout that cannot hold a value at accessibility sizes stacks vertically rather than truncating the number.
 
@@ -332,9 +332,12 @@ When Flint prose links an event, show it as a card under the paragraph, in the o
 - **Metric** (sleep, sleep score, readiness, activity score, steps, other daily metrics): the `compact` card. Scores show as a ring. Durations and counts show as the value over a thin against-the-mean bar (section 8, Bar) with its Avg marker. Up to three in a row; with more than three, the third card reads "+N more" and opens a list. A lone metric card spans the row, with its ring or bar trailing.
 - **Journey** (a flight a flight tracker wrote into the calendar): the airport codes are the hero, with each end's local time under it, joined by a route line. While the flight is in the air the plane glyph sits along the line at the share of the flight time gone. The context names the flight time and the cities.
 - **Calendar** (any other calendar entry): the entry's title, then its time span and length.
-- **Payment** (a card or bank payment): the amount as the hero, the merchant in display case, the account and a Pending chip while the line is pending. Trailing, a strip of the week's payments up to that day, with this one in the domain fill and a caption when it stands out ("Largest this week").
-- **Reading** (an article or newsletter issue): the publication's monogram and name in the eyebrow, the article's own headline in the serif face, the read time, then up to four key takeaways, each a bullet held to two lines.
+- **Payment** (a card or bank payment, or a direct debit): the amount as the hero, the merchant in display case, the account and a Pending chip while the line is pending. Trailing, a strip of the week's payments up to that day, with this one in the domain fill and a caption when it stands out ("Largest this week").
+- **Transfer** (money moving rather than spent: bank transfers, direct credits, Monzo Me, pot moves, salary, and money into an open-banking account that isn't a credit card; Will, 2026-11-06): "Transfer in" or "Transfer out" in the eyebrow with the time, the amount as the hero, then one line with the other party in bold and the account after it, "**Mortgage** into Current Account" (or "from" for money going out), and a Pending chip while it's pending. No week strip, since a transfer isn't spending.
+- **Reading** (an article or newsletter issue): the publication's monogram and name in the eyebrow, the article's own headline in the serif face, the read time, then up to four key takeaways, each a bullet shown in full, never truncated (Will, 2026-11-06).
 - **Digest** (one of Flint's own digests: the news roundup, the reading list, a money review): the digest's name in the eyebrow with a glyph for its kind, a count line ("3 stories, 8 sources", "4 picks"), then every story or pick in it, never cut short (Will, 2026-11-07). Each item is its headline in the serif face, with the outlets that covered a story, or a pick's read time, under it. Run notes, the day context, questions and dropped reads are left out. The whole card opens the digest.
+
+**Section headings in the briefing.** Flint writes Playbook-style section headings in capitals ("DRIVING THE DAY", "THE NOVEMBER TRANSFER IS DONE —"). Draw them as a serif headline above the prose that follows, still in capitals, without the trailing dash that led into the paragraph: the one exception to sentence case (4), because it is Flint's voice (Will, 2026-11-06).
 
 Every layout but Metric spans the row. Only Metric cards carry a comparison line (3.4): a one-off event has no usual, so the others show a fact instead. When the reader has answered a Flint question that links the event, the card ends with "You answered" and the answer (its note when there is one) under a hairline.
 
