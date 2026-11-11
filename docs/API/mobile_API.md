@@ -258,6 +258,8 @@ Day-scoped payloads also **render** in that zone: every timestamp inside `GET /b
 | `GET`  | `/flint/topics`                 | Flint's long-lived strategic/thematic/tactical threads (cursor-paginated)       |
 | `GET`  | `/flint/topics/{id}`            | A Thread with versioned digest/block evidence                                   |
 | `GET`  | `/flint/notes`                  | Cursor-paginated user-authored Flint notes                                      |
+| `GET`  | `/flint/ask/conversations`      | Ask Flint conversations, newest first (cursor-paginated)                        |
+| `GET`  | `/flint/ask/conversations/{id}` | One Ask Flint conversation's messages, with each change's Undo state            |
 | `GET`  | `/flint/routines/health`        | Configuration, attempt, output, and scheduling health for Flint routines        |
 | `GET`  | `/money/accounts`               | All non-archived manual/synced finance accounts (cursor-paginated)              |
 | `GET`  | `/money/accounts/{id}`          | A single finance account                                                        |
@@ -1782,6 +1784,83 @@ Each note includes `id`, derived `title`, `body`, `authored_at`, `created_at`,
 `deleted_at`, validated `context_links`, consent metadata, and a strong
 `version`. The envelope includes top-level `next_cursor` and `has_more`; its
 `meta` object contains `effective_timezone` and `account_id`.
+
+---
+
+### Ask Flint
+
+A conversation with the user's Spark data, run by a `laravel/ai` agent that
+reads through Spark's own MCP tools in-process. Asking and reading history need
+`flint:read`. Whether a turn may change anything is decided from the token's
+`data:write`: without it the agent is given no write tools.
+
+**`POST /flint/ask`** — body `message` (required, up to 4,000 characters),
+`conversation_id` (optional, continues a thread) and `stream` (optional).
+Limited to 20 requests a minute.
+
+Without `stream`, the whole answer comes back as JSON:
+
+```json
+{
+    "contract_version": 1,
+    "conversation_id": "01a1ca8b-9e5e-7239-b47a-ecb00947ad5c",
+    "message": {
+        "id": "01a1ca8b-9e6b-72bc-9c24-660bfdf94d97",
+        "role": "assistant",
+        "text": "Tagged [Card payment to Pret A Manger](/events/9b1d…) as work lunch.",
+        "references": [{ "kind": "event", "id": "9b1d…", "title": "Card payment to Pret A Manger" }],
+        "changes": [
+            {
+                "receipt_id": "c2f0…",
+                "operation": "tag",
+                "kind": "event",
+                "id": "9b1d…",
+                "title": "Card payment to Pret A Manger",
+                "summary": "Tagged work lunch",
+                "undo": { "available": true, "expires_at": "2026-11-11T12:33:30+00:00", "undone": false }
+            }
+        ],
+        "status": "completed",
+        "created_at": "2026-11-11T12:18:30+00:00"
+    }
+}
+```
+
+With `stream: true` (or `Accept: text/event-stream`) the answer is sent as
+server-sent events, each carrying `contract_version`:
+
+| Event          | Data                              | When                                         |
+| -------------- | --------------------------------- | -------------------------------------------- |
+| `conversation` | `conversation_id`                 | Once, as soon as the thread has an id        |
+| `delta`        | `text`                            | Each piece of the answer as it is written    |
+| `activity`     | `tool`, `label`                   | A tool starts ("Searching Spark")            |
+| `change`       | A change, as in `message.changes` | A change has been applied                    |
+| `done`         | `conversation_id`, `message`      | The finished message; replaces the deltas    |
+| `error`        | `message`                         | The turn failed after the stream had started |
+
+`text` is Markdown. A record is linked by path (`/events/{id}`,
+`/objects/{id}`, `/blocks/{id}`); every link in a finished message has been
+checked against the user's data and appears in `references`.
+
+Changes apply at once. `operation` is `update`, `note`, `tag`, `link` or
+`delete` (a soft delete). Each carries an action receipt, undone with
+`POST /actions/receipts/{receipt_id}/undo` for 15 minutes. A turn makes at most
+five changes.
+
+**Errors**: `404` unknown or another user's `conversation_id`; `422`
+validation; `429` with `code: daily_allowance_reached` when the daily AI
+allowance is spent; `503` with `code: flint_unavailable`.
+
+**`GET /flint/ask/conversations`** — `limit` (1–50, default 20), `cursor`.
+Items carry `id`, `title`, `created_at`, `updated_at`.
+
+**`GET /flint/ask/conversations/{id}`** — `limit` (1–100, default 30),
+`cursor`. Returns the newest messages, oldest first within the page; the cursor
+pages back through the thread. Messages have the shape of `message` above, and
+each change reports its receipt's Undo state as it is now.
+
+**`DELETE /flint/ask/conversations/{id}`** — needs `flint:write`. Deletes the
+thread and its messages; changes it made stay made. `204`.
 
 ---
 

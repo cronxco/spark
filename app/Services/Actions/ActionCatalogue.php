@@ -5,6 +5,9 @@ namespace App\Services\Actions;
 use App\Services\Actions\Handlers\AcknowledgeAnomaly;
 use App\Services\Actions\Handlers\AcknowledgeMetricTrends;
 use App\Services\Actions\Handlers\AddEventTag;
+use App\Services\Actions\Handlers\AskFlintEdit;
+use App\Services\Actions\Handlers\AskFlintLink;
+use App\Services\Actions\Handlers\AskFlintNote;
 use App\Services\Actions\Handlers\CalculateMetricStatistics;
 use App\Services\Actions\Handlers\DeleteEvent;
 use App\Services\Actions\Handlers\DetectMetricTrends;
@@ -179,6 +182,44 @@ final class ActionCatalogue
                 confirm: ConfirmPolicy::Undo,
                 capability: 'data:write',
                 handler: LogReflection::class,
+                surfaces: [],
+            ),
+            // Internal: Ask Flint's write tools make these changes and record the
+            // receipts that carry their Undo, so no surface lists or runs them.
+            new ActionDefinition(
+                id: 'flint.ask_edit',
+                title: 'Flint edit',
+                subtitle: 'Change a record',
+                icon: 'pencil',
+                domain: 'flint',
+                kind: ActionKind::Data,
+                confirm: ConfirmPolicy::Undo,
+                capability: 'data:write',
+                handler: AskFlintEdit::class,
+                surfaces: [],
+            ),
+            new ActionDefinition(
+                id: 'flint.ask_note',
+                title: 'Flint note',
+                subtitle: 'Set an event note',
+                icon: 'pencil',
+                domain: 'flint',
+                kind: ActionKind::Data,
+                confirm: ConfirmPolicy::Undo,
+                capability: 'data:write',
+                handler: AskFlintNote::class,
+                surfaces: [],
+            ),
+            new ActionDefinition(
+                id: 'flint.ask_link',
+                title: 'Flint link',
+                subtitle: 'Link two records',
+                icon: 'link',
+                domain: 'flint',
+                kind: ActionKind::Data,
+                confirm: ConfirmPolicy::Undo,
+                capability: 'data:write',
+                handler: AskFlintLink::class,
                 surfaces: [],
             ),
             new ActionDefinition(
