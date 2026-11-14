@@ -39,13 +39,6 @@ abstract class AskFlintWriteTool implements Tool
 
     abstract public function name(): string;
 
-    /**
-     * Apply the change and return what to tell the model.
-     *
-     * @return array<string, mixed>
-     */
-    abstract protected function apply(Request $request): array;
-
     public function handle(Request $request): string
     {
         if (! SparkAbility::allows($this->user, self::CAPABILITY)) {
@@ -66,6 +59,13 @@ abstract class AskFlintWriteTool implements Tool
             return $this->failed('The change could not be made.');
         }
     }
+
+    /**
+     * Apply the change and return what to tell the model.
+     *
+     * @return array<string, mixed>
+     */
+    abstract protected function apply(Request $request): array;
 
     protected function action(string $id): ActionDefinition
     {

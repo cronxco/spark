@@ -69,6 +69,17 @@ class AskFlintTools
     ];
 
     /**
+     * The names the write tools go by, for reading changes back out of a
+     * stored turn.
+     *
+     * @return array<int, string>
+     */
+    public static function writeToolNames(): array
+    {
+        return ['update-record', 'set-event-note', 'tag-event', 'link-records', 'delete-event', 'log-event'];
+    }
+
+    /**
      * @param  User  $actor  the user, holding the turn's scoped token
      * @return array<int, Tool>
      */
@@ -90,16 +101,5 @@ class AskFlintTools
                 self::WRITE_TOOLS,
             ),
         ];
-    }
-
-    /**
-     * The names the write tools go by, for reading changes back out of a
-     * stored turn.
-     *
-     * @return array<int, string>
-     */
-    public static function writeToolNames(): array
-    {
-        return ['update-record', 'set-event-note', 'tag-event', 'link-records', 'delete-event', 'log-event'];
     }
 }

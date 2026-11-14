@@ -20,31 +20,6 @@ class AskFlintChangeLog
     /** @var array<int, array<string, mixed>> */
     private array $changes = [];
 
-    public function limitReached(): bool
-    {
-        return count($this->changes) >= self::MAX_PER_TURN;
-    }
-
-    /**
-     * @return array<string, mixed> the change as the client receives it
-     */
-    public function add(ActionReceipt $receipt, string $operation, string $kind, Event|EventObject|Block $entity, string $summary): array
-    {
-        return $this->changes[] = self::payload($receipt, [
-            'operation' => $operation,
-            'kind' => $kind,
-            'id' => (string) $entity->getKey(),
-            'title' => self::label($entity),
-            'summary' => $summary,
-        ]);
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    public function all(): array
-    {
-        return $this->changes;
-    }
-
     /**
      * A change with its receipt's present Undo state, so a transcript read
      * later does not offer an Undo that has expired or already run.
@@ -79,5 +54,30 @@ class AskFlintChangeLog
         };
 
         return Str::limit($label !== '' ? $label : 'Untitled', 80);
+    }
+
+    public function limitReached(): bool
+    {
+        return count($this->changes) >= self::MAX_PER_TURN;
+    }
+
+    /**
+     * @return array<string, mixed> the change as the client receives it
+     */
+    public function add(ActionReceipt $receipt, string $operation, string $kind, Event|EventObject|Block $entity, string $summary): array
+    {
+        return $this->changes[] = self::payload($receipt, [
+            'operation' => $operation,
+            'kind' => $kind,
+            'id' => (string) $entity->getKey(),
+            'title' => self::label($entity),
+            'summary' => $summary,
+        ]);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function all(): array
+    {
+        return $this->changes;
     }
 }

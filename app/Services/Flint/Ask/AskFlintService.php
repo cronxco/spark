@@ -57,6 +57,18 @@ class AskFlintService
         private AiUsageRecorder $usage,
     ) {}
 
+    private static function activityLabel(string $tool): string
+    {
+        return match (true) {
+            in_array($tool, AskFlintTools::writeToolNames(), true) => 'Making a change',
+            str_contains($tool, 'search') => 'Searching Spark',
+            str_contains($tool, 'day-summary') => 'Reading the day',
+            str_contains($tool, 'metric') || str_contains($tool, 'baseline') => 'Checking metrics',
+            str_contains($tool, 'money') => 'Checking money',
+            default => 'Looking things up',
+        };
+    }
+
     /**
      * Ask and wait for the whole answer. `$readOnly` withholds the write
      * tools for this turn.
@@ -353,17 +365,5 @@ class AskFlintService
         } catch (Throwable $exception) {
             report($exception);
         }
-    }
-
-    private static function activityLabel(string $tool): string
-    {
-        return match (true) {
-            in_array($tool, AskFlintTools::writeToolNames(), true) => 'Making a change',
-            str_contains($tool, 'search') => 'Searching Spark',
-            str_contains($tool, 'day-summary') => 'Reading the day',
-            str_contains($tool, 'metric') || str_contains($tool, 'baseline') => 'Checking metrics',
-            str_contains($tool, 'money') => 'Checking money',
-            default => 'Looking things up',
-        };
     }
 }
