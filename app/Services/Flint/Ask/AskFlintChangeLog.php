@@ -5,6 +5,7 @@ namespace App\Services\Flint\Ask;
 use App\Models\Block;
 use App\Models\Event;
 use App\Models\EventObject;
+use App\Services\Actions\ActionDefinition;
 use App\Services\Actions\ActionReceipt;
 use Illuminate\Support\Str;
 
@@ -71,6 +72,23 @@ class AskFlintChangeLog
             'kind' => $kind,
             'id' => (string) $entity->getKey(),
             'title' => self::label($entity),
+            'summary' => $summary,
+        ]);
+    }
+
+    /**
+     * A registry command Flint ran that can be undone. It changes no single
+     * event, object or block, so the card names the command.
+     *
+     * @return array<string, mixed> the change as the client receives it
+     */
+    public function addAction(ActionReceipt $receipt, ActionDefinition $action, string $summary): array
+    {
+        return $this->changes[] = self::payload($receipt, [
+            'operation' => 'run',
+            'kind' => 'action',
+            'id' => $action->id,
+            'title' => $action->title,
             'summary' => $summary,
         ]);
     }

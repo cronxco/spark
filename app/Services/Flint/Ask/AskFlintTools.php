@@ -3,8 +3,10 @@
 namespace App\Services\Flint\Ask;
 
 use App\Ai\Tools\AskFlint\DeleteEventTool;
+use App\Ai\Tools\AskFlint\LeaveNoteTool;
 use App\Ai\Tools\AskFlint\LinkRecordsTool;
 use App\Ai\Tools\AskFlint\LogEventTool;
+use App\Ai\Tools\AskFlint\RunActionTool;
 use App\Ai\Tools\AskFlint\SetEventNoteTool;
 use App\Ai\Tools\AskFlint\TagEventTool;
 use App\Ai\Tools\AskFlint\UpdateRecordTool;
@@ -33,9 +35,11 @@ use Laravel\Mcp\Server\Tool as McpTool;
  *
  * Reads are Spark's own MCP tools, run in-process exactly as CronxTools would
  * call them, so they keep their capability checks and their output. The list
- * is an allowlist: nothing that fetches the web, triggers a sync, runs a
- * routine or manages tokens is here, however the MCP server grows. Writes are
- * the Ask Flint write tools, the only ones that leave an Undo receipt.
+ * is an allowlist: nothing that fetches the web, runs a routine or manages
+ * tokens is here, however the MCP server grows. Writes are the Ask Flint
+ * write tools, the only ones that leave an Undo receipt. Among them,
+ * `run-action` runs the registry commands the app could run without asking
+ * first, and `leave-note` keeps a note for Flint's routines.
  */
 class AskFlintTools
 {
@@ -66,6 +70,7 @@ class AskFlintTools
         LinkRecordsTool::class,
         DeleteEventTool::class,
         LogEventTool::class,
+        RunActionTool::class,
     ];
 
     /**
@@ -76,7 +81,7 @@ class AskFlintTools
      */
     public static function writeToolNames(): array
     {
-        return ['update-record', 'set-event-note', 'tag-event', 'link-records', 'delete-event', 'log-event'];
+        return ['update-record', 'set-event-note', 'tag-event', 'link-records', 'delete-event', 'log-event', 'run-action'];
     }
 
     /**
@@ -100,6 +105,7 @@ class AskFlintTools
                 fn (string $class): Tool => app()->make($class, ['user' => $actor, 'changes' => $changes]),
                 self::WRITE_TOOLS,
             ),
+            app()->make(LeaveNoteTool::class, ['user' => $actor]),
         ];
     }
 }
