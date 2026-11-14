@@ -245,6 +245,7 @@ class SpendingTest extends TestCase
     #[Test]
     public function the_assessor_records_shadow_answers_on_ambiguous_bank_lines_only(): void
     {
+        $this->travelTo('2026-10-20 12:00:00');
         config(['money.jev.enabled' => true]);
         $rent = $this->bankEvent($this->barclays, 'payment_to', 60_000, 'Landlord', 'Rent');
         $this->bankEvent($this->amex, 'payment_to', 1000, 'Shop', 'Shop');

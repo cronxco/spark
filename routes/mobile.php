@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Mobile\DevicesController;
 use App\Http\Controllers\Api\V1\Mobile\EntityMutationsController;
 use App\Http\Controllers\Api\V1\Mobile\EventsController;
 use App\Http\Controllers\Api\V1\Mobile\FeedController;
+use App\Http\Controllers\Api\V1\Mobile\FlintAskController;
 use App\Http\Controllers\Api\V1\Mobile\FlintDigestsController;
 use App\Http\Controllers\Api\V1\Mobile\FlintNotesController;
 use App\Http\Controllers\Api\V1\Mobile\FlintQuestionsController;
@@ -465,6 +466,26 @@ Route::get('flint/notes', [FlintNotesController::class, 'index'])->middleware('s
 Route::post('flint/notes', [FlintNotesController::class, 'store'])->middleware('spark.ability:flint:write')->name('flint.notes.store');
 Route::post('flint/notes/acknowledge', [FlintNotesController::class, 'acknowledge'])->middleware('spark.ability:flint:write')->name('flint.notes.acknowledge');
 Route::delete('flint/notes/{id}', [FlintNotesController::class, 'destroy'])->middleware('spark.ability:flint:write')->name('flint.notes.destroy');
+
+/*
+ * Ask Flint. Asking and reading history need `flint:read`; whether a turn may
+ * change anything is decided inside it, from the token's `data:write`. A
+ * change is undone through `actions/receipts/{id}/undo`.
+ */
+Route::post('flint/ask', [FlintAskController::class, 'store'])
+    ->middleware(['spark.ability:flint:read', 'throttle:20,1'])
+    ->name('flint.ask.store');
+Route::get('flint/ask/conversations', [FlintAskController::class, 'index'])
+    ->middleware('spark.ability:flint:read')
+    ->name('flint.ask.conversations.index');
+Route::get('flint/ask/conversations/{id}', [FlintAskController::class, 'show'])
+    ->whereUuid('id')
+    ->middleware('spark.ability:flint:read')
+    ->name('flint.ask.conversations.show');
+Route::delete('flint/ask/conversations/{id}', [FlintAskController::class, 'destroy'])
+    ->whereUuid('id')
+    ->middleware('spark.ability:flint:write')
+    ->name('flint.ask.conversations.destroy');
 
 Route::get('flint/routines/health', FlintRoutineHealthController::class)
     ->middleware('spark.ability:flint:read')

@@ -20,6 +20,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Conversations
+    |--------------------------------------------------------------------------
+    |
+    | Agents that remember their threads (Ask Flint) store them in
+    | agent_conversations and agent_conversation_messages.
+    |
+    */
+
+    'conversations' => [
+        // Titles come from the first message. The SDK's generated titles would
+        // pick a model themselves, outside App\Services\Ai\AiModel and the
+        // usage ledger.
+        'generate_title' => false,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Caching
     |--------------------------------------------------------------------------
     |
