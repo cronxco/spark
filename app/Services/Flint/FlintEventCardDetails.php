@@ -2,6 +2,8 @@
 
 namespace App\Services\Flint;
 
+use App\Integrations\Flint\FlintPlugin;
+use App\Models\Block;
 use App\Models\Event;
 use App\Services\Money\SpendingScope;
 use App\Support\CalendarFlight;
@@ -28,6 +30,9 @@ use Illuminate\Support\Str;
  *   and pending; Will, 6 Nov 2026).
  * - `reading`: an article or newsletter issue (publication, its own headline,
  *   read time and up to four key takeaways).
+ * - `digest`: one of Flint's own digests, such as the news roundup (its name,
+ *   then every story or pick in it with the outlets that covered it or its
+ *   read time; Will, 7 Nov 2026).
  * - `metric`: everything else.
  */
 class FlintEventCardDetails
@@ -60,6 +65,21 @@ class FlintEventCardDetails
         'salary_received_from' => 'in',
     ];
 
+    /**
+     * Digest blocks that aren't items a reader would open the digest for:
+     * the run notes, the day context strip, questions, and articles Flint
+     * decided to skip.
+     */
+    private const DIGEST_SKIPPED_BLOCKS = [
+        'flint_editorial_note',
+        'flint_day_context',
+        'flint_user_question',
+        'flint_reading_drop',
+    ];
+
+    /** Story blocks a news roundup has used, current and retired. */
+    private const NEWS_BLOCKS = ['flint_news', 'flint_story', 'flint_news_roundup_story'];
+
     public function __construct(private SpendingScope $spending) {}
 
     /**
@@ -87,6 +107,10 @@ class FlintEventCardDetails
             return ['layout' => 'reading', 'details' => $this->reading($event)];
         }
 
+        if ($this->isDigest($event)) {
+            return ['layout' => 'digest', 'details' => $this->digest($event)];
+        }
+
         return ['layout' => 'metric', 'details' => null];
     }
 
@@ -98,6 +122,88 @@ class FlintEventCardDetails
     {
         return $event->domain === 'knowledge'
             && ($event->service === 'newsletter' || $event->action === 'bookmarked' || $event->service === 'fetch');
+    }
+
+    /**
+     * Whether the event is one of Flint's own digests: a briefing, the news
+     * roundup, the reading list or a money review.
+     */
+    public function isDigest(Event $event): bool
+    {
+        return $event->service === 'flint' && $event->action === 'had_summary';
+    }
+
+    /**
+     * The digest's name, a count line, and every item in it in order, never
+     * cut short (Will, 7 Nov 2026). News stories carry the outlets that
+     * covered them; reading picks their read time.
+     *
+     * @return array{name: string, facts: array<int, string>, items: array<int, array{title: string, sources: array<int, string>, read_minutes: int|null}>}
+     */
+    private function digest(Event $event): array
+    {
+        $blocks = $event->relationLoaded('blocks') ? $event->blocks : $event->blocks()->get();
+
+        $items = $blocks
+            ->reject(fn (Block $block): bool => in_array($block->block_type, self::DIGEST_SKIPPED_BLOCKS, true))
+            ->reject(fn (Block $block): bool => trim((string) $block->title) === '')
+            ->map(fn (Block $block): array => [
+                'title' => trim((string) $block->title),
+                'sources' => $this->newsSources($block),
+                'read_minutes' => $block->block_type === 'flint_reading_pick' && is_numeric($block->value)
+                    ? (int) round((float) $block->value)
+                    : null,
+            ])
+            ->values();
+
+        $isNews = $blocks->contains(fn (Block $block): bool => in_array($block->block_type, self::NEWS_BLOCKS, true));
+        $isReadingList = $blocks->contains(fn (Block $block): bool => $block->block_type === 'flint_reading_pick');
+        $noun = match (true) {
+            $isNews => 'story',
+            $isReadingList => 'pick',
+            default => 'item',
+        };
+        $sourceCount = $items->pluck('sources')->flatten()->unique()->count();
+
+        return [
+            'name' => $this->digestName($event),
+            'facts' => array_values(array_filter([
+                $items->isNotEmpty() ? $items->count() . ' ' . Str::plural($noun, $items->count()) : null,
+                $sourceCount > 0 ? $sourceCount . ' ' . Str::plural('source', $sourceCount) : null,
+            ])),
+            'items' => $items->all(),
+        ];
+    }
+
+    /**
+     * The outlets a news story names, in the order Flint gave them, each once.
+     *
+     * @return array<int, string>
+     */
+    private function newsSources(Block $block): array
+    {
+        if (! in_array($block->block_type, self::NEWS_BLOCKS, true)) {
+            return [];
+        }
+
+        return collect(data_get($block->metadata, 'news.sources', []))
+            ->map(fn (mixed $source): string => is_array($source) ? trim((string) ($source['publication'] ?? '')) : '')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The digest object's type name in sentence case ("News roundup",
+     * "Morning digest"), or "Digest" when the type is unknown.
+     */
+    private function digestName(Event $event): string
+    {
+        $type = (string) ($event->target?->type ?? '');
+        $name = FlintPlugin::getObjectTypes()[$type]['display_name'] ?? null;
+
+        return $name ? Str::ucfirst(Str::lower($name)) : 'Digest';
     }
 
     /**
