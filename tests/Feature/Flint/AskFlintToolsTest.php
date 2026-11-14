@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Flint;
 
+use App\Ai\Tools\AskFlint\LogEventTool;
 use App\Ai\Tools\AskFlint\TagEventTool;
 use App\Models\Event;
 use App\Models\Integration;
@@ -97,6 +98,23 @@ class AskFlintToolsTest extends TestCase
         $this->assertSame('failed', $output['status']);
         $this->assertNotEmpty($output['error']);
         $this->assertSame([], $changes->all());
+    }
+
+    #[Test]
+    public function a_log_that_breaks_the_log_rules_writes_nothing(): void
+    {
+        $user = User::factory()->create();
+        $changes = new AskFlintChangeLog;
+        $tool = app()->make(LogEventTool::class, ['user' => $this->actor($user, ['data:write']), 'changes' => $changes]);
+
+        $noTitle = json_decode($tool->handle(new Request(['kind' => 'wine'])), true);
+        $future = json_decode($tool->handle(new Request(['kind' => 'reflection', 'body' => 'Tomorrow went well.', 'occurred_at' => now()->addDay()->toIso8601String()])), true);
+
+        $this->assertSame('failed', $noTitle['status']);
+        $this->assertSame('failed', $future['status']);
+        $this->assertSame('Nothing can be logged in the future.', $future['error']);
+        $this->assertSame([], $changes->all());
+        $this->assertSame(0, Event::query()->where('service', 'manual_log')->count());
     }
 
     /** @param  array<int, string>  $abilities */

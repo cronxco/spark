@@ -1795,7 +1795,9 @@ reads through Spark's own MCP tools in-process. Asking and reading history need
 `data:write`: without it the agent is given no write tools.
 
 **`POST /flint/ask`** — body `message` (required, up to 4,000 characters),
-`conversation_id` (optional, continues a thread) and `stream` (optional).
+`conversation_id` (optional, continues a thread), `read_only` (optional; the
+turn is given no write tools whatever the token allows, which is how Siri
+asks) and `stream` (optional).
 Limited to 20 requests a minute.
 
 Without `stream`, the whole answer comes back as JSON:
@@ -1842,8 +1844,10 @@ server-sent events, each carrying `contract_version`:
 `/objects/{id}`, `/blocks/{id}`); every link in a finished message has been
 checked against the user's data and appears in `references`.
 
-Changes apply at once. `operation` is `update`, `note`, `tag`, `link` or
-`delete` (a soft delete). Each carries an action receipt, undone with
+Changes apply at once. `operation` is `update`, `note`, `tag`, `link`,
+`delete` (a soft delete) or `create` (something logged through Manual Log: a
+wine, beer, TV episodes, cinema trip, board game or reflection; `id` is the
+first event logged). Each carries an action receipt, undone with
 `POST /actions/receipts/{receipt_id}/undo` for 15 minutes. A turn makes at most
 five changes.
 

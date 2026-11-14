@@ -28,6 +28,7 @@ class AskFlintRequest extends FormRequest
             'message' => ['required', 'string', 'max:' . self::MAX_MESSAGE_LENGTH],
             'conversation_id' => ['nullable', 'uuid'],
             'stream' => ['nullable', 'boolean'],
+            'read_only' => ['nullable', 'boolean'],
         ];
     }
 

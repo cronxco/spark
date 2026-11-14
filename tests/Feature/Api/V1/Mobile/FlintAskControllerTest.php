@@ -11,7 +11,10 @@ use App\Models\IntegrationGroup;
 use App\Models\User;
 use App\Support\SparkAbility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Ai\Responses\Data\ToolCall;
+use Laravel\Ai\Tools\McpServerTool;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -221,6 +224,46 @@ class FlintAskControllerTest extends TestCase
         $this->postJson('/api/v1/mobile/actions/receipts/' . $response->json('message.changes.0.receipt_id') . '/undo')->assertOk();
 
         $this->assertNotSoftDeleted('events', ['id' => $event->id]);
+    }
+
+    #[Test]
+    public function logging_something_new_creates_the_event_and_undo_bins_it(): void
+    {
+        Queue::fake();
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        AskFlintAgent::fake([
+            new ToolCall('call-1', 'log-event', ['kind' => 'reflection', 'body' => 'Long walk by the river. Felt clear-headed after.']),
+            'Logged that reflection.',
+        ]);
+
+        $response = $this->postJson(self::ASK, ['message' => 'Log a reflection: long walk by the river, felt clear-headed after'])
+            ->assertOk()
+            ->assertJsonCount(1, 'message.changes')
+            ->assertJsonPath('message.changes.0.operation', 'create')
+            ->assertJsonPath('message.changes.0.kind', 'event')
+            ->assertJsonPath('message.changes.0.undo.available', true);
+
+        $event = Event::query()->where('service', 'manual_log')->where('action', 'logged_reflection')->sole();
+        $this->assertSame($event->id, $response->json('message.changes.0.id'));
+        $this->assertSame('Long walk by the river. Felt clear-headed after.', $event->target->content);
+
+        $this->postJson('/api/v1/mobile/actions/receipts/' . $response->json('message.changes.0.receipt_id') . '/undo')->assertOk();
+
+        $this->assertSoftDeleted('events', ['id' => $event->id]);
+    }
+
+    #[Test]
+    public function a_read_only_ask_is_given_no_write_tools_even_with_a_writing_token(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        AskFlintAgent::fake(['Your sleep score was 82.']);
+
+        $this->postJson(self::ASK, ['message' => 'How did I sleep?', 'read_only' => true])
+            ->assertOk()
+            ->assertJsonPath('message.changes', []);
+
+        AskFlintAgent::assertPrompted(fn (AgentPrompt $prompt): bool => collect($prompt->agent->tools())
+            ->every(fn (object $tool): bool => $tool instanceof McpServerTool));
     }
 
     #[Test]

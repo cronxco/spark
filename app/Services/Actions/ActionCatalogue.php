@@ -7,6 +7,7 @@ use App\Services\Actions\Handlers\AcknowledgeMetricTrends;
 use App\Services\Actions\Handlers\AddEventTag;
 use App\Services\Actions\Handlers\AskFlintEdit;
 use App\Services\Actions\Handlers\AskFlintLink;
+use App\Services\Actions\Handlers\AskFlintLog;
 use App\Services\Actions\Handlers\AskFlintNote;
 use App\Services\Actions\Handlers\CalculateMetricStatistics;
 use App\Services\Actions\Handlers\DeleteEvent;
@@ -220,6 +221,18 @@ final class ActionCatalogue
                 confirm: ConfirmPolicy::Undo,
                 capability: 'data:write',
                 handler: AskFlintLink::class,
+                surfaces: [],
+            ),
+            new ActionDefinition(
+                id: 'flint.ask_log',
+                title: 'Flint log',
+                subtitle: 'Log something new',
+                icon: 'plus',
+                domain: 'flint',
+                kind: ActionKind::Data,
+                confirm: ConfirmPolicy::Undo,
+                capability: 'data:write',
+                handler: AskFlintLog::class,
                 surfaces: [],
             ),
             new ActionDefinition(

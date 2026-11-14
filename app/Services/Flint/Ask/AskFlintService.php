@@ -58,16 +58,17 @@ class AskFlintService
     ) {}
 
     /**
-     * Ask and wait for the whole answer.
+     * Ask and wait for the whole answer. `$readOnly` withholds the write
+     * tools for this turn.
      *
      * @return array{conversation_id: string|null, message: array<string, mixed>}
      *
      * @throws AskFlintConversationNotFound
      * @throws AiDailyTokenCapExceeded
      */
-    public function ask(User $user, string $message, ?string $conversationId = null): array
+    public function ask(User $user, string $message, ?string $conversationId = null, bool $readOnly = false): array
     {
-        [$agent, $actor, $changes] = $this->prepare($user, $conversationId);
+        [$agent, $actor, $changes] = $this->prepare($user, $conversationId, $readOnly);
         $model = AiModel::Reasoning->model();
         $reservation = $this->reserve($user, $model, $message);
         $span = start_ai_agent_span('ask-flint', ['streaming' => false]);
@@ -109,9 +110,9 @@ class AskFlintService
      * @throws AskFlintConversationNotFound
      * @throws AiDailyTokenCapExceeded
      */
-    public function stream(User $user, string $message, ?string $conversationId = null): Generator
+    public function stream(User $user, string $message, ?string $conversationId = null, bool $readOnly = false): Generator
     {
-        [$agent, $actor, $changes] = $this->prepare($user, $conversationId);
+        [$agent, $actor, $changes] = $this->prepare($user, $conversationId, $readOnly);
         $model = AiModel::Reasoning->model();
         $reservation = $this->reserve($user, $model, $message);
 
@@ -184,18 +185,21 @@ class AskFlintService
     }
 
     /**
+     * A read-only turn is given no write tools, whatever the token allows:
+     * it is how Siri asks, where no Undo can be shown.
+     *
      * @return array{0: AskFlintAgent, 1: User, 2: AskFlintChangeLog}
      *
      * @throws AskFlintConversationNotFound
      */
-    private function prepare(User $user, ?string $conversationId): array
+    private function prepare(User $user, ?string $conversationId, bool $readOnly = false): array
     {
         if ($conversationId !== null) {
             $this->assertOwned($user, $conversationId);
         }
 
         $actor = $this->actor($user);
-        $canWrite = SparkAbility::allows($actor, 'data:write');
+        $canWrite = ! $readOnly && SparkAbility::allows($actor, 'data:write');
         $changes = new AskFlintChangeLog;
         $timezone = $user->getTimezone();
 

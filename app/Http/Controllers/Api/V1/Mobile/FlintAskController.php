@@ -25,7 +25,8 @@ class FlintAskController extends Controller
     /**
      * POST /api/v1/mobile/flint/ask
      *
-     * Body: `message`, optional `conversation_id` to continue a thread, and
+     * Body: `message`, optional `conversation_id` to continue a thread,
+     * `read_only` to ask without letting the turn change anything, and
      * `stream`. With `stream` (or `Accept: text/event-stream`) the answer is
      * sent as server-sent events — `conversation`, `delta`, `activity`,
      * `change`, then `done` or `error`. Otherwise the whole answer comes back
@@ -36,10 +37,11 @@ class FlintAskController extends Controller
         $user = $request->user();
         $message = trim((string) $request->validated('message'));
         $conversationId = $request->validated('conversation_id');
+        $readOnly = $request->boolean('read_only');
 
         try {
             if ($request->wantsStream()) {
-                $frames = $this->flint->stream($user, $message, $conversationId);
+                $frames = $this->flint->stream($user, $message, $conversationId, $readOnly);
 
                 return response()->stream(function () use ($frames): void {
                     foreach ($frames as [$event, $data]) {
@@ -58,7 +60,7 @@ class FlintAskController extends Controller
                 ]);
             }
 
-            return response()->json(['contract_version' => AskFlintTranscript::CONTRACT_VERSION] + $this->flint->ask($user, $message, $conversationId));
+            return response()->json(['contract_version' => AskFlintTranscript::CONTRACT_VERSION] + $this->flint->ask($user, $message, $conversationId, $readOnly));
         } catch (AskFlintConversationNotFound) {
             return $this->notFound();
         } catch (AiDailyTokenCapExceeded) {

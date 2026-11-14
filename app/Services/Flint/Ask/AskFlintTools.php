@@ -4,6 +4,7 @@ namespace App\Services\Flint\Ask;
 
 use App\Ai\Tools\AskFlint\DeleteEventTool;
 use App\Ai\Tools\AskFlint\LinkRecordsTool;
+use App\Ai\Tools\AskFlint\LogEventTool;
 use App\Ai\Tools\AskFlint\SetEventNoteTool;
 use App\Ai\Tools\AskFlint\TagEventTool;
 use App\Ai\Tools\AskFlint\UpdateRecordTool;
@@ -64,6 +65,7 @@ class AskFlintTools
         TagEventTool::class,
         LinkRecordsTool::class,
         DeleteEventTool::class,
+        LogEventTool::class,
     ];
 
     /**
@@ -98,6 +100,6 @@ class AskFlintTools
      */
     public static function writeToolNames(): array
     {
-        return ['update-record', 'set-event-note', 'tag-event', 'link-records', 'delete-event'];
+        return ['update-record', 'set-event-note', 'tag-event', 'link-records', 'delete-event', 'log-event'];
     }
 }
