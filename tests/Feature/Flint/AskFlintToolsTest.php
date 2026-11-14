@@ -2,12 +2,16 @@
 
 namespace Tests\Feature\Flint;
 
+use App\Ai\Tools\AskFlint\LeaveNoteTool;
 use App\Ai\Tools\AskFlint\LogEventTool;
+use App\Ai\Tools\AskFlint\RunActionTool;
 use App\Ai\Tools\AskFlint\TagEventTool;
 use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\Integration;
 use App\Models\IntegrationGroup;
 use App\Models\User;
+use App\Services\Actions\ActionExecutor;
 use App\Services\Flint\Ask\AskFlintChangeLog;
 use App\Services\Flint\Ask\AskFlintTools;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -48,7 +52,77 @@ class AskFlintToolsTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame(AskFlintTools::writeToolNames(), $written);
+        $this->assertSame([...AskFlintTools::writeToolNames(), 'leave-note'], $written);
+    }
+
+    #[Test]
+    public function flint_runs_a_listed_command_and_its_undo_reverses_it(): void
+    {
+        $user = User::factory()->create();
+        $integration = $this->eventFor($user)->integration;
+        $changes = new AskFlintChangeLog;
+        $tool = app()->make(RunActionTool::class, [
+            'user' => $this->actor($user, ['data:write', 'integrations:manage']),
+            'changes' => $changes,
+        ]);
+
+        $result = json_decode($tool->handle(new Request(['action' => 'integrations.pause', 'integration_id' => $integration->id])), true);
+
+        $this->assertSame('changed', $result['status']);
+        $this->assertSame('run', $result['change']['operation']);
+        $this->assertSame('action', $result['change']['kind']);
+        $this->assertSame('integrations.pause', $result['change']['id']);
+        $this->assertTrue($result['change']['undo']['available']);
+        $this->assertTrue($integration->fresh()->isPaused());
+        $this->assertCount(1, $changes->all());
+
+        app(ActionExecutor::class)->undo($user, $result['change']['receipt_id']);
+
+        $this->assertFalse($integration->fresh()->isPaused());
+    }
+
+    #[Test]
+    public function flint_cannot_run_a_command_that_asks_first_has_its_own_tool_or_is_beyond_the_token(): void
+    {
+        $user = User::factory()->create();
+        $event = $this->eventFor($user);
+        $changes = new AskFlintChangeLog;
+        $tool = app()->make(RunActionTool::class, ['user' => $this->actor($user, ['data:write']), 'changes' => $changes]);
+
+        $asksFirst = json_decode($tool->handle(new Request(['action' => 'events.reprocess', 'event_id' => $event->id])), true);
+        $ownTool = json_decode($tool->handle(new Request(['action' => 'events.delete', 'event_id' => $event->id])), true);
+        $beyondToken = json_decode($tool->handle(new Request(['action' => 'integrations.pause', 'integration_id' => $event->integration_id])), true);
+
+        $this->assertSame('failed', $asksFirst['status']);
+        $this->assertSame('failed', $ownTool['status']);
+        $this->assertSame('failed', $beyondToken['status']);
+        $this->assertSame([], $changes->all());
+        $this->assertNull($event->fresh()->deleted_at);
+        $this->assertFalse($event->integration->fresh()->isPaused());
+        $this->assertStringNotContainsString('integrations.pause', $tool->description());
+        $this->assertStringNotContainsString('events.reprocess', $tool->description());
+    }
+
+    #[Test]
+    public function flint_keeps_a_note_for_later_only_when_the_token_may_write_notes(): void
+    {
+        $user = User::factory()->create();
+        $notes = fn (): int => EventObject::query()->where('user_id', $user->id)->where('type', 'flint_note')->count();
+
+        $refused = json_decode(app()->make(LeaveNoteTool::class, ['user' => $this->actor($user, ['data:write'])])
+            ->handle(new Request(['body' => 'Away next week'])), true);
+        $this->assertSame('failed', $refused['status']);
+        $this->assertSame(0, $notes());
+
+        $kept = json_decode(app()->make(LeaveNoteTool::class, ['user' => $this->actor($user, ['flint:write'])])
+            ->handle(new Request(['body' => 'Away next week'])), true);
+        $this->assertSame('noted', $kept['status']);
+        $this->assertSame(1, $notes());
+
+        $empty = json_decode(app()->make(LeaveNoteTool::class, ['user' => $this->actor($user, ['flint:write'])])
+            ->handle(new Request(['body' => '  '])), true);
+        $this->assertSame('failed', $empty['status']);
+        $this->assertSame(1, $notes());
     }
 
     #[Test]

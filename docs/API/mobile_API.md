@@ -1845,7 +1845,8 @@ server-sent events, each carrying `contract_version`:
 checked against the user's data and appears in `references`.
 
 Changes apply at once. `operation` is `update`, `note`, `tag`, `link`,
-`delete` (a soft delete) or `create` (something logged through Manual Log: a
+`delete` (a soft delete), `run` (a registry command Flint ran that can be
+undone; `kind` is `action` and `id` the action id) or `create` (something logged through Manual Log: a
 wine, beer, TV episodes, cinema trip, board game or reflection; `id` is the
 first event logged). Each carries an action receipt, undone with
 `POST /actions/receipts/{receipt_id}/undo` for 15 minutes. A turn makes at most
