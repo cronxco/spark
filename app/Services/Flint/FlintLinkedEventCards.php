@@ -155,7 +155,7 @@ class FlintLinkedEventCards
             ->map(fn (Event $event): array => $this->details->for($event, $userId))
             ->filter(fn (array $layout, string $id): bool => $layout['layout'] !== 'metric' || $events->get($id)?->value !== null);
 
-        $statistics = $this->statisticsFor($events->only($details->keys()), $userId);
+        $statistics = $this->statisticsFor($events->filter(fn (Event $event, string $id): bool => $details->has($id)), $userId);
 
         return collect($ids)
             ->filter(fn (string $id): bool => $details->has($id))

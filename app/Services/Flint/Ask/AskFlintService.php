@@ -122,9 +122,12 @@ class AskFlintService
             $this->settle($reservation, $response->usage);
             $succeeded = true;
 
+            $messageId = $response->assistantMessageId ?? null;
+            $conversation = $response->conversationId ?? $agent->currentConversation();
+
             return [
-                'conversation_id' => $response->conversationId ?? $agent->currentConversation(),
-                'message' => $this->transcript->fresh($user, $response->assistantMessageId ?? null, $response->text, $changes->all()),
+                'conversation_id' => $conversation,
+                'message' => $this->transcript->fresh($user, $messageId, $response->text, $changes->all(), $this->answerSteps($messageId, $conversation)),
             ];
         } catch (Throwable $exception) {
             $succeeded || $this->abandon($reservation);
@@ -430,6 +433,28 @@ class AskFlintService
             finish_ai_agent_span($span, ['changes' => count($changes->all())], $succeeded);
             $previous ? $guard->setUser($previous) : $guard->forgetUser();
         }
+    }
+
+    /**
+     * The steps the SDK stored with a finished answer, for a turn that was
+     * not streamed and so saw none of them as they ran. Without the answer's
+     * id, the conversation's latest answer is the one just written.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function answerSteps(?string $messageId, ?string $conversationId): array
+    {
+        $message = match (true) {
+            $messageId !== null => ConversationMessage::query()->whereKey($messageId)->first(),
+            $conversationId !== null => ConversationMessage::query()
+                ->where('conversation_id', $conversationId)
+                ->where('role', 'assistant')
+                ->latest()
+                ->first(),
+            default => null,
+        };
+
+        return $message === null ? [] : AskFlintSteps::fromStored(self::storedSteps($message->steps));
     }
 
     /**
