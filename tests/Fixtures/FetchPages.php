@@ -112,6 +112,44 @@ class FetchPages
     }
 
     /**
+     * A weekend roundup: five stories, each a photo link and a headline link
+     * to the same tracked URL, but every story from a different section so no
+     * two share a URL shape.
+     */
+    public static function mixedSectionRoundup(): string
+    {
+        $stories = [
+            ['arts', 'Grand Theft Auto VI Will Steal Your Heart'],
+            ['well', 'U.S. Loses Its Measles Elimination Status'],
+            ['world/americas', 'Isolated Amazon Indigenous Group Makes Rare Contact'],
+            ['world/europe', 'Leaked Files Show Deutsche Bank Protected Russian Profits'],
+            ['business/economy', 'Winter Nightmare Looms Early as Prices Climb Relentlessly'],
+        ];
+
+        $rows = '';
+        foreach ($stories as $i => [$section, $headline]) {
+            $url = "https://www.example-news.com/2026/11/1{$i}/{$section}/story-number-{$i}-slug.html?algo=clicks&amp;imp_id={$i}";
+            $rows .= <<<HTML
+                <tr><td><table><tr>
+                    <td><a href="{$url}"><img src="https://img.example-news.com/{$i}.jpg" alt="Photo {$i}"></a></td>
+                    <td><a href="{$url}"><h3>{$headline} →</h3><p>By A. Reporter</p></a></td>
+                </tr></table></td></tr>
+            HTML;
+        }
+
+        return <<<HTML
+            <html><head><title>The World: Five stories you might have missed</title></head><body>
+                <table>
+                    <tr><td><a href="https://www.example-news.com/">example-news.com</a></td></tr>
+                    <tr><td><p>Here are some standout stories from this week.</p></td></tr>
+                    {$rows}
+                    <tr><td><a href="https://www.example-news.com/newsletters/optout?token=abc">unsubscribe</a></td></tr>
+                </table>
+            </body></html>
+        HTML;
+    }
+
+    /**
      * A TLDR-style link digest email: tracked story links, a sponsor block,
      * social links and the usual housekeeping links.
      */

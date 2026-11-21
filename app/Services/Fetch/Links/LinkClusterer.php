@@ -28,6 +28,11 @@ class LinkClusterer
      */
     private const ARTICLE_TEXT_LENGTH = 1500;
 
+    /**
+     * URL template label for groups that span several URL shapes.
+     */
+    private const MIXED_TEMPLATE = '(mixed paths)';
+
     public function __construct(
         private int $minItems = 5,
         private int $maxClusters = 6,
@@ -101,6 +106,62 @@ class LinkClusterer
             fn (LinkCluster $cluster, int $index): LinkCluster => $this->withId($cluster, 'c' . $index),
             array_slice($clusters, 0, $this->maxClusters),
             array_keys(array_slice($clusters, 0, $this->maxClusters)),
+        ));
+    }
+
+    /**
+     * Groups for pages the strict clustering found nothing in.
+     *
+     * Strict groups need a shared DOM path and a shared URL shape, so a
+     * roundup that mixes sections (`/arts/…`, `/world/europe/…`) never
+     * reaches the minimum group size. Relax in two steps: first group by DOM
+     * path alone (the repeated item markup), then, failing that, treat every
+     * body link as one group. Jev still decides whether the group is the
+     * page's list and which of its links are articles.
+     *
+     * @return list<LinkCluster> Best first
+     */
+    public function fallbackClusters(PageLinks $page): array
+    {
+        $pageHost = strtolower((string) parse_url($page->pageUrl, PHP_URL_HOST));
+        $total = max(1, count($page->candidates));
+        $minItems = max(2, (int) config('fetch.list_detection.fallback_min_items', 3));
+        $body = array_values(array_filter(
+            $page->candidates,
+            fn (LinkCandidate $candidate): bool => ! $candidate->hasLandmark(...self::HARD_EXCLUDED_LANDMARKS),
+        ));
+
+        $byDom = [];
+        foreach ($body as $candidate) {
+            $byDom[$candidate->domSignature][] = $candidate;
+        }
+
+        $clusters = [];
+        foreach ($byDom as $domSignature => $candidates) {
+            $items = $this->distinctByUrl($candidates);
+
+            if (count($items) >= $minItems) {
+                $clusters[] = $this->build($domSignature . '|' . self::MIXED_TEMPLATE, $items, $pageHost, $total);
+            }
+        }
+
+        $clusters = $this->dropDuplicateGroups($clusters);
+
+        if ($clusters === []) {
+            $items = $this->distinctByUrl($body);
+
+            if (count($items) >= $minItems) {
+                $clusters[] = $this->build('*|' . self::MIXED_TEMPLATE, $items, $pageHost, $total);
+            }
+        }
+
+        usort($clusters, fn (LinkCluster $a, LinkCluster $b): int => $b->score <=> $a->score);
+        $clusters = array_slice($clusters, 0, $this->maxClusters);
+
+        return array_values(array_map(
+            fn (LinkCluster $cluster, int $index): LinkCluster => $this->withId($cluster, 'c' . $index),
+            $clusters,
+            array_keys($clusters),
         ));
     }
 

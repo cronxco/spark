@@ -126,8 +126,9 @@ class ListPageFetchTest extends TestCase
     }
 
     #[Test]
-    public function an_article_with_a_related_rail_never_reaches_jev(): void
+    public function an_article_with_a_related_rail_never_reaches_jev_when_always_consult_is_off(): void
     {
+        config(['fetch.list_detection.always_consult' => false]);
         $this->worker(FetchPages::articleWithRelatedRail());
         $this->jevSaysList();
         $bookmark = $this->bookmark(['fetch_mode' => 'once', 'subscription_source' => 'api']);
@@ -136,6 +137,78 @@ class ListPageFetchTest extends TestCase
 
         Queue::assertPushed(ProcessFetchedContent::class);
         Http::assertNotSent(fn (Request $request): bool => $request->url() === FakeJev::URL);
+    }
+
+    #[Test]
+    public function with_always_consult_an_article_is_still_put_to_jev_and_stays_an_article(): void
+    {
+        $this->worker(FetchPages::articleWithRelatedRail());
+        FakeJev::fake(['page_kind' => 'single_article', 'has_article_list' => 0.05]);
+        $bookmark = $this->bookmark(['fetch_mode' => 'once', 'subscription_source' => 'api']);
+
+        $this->fetch($bookmark);
+
+        Http::assertSent(fn (Request $request): bool => $request->url() === FakeJev::URL);
+        Queue::assertNotPushed(ExpandLinkListJob::class);
+        Queue::assertPushed(ProcessFetchedContent::class);
+        $this->assertSame('article', $bookmark->fresh()->metadata['list_detection']['kind']);
+    }
+
+    #[Test]
+    public function with_always_consult_a_recent_article_verdict_is_asked_again(): void
+    {
+        $this->worker(FetchPages::blogIndex());
+        $this->jevSaysList();
+        $bookmark = $this->bookmark([
+            'fetch_mode' => 'once',
+            'subscription_source' => 'api',
+            'list_detection' => ['kind' => 'article', 'assessed_at' => now()->subDay()->toIso8601String()],
+        ]);
+
+        $this->fetch($bookmark);
+
+        Queue::assertPushed(ExpandLinkListJob::class);
+        $this->assertSame('list', $bookmark->fresh()->metadata['list_detection']['kind']);
+    }
+
+    #[Test]
+    public function a_roundup_that_mixes_sections_reaches_jev_through_the_fallback_group(): void
+    {
+        $this->worker(FetchPages::mixedSectionRoundup());
+        FakeJev::fake([
+            'page_kind' => 'article_list',
+            'has_article_list' => 0.95,
+            'cluster_c0_is_primary' => 0.9,
+            'link_*_is_article' => 0.9, 'link_*_role' => 'article',
+        ]);
+        $bookmark = $this->bookmark(['fetch_mode' => 'recurring', 'subscription_source' => 'subscribed']);
+
+        $this->fetch($bookmark);
+
+        Queue::assertPushed(ExpandLinkListJob::class, fn (ExpandLinkListJob $job): bool => count($job->items) === 5);
+        $this->assertSame('list', $bookmark->fresh()->metadata['list_detection']['kind']);
+    }
+
+    #[Test]
+    public function a_skip_is_recorded_with_its_reason_and_keeps_the_earlier_verdict(): void
+    {
+        config(['fetch.list_detection.always_consult' => false]);
+        $this->worker(FetchPages::articleWithRelatedRail());
+        $this->jevSaysList();
+        $assessedAt = now()->subDay()->toIso8601String();
+        $bookmark = $this->bookmark([
+            'fetch_mode' => 'once',
+            'subscription_source' => 'api',
+            'list_detection' => ['kind' => 'list', 'assessed_at' => $assessedAt],
+        ]);
+
+        $this->fetch($bookmark);
+
+        $memo = $bookmark->fresh()->metadata['list_detection'];
+        $this->assertSame('skipped', $memo['last_status']);
+        $this->assertSame('Structural check: no group looks like a list of articles', $memo['last_skip']['reason']);
+        $this->assertSame('list', $memo['kind']);
+        $this->assertSame($assessedAt, $memo['assessed_at']);
     }
 
     #[Test]

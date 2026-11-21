@@ -164,6 +164,38 @@ class LinkClustererTest extends FrameworkTestCase
     }
 
     #[Test]
+    public function strict_grouping_finds_nothing_in_a_roundup_that_mixes_sections(): void
+    {
+        $page = (new LinkCandidateExtractor)->fromHtml(FetchPages::mixedSectionRoundup(), 'https://static.example-news.com/roundup.html');
+        $clusterer = new LinkClusterer(minItems: 5);
+
+        $this->assertSame([], $clusterer->cluster($page));
+        $this->assertFalse($clusterer->looksListLike($page, [], 400));
+    }
+
+    #[Test]
+    public function the_fallback_groups_a_mixed_section_roundup_by_markup(): void
+    {
+        $page = (new LinkCandidateExtractor)->fromHtml(FetchPages::mixedSectionRoundup(), 'https://static.example-news.com/roundup.html');
+
+        $clusters = (new LinkClusterer(minItems: 5))->fallbackClusters($page);
+
+        $this->assertCount(1, $clusters);
+        $this->assertSame('c0', $clusters[0]->id);
+        $this->assertSame(5, $clusters[0]->count());
+        $this->assertSame('example-news.com/(mixed paths)', preg_replace('/^.*?\//', 'example-news.com/', $clusters[0]->urlTemplate));
+        $this->assertStringContainsString('Grand Theft Auto VI', $clusters[0]->items[0]->anchorText);
+    }
+
+    #[Test]
+    public function the_fallback_is_empty_for_a_page_with_too_few_links(): void
+    {
+        $page = (new LinkCandidateExtractor)->fromHtml('<html><body><a href="/a">One lonely link</a></body></html>', 'https://example.com/');
+
+        $this->assertSame([], (new LinkClusterer)->fallbackClusters($page));
+    }
+
+    #[Test]
     public function it_describes_clusters_without_raw_numbers_for_jev(): void
     {
         $page = (new LinkCandidateExtractor)->fromHtml(FetchPages::blogIndex(), 'https://blog.example.com/');
