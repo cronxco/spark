@@ -172,7 +172,7 @@ class AskFlintService
     {
         $askFlintMessages = fn () => ConversationMessage::query()->select('conversation_id')->where('agent', AskFlintAgent::class);
         $search = $search !== null ? trim($search) : null;
-        $pattern = $search ? '%' . addcslashes($search, '%_\\') . '%' : null;
+        $pattern = $search !== null && $search !== '' ? '%' . addcslashes($search, '%_\\') . '%' : null;
 
         $page = Conversation::query()
             ->where('participant_type', Conversation::participantType($user))
