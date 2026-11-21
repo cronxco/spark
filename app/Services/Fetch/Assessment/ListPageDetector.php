@@ -44,6 +44,15 @@ class ListPageDetector
         return (bool) config('fetch.list_detection.enabled', false);
     }
 
+    /**
+     * Whether every eligible fetch is put to Jev, skipping the structural
+     * gate and the reuse of an earlier "article" verdict.
+     */
+    public static function alwaysConsult(): bool
+    {
+        return (bool) config('fetch.list_detection.always_consult', true);
+    }
+
     public static function isShadow(): bool
     {
         return (bool) config('fetch.list_detection.shadow', true);
@@ -110,10 +119,13 @@ class ListPageDetector
         $assessedAt = isset($memo['assessed_at']) ? CarbonImmutable::parse($memo['assessed_at']) : null;
         $logContext = ['webpage_id' => $bookmark->id, 'url' => $pageUrl];
 
-        if ($mode === self::MODE_AUTO
+        if (! self::alwaysConsult()
+            && $mode === self::MODE_AUTO
             && ($memo['kind'] ?? null) === 'article'
             && $validation['success']
             && $assessedAt?->gt(now()->subDays((int) config('fetch.list_detection.negative_memo_days', 14)))) {
+            $this->recordSkip($bookmark, 'Reused the earlier article verdict (assessed ' . $assessedAt->toDateString() . ')', $logContext);
+
             return null;
         }
 
@@ -125,12 +137,20 @@ class ListPageDetector
             $clusters = array_slice(array_merge([$structured], $clusters), 0, max(1, (int) config('fetch.list_detection.max_clusters', 6)));
         }
 
+        if ($clusters === [] && self::alwaysConsult()) {
+            $clusters = $clusterer->fallbackClusters($page);
+        }
+
         // A structural signature says where links live, not whether today's
         // links are articles. Reclassify each scan so new sponsored cards and
         // links rejected on earlier scans cannot inherit a group verdict.
         $textLength = $parsed['success'] ? mb_strlen((string) ($parsed['data']['text_content'] ?? '')) : null;
 
-        if ($mode !== self::MODE_FORCE && ! $clusterer->looksListLike($page, $clusters, $validation['success'] ? $textLength : null)) {
+        if (! self::alwaysConsult()
+            && $mode !== self::MODE_FORCE
+            && ! $clusterer->looksListLike($page, $clusters, $validation['success'] ? $textLength : null)) {
+            $this->recordSkip($bookmark, $clusters === [] ? 'No candidate link groups found' : 'Structural check: no group looks like a list of articles', $logContext);
+
             return null;
         }
 
@@ -140,6 +160,12 @@ class ListPageDetector
             'excerpt' => $parsed['data']['excerpt'] ?? null,
             'title' => $parsed['data']['title'] ?? null,
         ], $capturedTitle, $logContext);
+
+        if ($assessment->status === ListAssessment::STATUS_SKIPPED) {
+            $this->recordSkip($bookmark, $assessment->reason, $logContext);
+
+            return null;
+        }
 
         $this->remember($bookmark, $assessment);
 
@@ -158,6 +184,33 @@ class ListPageDetector
         return $assessment;
     }
 
+    /**
+     * Keep a visible reason when a page is not put to Jev, so a verdict that
+     * never changes can be told apart from a page that is never asked about.
+     * Leaves the earlier verdict (`kind`, `assessed_at`) untouched and only
+     * writes when the reason changes.
+     *
+     * @param  array<string, mixed>  $logContext
+     */
+    private function recordSkip(EventObject $bookmark, string $reason, array $logContext): void
+    {
+        Log::info('Fetch: List assessment skipped', $logContext + ['reason' => $reason]);
+
+        if (($bookmark->metadata['list_detection']['last_skip']['reason'] ?? null) === $reason
+            && ($bookmark->metadata['list_detection']['last_status'] ?? null) === ListAssessment::STATUS_SKIPPED) {
+            return;
+        }
+
+        FetchMetadata::mutate($bookmark, function (array $metadata) use ($reason): array {
+            $memo = $metadata['list_detection'] ?? [];
+            $memo['last_status'] = ListAssessment::STATUS_SKIPPED;
+            $memo['last_skip'] = ['reason' => $reason, 'at' => now()->toIso8601String()];
+            $metadata['list_detection'] = $memo;
+
+            return $metadata;
+        });
+    }
+
     private function remember(EventObject $bookmark, ListAssessment $assessment): void
     {
         FetchMetadata::mutate($bookmark, function (array $metadata) use ($assessment): array {
@@ -165,6 +218,7 @@ class ListPageDetector
             $memo['last_status'] = $assessment->status;
             $memo['last_assessment'] = $assessment->toArray();
             $memo['shadow'] = self::isShadow();
+            unset($memo['last_skip']);
 
             if ($assessment->status === ListAssessment::STATUS_ASSESSED) {
                 $memo['kind'] = $assessment->isList ? 'list' : 'article';

@@ -73,6 +73,12 @@ return [
     'list_detection' => [
         'enabled' => env('FETCH_LIST_DETECTION_ENABLED', false),
         'shadow' => env('FETCH_LIST_DETECTION_SHADOW', true),
+        // Ask Jev about every eligible fetch: no structural gate, no reuse of
+        // an earlier "article" verdict, and relaxed grouping when strict
+        // grouping finds nothing. Pages change shape (a weekday roundup is a
+        // weekend set of stories), so an old verdict or a strict gate can miss.
+        'always_consult' => env('FETCH_LIST_ALWAYS_CONSULT', true),
+        'fallback_min_items' => env('FETCH_LIST_FALLBACK_MIN_ITEMS', 3),
         'min_cluster_items' => env('FETCH_LIST_MIN_CLUSTER_ITEMS', 5),
         'max_clusters' => 6,
         'max_links' => 60,

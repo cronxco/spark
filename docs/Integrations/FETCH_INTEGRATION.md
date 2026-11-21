@@ -273,8 +273,18 @@ Spotlight, manual and legacy subscriptions). Pages found by discovery or by an
 earlier expansion never expand, so expansion cannot chain into a crawl.
 Recurring lists reclassify their current links on every scan, so rejected or
 new sponsored cards cannot inherit an earlier group verdict. Links beyond the
-classification budget are not expanded. Pages judged to be articles are not
+classification budget are not expanded. Unless always-consult is turned off, pages judged to be articles are asked again on every fetch; otherwise they are not
 re-asked for 14 days.
+
+By default (`FETCH_LIST_ALWAYS_CONSULT=true`) Jev is asked about every
+eligible fetch: there is no structural gate, an earlier "article" verdict is
+never reused, and when strict grouping finds nothing the page is grouped by
+markup alone, then as one group of all body links
+(`FETCH_LIST_FALLBACK_MIN_ITEMS`, default 3). That catches pages whose shape
+changes, such as a roundup of stories from different sections. Set it to
+`false` to restore the gate and the 14-day memo. When a page is not put to
+Jev, the reason is stored in `metadata.list_detection.last_skip` and logged
+as "Fetch: List assessment skipped"; the earlier verdict is left in place.
 
 Per bookmark, the URLs tab offers **Treat as list of articles** (skip the
 structural check), **Always treat as one article** and **Detect lists
