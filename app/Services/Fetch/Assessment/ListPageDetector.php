@@ -161,6 +161,12 @@ class ListPageDetector
             'title' => $parsed['data']['title'] ?? null,
         ], $capturedTitle, $logContext);
 
+        if ($assessment->status === ListAssessment::STATUS_SKIPPED) {
+            $this->recordSkip($bookmark, $assessment->reason, $logContext);
+
+            return null;
+        }
+
         $this->remember($bookmark, $assessment);
 
         Log::info('Fetch: List assessment', $logContext + [

@@ -190,6 +190,21 @@ class ListPageFetchTest extends TestCase
     }
 
     #[Test]
+    public function a_page_with_too_few_links_records_why_jev_was_not_asked(): void
+    {
+        $this->worker('<html><head><title>Lonely</title></head><body><a href="https://blog.example.com/only">The only link on this page</a></body></html>');
+        $this->jevSaysList();
+        $bookmark = $this->bookmark(['fetch_mode' => 'once', 'subscription_source' => 'api']);
+
+        $this->fetch($bookmark);
+
+        Http::assertNotSent(fn (Request $request): bool => $request->url() === FakeJev::URL);
+        $memo = $bookmark->fresh()->metadata['list_detection'];
+        $this->assertSame('skipped', $memo['last_status']);
+        $this->assertSame('No candidate link groups', $memo['last_skip']['reason']);
+    }
+
+    #[Test]
     public function a_skip_is_recorded_with_its_reason_and_keeps_the_earlier_verdict(): void
     {
         config(['fetch.list_detection.always_consult' => false]);

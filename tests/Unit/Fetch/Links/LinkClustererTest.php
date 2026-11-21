@@ -183,7 +183,7 @@ class LinkClustererTest extends FrameworkTestCase
         $this->assertCount(1, $clusters);
         $this->assertSame('c0', $clusters[0]->id);
         $this->assertSame(5, $clusters[0]->count());
-        $this->assertSame('example-news.com/(mixed paths)', preg_replace('/^.*?\//', 'example-news.com/', $clusters[0]->urlTemplate));
+        $this->assertSame('(mixed paths)', $clusters[0]->urlTemplate);
         $this->assertStringContainsString('Grand Theft Auto VI', $clusters[0]->items[0]->anchorText);
     }
 
