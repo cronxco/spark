@@ -133,6 +133,7 @@ Anything a model wrote sits on a **generated surface** so it can be told apart f
 - **Full-width band (Will, 2026-10-30).** On reading pages with a lot of generated text, such as a news article with its summary, key points and takeaways, the surface can run the full width of the page as a band instead of sitting in a card. The band has the same gradient, no corner radius, and the 1px ember-5 hairline along the top and bottom only, with no side borders. The two rules match in colour and weight, so this is not a one-sided edge (5.3). Text inside keeps the page's side gutter, and the eyebrow rule above still applies. Use the card where generated text sits among other cards in a grid or feed, and the band where it is part of the reading flow. Never nest one in the other, and keep section spacing (5.1) between two bands so they never touch.
 - No model names, word counts or character counts.
 - **Up to Speed story screens are exempt (Will, 2026-11-05).** Every screen in the Up to Speed flow is Flint speaking, and the Flint byline (avatar, name and context) at the top of each screen already marks the voice. Their prose sits on the screen's ground with no generated surface, card or band. A generated card still applies where Flint's text sits among other content outside the flow, such as a summary block in a feed or on a detail page.
+- **Chat answers are exempt (Will, 2026-11-21).** In a Chat conversation the answer sits on the page under the Flint byline, as in Up to Speed, with no generated surface (7.6).
 - On iOS this is `.sparkGeneratedSurface(radius:)` in SparkUI/Materials. It is opaque content, not glass, and under Increase Contrast it keeps the hairline at full strength. On the web it is a `.surface-generated` class in `app.css`, built from `--color-spark` and `--color-ember` tokens. The band is `.surface-generated-band` on the web (the same background with `border-y`, no radius, breaking out of the page container) and `.sparkGeneratedBand()` on iOS (the background ignores the horizontal safe area; the content does not).
 
 ### 3.6 Hero values
@@ -391,6 +392,21 @@ The current web `x-*-ref` and `<x-tag-ref>` components are the primary design fo
 
 Tags and references are links, so they are exempt from the "chips mean action" rule in 12.9.
 
+### 7.6 Chat
+
+Chat is where you talk to Flint (Will, 2026-11-21). It has its own tab, named "Chat" with a speech-bubble glyph.
+
+- **Home.** The home lists your real conversations, newest first. They are grouped by the day each was last active: "Today", "Yesterday", then "Sun 22 Nov", with the year added when it isn't this year. Each row shows the title, a one-line preview, the domains the conversation touched as small glyphs, the number of changes Flint made, and a 24-hour time. A search field narrows the list on the server. A "Logged" section lists what you logged with the input bar, and each entry opens its event. Typing on the home always starts a new conversation.
+- **A conversation** opens full screen and hides the tab bar. Its title is the conversation's title, or "New chat". When you send a question, it moves to the top of the screen and the answer is written below it, so the page doesn't pull along as the text grows. A conversation you open starts at its latest turn.
+- **The question** sits in a bubble on the trailing side, at `accent` 18%.
+- **The answer** is written on the page under the Flint byline, with no generated surface (3.5). Paragraphs, list text and quotes are serif (`longFormBodySmall`). Headings, list markers, table cells and code use SF. Links take the highlight token (3.3): semibold, with no underline.
+- **Steps.** While Flint works, each step shows as it runs: a status glyph, what Flint did ("Searched payments"), what it covered ("Thu 19 Nov"), what it found ("1 match"), and chips for the records it found, which open them. A reasoning step shows Flint's short summary in italics. When the answer finishes, the steps fold into one secondary line, such as "3 steps in 4.2s", or "Thought it through" when Flint used no tool. Tapping that line opens the steps again in place. A step still running when an answer stops or fails shows as failed.
+- **Cards** for the events an answer links sit under the paragraph or list item that first links them. They use the Up to Speed layouts in 7.3. Inside a list, a calendar entry or metric is a **slim row** instead: its glyph, its title or label, and its time or value on one line, 40pt high, on the domain-tinted fill. This keeps a week of plans reading as a list. A card no block links goes at the end of the answer.
+- **Changes** Flint made sit after the answer, each with its Undo.
+- **Follow-ups.** The latest finished answer can end with up to two questions to ask next, shown as full-width glass pills with a reply glyph. Earlier answers drop them. The old reference chips at the end of an answer are gone: cards and step records do that job.
+- **Motion.** Steps appear and fold at `motion.state`. Follow-ups fade in once the answer finishes. Linked cards keep the rise and draw-once from 7.3. Under Reduce Motion, all of these simply appear.
+- **Haptics** are listed in 10.8.
+
 ## 8. Visual patterns for blocks and events
 
 Pick one pattern per card. Each has one implementation per platform, shared across every type that uses it.
@@ -503,6 +519,21 @@ Use the existing pager hierarchy: a chapter-boundary cue replaces the within-cha
 **Linked-card motion.** Retain PR92's cards rising into place 70ms apart after the prose, and its one-time ring, against-the-mean bar, route and week-bar drawing effects. Keep the implemented choreography as the baseline, including its longer presentation springs; the micro/state/spatial ranges are not grounds for removing or shortening these approved effects. Retain the flight-progress glyph's meaningful position along the route. This permission is specific to these Up to Speed cards, not a default entrance treatment for every list or chart.
 
 **Accessibility and lifecycle.** Under Reduce Motion, show the linked cards and final chart/route states without their spatial entrance or drawing animation. Reduce Motion does not itself disable the reading haptics; the Spark-specific haptic setting and OS behaviour govern those. Preserve foreground reading interactions when centralising feedback in `SparkHaptics`, without adding a second cue. Background data refresh, passive value changes and read-marker queue flushing do not acquire haptics from this exception. Animation never delays a tap or a save, and completion cues for actual writes must still reflect their real outcome.
+
+### 10.8 Chat feedback
+
+Chat uses a few cues so you can feel Flint's progress without watching it (Will, 2026-11-21). They come from the view model's single `feedback` value, so no action gives two cues.
+
+| Chat moment | Feedback | Timing |
+|---|---|---|
+| Send a question, including a follow-up | Light impact | When the question is added |
+| Flint confirms a change it made | Success | When the change frame arrives, which means it was saved |
+| Undo confirmed | Light impact | After the server confirms the undo |
+| The answer or an Undo fails | Error | With the visible error |
+| The answer finishes | Soft impact at half intensity | When the completed message arrives, not for a failed or paused one |
+| Tap a linked card | Light impact | As in 7.3 |
+
+Streaming text, steps arriving and scrolling add no haptics.
 
 ## 11. Accessibility checks
 
