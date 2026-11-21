@@ -437,6 +437,7 @@ class FlintAskControllerTest extends TestCase
         return Event::factory()->create([
             'integration_id' => $this->integration->id,
             'service' => 'monzo',
+            'domain' => 'money',
             'action' => 'card_payment_to',
             'target_id' => $target->id,
             'time' => now()->subDay(),
