@@ -2,8 +2,12 @@
 
 namespace App\Services\Flint\Ask;
 
+use App\Models\Block;
+use App\Models\Event;
+use App\Models\EventObject;
 use App\Models\User;
 use App\Services\Api\EntityMutationService;
+use Illuminate\Support\Str;
 
 /**
  * The records an answer links to.
@@ -38,7 +42,7 @@ class AskFlintReferences
                 $references[$key] = $entity === null ? null : [
                     'kind' => $kind,
                     'id' => $id,
-                    'title' => AskFlintChangeLog::label($entity),
+                    'title' => self::title($entity),
                 ];
             }
 
@@ -46,5 +50,21 @@ class AskFlintReferences
         }, $text);
 
         return ['text' => $text, 'references' => array_values(array_filter($references))];
+    }
+
+    /**
+     * A reference shows the record's own title (design language 7.5): "F1:
+     * Grand Prix", not "Had event F1: Grand Prix".
+     */
+    public static function title(Event|EventObject|Block $entity): string
+    {
+        if ($entity instanceof Event) {
+            $title = trim((string) ($entity->target?->title ?? ''));
+            if ($title !== '') {
+                return Str::limit($title, 80);
+            }
+        }
+
+        return AskFlintChangeLog::label($entity);
     }
 }

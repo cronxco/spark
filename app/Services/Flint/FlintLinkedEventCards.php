@@ -124,6 +124,53 @@ class FlintLinkedEventCards
     }
 
     /**
+     * Cards for the events one piece of Flint text links to, in the order it
+     * first mentions them: an Ask Flint answer rather than a digest, so there
+     * is no value at digest time and no answered question to close.
+     *
+     * Unlike a briefing, a calendar entry with no value still gets its card,
+     * because "what's on this week" is answered by the entries themselves.
+     * Anything else valueless that would fall back to a metric card is left
+     * to the prose.
+     *
+     * @param  array<int, string>|Collection<int, string>  $integrationIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function forText(?string $markdown, mixed $integrationIds, int|string $userId): array
+    {
+        $ids = self::linkedIds($markdown);
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $events = Event::query()
+            ->whereIn('id', $ids)
+            ->whereIn('integration_id', $integrationIds)
+            ->with(['integration', 'actor', 'target', 'blocks'])
+            ->get()
+            ->keyBy(fn (Event $event): string => strtolower($event->id));
+
+        $details = $events
+            ->map(fn (Event $event): array => $this->details->for($event, $userId))
+            ->filter(fn (array $layout, string $id): bool => $layout['layout'] !== 'metric' || $events->get($id)?->value !== null);
+
+        $statistics = $this->statisticsFor($events->only($details->keys()), $userId);
+
+        return collect($ids)
+            ->filter(fn (string $id): bool => $details->has($id))
+            ->map(fn (string $id): array => $this->card(
+                $events->get($id),
+                $details->get($id),
+                $statistics->get($this->metricKey($events->get($id))),
+                null,
+                null,
+            ))
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  array{layout: string, details: array<string, mixed>|null}  $layout
      * @param  array{value: float|int|string, display_value: string}|null  $atDigest
      * @param  array{answer: string, note: string|null}|null  $answer
