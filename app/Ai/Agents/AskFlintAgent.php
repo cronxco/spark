@@ -42,6 +42,11 @@ class AskFlintAgent implements Agent, Conversational, HasProviderOptions, HasToo
         private ?string $model = null,
     ) {}
 
+    public static function isReasoningModel(?string $model): bool
+    {
+        return $model !== null && (bool) preg_match('/^(?:gpt-5(?:[.-].+)?|o(?:1|3|4)(?:[.-].+)?)$/i', $model);
+    }
+
     public function instructions(): string
     {
         $writing = $this->canWrite
@@ -100,11 +105,6 @@ class AskFlintAgent implements Agent, Conversational, HasProviderOptions, HasToo
         return $isOpenAi && self::isReasoningModel($this->model)
             ? ['reasoning' => ['summary' => 'auto']]
             : [];
-    }
-
-    public static function isReasoningModel(?string $model): bool
-    {
-        return $model !== null && (bool) preg_match('/^(?:gpt-5(?:[.-].+)?|o(?:1|3|4)(?:[.-].+)?)$/i', $model);
     }
 
     public function tools(): iterable

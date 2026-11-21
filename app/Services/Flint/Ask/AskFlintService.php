@@ -5,13 +5,13 @@ namespace App\Services\Flint\Ask;
 use App\Ai\Agents\AskFlintAgent;
 use App\Models\Event;
 use App\Models\User;
-use App\Services\Flint\FlintLinkedEventCards;
 use App\Services\Ai\AiModel;
 use App\Services\Ai\AiTokenUsage;
 use App\Services\Ai\AiUsageContext;
 use App\Services\Ai\AiUsageRecorder;
 use App\Services\Ai\AiUsageReservation;
 use App\Services\Ai\Exceptions\AiDailyTokenCapExceeded;
+use App\Services\Flint\FlintLinkedEventCards;
 use App\Support\SparkAbility;
 use Generator;
 use Illuminate\Support\Facades\Auth;
@@ -60,6 +60,19 @@ class AskFlintService
         private AiUsageRecorder $usage,
     ) {}
 
+    /** The answer's opening sentence or two as plain text, for a list row. */
+    public static function preview(string $markdown): ?string
+    {
+        $text = preg_replace(
+            ['~\[([^\]]+)\]\([^)]*\)~', '~(?m)^\s{0,3}#{1,6}\s+~', '~(?m)^\s*(?:[-*+]|\d+[.)])\s+~', '~[*_`]{1,3}~', '~\s+~'],
+            ['$1', '', '', '', ' '],
+            $markdown,
+        );
+        $text = trim((string) $text);
+
+        return $text === '' ? null : Str::limit($text, 140);
+    }
+
     private static function activityLabel(string $tool): string
     {
         return match (true) {
@@ -70,6 +83,16 @@ class AskFlintService
             str_contains($tool, 'money') => 'Checking money',
             default => 'Looking things up',
         };
+    }
+
+    /** @return array<int, mixed> */
+    private static function storedSteps(mixed $steps): array
+    {
+        if (is_string($steps)) {
+            $steps = json_decode($steps, true);
+        }
+
+        return is_array($steps) ? $steps : [];
     }
 
     /**
@@ -177,6 +200,44 @@ class AskFlintService
     }
 
     /**
+     * One conversation's messages, oldest first within the page. The cursor
+     * pages backwards, towards the start of the thread.
+     *
+     * @return array{data: array<int, array<string, mixed>>, next_cursor: string|null, has_more: bool}
+     *
+     * @throws AskFlintConversationNotFound
+     */
+    public function messages(User $user, string $conversationId, int $limit = 30, ?string $cursor = null): array
+    {
+        $this->assertOwned($user, $conversationId);
+
+        if (! $this->store instanceof PaginatesConversations) {
+            return ['data' => [], 'next_cursor' => null, 'has_more' => false];
+        }
+
+        $page = $this->store->paginateConversationMessages($conversationId, $limit, 'cursor', $cursor);
+
+        return [
+            'data' => collect($page->items())
+                ->reverse()
+                ->map(fn (StoredMessage $message): array => $this->transcript->message($user, $message))
+                ->values()
+                ->all(),
+            'next_cursor' => $page->nextCursor()?->encode(),
+            'has_more' => $page->hasMorePages(),
+        ];
+    }
+
+    /** @throws AskFlintConversationNotFound */
+    public function forget(User $user, string $conversationId): void
+    {
+        $this->assertOwned($user, $conversationId);
+
+        ConversationMessage::query()->where('conversation_id', $conversationId)->delete();
+        Conversation::query()->whereKey($conversationId)->delete();
+    }
+
+    /**
      * @param  array<int, string>  $conversationIds
      * @return array<string, array{preview: string|null, domains: array<int, string>, change_count: int}>
      */
@@ -214,67 +275,6 @@ class AskFlintService
                 ->filter(fn (mixed $call): bool => is_array($call) && in_array($call['name'] ?? null, $writeTools, true) && ! ($call['failed'] ?? false))
                 ->count()),
         ])->all();
-    }
-
-    /** @return array<int, mixed> */
-    private static function storedSteps(mixed $steps): array
-    {
-        if (is_string($steps)) {
-            $steps = json_decode($steps, true);
-        }
-
-        return is_array($steps) ? $steps : [];
-    }
-
-    /** The answer's opening sentence or two as plain text, for a list row. */
-    public static function preview(string $markdown): ?string
-    {
-        $text = preg_replace(
-            ['~\[([^\]]+)\]\([^)]*\)~', '~(?m)^\s{0,3}#{1,6}\s+~', '~(?m)^\s*(?:[-*+]|\d+[.)])\s+~', '~[*_`]{1,3}~', '~\s+~'],
-            ['$1', '', '', '', ' '],
-            $markdown,
-        );
-        $text = trim((string) $text);
-
-        return $text === '' ? null : Str::limit($text, 140);
-    }
-
-    /**
-     * One conversation's messages, oldest first within the page. The cursor
-     * pages backwards, towards the start of the thread.
-     *
-     * @return array{data: array<int, array<string, mixed>>, next_cursor: string|null, has_more: bool}
-     *
-     * @throws AskFlintConversationNotFound
-     */
-    public function messages(User $user, string $conversationId, int $limit = 30, ?string $cursor = null): array
-    {
-        $this->assertOwned($user, $conversationId);
-
-        if (! $this->store instanceof PaginatesConversations) {
-            return ['data' => [], 'next_cursor' => null, 'has_more' => false];
-        }
-
-        $page = $this->store->paginateConversationMessages($conversationId, $limit, 'cursor', $cursor);
-
-        return [
-            'data' => collect($page->items())
-                ->reverse()
-                ->map(fn (StoredMessage $message): array => $this->transcript->message($user, $message))
-                ->values()
-                ->all(),
-            'next_cursor' => $page->nextCursor()?->encode(),
-            'has_more' => $page->hasMorePages(),
-        ];
-    }
-
-    /** @throws AskFlintConversationNotFound */
-    public function forget(User $user, string $conversationId): void
-    {
-        $this->assertOwned($user, $conversationId);
-
-        ConversationMessage::query()->where('conversation_id', $conversationId)->delete();
-        Conversation::query()->whereKey($conversationId)->delete();
     }
 
     /**

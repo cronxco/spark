@@ -26,6 +26,22 @@ class AskFlintReferences
     public function __construct(private EntityMutationService $entities) {}
 
     /**
+     * A reference shows the record's own title (design language 7.5): "F1:
+     * Grand Prix", not "Had event F1: Grand Prix".
+     */
+    public static function title(Event|EventObject|Block $entity): string
+    {
+        if ($entity instanceof Event) {
+            $title = trim((string) ($entity->target?->title ?? ''));
+            if ($title !== '') {
+                return Str::limit($title, 80);
+            }
+        }
+
+        return AskFlintChangeLog::label($entity);
+    }
+
+    /**
      * @return array{text: string, references: array<int, array{kind: string, id: string, title: string}>}
      */
     public function resolve(User $user, string $text): array
@@ -50,21 +66,5 @@ class AskFlintReferences
         }, $text);
 
         return ['text' => $text, 'references' => array_values(array_filter($references))];
-    }
-
-    /**
-     * A reference shows the record's own title (design language 7.5): "F1:
-     * Grand Prix", not "Had event F1: Grand Prix".
-     */
-    public static function title(Event|EventObject|Block $entity): string
-    {
-        if ($entity instanceof Event) {
-            $title = trim((string) ($entity->target?->title ?? ''));
-            if ($title !== '') {
-                return Str::limit($title, 80);
-            }
-        }
-
-        return AskFlintChangeLog::label($entity);
     }
 }
