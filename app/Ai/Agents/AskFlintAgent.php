@@ -5,8 +5,10 @@ namespace App\Ai\Agents;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
+use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
+use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 
 /**
@@ -14,9 +16,11 @@ use Laravel\Ai\Promptable;
  *
  * Reads go through Spark's MCP tools in-process; writes go through the Ask
  * Flint write tools, which apply a change at once and leave an Undo receipt.
- * The thread is remembered in laravel/ai's conversation store.
+ * The thread is remembered in laravel/ai's conversation store. On a
+ * reasoning model it asks for short reasoning summaries, which the app shows
+ * among the steps Flint took.
  */
-class AskFlintAgent implements Agent, Conversational, HasTools
+class AskFlintAgent implements Agent, Conversational, HasProviderOptions, HasTools
 {
     use Promptable;
     use RemembersConversations;
@@ -35,7 +39,13 @@ class AskFlintAgent implements Agent, Conversational, HasTools
         private string $timezone,
         private string $now,
         private bool $canWrite,
+        private ?string $model = null,
     ) {}
+
+    public static function isReasoningModel(?string $model): bool
+    {
+        return $model !== null && (bool) preg_match('/^(?:gpt-5(?:[.-].+)?|o(?:1|3|4)(?:[.-].+)?)$/i', $model);
+    }
 
     public function instructions(): string
     {
@@ -64,12 +74,37 @@ class AskFlintAgent implements Agent, Conversational, HasTools
             ## Answering
             - Use the tools for every fact. Never answer from memory about the user's data, and never invent a number, date or record. If the tools return nothing, say so.
             - Prefer the day summary and metric tools for "how was my..." questions, the filter tool for exact lists, and semantic search for fuzzy ones.
-            - Be brief and specific: lead with the answer, give the numbers, skip preamble. British English. Money in pounds unless the record says otherwise. Clock times from `local_time`.
+            - Be brief and specific: lead with the answer in one sentence, give the numbers, skip preamble. British English. Money in pounds unless the record says otherwise. Clock times from `local_time`, in 24-hour form (17:30). Dates like "Sun 22 Nov".
             - Do not give medical or financial advice; describe what the data shows.
-            - When you mention a specific record, link it once in Markdown using its id: `[title](/events/<id>)`, `[title](/objects/<id>)` or `[title](/blocks/<id>)`. Use only ids a tool returned.
+
+            ## Formatting
+            The app renders Markdown and shows a card under each paragraph or list item for the records it links.
+            - Three or more parallel items (days, payments, workouts) go in a bulleted list, one item per line, each starting with a short bold lead-in: `- **Sun 22** The [Las Vegas Grand Prix](/events/<id>) at 04:00.` Two items stay in a sentence.
+            - Use `###` headings only when an answer has three or more distinct sections. Otherwise no headings.
+            - Separate paragraphs with a blank line. Keep paragraphs to two or three sentences.
+            - When you mention a specific record, link the words that name it, inside the sentence, once: `[title](/events/<id>)`, `[title](/objects/<id>)` or `[title](/blocks/<id>)`. Use only ids a tool returned. Never add a list of links after a sentence, and never join items with `·` or `|`.
+            - No tables, no emoji, no closing offers of more help.
+
+            ## Follow-ups
+            After the answer, on new lines, write `<follow-ups>`, then up to two short questions the user is likely to ask next, one per line in their voice ("What about last week?"), then `</follow-ups>`. Only questions you could answer with your tools. Leave the block out after a change, a refusal, or a question back to the user. The app shows these as buttons, never as text.
 
             {$writing}
             TEXT;
+    }
+
+    /**
+     * Reasoning summaries on OpenAI's reasoning models, which reject the
+     * option otherwise.
+     *
+     * @return array<string, mixed>
+     */
+    public function providerOptions(Lab|string $provider): array
+    {
+        $isOpenAi = $provider === Lab::OpenAI || $provider === 'openai';
+
+        return $isOpenAi && self::isReasoningModel($this->model)
+            ? ['reasoning' => ['summary' => 'auto']]
+            : [];
     }
 
     public function tools(): iterable

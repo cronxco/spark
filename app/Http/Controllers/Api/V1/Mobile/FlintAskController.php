@@ -28,8 +28,9 @@ class FlintAskController extends Controller
      * Body: `message`, optional `conversation_id` to continue a thread,
      * `read_only` to ask without letting the turn change anything, and
      * `stream`. With `stream` (or `Accept: text/event-stream`) the answer is
-     * sent as server-sent events — `conversation`, `delta`, `activity`,
-     * `change`, then `done` or `error`. Otherwise the whole answer comes back
+     * sent as server-sent events — `conversation`, `delta`, `reasoning`,
+     * `step` (as each tool starts and finishes), `activity`, `change`, then
+     * `done` or `error`. Otherwise the whole answer comes back
      * as JSON, which is what a Siri intent with a short time budget wants.
      */
     public function store(AskFlintRequest $request): JsonResponse|StreamedResponse
@@ -78,18 +79,20 @@ class FlintAskController extends Controller
         }
     }
 
-    /** GET /api/v1/mobile/flint/ask/conversations?limit=&cursor= */
+    /** GET /api/v1/mobile/flint/ask/conversations?limit=&cursor=&q= */
     public function index(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
             'cursor' => ['nullable', 'string'],
+            'q' => ['nullable', 'string', 'max:200'],
         ]);
 
         return response()->json(['contract_version' => AskFlintTranscript::CONTRACT_VERSION] + $this->flint->conversations(
             $request->user(),
             (int) ($validated['limit'] ?? 20),
             $validated['cursor'] ?? null,
+            $validated['q'] ?? null,
         ));
     }
 

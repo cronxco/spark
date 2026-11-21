@@ -55,7 +55,7 @@ class FlintAskControllerTest extends TestCase
 
         $response = $this->postJson(self::ASK, ['message' => 'How did I sleep?'])
             ->assertOk()
-            ->assertJsonPath('contract_version', 1)
+            ->assertJsonPath('contract_version', 2)
             ->assertJsonPath('message.role', 'assistant')
             ->assertJsonPath('message.text', 'Your sleep score was 82.')
             ->assertJsonPath('message.changes', []);
@@ -140,7 +140,10 @@ class FlintAskControllerTest extends TestCase
             ->assertJsonPath('message.changes.0.kind', 'event')
             ->assertJsonPath('message.changes.0.id', $event->id)
             ->assertJsonPath('message.changes.0.undo.available', true)
-            ->assertJsonPath('message.changes.0.undo.undone', false);
+            ->assertJsonPath('message.changes.0.undo.undone', false)
+            ->assertJsonPath('message.steps.0.type', 'tool')
+            ->assertJsonPath('message.steps.0.label', 'Tagged an event')
+            ->assertJsonPath('message.steps.0.status', 'done');
 
         $this->assertSame(1, $event->fresh()->tags()->count());
 
@@ -153,7 +156,9 @@ class FlintAskControllerTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.1.changes.0.receipt_id', $receiptId)
             ->assertJsonPath('data.1.changes.0.undo.available', false)
-            ->assertJsonPath('data.1.changes.0.undo.undone', true);
+            ->assertJsonPath('data.1.changes.0.undo.undone', true)
+            ->assertJsonPath('data.1.steps.0.label', 'Tagged an event')
+            ->assertJsonPath('data.1.steps.0.status', 'done');
     }
 
     #[Test]
@@ -301,7 +306,75 @@ class FlintAskControllerTest extends TestCase
             ->assertJsonPath('message.text', "You spent at [Pret](/events/{$event->id}) and Costa.")
             ->assertJsonCount(1, 'message.references')
             ->assertJsonPath('message.references.0.kind', 'event')
-            ->assertJsonPath('message.references.0.id', $event->id);
+            ->assertJsonPath('message.references.0.id', $event->id)
+            ->assertJsonPath('message.references.0.title', 'Pret A Manger')
+            ->assertJsonCount(1, 'message.cards')
+            ->assertJsonPath('message.cards.0.event.id', $event->id)
+            ->assertJsonPath('message.cards.0.layout', 'payment');
+    }
+
+    #[Test]
+    public function follow_ups_are_lifted_out_of_the_answer_and_never_streamed_as_text(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $answer = "Your sleep score was 82.\n\n<follow-ups>\nWhat about last week?\nHow was my HRV?\n</follow-ups>";
+        AskFlintAgent::fake([$answer, $answer]);
+
+        $conversationId = $this->postJson(self::ASK, ['message' => 'How did I sleep?'])
+            ->assertOk()
+            ->assertJsonPath('message.text', 'Your sleep score was 82.')
+            ->assertJsonPath('message.follow_ups', ['What about last week?', 'How was my HRV?'])
+            ->json('conversation_id');
+
+        $this->getJson(self::ASK . "/conversations/{$conversationId}")
+            ->assertOk()
+            ->assertJsonPath('data.1.text', 'Your sleep score was 82.')
+            ->assertJsonPath('data.1.follow_ups', ['What about last week?', 'How was my HRV?']);
+
+        $body = $this->postJson(self::ASK, ['message' => 'How did I sleep?', 'stream' => true])->assertOk()->streamedContent();
+        $deltas = collect(explode("\n\n", $body))
+            ->filter(fn (string $frame): bool => str_starts_with($frame, 'event: delta'))
+            ->map(fn (string $frame): string => (string) json_decode(substr($frame, strpos($frame, 'data: ') + 6), true)['text'])
+            ->implode('');
+
+        $this->assertStringNotContainsString('follow-ups', $deltas);
+        $this->assertStringContainsString('Your sleep score was 82.', $deltas);
+        $this->assertStringContainsString('What about last week?', $body);
+    }
+
+    #[Test]
+    public function the_conversation_list_has_a_preview_and_can_be_searched(): void
+    {
+        Sanctum::actingAs($this->user, SparkAbility::MOBILE_SESSION);
+        $event = $this->event();
+        AskFlintAgent::fake([
+            new ToolCall('call-1', 'tag-event', ['event_id' => $event->id, 'name' => 'work lunch']),
+            "Tagged [Pret](/events/{$event->id}) as **work lunch**.",
+            'Your sleep score was 82.',
+        ]);
+
+        $this->postJson(self::ASK, ['message' => 'Tag my Pret lunch as work lunch'])->assertOk();
+        $this->postJson(self::ASK, ['message' => 'How did I sleep?'])->assertOk();
+
+        $list = collect($this->getJson(self::ASK . '/conversations')->assertOk()->assertJsonCount(2, 'data')->json('data'))
+            ->keyBy('title');
+
+        $this->assertSame('Tagged Pret as work lunch.', $list['Tag my Pret lunch as work lunch']['preview']);
+        $this->assertSame(1, $list['Tag my Pret lunch as work lunch']['change_count']);
+        $this->assertSame(['money'], $list['Tag my Pret lunch as work lunch']['domains']);
+        $this->assertSame('Your sleep score was 82.', $list['How did I sleep?']['preview']);
+        $this->assertSame(0, $list['How did I sleep?']['change_count']);
+        $this->assertSame([], $list['How did I sleep?']['domains']);
+
+        $this->getJson(self::ASK . '/conversations?q=sleep')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'How did I sleep?');
+
+        $this->getJson(self::ASK . '/conversations?q=' . urlencode('work lunch'))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Tag my Pret lunch as work lunch');
     }
 
     #[Test]
@@ -364,6 +437,7 @@ class FlintAskControllerTest extends TestCase
         return Event::factory()->create([
             'integration_id' => $this->integration->id,
             'service' => 'monzo',
+            'domain' => 'money',
             'action' => 'card_payment_to',
             'target_id' => $target->id,
             'time' => now()->subDay(),

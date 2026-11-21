@@ -3,6 +3,7 @@
 namespace App\Services\Flint\Ask;
 
 use App\Ai\Agents\AskFlintAgent;
+use App\Models\Event;
 use App\Models\User;
 use App\Services\Ai\AiModel;
 use App\Services\Ai\AiTokenUsage;
@@ -10,6 +11,7 @@ use App\Services\Ai\AiUsageContext;
 use App\Services\Ai\AiUsageRecorder;
 use App\Services\Ai\AiUsageReservation;
 use App\Services\Ai\Exceptions\AiDailyTokenCapExceeded;
+use App\Services\Flint\FlintLinkedEventCards;
 use App\Support\SparkAbility;
 use Generator;
 use Illuminate\Support\Facades\Auth;
@@ -21,6 +23,7 @@ use Laravel\Ai\Models\Conversation;
 use Laravel\Ai\Models\ConversationMessage;
 use Laravel\Ai\Responses\Data\Usage;
 use Laravel\Ai\Storage\StoredMessage;
+use Laravel\Ai\Streaming\Events\ReasoningDelta;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Ai\Streaming\Events\ToolResult;
@@ -57,6 +60,19 @@ class AskFlintService
         private AiUsageRecorder $usage,
     ) {}
 
+    /** The answer's opening sentence or two as plain text, for a list row. */
+    public static function preview(string $markdown): ?string
+    {
+        $text = preg_replace(
+            ['~\[([^\]]+)\]\([^)]*\)~', '~(?m)^\s{0,3}#{1,6}\s+~', '~(?m)^\s*(?:[-*+]|\d+[.)])\s+~', '~[*_`]{1,3}~', '~\s+~'],
+            ['$1', '', '', '', ' '],
+            $markdown,
+        );
+        $text = trim((string) $text);
+
+        return $text === '' ? null : Str::limit($text, 140);
+    }
+
     private static function activityLabel(string $tool): string
     {
         return match (true) {
@@ -67,6 +83,16 @@ class AskFlintService
             str_contains($tool, 'money') => 'Checking money',
             default => 'Looking things up',
         };
+    }
+
+    /** @return array<int, mixed> */
+    private static function storedSteps(mixed $steps): array
+    {
+        if (is_string($steps)) {
+            $steps = json_decode($steps, true);
+        }
+
+        return is_array($steps) ? $steps : [];
     }
 
     /**
@@ -96,9 +122,12 @@ class AskFlintService
             $this->settle($reservation, $response->usage);
             $succeeded = true;
 
+            $messageId = $response->assistantMessageId ?? null;
+            $conversation = $response->conversationId ?? $agent->currentConversation();
+
             return [
-                'conversation_id' => $response->conversationId ?? $agent->currentConversation(),
-                'message' => $this->transcript->fresh($user, $response->assistantMessageId ?? null, $response->text, $changes->all()),
+                'conversation_id' => $conversation,
+                'message' => $this->transcript->fresh($user, $messageId, $response->text, $changes->all(), $this->answerSteps($messageId, $conversation)),
             ];
         } catch (Throwable $exception) {
             $succeeded || $this->abandon($reservation);
@@ -132,24 +161,39 @@ class AskFlintService
     }
 
     /**
-     * The user's Ask Flint conversations, newest first.
+     * The user's Ask Flint conversations, newest first, each with the opening
+     * line of its latest answer, the domains of the events that answer links,
+     * and how many changes Flint made in it. `$search` matches the title and
+     * the text of any message.
      *
      * @return array{data: array<int, array<string, mixed>>, next_cursor: string|null, has_more: bool}
      */
-    public function conversations(User $user, int $limit = 20, ?string $cursor = null): array
+    public function conversations(User $user, int $limit = 20, ?string $cursor = null, ?string $search = null): array
     {
+        $askFlintMessages = fn () => ConversationMessage::query()->select('conversation_id')->where('agent', AskFlintAgent::class);
+        $search = $search !== null ? trim($search) : null;
+        $pattern = $search !== null && $search !== '' ? '%' . addcslashes($search, '%_\\') . '%' : null;
+
         $page = Conversation::query()
             ->where('participant_type', Conversation::participantType($user))
             ->where('participant_id', (string) Conversation::participantKey($user))
-            ->whereIn('id', ConversationMessage::query()->select('conversation_id')->where('agent', AskFlintAgent::class))
+            ->whereIn('id', $askFlintMessages())
+            ->when($pattern, fn ($query) => $query->where(fn ($query) => $query
+                ->where('title', 'ilike', $pattern)
+                ->orWhereIn('id', $askFlintMessages()->where('content', 'ilike', $pattern))))
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->cursorPaginate($limit, ['*'], 'cursor', $cursor);
+
+        $summaries = $this->summaries($user, collect($page->items())->pluck('id')->all());
 
         return [
             'data' => collect($page->items())->map(fn (Conversation $conversation): array => [
                 'id' => $conversation->id,
                 'title' => $conversation->title,
+                'preview' => $summaries[$conversation->id]['preview'] ?? null,
+                'domains' => $summaries[$conversation->id]['domains'] ?? [],
+                'change_count' => $summaries[$conversation->id]['change_count'] ?? 0,
                 'created_at' => $conversation->created_at?->toIso8601String(),
                 'updated_at' => $conversation->updated_at?->toIso8601String(),
             ])->all(),
@@ -197,6 +241,46 @@ class AskFlintService
     }
 
     /**
+     * @param  array<int, string>  $conversationIds
+     * @return array<string, array{preview: string|null, domains: array<int, string>, change_count: int}>
+     */
+    private function summaries(User $user, array $conversationIds): array
+    {
+        if ($conversationIds === []) {
+            return [];
+        }
+
+        $answers = ConversationMessage::query()
+            ->whereIn('conversation_id', $conversationIds)
+            ->where('agent', AskFlintAgent::class)
+            ->where('role', 'assistant')
+            ->orderBy('created_at')
+            ->get(['id', 'conversation_id', 'content', 'steps', 'created_at'])
+            ->groupBy('conversation_id');
+
+        $latest = $answers->map(fn ($messages) => AskFlintFollowUps::split((string) $messages->last()->content)['text']);
+
+        $linked = $latest->map(fn (string $text): array => FlintLinkedEventCards::linkedIds($text));
+        $domains = Event::query()
+            ->whereIn('id', $linked->flatten()->unique()->values())
+            ->whereIn('integration_id', $user->integrations()->pluck('id'))
+            ->with('integration')
+            ->get()
+            ->mapWithKeys(fn (Event $event): array => [strtolower($event->id) => $event->domain]);
+
+        $writeTools = AskFlintTools::writeToolNames();
+
+        return $answers->map(fn ($messages, string $id): array => [
+            'preview' => self::preview($latest[$id] ?? ''),
+            'domains' => collect($linked[$id] ?? [])->map(fn (string $eventId): ?string => $domains[$eventId] ?? null)->filter()->unique()->values()->all(),
+            'change_count' => $messages->sum(fn (ConversationMessage $message): int => collect(self::storedSteps($message->steps))
+                ->flatMap(fn (mixed $step): array => is_array($step) ? (array) ($step['tool_calls'] ?? []) : [])
+                ->filter(fn (mixed $call): bool => is_array($call) && in_array($call['name'] ?? null, $writeTools, true) && ! ($call['failed'] ?? false))
+                ->count()),
+        ])->all();
+    }
+
+    /**
      * A read-only turn is given no write tools, whatever the token allows:
      * it is how Siri asks, where no Undo can be shown.
      *
@@ -220,6 +304,7 @@ class AskFlintService
             timezone: $timezone,
             now: now($timezone)->format('l j F Y, H:i'),
             canWrite: $canWrite,
+            model: AiModel::Reasoning->model(),
         );
         $agent->continueOrStart($conversationId, $user);
 
@@ -248,6 +333,15 @@ class AskFlintService
             $stream = $agent->stream($message, provider: 'openai', model: $model, timeout: self::TIMEOUT_SECONDS);
             $announced = false;
             $sent = 0;
+            $began = hrtime(true);
+            /** @var array<string, array{step: array<string, mixed>, began: int}> $running */
+            $running = [];
+            /** @var array<int, array<string, mixed>> $steps */
+            $steps = [];
+            $durations = [];
+            $pending = '';
+            $heldBack = false;
+            $reasoning = null;
 
             foreach ($stream as $event) {
                 if (! $announced && ($id = $stream->conversationId ?? $agent->currentConversation()) !== null) {
@@ -256,10 +350,60 @@ class AskFlintService
                 }
 
                 if ($event instanceof TextDelta && $event->delta !== '') {
-                    yield ['delta', ['text' => $event->delta]];
+                    if ($reasoning !== null) {
+                        $steps[] = AskFlintSteps::reasoning($reasoning['id'], trim($reasoning['text']));
+                        $reasoning = null;
+                    }
+
+                    if ($heldBack) {
+                        continue;
+                    }
+
+                    $pending .= $event->delta;
+                    $sendable = AskFlintFollowUps::sendable($pending);
+                    if ($sendable > 0) {
+                        yield ['delta', ['text' => substr($pending, 0, $sendable)]];
+                        $pending = substr($pending, $sendable);
+                    }
+                    $heldBack = str_starts_with($pending, AskFlintFollowUps::OPEN);
+                } elseif ($event instanceof ReasoningDelta) {
+                    $delta = (string) ($event->delta ?? '');
+                    if ($delta === '') {
+                        continue;
+                    }
+                    $reasoning ??= ['id' => 'reasoning-' . count($steps), 'text' => ''];
+                    $reasoning['text'] .= $delta;
+                    yield ['reasoning', ['id' => $reasoning['id'], 'text' => $delta]];
                 } elseif ($event instanceof ToolCall) {
-                    yield ['activity', ['tool' => $event->toolCall->name, 'label' => self::activityLabel($event->toolCall->name)]];
+                    if ($reasoning !== null) {
+                        $steps[] = AskFlintSteps::reasoning($reasoning['id'], trim($reasoning['text']));
+                        $reasoning = null;
+                    }
+
+                    $call = $event->toolCall;
+                    $callId = (string) ($call->id ?? Str::uuid());
+                    $step = AskFlintSteps::started($callId, $call->name, is_array($call->arguments ?? null) ? $call->arguments : []);
+                    $running[$callId] = ['step' => $step, 'began' => hrtime(true)];
+
+                    yield ['activity', ['tool' => $call->name, 'label' => self::activityLabel($call->name)]];
+                    yield ['step', $step];
                 } elseif ($event instanceof ToolResult) {
+                    if ($event->preliminary ?? false) {
+                        continue;
+                    }
+
+                    $result = $event->toolResult;
+                    $callId = (string) ($result->id ?? '');
+                    $started = $running[$callId] ?? null;
+
+                    if ($started !== null) {
+                        unset($running[$callId]);
+                        $durations[$callId] = intdiv(hrtime(true) - $started['began'], 1_000_000);
+                        $step = AskFlintSteps::finished($started['step'], $result->result ?? null, $durations[$callId], (bool) ($result->failed ?? false));
+                        $steps[] = $step;
+                        yield ['step', $step];
+                    }
+
                     foreach (array_slice($changes->all(), $sent) as $change) {
                         $sent++;
                         yield ['change', $change];
@@ -267,12 +411,18 @@ class AskFlintService
                 }
             }
 
+            if (! $heldBack && $pending !== '') {
+                yield ['delta', ['text' => $pending]];
+            }
+
             $this->settle($reservation, $stream->usage);
             $succeeded = true;
+            $elapsedMs = intdiv(hrtime(true) - $began, 1_000_000);
+            $this->keepTimings($stream->assistantMessageId, $durations, $elapsedMs);
 
             yield ['done', [
                 'conversation_id' => $stream->conversationId ?? $agent->currentConversation(),
-                'message' => $this->transcript->fresh($user, $stream->assistantMessageId, (string) $stream->text, $changes->all()),
+                'message' => $this->transcript->fresh($user, $stream->assistantMessageId, (string) $stream->text, $changes->all(), $steps, $elapsedMs),
             ]];
         } catch (Throwable $exception) {
             report($exception);
@@ -282,6 +432,56 @@ class AskFlintService
             $succeeded || $this->abandon($reservation);
             finish_ai_agent_span($span, ['changes' => count($changes->all())], $succeeded);
             $previous ? $guard->setUser($previous) : $guard->forgetUser();
+        }
+    }
+
+    /**
+     * The steps the SDK stored with a finished answer, for a turn that was
+     * not streamed and so saw none of them as they ran. Without the answer's
+     * id, the conversation's latest answer is the one just written.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function answerSteps(?string $messageId, ?string $conversationId): array
+    {
+        $message = match (true) {
+            $messageId !== null => ConversationMessage::query()->whereKey($messageId)->first(),
+            $conversationId !== null => ConversationMessage::query()
+                ->where('conversation_id', $conversationId)
+                ->where('role', 'assistant')
+                ->latest()
+                ->first(),
+            default => null,
+        };
+
+        return $message === null ? [] : AskFlintSteps::fromStored(self::storedSteps($message->steps));
+    }
+
+    /**
+     * Keeps how long each step and the whole turn took on the stored answer,
+     * so a reopened conversation shows the same trace. The SDK stores the
+     * steps themselves; it has no timings.
+     *
+     * @param  array<string, int>  $durations  milliseconds by tool call id
+     */
+    private function keepTimings(?string $messageId, array $durations, int $elapsedMs): void
+    {
+        if ($messageId === null) {
+            return;
+        }
+
+        try {
+            $message = ConversationMessage::query()->whereKey($messageId)->first();
+            if ($message === null) {
+                return;
+            }
+
+            $stored = $message->meta;
+            $meta = is_string($stored) ? (json_decode($stored, true) ?: []) : (is_array($stored) ? $stored : []);
+            $meta[AskFlintTranscript::META_KEY] = ['elapsed_ms' => $elapsedMs, 'steps' => $durations];
+            $message->forceFill(['meta' => is_string($stored) || $stored === null ? json_encode($meta) : $meta])->save();
+        } catch (Throwable $exception) {
+            report($exception);
         }
     }
 

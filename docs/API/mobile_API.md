@@ -1804,13 +1804,13 @@ Without `stream`, the whole answer comes back as JSON:
 
 ```json
 {
-    "contract_version": 1,
+    "contract_version": 2,
     "conversation_id": "01a1ca8b-9e5e-7239-b47a-ecb00947ad5c",
     "message": {
         "id": "01a1ca8b-9e6b-72bc-9c24-660bfdf94d97",
         "role": "assistant",
         "text": "Tagged [Card payment to Pret A Manger](/events/9b1d…) as work lunch.",
-        "references": [{ "kind": "event", "id": "9b1d…", "title": "Card payment to Pret A Manger" }],
+        "references": [{ "kind": "event", "id": "9b1d…", "title": "Pret A Manger" }],
         "changes": [
             {
                 "receipt_id": "c2f0…",
@@ -1822,11 +1822,48 @@ Without `stream`, the whole answer comes back as JSON:
                 "undo": { "available": true, "expires_at": "2026-11-11T12:33:30+00:00", "undone": false }
             }
         ],
+        "steps": [
+            {
+                "id": "call_1",
+                "type": "tool",
+                "tool": "tag-event",
+                "glyph": "tag",
+                "label": "Tagged an event",
+                "detail": null,
+                "status": "done",
+                "result": "Tagged work lunch",
+                "records": [{ "kind": "event", "id": "9b1d…", "title": "Card payment to Pret A Manger" }],
+                "duration_ms": 412
+            }
+        ],
+        "cards": [{ "kind": "monzo.card_payment_to", "layout": "payment", "event": { "id": "9b1d…" }, "details": {} }],
+        "follow_ups": [],
+        "elapsed_ms": 3810,
         "status": "completed",
         "created_at": "2026-11-11T12:18:30+00:00"
     }
 }
 ```
+
+**Contract 2** added `steps`, `cards`, `follow_ups` and `elapsed_ms` to every
+message (empty, or null, on a user's message) and the `reasoning` and `step`
+stream events. A contract 1 client ignores them.
+
+- `steps` are what Flint did, in order, in the reader's words. A `tool` step
+  has a `label` ("Searched events for “flight”"), a `detail` saying what it
+  covered ("Sun 22 Nov to Sat 28 Nov"), a `result` line ("1 match", "Nothing
+  found"), up to three `records` it found as references, a `glyph` (a Font
+  Awesome name), `status` (`running`, `done` or `failed`) and `duration_ms`
+  when it was timed. A `reasoning` step carries the model's reasoning summary
+  in `detail` (only on reasoning models). Raw arguments and results are never
+  sent. Steps come from the tool calls laravel/ai stores with each message, so
+  conversations from before contract 2 have them too, without timings.
+- `cards` are the Up to Speed event cards (same shape as `linked_events`) for
+  the events the text links, in the order first mentioned. A calendar entry
+  gets one even without a value.
+- `follow_ups` are up to two suggested next questions. Flint writes them in a
+  `<follow-ups>` block at the end of its answer; the block is never sent as
+  `delta` text and is removed from `text`.
 
 With `stream: true` (or `Accept: text/event-stream`) the answer is sent as
 server-sent events, each carrying `contract_version`:
@@ -1835,7 +1872,9 @@ server-sent events, each carrying `contract_version`:
 | -------------- | --------------------------------- | -------------------------------------------- |
 | `conversation` | `conversation_id`                 | Once, as soon as the thread has an id        |
 | `delta`        | `text`                            | Each piece of the answer as it is written    |
-| `activity`     | `tool`, `label`                   | A tool starts ("Searching Spark")            |
+| `reasoning`    | `id`, `text`                      | A piece of the model's reasoning summary     |
+| `activity`     | `tool`, `label`                   | A tool starts ("Searching Spark"); kept for contract 1 clients |
+| `step`         | A step, as in `message.steps`     | A tool starts (`running`), then again when it finishes, same `id` |
 | `change`       | A change, as in `message.changes` | A change has been applied                    |
 | `done`         | `conversation_id`, `message`      | The finished message; replaces the deltas    |
 | `error`        | `message`                         | The turn failed after the stream had started |
@@ -1856,8 +1895,11 @@ five changes.
 validation; `429` with `code: daily_allowance_reached` when the daily AI
 allowance is spent; `503` with `code: flint_unavailable`.
 
-**`GET /flint/ask/conversations`** — `limit` (1–50, default 20), `cursor`.
-Items carry `id`, `title`, `created_at`, `updated_at`.
+**`GET /flint/ask/conversations`** — `limit` (1–50, default 20), `cursor`,
+`q` (optional; matches the title or any message's text). Items carry `id`,
+`title`, `preview` (the opening of the latest answer as plain text, up to 140
+characters), `domains` (of the events that answer links), `change_count` (all
+the changes Flint made in the thread), `created_at`, `updated_at`.
 
 **`GET /flint/ask/conversations/{id}`** — `limit` (1–100, default 30),
 `cursor`. Returns the newest messages, oldest first within the page; the cursor
