@@ -28,8 +28,8 @@ use Spatie\Activitylog\Models\Activity;
  *
  * Each card names its `layout` (see FlintEventCardDetails): daily metrics keep
  * the compact metric card and its comparison with the reader's baseline;
- * flights, calendar entries, payments and articles get a card that says what
- * they are, with no baseline line, since a one-off event has no usual. When
+ * flights, calendar entries, payments, articles and Flint's own digests get a
+ * card that says what they are, with no baseline line, since a one-off event has no usual. When
  * the reader has answered a question in the same digest that links the event,
  * the card carries that `answer`.
  */
