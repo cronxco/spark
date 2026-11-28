@@ -32,7 +32,7 @@
         "@semantic-release/exec": "7.1.0",
         "@sentry/browser": "10.78.0",
         "@sentry/vite-plugin": "4.9.1",
-        "@tailwindcss/vite": "4.3.3",
+        "@tailwindcss/vite": "4.3.5",
         "chokidar": "5.0.0",
         "daisyui": "5.7.50",
         "husky": "9.1.7",
@@ -40,7 +40,7 @@
         "prettier": "3.9.10",
         "semantic-release": "25.0.9",
         "semantic-release-gitmoji": "1.6.9",
-        "tailwindcss": "4.3.3"
+        "tailwindcss": "4.3.5"
     },
     "lint-staged": {
         "**/*": "prettier --write --ignore-unknown"
